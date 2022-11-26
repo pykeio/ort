@@ -1,0 +1,40 @@
+name: Run cargo tests
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - '.github/workflows/test.yml'
+      - 'src/**/*.rs'
+      - 'build.rs'
+      - 'Cargo.toml'
+      - '.cargo/**/*'
+      - 'tests/**/*'
+  pull_request:
+    paths:
+      - '.github/workflows/test.yml'
+      - 'src/**/*.rs'
+      - 'build.rs'
+      - 'Cargo.toml'
+      - '.cargo/**/*'
+      - 'tests/**/*'
+env:
+  RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install stable Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v1
+      - name: Run tests
+        # do not run doctests until rust-lang/cargo#10469 is merged
+        run: |
+          cargo test --verbose --lib

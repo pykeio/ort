@@ -1,0 +1,81 @@
+name: Code Quality
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - '.github/workflows/code-quality.yml'
+      - 'src/**/*.rs'
+      - 'build.rs'
+      - 'Cargo.toml'
+      - '.cargo/**/*'
+      - 'tests/**/*'
+  pull_request:
+    paths:
+      - '.github/workflows/code-quality.yml'
+      - 'src/**/*.rs'
+      - 'build.rs'
+      - 'Cargo.toml'
+      - '.cargo/**/*'
+      - 'tests/**/*'
+env:
+  RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
+jobs:
+  lint-and-fmt:
+    name: Lint & format
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly # required for some rustfmt/clippy features
+          override: true
+          components: rustfmt, clippy
+      - name: Check fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+      - name: Run clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --all-targets
+  coverage:
+    name: Code coverage
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Get Rust version
+        id: rust-version
+        run: echo "::set-output name=version::$(cargo --version | cut -d ' ' -f 2)"
+        shell: bash
+      - uses: actions/cache@v2
+        id: tarpaulin-cache
+        with:
+          path: ~/.cargo/bin/cargo-tarpaulin
+          key: ${{ runner.os }}-cargo-${{ steps.rustc-version.outputs.version }}
+      - name: Install tarpaulin
+        if: steps.tarpaulin-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-tarpaulin
+      - name: Generate code coverage
+        run: |
+          cargo tarpaulin --verbose --timeout 120 --out Xml
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v2
+        with:
+          fail_ci_if_error: true

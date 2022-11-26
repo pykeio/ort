@@ -1,0 +1,11 @@
+{
+	"rust-analyzer.checkOnSave.command": "clippy",
+	"rust-analyzer.rustfmt.extraArgs": [ "+nightly" ],
+	"[rust]": {
+		"editor.formatOnSave": true,
+		"editor.defaultFormatter": "rust-lang.rust-analyzer",
+		"editor.semanticHighlighting.enabled": true
+	},
+	"rust-analyzer.cachePriming.enable": true,
+	"rust-analyzer.diagnostics.experimental.enable": true
+}

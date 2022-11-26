@@ -168,7 +168,7 @@ pub const ETIMEDOUT: u32 = 138;
 pub const ETXTBSY: u32 = 139;
 pub const EWOULDBLOCK: u32 = 140;
 pub const _NLSCMPERROR: u32 = 2147483647;
-pub const ORT_API_VERSION: u32 = 12;
+pub const ORT_API_VERSION: u32 = 13;
 pub const __SAL_H_FULL_VER: u32 = 140050727;
 pub const __SPECSTRINGS_STRICT_LEVEL: u32 = 1;
 pub const __drv_typeConst: u32 = 0;
@@ -2058,6 +2058,11 @@ pub struct OrtCUDAProviderOptionsV2 {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct OrtCANNProviderOptions {
+	_unused: [u8; 0]
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct OrtOp {
 	_unused: [u8; 0]
 }
@@ -2455,7 +2460,7 @@ fn bindgen_test_layout_OrtMIGraphXProviderOptions() {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct OrtOpenVINOProviderOptions {
-	#[doc = " \\brief Device type string\n\n Valid settings are one of: \"CPU_FP32\", \"GPU_FP32\", \"GPU_FP16\", \"MYRIAD_FP16\", \"VAD-M_FP16\" or \"VAD-F_FP32\""]
+	#[doc = " \\brief Device type string\n\n Valid settings are one of: \"CPU_FP32\", \"CPU_FP16\", \"GPU_FP32\", \"GPU_FP16\", \"MYRIAD_FP16\", \"VAD-M_FP16\" or \"VAD-F_FP32\""]
 	pub device_type: *const ::std::os::raw::c_char,
 	#[doc = "< 0 = disabled, nonzero = enabled"]
 	pub enable_vpu_fast_compile: ::std::os::raw::c_uchar,
@@ -2522,6 +2527,11 @@ fn bindgen_test_layout_OrtOpenVINOProviderOptions() {
 		57usize,
 		concat!("Offset of field: ", stringify!(OrtOpenVINOProviderOptions), "::", stringify!(enable_dynamic_shapes))
 	);
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OrtTrainingApi {
+	_unused: [u8; 0]
 }
 #[doc = " \\brief The helper interface to get the right version of OrtApi\n\n Get a pointer to this structure through ::OrtGetApiBase"]
 #[repr(C)]
@@ -3238,13 +3248,30 @@ pub struct OrtApi {
 		) -> OrtStatusPtr
 	>,
 	pub CopyKernelInfo: ::std::option::Option<unsafe extern "C" fn(info: *const OrtKernelInfo, info_copy: *mut *mut OrtKernelInfo) -> OrtStatusPtr>,
-	pub ReleaseKernelInfo: ::std::option::Option<unsafe extern "C" fn(input: *mut OrtKernelInfo)>
+	pub ReleaseKernelInfo: ::std::option::Option<unsafe extern "C" fn(input: *mut OrtKernelInfo)>,
+	pub GetTrainingApi: ::std::option::Option<unsafe extern "C" fn(version: u32) -> *const OrtTrainingApi>,
+	pub SessionOptionsAppendExecutionProvider_CANN:
+		::std::option::Option<unsafe extern "C" fn(options: *mut OrtSessionOptions, cann_options: *const OrtCANNProviderOptions) -> OrtStatusPtr>,
+	pub CreateCANNProviderOptions: ::std::option::Option<unsafe extern "C" fn(out: *mut *mut OrtCANNProviderOptions) -> OrtStatusPtr>,
+	pub UpdateCANNProviderOptions: ::std::option::Option<
+		unsafe extern "C" fn(
+			cann_options: *mut OrtCANNProviderOptions,
+			provider_options_keys: *const *const ::std::os::raw::c_char,
+			provider_options_values: *const *const ::std::os::raw::c_char,
+			num_keys: size_t
+		) -> OrtStatusPtr
+	>,
+	pub GetCANNProviderOptionsAsString: ::std::option::Option<
+		unsafe extern "C" fn(cann_options: *const OrtCANNProviderOptions, allocator: *mut OrtAllocator, ptr: *mut *mut ::std::os::raw::c_char) -> OrtStatusPtr
+	>,
+	#[doc = " \\brief Release an OrtCANNProviderOptions\n\n \\param[in] the pointer of OrtCANNProviderOptions which will been deleted\n\n \\since Version 1.13."]
+	pub ReleaseCANNProviderOptions: ::std::option::Option<unsafe extern "C" fn(input: *mut OrtCANNProviderOptions)>
 }
 #[test]
 fn bindgen_test_layout_OrtApi() {
 	const UNINIT: ::std::mem::MaybeUninit<OrtApi> = ::std::mem::MaybeUninit::uninit();
 	let ptr = UNINIT.as_ptr();
-	assert_eq!(::std::mem::size_of::<OrtApi>(), 1752usize, concat!("Size of: ", stringify!(OrtApi)));
+	assert_eq!(::std::mem::size_of::<OrtApi>(), 1800usize, concat!("Size of: ", stringify!(OrtApi)));
 	assert_eq!(::std::mem::align_of::<OrtApi>(), 8usize, concat!("Alignment of ", stringify!(OrtApi)));
 	assert_eq!(
 		unsafe { ::std::ptr::addr_of!((*ptr).CreateStatus) as usize - ptr as usize },
@@ -4340,6 +4367,36 @@ fn bindgen_test_layout_OrtApi() {
 		unsafe { ::std::ptr::addr_of!((*ptr).ReleaseKernelInfo) as usize - ptr as usize },
 		1744usize,
 		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(ReleaseKernelInfo))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).GetTrainingApi) as usize - ptr as usize },
+		1752usize,
+		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(GetTrainingApi))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).SessionOptionsAppendExecutionProvider_CANN) as usize - ptr as usize },
+		1760usize,
+		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(SessionOptionsAppendExecutionProvider_CANN))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).CreateCANNProviderOptions) as usize - ptr as usize },
+		1768usize,
+		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(CreateCANNProviderOptions))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).UpdateCANNProviderOptions) as usize - ptr as usize },
+		1776usize,
+		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(UpdateCANNProviderOptions))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).GetCANNProviderOptionsAsString) as usize - ptr as usize },
+		1784usize,
+		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(GetCANNProviderOptionsAsString))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).ReleaseCANNProviderOptions) as usize - ptr as usize },
+		1792usize,
+		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(ReleaseCANNProviderOptions))
 	);
 }
 pub const OrtCustomOpInputOutputCharacteristic_INPUT_OUTPUT_REQUIRED: OrtCustomOpInputOutputCharacteristic = 0;

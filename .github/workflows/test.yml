@@ -1,5 +1,6 @@
 name: Run cargo tests
 on:
+  workflow_dispatch:
   push:
     branches:
       - 'main'

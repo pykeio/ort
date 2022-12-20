@@ -25,7 +25,6 @@ features = [ "half", "fetch-models", "copy-dylibs", "disable-build-script" ]
 
 [features]
 default = [ "half", "fetch-models", "copy-dylibs" ]
-use-half-intrinsics = [ "half/use-intrinsics" ]
 # used to prevent issues with docs.rs
 disable-build-script = []
 
@@ -38,7 +37,6 @@ prefer-compile-strategy = []
 prefer-system-strategy = []
 prefer-dynamic-libs = []
 minimal-build = []
-training = []
 experimental = []
 mimalloc = []
 compile-static = []

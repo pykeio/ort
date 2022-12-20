@@ -56,7 +56,7 @@ impl FromStr for Architecture {
 			"x86_64" => Ok(Architecture::X86_64),
 			"arm" => Ok(Architecture::Arm),
 			"aarch64" => Ok(Architecture::Arm64),
-			_ => Err(format!("Unsupported architecture: {}", s))
+			_ => Err(format!("Unsupported architecture: {s}"))
 		}
 	}
 }
@@ -98,7 +98,7 @@ impl FromStr for Os {
 			"windows" => Ok(Os::Windows),
 			"linux" => Ok(Os::Linux),
 			"macos" => Ok(Os::MacOS),
-			_ => Err(format!("Unsupported OS: {}", s))
+			_ => Err(format!("Unsupported OS: {s}"))
 		}
 	}
 }
@@ -175,7 +175,7 @@ fn prebuilt_onnx_url() -> (PathBuf, String) {
 	};
 
 	let prebuilt_archive = format!("onnxruntime-{}-{}.{}", triplet.as_onnx_str(), ORT_VERSION, triplet.os.archive_extension());
-	let prebuilt_url = format!("{}/v{}/{}", ORT_RELEASE_BASE_URL, ORT_VERSION, prebuilt_archive);
+	let prebuilt_url = format!("{ORT_RELEASE_BASE_URL}/v{ORT_VERSION}/{prebuilt_archive}");
 
 	(PathBuf::from(prebuilt_archive), prebuilt_url)
 }
@@ -198,8 +198,8 @@ fn prebuilt_protoc_url() -> (PathBuf, String) {
 		format!("linux-{}", if cfg!(target_arch = "x86_64") { "x86_64" } else { "x86_32" })
 	};
 
-	let prebuilt_archive = format!("protoc-{}-{}.zip", PROTOBUF_VERSION, host_platform);
-	let prebuilt_url = format!("{}/v{}/{}", PROTOBUF_RELEASE_BASE_URL, PROTOBUF_VERSION, prebuilt_archive);
+	let prebuilt_archive = format!("protoc-{PROTOBUF_VERSION}-{host_platform}.zip");
+	let prebuilt_url = format!("{PROTOBUF_RELEASE_BASE_URL}/v{PROTOBUF_VERSION}/{prebuilt_archive}");
 
 	(PathBuf::from(prebuilt_archive), prebuilt_url)
 }
@@ -211,7 +211,7 @@ where
 	let resp = ureq::get(source_url)
 		.timeout(std::time::Duration::from_secs(300))
 		.call()
-		.unwrap_or_else(|err| panic!("ERROR: Failed to download {}: {:?}", source_url, err));
+		.unwrap_or_else(|err| panic!("[ort] failed to download {source_url}: {err:?}"));
 
 	let len = resp.header("Content-Length").and_then(|s| s.parse::<usize>().ok()).unwrap();
 	let mut reader = resp.into_reader();
@@ -302,7 +302,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 	} else if target_arch.eq_ignore_ascii_case("x86_64") {
 		incompatible_providers![vitis_ai, acl, armnn];
 	} else {
-		panic!("unsupported target architecture: {}", target_arch);
+		panic!("unsupported target architecture: {target_arch}");
 	}
 
 	if target.contains("macos") {
@@ -364,7 +364,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 
 			let target = env::var("TARGET").unwrap();
 			if target.contains("macos") && !cfg!(target_os = "darwin") && env::var(ORT_ENV_CMAKE_PROGRAM).is_err() {
-				panic!("[ort] cross-compiling for macOS with the `compile` strategy requires `{}` to be set", ORT_ENV_CMAKE_PROGRAM);
+				panic!("[ort] cross-compiling for macOS with the `compile` strategy requires `{ORT_ENV_CMAKE_PROGRAM}` to be set");
 			}
 
 			let cmake = env::var(ORT_ENV_CMAKE_PROGRAM).unwrap_or_else(|_| "cmake".to_string());
@@ -380,7 +380,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 			let required_cmds: &[&str] = &[&cmake, "python", "git"];
 			for cmd in required_cmds {
 				if Command::new(cmd).output().is_err() {
-					panic!("[ort] compile strategy requires `{}` to be installed", cmd);
+					panic!("[ort] compile strategy requires `{cmd}` to be installed");
 				}
 			}
 
@@ -393,7 +393,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					"1",
 					"--single-branch",
 					"--branch",
-					&format!("v{}", ORT_VERSION),
+					&format!("v{ORT_VERSION}"),
 					"--shallow-submodules",
 					"--recursive",
 					ORT_GIT_REPO,
@@ -522,13 +522,13 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 			let lib_dir = if cfg!(target_os = "windows") { lib_dir.join(config) } else { lib_dir };
 			for lib in &["common", "flatbuffers", "framework", "graph", "mlas", "optimizer", "providers", "session", "util"] {
 				let lib_path = lib_dir.join(if cfg!(target_os = "windows") {
-					format!("onnxruntime_{}.lib", lib)
+					format!("onnxruntime_{lib}.lib")
 				} else {
-					format!("libonnxruntime_{}.a", lib)
+					format!("libonnxruntime_{lib}.a")
 				});
 				// sanity check, just make sure the library exists before we try to link to it
 				if lib_path.exists() {
-					println!("cargo:rustc-link-lib=static=onnxruntime_{}", lib);
+					println!("cargo:rustc-link-lib=static=onnxruntime_{lib}");
 				} else {
 					panic!("[ort] unable to find ONNX Runtime library: {}", lib_path.display());
 				}
@@ -585,7 +585,7 @@ fn generate_bindings(include_dir: &Path) {
 		.join(env::var("CARGO_CFG_TARGET_OS").unwrap())
 		.join(env::var("CARGO_CFG_TARGET_ARCH").unwrap())
 		.join("bindings.rs");
-	println!("cargo:rerun-if-changed={:?}", generated_file);
+	println!("cargo:rerun-if-changed={generated_file:?}");
 	fs::create_dir_all(generated_file.parent().unwrap()).unwrap();
 	bindings.write_to_file(&generated_file).expect("Couldn't write bindings!");
 }

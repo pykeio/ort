@@ -313,6 +313,8 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 		incompatible_providers![coreml, vitis_ai, directml, winml];
 	}
 
+	println!("cargo:rerun-if-env-changed={}", ORT_ENV_STRATEGY);
+
 	match strategy
 		.as_ref()
 		.map(String::as_str)

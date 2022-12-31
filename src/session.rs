@@ -463,7 +463,7 @@ impl Session {
 	///
 	/// Note that ONNX models can have multiple inputs; a `Vec<_>` is thus
 	/// used for the input data here.
-	pub fn run<'s, 'm>(&'s mut self, input_arrays: impl AsRef<[InputTensor]>) -> OrtResult<Vec<DynOrtTensor<'m, IxDyn>>>
+	pub fn run<'s, 'm>(&'s self, input_arrays: impl AsRef<[InputTensor]>) -> OrtResult<Vec<DynOrtTensor<'m, IxDyn>>>
 	where
 		's: 'm // 's outlives 'm (session outlives memory info)
 	{
@@ -546,7 +546,7 @@ impl Session {
 		outputs
 	}
 
-	fn validate_input_shapes(&mut self, input_arrays: impl AsRef<[InputTensor]>) -> OrtResult<()> {
+	fn validate_input_shapes(&self, input_arrays: impl AsRef<[InputTensor]>) -> OrtResult<()> {
 		// ******************************************************************
 		// FIXME: Properly handle errors here
 		// Make sure all dimensions match (except dynamic ones)

@@ -22,7 +22,7 @@ fn main() -> OrtResult<()> {
 			.build()?
 	);
 
-	let mut session = SessionBuilder::new(&environment)?
+	let session = SessionBuilder::new(&environment)?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
 		.with_model_downloaded(MachineComprehension::GPT2(GPT2::GPT2LmHead))?;

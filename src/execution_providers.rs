@@ -8,6 +8,8 @@ extern "C" {
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CPU(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr;
 	#[cfg(feature = "acl")]
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr;
+	#[cfg(feature = "onednn")]
+	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_Dnnl(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr;
 }
 
 #[derive(Debug, Clone)]
@@ -68,6 +70,8 @@ impl ExecutionProvider {
 
 	ep_providers! {
 		acl = "AclExecutionProvider",
+		dnnl = "DnnlExecutionProvider",
+		onednn = "DnnlExecutionProvider",
 		cuda = "CUDAExecutionProvider",
 		tensorrt = "TensorRTExecutionProvider",
 		cpu = "CPUExecutionProvider"
@@ -95,7 +99,9 @@ impl ExecutionProvider {
 	ep_if_available! {
 		tensorrt_if_available(tensorrt): "TensorRT",
 		cuda_if_available(cuda): "CUDA",
-		acl_if_available(acl): "ACL"
+		acl_if_available(acl): "ACL",
+		dnnl_if_available(dnnl): "oneDNN",
+		onednn_if_available(dnnl): "oneDNN"
 	}
 
 	/// Configure this execution provider with the given option.
@@ -114,14 +120,6 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 	for ep in execution_providers.as_ref() {
 		let init_args = ep.options.clone();
 		match ep.provider.as_str() {
-			#[cfg(feature = "acl")]
-			"AclExecutionProvider" => {
-				let use_arena = init_args.get("use_arena").map(|s| s.parse::<bool>().unwrap_or(false)).unwrap_or(false);
-				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_ACL(options, use_arena.into()) };
-				if status_to_result(status).is_ok() {
-					return; // EP found
-				}
-			}
 			"CPUExecutionProvider" => {
 				let use_arena = init_args.get("use_arena").map(|s| s.parse::<bool>().unwrap_or(false)).unwrap_or(false);
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_CPU(options, use_arena.into()) };
@@ -169,6 +167,22 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 				}
 				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_TensorRT_V2(options, tensorrt_options)];
 				ortsys![unsafe ReleaseTensorRTProviderOptions(tensorrt_options)];
+				if status_to_result(status).is_ok() {
+					return; // EP found
+				}
+			}
+			#[cfg(feature = "acl")]
+			"AclExecutionProvider" => {
+				let use_arena = init_args.get("use_arena").map(|s| s.parse::<bool>().unwrap_or(false)).unwrap_or(false);
+				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_ACL(options, use_arena.into()) };
+				if status_to_result(status).is_ok() {
+					return; // EP found
+				}
+			}
+			#[cfg(feature = "onednn")]
+			"DnnlExecutionProvider" => {
+				let use_arena = init_args.get("use_arena").map(|s| s.parse::<bool>().unwrap_or(false)).unwrap_or(false);
+				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_Dnnl(options, use_arena.into()) };
 				if status_to_result(status).is_ok() {
 					return; // EP found
 				}

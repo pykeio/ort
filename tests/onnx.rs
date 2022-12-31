@@ -33,7 +33,7 @@ mod download {
 				.build()?
 		);
 
-		let mut session = SessionBuilder::new(&environment)?
+		let session = SessionBuilder::new(&environment)?
 			.with_optimization_level(GraphOptimizationLevel::Level1)?
 			.with_intra_threads(1)?
 			.with_model_downloaded(ImageClassification::SqueezeNet)
@@ -113,7 +113,7 @@ mod download {
 				.build()?
 		);
 
-		let mut session = SessionBuilder::new(&environment)?
+		let session = SessionBuilder::new(&environment)?
 			.with_optimization_level(GraphOptimizationLevel::Level1)?
 			.with_intra_threads(1)?
 			.with_model_downloaded(DomainBasedImageClassification::Mnist)
@@ -192,7 +192,7 @@ mod download {
 				.build()?
 		);
 
-		let mut session = SessionBuilder::new(&environment)?
+		let session = SessionBuilder::new(&environment)?
 			.with_optimization_level(GraphOptimizationLevel::Level1)?
 			.with_intra_threads(1)?
 			.with_model_from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("upsample.onnx"))

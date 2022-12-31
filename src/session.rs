@@ -617,6 +617,10 @@ impl Session {
 	}
 }
 
+// https://github.com/microsoft/onnxruntime/issues/114
+unsafe impl Send for Session {}
+unsafe impl Sync for Session {}
+
 unsafe fn get_tensor_dimensions(tensor_info_ptr: *const sys::OrtTensorTypeAndShapeInfo) -> OrtResult<Vec<i64>> {
 	let mut num_dims = 0;
 	ortsys![GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> OrtError::GetDimensionsCount];

@@ -1,6 +1,8 @@
 #![allow(unused_imports)]
 
 use std::{collections::HashMap, ffi::CString, os::raw::c_char};
+use tracing::info;
+use crate::{error, OrtApiError};
 
 use super::{error::status_to_result, ortsys, sys};
 
@@ -117,20 +119,25 @@ impl ExecutionProvider {
 }
 
 pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, execution_providers: impl AsRef<[ExecutionProvider]>) {
+	fn status_to_result(provider: &str, status: *mut sys::OrtStatus) -> std::result::Result<(), OrtApiError> {
+		let status_res = error::status_to_result(status);
+		println!("{:?} status: {:?}", provider, status_res);
+		status_res
+	}
 	for ep in execution_providers.as_ref() {
 		let init_args = ep.options.clone();
 		match ep.provider.as_str() {
 			"CPUExecutionProvider" => {
 				let use_arena = init_args.get("use_arena").map(|s| s.parse::<bool>().unwrap_or(false)).unwrap_or(false);
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_CPU(options, use_arena.into()) };
-				if status_to_result(status).is_ok() {
+				if status_to_result(&ep.provider, status).is_ok() {
 					return; // EP found
 				}
 			}
 			#[cfg(feature = "cuda")]
 			"CUDAExecutionProvider" => {
 				let mut cuda_options: *mut sys::OrtCUDAProviderOptionsV2 = std::ptr::null_mut();
-				if status_to_result(ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)]).is_err() {
+				if status_to_result(&ep.provider, ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)]).is_err() {
 					continue; // next EP
 				}
 				let keys: Vec<CString> = init_args.keys().map(|k| CString::new(k.as_str()).unwrap()).collect();
@@ -139,20 +146,20 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 				let key_ptrs: Vec<*const c_char> = keys.iter().map(|k| k.as_ptr()).collect();
 				let value_ptrs: Vec<*const c_char> = values.iter().map(|v| v.as_ptr()).collect();
 				let status = ortsys![unsafe UpdateCUDAProviderOptions(cuda_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), keys.len())];
-				if status_to_result(status).is_err() {
+				if status_to_result(&ep.provider, status).is_err() {
 					ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
 					continue; // next EP
 				}
 				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(options, cuda_options)];
 				ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
-				if status_to_result(status).is_ok() {
+				if status_to_result(&ep.provider, status).is_ok() {
 					return; // EP found
 				}
 			}
 			#[cfg(feature = "tensorrt")]
 			"TensorRTExecutionProvider" => {
 				let mut tensorrt_options: *mut sys::OrtTensorRTProviderOptionsV2 = std::ptr::null_mut();
-				if status_to_result(ortsys![unsafe CreateTensorRTProviderOptions(&mut tensorrt_options)]).is_err() {
+				if status_to_result(&ep.provider, ortsys![unsafe CreateTensorRTProviderOptions(&mut tensorrt_options)]).is_err() {
 					continue; // next EP
 				}
 				let keys: Vec<CString> = init_args.keys().map(|k| CString::new(k.as_str()).unwrap()).collect();
@@ -161,13 +168,13 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 				let key_ptrs: Vec<*const c_char> = keys.iter().map(|k| k.as_ptr()).collect();
 				let value_ptrs: Vec<*const c_char> = values.iter().map(|v| v.as_ptr()).collect();
 				let status = ortsys![unsafe UpdateTensorRTProviderOptions(tensorrt_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), keys.len())];
-				if status_to_result(status).is_err() {
+				if status_to_result(&ep.provider, status).is_err() {
 					ortsys![unsafe ReleaseTensorRTProviderOptions(tensorrt_options)];
 					continue; // next EP
 				}
 				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_TensorRT_V2(options, tensorrt_options)];
 				ortsys![unsafe ReleaseTensorRTProviderOptions(tensorrt_options)];
-				if status_to_result(status).is_ok() {
+				if status_to_result(&ep.provider, status).is_ok() {
 					return; // EP found
 				}
 			}
@@ -175,7 +182,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 			"AclExecutionProvider" => {
 				let use_arena = init_args.get("use_arena").map(|s| s.parse::<bool>().unwrap_or(false)).unwrap_or(false);
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_ACL(options, use_arena.into()) };
-				if status_to_result(status).is_ok() {
+				if status_to_result(&ep.provider, status).is_ok() {
 					return; // EP found
 				}
 			}
@@ -183,7 +190,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 			"DnnlExecutionProvider" => {
 				let use_arena = init_args.get("use_arena").map(|s| s.parse::<bool>().unwrap_or(false)).unwrap_or(false);
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_Dnnl(options, use_arena.into()) };
-				if status_to_result(status).is_ok() {
+				if status_to_result(&ep.provider, status).is_ok() {
 					return; // EP found
 				}
 			}

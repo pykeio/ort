@@ -119,7 +119,7 @@ impl ExecutionProvider {
 }
 
 pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, execution_providers: impl AsRef<[ExecutionProvider]>) {
-	fn status_to_result(provider: &str, status: *mut sys::OrtStatus) -> std::result::Result<(), OrtApiError> {
+	fn status_to_result(provider: &str, status: *mut sys::OrtStatus) -> Result<(), OrtApiError> {
 		let status_res = error::status_to_result(status);
 		info!("{:?} status: {:?}", provider, status_res);
 		status_res

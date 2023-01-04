@@ -10,6 +10,8 @@ extern "C" {
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr;
 	#[cfg(feature = "onednn")]
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_Dnnl(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr;
+	#[cfg(feature = "coreml")]
+	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CoreML(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr;
 }
 
 #[derive(Debug, Clone)]
@@ -69,12 +71,13 @@ impl ExecutionProvider {
 	}
 
 	ep_providers! {
+		cpu = "CPUExecutionProvider",
+		cuda = "CUDAExecutionProvider",
+		tensorrt = "TensorRTExecutionProvider",
 		acl = "AclExecutionProvider",
 		dnnl = "DnnlExecutionProvider",
 		onednn = "DnnlExecutionProvider",
-		cuda = "CUDAExecutionProvider",
-		tensorrt = "TensorRTExecutionProvider",
-		cpu = "CPUExecutionProvider"
+		coreml = "CoreMLExecutionProvider"
 	}
 
 	pub fn is_available(&self) -> bool {
@@ -97,11 +100,12 @@ impl ExecutionProvider {
 	}
 
 	ep_if_available! {
-		tensorrt_if_available(tensorrt): "TensorRT",
 		cuda_if_available(cuda): "CUDA",
+		tensorrt_if_available(tensorrt): "TensorRT",
 		acl_if_available(acl): "ACL",
 		dnnl_if_available(dnnl): "oneDNN",
-		onednn_if_available(dnnl): "oneDNN"
+		onednn_if_available(dnnl): "oneDNN",
+		coreml_if_available(coreml): "CoreML"
 	}
 
 	/// Configure this execution provider with the given option.
@@ -111,7 +115,9 @@ impl ExecutionProvider {
 	}
 
 	ep_options! {
-		/// Whether or not to use CPU arena allocator.
+		/// Whether or not to use the arena allocator.
+		///
+		/// Supported backends: CPU, ACL, oneDNN
 		pub fn with_use_arena(bool) = use_arena;
 	}
 }
@@ -190,6 +196,15 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 				let use_arena = init_args.get("use_arena").map(|s| s.parse::<bool>().unwrap_or(false)).unwrap_or(false);
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_Dnnl(options, use_arena.into()) };
 				if status_to_result_and_log("oneDNN", status).is_ok() {
+					return; // EP found
+				}
+			}
+			#[cfg(feature = "coreml")]
+			"CoreMLExecutionProvider" => {
+				// TODO: Support additional CoreML flags
+				// https://onnxruntime.ai/docs/execution-providers/CoreML-ExecutionProvider.html#available-options
+				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_CoreML(options, 0) };
+				if status_to_result_and_log("CoreML", status).is_ok() {
 					return; // EP found
 				}
 			}

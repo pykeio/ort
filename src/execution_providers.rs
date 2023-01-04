@@ -133,7 +133,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 		let init_args = ep.options.clone();
 		match ep.provider.as_str() {
 			"CPUExecutionProvider" => {
-				let use_arena = init_args.get("use_arena").map(|s| s.parse::<bool>().unwrap_or(false)).unwrap_or(false);
+				let use_arena = init_args.get("use_arena").map_or(false, |s| s.parse::<bool>().unwrap_or(false));
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_CPU(options, use_arena.into()) };
 				if status_to_result_and_log("CPU", status).is_ok() {
 					return; // EP found
@@ -185,7 +185,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 			}
 			#[cfg(feature = "acl")]
 			"AclExecutionProvider" => {
-				let use_arena = init_args.get("use_arena").map(|s| s.parse::<bool>().unwrap_or(false)).unwrap_or(false);
+				let use_arena = init_args.get("use_arena").map_or(false, |s| s.parse::<bool>().unwrap_or(false));
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_ACL(options, use_arena.into()) };
 				if status_to_result_and_log("ACL", status).is_ok() {
 					return; // EP found
@@ -193,7 +193,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 			}
 			#[cfg(feature = "onednn")]
 			"DnnlExecutionProvider" => {
-				let use_arena = init_args.get("use_arena").map(|s| s.parse::<bool>().unwrap_or(false)).unwrap_or(false);
+				let use_arena = init_args.get("use_arena").map_or(false, |s| s.parse::<bool>().unwrap_or(false));
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_Dnnl(options, use_arena.into()) };
 				if status_to_result_and_log("oneDNN", status).is_ok() {
 					return; // EP found

@@ -91,9 +91,9 @@ where
 					unsafe CreateTensorWithDataAsOrtValue(
 						memory_info.ptr,
 						tensor_values_ptr,
-						array.len() * std::mem::size_of::<T>(),
+						(array.len() * std::mem::size_of::<T>()) as _,
 						shape_ptr,
-						shape_len,
+						shape_len as _,
 						T::tensor_element_data_type().into(),
 						tensor_ptr_ptr
 					) -> OrtError::CreateTensorWithData;

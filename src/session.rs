@@ -35,6 +35,8 @@ use super::{
 #[cfg(feature = "fetch-models")]
 use super::{download::OnnxModel, error::OrtDownloadError};
 
+use crate::session::dangerous::raw_pointer_to_string;
+
 /// Type used to create a session using the _builder pattern_.
 ///
 /// A `SessionBuilder` is created by calling the [`Environment::session()`] method on the environment.
@@ -200,6 +202,12 @@ impl SessionBuilder {
 	pub fn with_optimization_level(self, opt_level: GraphOptimizationLevel) -> OrtResult<Self> {
 		ortsys![unsafe SetSessionGraphOptimizationLevel(self.session_options_ptr, opt_level.into()) -> OrtError::CreateSessionOptions];
 		Ok(self)
+	}
+	/// enable profiling. Once enabled profile information will be writen to profiling_file
+	pub fn enable_profiling(self, profiling_file: &str) -> OrtResult<Self> {
+		let profiling_file = CString::new(profiling_file)?;
+		ortsys![unsafe EnableProfiling(self.session_options_ptr, profiling_file.as_ptr()) -> OrtError::CreateSessionOptions];
+			Ok(self)
 	}
 
 	/// Set the session's allocator. Defaults to [`AllocatorType::Arena`].
@@ -615,6 +623,14 @@ impl Session {
 		ortsys![unsafe SessionGetModelMetadata(self.session_ptr, &mut metadata_ptr) -> OrtError::GetModelMetadata; nonNull(metadata_ptr)];
 		Ok(Metadata::new(metadata_ptr, self.allocator_ptr))
 	}
+	//end profiling for the session. Note it has to be explicitly called otherwise profiing file will be empty
+	pub fn end_profiling(&self) -> OrtResult<String>{
+		let mut profiling_name: *mut c_char = std::ptr::null_mut();
+
+		ortsys![unsafe SessionEndProfiling(self.session_ptr, self.allocator_ptr, & mut profiling_name)];
+		assert_non_null_pointer(profiling_name, "ProfilingName")?;
+		raw_pointer_to_string(self.allocator_ptr, profiling_name)
+	}
 }
 
 // https://github.com/microsoft/onnxruntime/issues/114
@@ -720,6 +736,11 @@ mod dangerous {
 		extract_io_name(f, session_ptr, allocator_ptr, i)
 	}
 
+	pub(crate) fn raw_pointer_to_string(allocator_ptr: *mut sys::OrtAllocator, c_str: *mut c_char) -> OrtResult<String>{
+		let name = char_p_to_string(c_str)?;
+		ortfree!(unsafe allocator_ptr, c_str);
+		Ok(name)
+	}
 	#[cfg(target_arch = "x86_64")]
 	fn extract_io_name(
 		f: extern_system_fn! { unsafe fn(
@@ -738,9 +759,7 @@ mod dangerous {
 		status_to_result(status).map_err(OrtError::GetInputName)?;
 		assert_non_null_pointer(name_bytes, "InputName")?;
 
-		let name = char_p_to_string(name_bytes)?;
-		ortfree!(unsafe allocator_ptr, name_bytes);
-		Ok(name)
+		raw_pointer_to_string(allocator_ptr, name_bytes)
 	}
 	#[cfg(target_arch = "aarch64")]
 	fn extract_io_name(
@@ -760,9 +779,7 @@ mod dangerous {
 		status_to_result(status).map_err(OrtError::GetInputName)?;
 		assert_non_null_pointer(name_bytes, "InputName")?;
 
-		let name = char_p_to_string(name_bytes)?;
-		ortfree!(unsafe allocator_ptr, name_bytes);
-		Ok(name)
+		raw_pointer_to_string(allocator_ptr, name_bytes)
 	}
 
 	pub(super) fn extract_input(session_ptr: *mut sys::OrtSession, allocator_ptr: *mut sys::OrtAllocator, i: usize) -> OrtResult<Input> {

@@ -271,15 +271,12 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 
 	let lib_files = fs::read_dir(lib_dir).unwrap();
 	for lib_file in lib_files.filter(|e| {
-		e.as_ref()
-			.ok()
-			.map(|e| {
-				e.file_type().map(|e| e.is_file()).unwrap_or(false)
-					&& [".dll", ".so", ".dylib"]
-						.into_iter()
-						.any(|v| e.path().into_os_string().into_string().unwrap().contains(v))
-			})
-			.unwrap_or(false)
+		e.as_ref().ok().map_or(false, |e| {
+			e.file_type().map_or(false, |e| !e.is_dir())
+				&& [".dll", ".so", ".dylib"]
+					.into_iter()
+					.any(|v| e.path().into_os_string().into_string().unwrap().contains(v))
+		})
 	}) {
 		let lib_file = lib_file.unwrap();
 		let lib_path = lib_file.path();
@@ -317,8 +314,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 
 	match strategy
 		.as_ref()
-		.map(String::as_str)
-		.unwrap_or_else(|_| if cfg!(feature = "prefer-compile-strategy") { "compile" } else { "download" })
+		.map_or_else(|_| if cfg!(feature = "prefer-compile-strategy") { "compile" } else { "download" }, String::as_str)
 	{
 		"download" => {
 			if target.contains("macos") {
@@ -433,16 +429,19 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 				.expect("error running `protoc --help`");
 
 			let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-			let _cmake_toolchain = env::var(ORT_ENV_CMAKE_TOOLCHAIN).map(PathBuf::from).unwrap_or(
-				if cfg!(target_os = "linux") && target.contains("aarch64") && target.contains("linux") {
-					root.join("toolchains").join("default-aarch64-linux-gnu.cmake")
-				} else if cfg!(target_os = "linux") && target.contains("aarch64") && target.contains("windows") {
-					root.join("toolchains").join("default-aarch64-w64-mingw32.cmake")
-				} else if cfg!(target_os = "linux") && target.contains("x86_64") && target.contains("windows") {
-					root.join("toolchains").join("default-x86_64-w64-mingw32.cmake")
-				} else {
-					PathBuf::new()
-				}
+			let _cmake_toolchain = env::var(ORT_ENV_CMAKE_TOOLCHAIN).map_or_else(
+				|_| {
+					if cfg!(target_os = "linux") && target.contains("aarch64") && target.contains("linux") {
+						root.join("toolchains").join("default-aarch64-linux-gnu.cmake")
+					} else if cfg!(target_os = "linux") && target.contains("aarch64") && target.contains("windows") {
+						root.join("toolchains").join("default-aarch64-w64-mingw32.cmake")
+					} else if cfg!(target_os = "linux") && target.contains("x86_64") && target.contains("windows") {
+						root.join("toolchains").join("default-x86_64-w64-mingw32.cmake")
+					} else {
+						PathBuf::default()
+					}
+				},
+				PathBuf::from
 			);
 
 			if cfg!(target_os = "linux") && target.contains("windows") && target.contains("aarch64") {

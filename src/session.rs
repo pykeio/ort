@@ -626,12 +626,12 @@ impl Session {
 
 	/// Ends profiling for this session. Note that this must be explicitly called at the end of profiling, otherwise
 	/// the profiing file will be empty.
-	pub fn end_profiling(&self) -> OrtResult<String>{
+	pub fn end_profiling(&self) -> OrtResult<String> {
 		let mut profiling_name: *mut c_char = std::ptr::null_mut();
 
 		ortsys![unsafe SessionEndProfiling(self.session_ptr, self.allocator_ptr, &mut profiling_name)];
 		assert_non_null_pointer(profiling_name, "ProfilingName")?;
-		raw_pointer_to_string(self.allocator_ptr, profiling_name)
+		dangerous::raw_pointer_to_string(self.allocator_ptr, profiling_name)
 	}
 }
 
@@ -738,7 +738,7 @@ mod dangerous {
 		extract_io_name(f, session_ptr, allocator_ptr, i)
 	}
 
-	pub(crate) fn raw_pointer_to_string(allocator_ptr: *mut sys::OrtAllocator, c_str: *mut c_char) -> OrtResult<String>{
+	pub(crate) fn raw_pointer_to_string(allocator_ptr: *mut sys::OrtAllocator, c_str: *mut c_char) -> OrtResult<String> {
 		let name = char_p_to_string(c_str)?;
 		ortfree!(unsafe allocator_ptr, c_str);
 		Ok(name)

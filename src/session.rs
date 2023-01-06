@@ -629,7 +629,7 @@ impl Session {
 	pub fn end_profiling(&self) -> OrtResult<String>{
 		let mut profiling_name: *mut c_char = std::ptr::null_mut();
 
-		ortsys![unsafe SessionEndProfiling(self.session_ptr, self.allocator_ptr, & mut profiling_name)];
+		ortsys![unsafe SessionEndProfiling(self.session_ptr, self.allocator_ptr, &mut profiling_name)];
 		assert_non_null_pointer(profiling_name, "ProfilingName")?;
 		raw_pointer_to_string(self.allocator_ptr, profiling_name)
 	}

@@ -35,8 +35,6 @@ use super::{
 #[cfg(feature = "fetch-models")]
 use super::{download::OnnxModel, error::OrtDownloadError};
 
-use crate::session::dangerous::raw_pointer_to_string;
-
 /// Type used to create a session using the _builder pattern_.
 ///
 /// A `SessionBuilder` is created by calling the [`Environment::session()`] method on the environment.
@@ -203,11 +201,13 @@ impl SessionBuilder {
 		ortsys![unsafe SetSessionGraphOptimizationLevel(self.session_options_ptr, opt_level.into()) -> OrtError::CreateSessionOptions];
 		Ok(self)
 	}
-	/// enable profiling. Once enabled profile information will be writen to profiling_file
-	pub fn enable_profiling(self, profiling_file: &str) -> OrtResult<Self> {
-		let profiling_file = CString::new(profiling_file)?;
+
+	/// Enables profiling. Profile information will be writen to `profiling_file` after profiling completes.
+	/// See `Session::end_profiling`.
+	pub fn with_profiling<S: AsRef<str>>(self, profiling_file: S) -> OrtResult<Self> {
+		let profiling_file = CString::new(profiling_file.as_ref())?;
 		ortsys![unsafe EnableProfiling(self.session_options_ptr, profiling_file.as_ptr()) -> OrtError::CreateSessionOptions];
-			Ok(self)
+		Ok(self)
 	}
 
 	/// Set the session's allocator. Defaults to [`AllocatorType::Arena`].
@@ -623,7 +623,9 @@ impl Session {
 		ortsys![unsafe SessionGetModelMetadata(self.session_ptr, &mut metadata_ptr) -> OrtError::GetModelMetadata; nonNull(metadata_ptr)];
 		Ok(Metadata::new(metadata_ptr, self.allocator_ptr))
 	}
-	//end profiling for the session. Note it has to be explicitly called otherwise profiing file will be empty
+
+	/// Ends profiling for this session. Note that this must be explicitly called at the end of profiling, otherwise
+	/// the profiing file will be empty.
 	pub fn end_profiling(&self) -> OrtResult<String>{
 		let mut profiling_name: *mut c_char = std::ptr::null_mut();
 

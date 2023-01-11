@@ -440,22 +440,25 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 			// build_args.push("--cmake_extra_defines");
 			// build_args.push("onnxruntime_BUILD_UNIT_TESTS=0");
 
-			use vswhom::VsFindResult;
-			let vs_find_result = VsFindResult::search();
-			match vs_find_result {
-				Some(VsFindResult { vs_exe_path: Some(vs_exe_path), .. }) => {
-					let vs_exe_path = vs_exe_path.to_string_lossy();
-					// the one sane thing about visual studio is that the version numbers are somewhat predictable...
-					if vs_exe_path.contains("14.1") {
-						build_args.push("--cmake_generator=Visual Studio 15 2017");
-					} else if vs_exe_path.contains("14.2") {
-						build_args.push("--cmake_generator=Visual Studio 16 2019");
-					} else if vs_exe_path.contains("14.3") {
-						build_args.push("--cmake_generator=Visual Studio 17 2022");
+			#[cfg(windows)]
+			{
+				use vswhom::VsFindResult;
+				let vs_find_result = VsFindResult::search();
+				match vs_find_result {
+					Some(VsFindResult { vs_exe_path: Some(vs_exe_path), .. }) => {
+						let vs_exe_path = vs_exe_path.to_string_lossy();
+						// the one sane thing about visual studio is that the version numbers are somewhat predictable...
+						if vs_exe_path.contains("14.1") {
+							build_args.push("--cmake_generator=Visual Studio 15 2017");
+						} else if vs_exe_path.contains("14.2") {
+							build_args.push("--cmake_generator=Visual Studio 16 2019");
+						} else if vs_exe_path.contains("14.3") {
+							build_args.push("--cmake_generator=Visual Studio 17 2022");
+						}
 					}
-				}
-				Some(VsFindResult { vs_exe_path: None, .. }) | None => panic!("[ort] unable to find Visual Studio installation")
-			};
+					Some(VsFindResult { vs_exe_path: None, .. }) | None => panic!("[ort] unable to find Visual Studio installation")
+				};
+			}
 
 			build_args.push("--build_dir=build");
 			command.args(build_args);

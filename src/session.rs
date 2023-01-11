@@ -204,7 +204,11 @@ impl SessionBuilder {
 
 	/// Enables profiling. Profile information will be writen to `profiling_file` after profiling completes.
 	/// See `Session::end_profiling`.
+	#[cfg(feature = "profiling")]
 	pub fn with_profiling<S: AsRef<str>>(self, profiling_file: S) -> OrtResult<Self> {
+		#[cfg(windows)]
+		let profiling_file = widestring::WideCString::from_str(profiling_file.as_ref())?;
+		#[cfg(not(windows))]
 		let profiling_file = CString::new(profiling_file.as_ref())?;
 		ortsys![unsafe EnableProfiling(self.session_options_ptr, profiling_file.as_ptr()) -> OrtError::CreateSessionOptions];
 		Ok(self)
@@ -626,6 +630,7 @@ impl Session {
 
 	/// Ends profiling for this session. Note that this must be explicitly called at the end of profiling, otherwise
 	/// the profiing file will be empty.
+	#[cfg(feature = "profiling")]
 	pub fn end_profiling(&self) -> OrtResult<String> {
 		let mut profiling_name: *mut c_char = std::ptr::null_mut();
 

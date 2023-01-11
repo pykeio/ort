@@ -99,9 +99,13 @@ pub enum OrtError {
 		/// Path with invalid UTF-8
 		path: PathBuf
 	},
-	/// Attempt to build a Rust `CString` from a null pointer
+	/// Attempt to build a Rust `CString` when the original string contains a null character.
 	#[error("Failed to build CString when original contains null: {0}")]
 	FfiStringNull(#[from] std::ffi::NulError),
+	/// Attempt to build a `WideCString` when the original string contains a null character.
+	#[cfg(all(windows, feature = "profiling"))]
+	#[error("Failed to build CString when original contains null: {0}")]
+	WideFfiStringNull(#[from] widestring::error::ContainsNul<u16>),
 	#[error("{0} pointer should be null")]
 	/// ORT pointer should have been null
 	PointerShouldBeNull(String),

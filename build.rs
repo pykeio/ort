@@ -20,7 +20,7 @@ const ORT_EXTRACT_DIR: &str = "onnxruntime";
 const ORT_GIT_DIR: &str = "onnxruntime";
 const ORT_GIT_REPO: &str = "https://github.com/microsoft/onnxruntime";
 const PROTOBUF_EXTRACT_DIR: &str = "protobuf";
-const PROTOBUF_VERSION: &str = "3.11.2";
+const PROTOBUF_VERSION: &str = "3.18.1";
 const PROTOBUF_RELEASE_BASE_URL: &str = "https://github.com/protocolbuffers/protobuf/releases/download";
 
 macro_rules! incompatible_providers {
@@ -361,28 +361,9 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 			use std::process::Command;
 
 			let target = env::var("TARGET").unwrap();
-			if target.contains("macos") && !cfg!(target_os = "darwin") && env::var(ORT_ENV_CMAKE_PROGRAM).is_err() {
-				panic!("[ort] cross-compiling for macOS with the `compile` strategy requires `{ORT_ENV_CMAKE_PROGRAM}` to be set");
-			}
-
-			let cmake = env::var(ORT_ENV_CMAKE_PROGRAM).unwrap_or_else(|_| "cmake".to_string());
-			let python = env::var(ORT_ENV_PYTHON_PROGRAM).unwrap_or_else(|_| {
-				if Command::new("python").arg("--version").status().unwrap().success() {
-					"python".to_string()
-				} else {
-					"python3".to_string()
-				}
-			});
-
 			let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-			let required_cmds: &[&str] = &[&cmake, "python", "git"];
-			for cmd in required_cmds {
-				if Command::new(cmd).output().is_err() {
-					panic!("[ort] compile strategy requires `{cmd}` to be installed");
-				}
-			}
 
-			println!("[ort] assuming C/C++ compilers are available");
+			let python = env::var("PYTHON").unwrap_or_else(|_| "python".to_string());
 
 			Command::new("git")
 				.args([
@@ -403,31 +384,6 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 				.status()
 				.expect("failed to clone ORT repo");
 
-			// download prebuilt protoc binary
-			let (protoc_archive, protoc_url) = prebuilt_protoc_url();
-			let protoc_dir = out_dir.join(PROTOBUF_EXTRACT_DIR);
-			let protoc_archive_file = out_dir.join(protoc_archive);
-
-			println!("cargo:rerun-if-changed={}", protoc_archive_file.display());
-
-			if !protoc_archive_file.exists() {
-				download(&protoc_url, &protoc_archive_file);
-			}
-
-			if !protoc_dir.exists() {
-				extract_archive(&protoc_archive_file, &protoc_dir);
-			}
-
-			let protoc_file = if cfg!(target_os = "windows") { "protoc.exe" } else { "protoc" };
-			let protoc_file = protoc_dir.join("bin").join(protoc_file);
-
-			Command::new(protoc_file)
-				.args(["--help"])
-				.current_dir(&out_dir)
-				.stdout(Stdio::null())
-				.status()
-				.expect("error running `protoc --help`");
-
 			let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 			let _cmake_toolchain = env::var(ORT_ENV_CMAKE_TOOLCHAIN).map_or_else(
 				|_| {
@@ -443,10 +399,6 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 				},
 				PathBuf::from
 			);
-
-			if cfg!(target_os = "linux") && target.contains("windows") && target.contains("aarch64") {
-				println!("[ort] detected cross compilation to Windows arm64, default toolchain will make bad assumptions.");
-			}
 
 			let mut command = Command::new(python);
 			command
@@ -485,33 +437,25 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 			// onnxruntime will still build tests when --skip_tests is enabled, this filters out most of them
 			// this "fixes" compilation on alpine: https://github.com/microsoft/onnxruntime/issues/9155
 			// but causes other compilation errors: https://github.com/microsoft/onnxruntime/issues/7571
-			build_args.push("--cmake_extra_defines");
-			build_args.push("onnxruntime_BUILD_UNIT_TESTS=0");
+			// build_args.push("--cmake_extra_defines");
+			// build_args.push("onnxruntime_BUILD_UNIT_TESTS=0");
 
-			// if we can use ninja on windows, great! let's use it!
-			// note that ninja + clang on windows is a total shitstorm so it's disabled for now
-			#[cfg(target_os = "windows")]
-			if Command::new("ninja").arg("--version").status().unwrap().success() && !Command::new("clang-cl").arg("--version").status().unwrap().success() {
-				build_args.push("--cmake_generator=Ninja");
-			} else {
-				// fuck
-				use vswhom::VsFindResult;
-				let vs_find_result = VsFindResult::search();
-				match vs_find_result {
-					Some(VsFindResult { vs_exe_path: Some(vs_exe_path), .. }) => {
-						let vs_exe_path = vs_exe_path.to_string_lossy();
-						// the one sane thing about visual studio is that the version numbers are somewhat predictable...
-						if vs_exe_path.contains("14.1") {
-							build_args.push("--cmake_generator=Visual Studio 15 2017");
-						} else if vs_exe_path.contains("14.2") {
-							build_args.push("--cmake_generator=Visual Studio 16 2019");
-						} else if vs_exe_path.contains("14.3") {
-							build_args.push("--cmake_generator=Visual Studio 17 2022");
-						}
+			use vswhom::VsFindResult;
+			let vs_find_result = VsFindResult::search();
+			match vs_find_result {
+				Some(VsFindResult { vs_exe_path: Some(vs_exe_path), .. }) => {
+					let vs_exe_path = vs_exe_path.to_string_lossy();
+					// the one sane thing about visual studio is that the version numbers are somewhat predictable...
+					if vs_exe_path.contains("14.1") {
+						build_args.push("--cmake_generator=Visual Studio 15 2017");
+					} else if vs_exe_path.contains("14.2") {
+						build_args.push("--cmake_generator=Visual Studio 16 2019");
+					} else if vs_exe_path.contains("14.3") {
+						build_args.push("--cmake_generator=Visual Studio 17 2022");
 					}
-					Some(VsFindResult { vs_exe_path: None, .. }) | None => panic!("[ort] unable to find Visual Studio installation")
-				};
-			}
+				}
+				Some(VsFindResult { vs_exe_path: None, .. }) | None => panic!("[ort] unable to find Visual Studio installation")
+			};
 
 			build_args.push("--build_dir=build");
 			command.args(build_args);

@@ -213,6 +213,15 @@ impl SessionBuilder {
 		ortsys![unsafe EnableProfiling(self.session_options_ptr, profiling_file.as_ptr()) -> OrtError::CreateSessionOptions];
 		Ok(self)
 	}
+	/// Enables/disables memory pattern optimization. Disable it if the input size varies, i.e., dynamic batch
+	pub fn with_memory_pattern(self, enable: bool) -> OrtResult<Self> {
+		if enable {
+			ortsys![unsafe EnableMemPattern(self.session_options_ptr) -> OrtError::CreateSessionOptions];
+		} else {
+			ortsys![unsafe DisableMemPattern(self.session_options_ptr) -> OrtError::CreateSessionOptions];
+		}
+		Ok(self)
+	}
 
 	/// Set the session's allocator. Defaults to [`AllocatorType::Arena`].
 	pub fn with_allocator(mut self, allocator: AllocatorType) -> OrtResult<Self> {

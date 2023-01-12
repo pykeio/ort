@@ -213,19 +213,8 @@ impl SessionBuilder {
 	pub fn with_memory_pattern(self, enable: bool) -> OrtResult<Self> {
 		if enable {
 			ortsys![unsafe EnableMemPattern(self.session_options_ptr) -> OrtError::CreateSessionOptions];
-		}
-		else {
+        } else {
 			ortsys![unsafe DisableMemPattern(self.session_options_ptr) -> OrtError::CreateSessionOptions];
-		}
-		Ok(self)
-	}
-	/// Enables/disables cpu mem areana allocator
-	pub fn with_cpu_memory_arena(self, enable: bool) -> OrtResult<Self> {
-		if enable {
-			ortsys![unsafe EnableCpuMemArena(self.session_options_ptr) -> OrtError::CreateSessionOptions];
-		}
-		else {
-			ortsys![unsafe DisableCpuMemArena(self.session_options_ptr) -> OrtError::CreateSessionOptions];
 		}
 		Ok(self)
 	}

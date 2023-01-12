@@ -213,7 +213,7 @@ impl SessionBuilder {
 	pub fn with_memory_pattern(self, enable: bool) -> OrtResult<Self> {
 		if enable {
 			ortsys![unsafe EnableMemPattern(self.session_options_ptr) -> OrtError::CreateSessionOptions];
-        } else {
+		} else {
 			ortsys![unsafe DisableMemPattern(self.session_options_ptr) -> OrtError::CreateSessionOptions];
 		}
 		Ok(self)

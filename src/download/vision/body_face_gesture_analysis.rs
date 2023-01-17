@@ -1,4 +1,4 @@
-use crate::download::{vision::Vision, ModelUrl, OnnxModel};
+use crate::download::ModelUrl;
 
 #[derive(Debug, Clone)]
 pub enum BodyFaceGestureAnalysis {
@@ -17,11 +17,5 @@ impl ModelUrl for BodyFaceGestureAnalysis {
 				"https://github.com/onnx/models/raw/main/vision/body_analysis/emotion_ferplus/model/emotion-ferplus-8.onnx"
 			}
 		}
-	}
-}
-
-impl From<BodyFaceGestureAnalysis> for OnnxModel {
-	fn from(model: BodyFaceGestureAnalysis) -> Self {
-		OnnxModel::Vision(Vision::BodyFaceGestureAnalysis(model))
 	}
 }

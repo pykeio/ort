@@ -1,6 +1,6 @@
 #![allow(clippy::upper_case_acronyms)]
 
-use crate::download::{language::Language, ModelUrl, OnnxModel};
+use crate::download::ModelUrl;
 
 /// Machine comprehension models.
 ///
@@ -59,23 +59,5 @@ impl ModelUrl for GPT2 {
 			GPT2::GPT2 => "https://github.com/onnx/models/raw/main/text/machine_comprehension/gpt-2/model/gpt2-10.onnx",
 			GPT2::GPT2LmHead => "https://github.com/onnx/models/raw/main/text/machine_comprehension/gpt-2/model/gpt2-lm-head-10.onnx"
 		}
-	}
-}
-
-impl From<MachineComprehension> for OnnxModel {
-	fn from(model: MachineComprehension) -> Self {
-		OnnxModel::Language(Language::MachineComprehension(model))
-	}
-}
-
-impl From<RoBERTa> for OnnxModel {
-	fn from(model: RoBERTa) -> Self {
-		OnnxModel::Language(Language::MachineComprehension(MachineComprehension::RoBERTa(model)))
-	}
-}
-
-impl From<GPT2> for OnnxModel {
-	fn from(model: GPT2) -> Self {
-		OnnxModel::Language(Language::MachineComprehension(MachineComprehension::GPT2(model)))
 	}
 }

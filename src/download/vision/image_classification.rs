@@ -1,6 +1,6 @@
 #![allow(clippy::upper_case_acronyms)]
 
-use crate::download::{vision::Vision, ModelUrl, OnnxModel};
+use crate::download::ModelUrl;
 
 #[derive(Debug, Clone)]
 pub enum ImageClassification {
@@ -202,35 +202,5 @@ impl ModelUrl for ShuffleNetVersion {
 			ShuffleNetVersion::V1 => "https://github.com/onnx/models/raw/main/vision/classification/shufflenet/model/shufflenet-9.onnx",
 			ShuffleNetVersion::V2 => "https://github.com/onnx/models/raw/main/vision/classification/shufflenet/model/shufflenet-v2-10.onnx"
 		}
-	}
-}
-
-impl From<ImageClassification> for OnnxModel {
-	fn from(model: ImageClassification) -> Self {
-		OnnxModel::Vision(Vision::ImageClassification(model))
-	}
-}
-
-impl From<ResNet> for OnnxModel {
-	fn from(variant: ResNet) -> Self {
-		OnnxModel::Vision(Vision::ImageClassification(ImageClassification::ResNet(variant)))
-	}
-}
-
-impl From<Vgg> for OnnxModel {
-	fn from(variant: Vgg) -> Self {
-		OnnxModel::Vision(Vision::ImageClassification(ImageClassification::Vgg(variant)))
-	}
-}
-
-impl From<InceptionVersion> for OnnxModel {
-	fn from(variant: InceptionVersion) -> Self {
-		OnnxModel::Vision(Vision::ImageClassification(ImageClassification::Inception(variant)))
-	}
-}
-
-impl From<ShuffleNetVersion> for OnnxModel {
-	fn from(variant: ShuffleNetVersion) -> Self {
-		OnnxModel::Vision(Vision::ImageClassification(ImageClassification::ShuffleNet(variant)))
 	}
 }

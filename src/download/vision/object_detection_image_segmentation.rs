@@ -1,6 +1,6 @@
 #![allow(clippy::upper_case_acronyms)]
 
-use crate::download::{vision::Vision, ModelUrl, OnnxModel};
+use crate::download::ModelUrl;
 
 /// Object Detection & Image Segmentation
 ///
@@ -86,11 +86,5 @@ impl ModelUrl for ObjectDetectionImageSegmentation {
 				"https://github.com/onnx/models/raw/main/vision/object_detection_segmentation/duc/model/ResNet101-DUC-7.onnx"
 			}
 		}
-	}
-}
-
-impl From<ObjectDetectionImageSegmentation> for OnnxModel {
-	fn from(model: ObjectDetectionImageSegmentation) -> Self {
-		OnnxModel::Vision(Vision::ObjectDetectionImageSegmentation(model))
 	}
 }

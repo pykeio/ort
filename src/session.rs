@@ -1,11 +1,11 @@
 #![allow(clippy::tabs_in_doc_comments)]
 
-#[cfg(feature = "fetch-models")]
-use std::env;
 #[cfg(not(target_family = "windows"))]
 use std::os::unix::ffi::OsStrExt;
 #[cfg(target_family = "windows")]
 use std::os::windows::ffi::OsStrExt;
+#[cfg(feature = "fetch-models")]
+use std::{env, path::PathBuf, time::Duration};
 use std::{
 	ffi::CString,
 	fmt::{self, Debug},
@@ -33,7 +33,7 @@ use super::{
 	AllocatorType, GraphOptimizationLevel, MemType
 };
 #[cfg(feature = "fetch-models")]
-use super::{download::OnnxModel, error::OrtDownloadError};
+use super::{download::ModelUrl, error::OrtDownloadError};
 
 /// Type used to create a session using the _builder pattern_.
 ///
@@ -266,16 +266,58 @@ impl SessionBuilder {
 	#[cfg(feature = "fetch-models")]
 	pub fn with_model_downloaded<M>(self, model: M) -> OrtResult<Session>
 	where
-		M: Into<OnnxModel>
+		M: ModelUrl
 	{
-		self.with_model_downloaded_monomorphized(model.into())
+		self.with_model_downloaded_monomorphized(model.fetch_url())
 	}
 
 	#[cfg(feature = "fetch-models")]
-	fn with_model_downloaded_monomorphized(self, model: OnnxModel) -> OrtResult<Session> {
+	fn with_model_downloaded_monomorphized(self, model: &str) -> OrtResult<Session> {
 		let download_dir = env::current_dir().map_err(OrtDownloadError::IoError)?;
-		let downloaded_path = model.download_to(download_dir)?;
+		let downloaded_path = self.download_to(model, download_dir)?;
 		self.with_model_from_file(downloaded_path)
+	}
+
+	#[cfg(feature = "fetch-models")]
+	#[tracing::instrument]
+	fn download_to<P>(&self, url: &str, download_dir: P) -> OrtResult<PathBuf>
+	where
+		P: AsRef<Path> + std::fmt::Debug
+	{
+		let model_filename = PathBuf::from(url.split('/').last().unwrap());
+		let model_filepath = download_dir.as_ref().join(model_filename);
+		if model_filepath.exists() {
+			tracing::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), "Model already exists, skipping download");
+			Ok(model_filepath)
+		} else {
+			tracing::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), url = format!("{:?}", url).as_str(), "Downloading model");
+
+			let resp = ureq::get(url)
+				.timeout(Duration::from_secs(180))
+				.call()
+				.map_err(Box::new)
+				.map_err(OrtDownloadError::FetchError)?;
+
+			assert!(resp.has("Content-Length"));
+			let len = resp.header("Content-Length").and_then(|s| s.parse::<usize>().ok()).unwrap();
+			tracing::info!(len, "Downloading {} bytes", len);
+
+			let mut reader = resp.into_reader();
+
+			let f = std::fs::File::create(&model_filepath).unwrap();
+			let mut writer = std::io::BufWriter::new(f);
+
+			let bytes_io_count = std::io::copy(&mut reader, &mut writer).map_err(OrtDownloadError::IoError)?;
+			if bytes_io_count == len as u64 {
+				Ok(model_filepath)
+			} else {
+				Err(OrtDownloadError::CopyError {
+					expected: len as u64,
+					io: bytes_io_count
+				}
+				.into())
+			}
+		}
 	}
 
 	// TODO: Add all functions changing the options.

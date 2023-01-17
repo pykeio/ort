@@ -1,4 +1,4 @@
-use crate::download::{vision::Vision, ModelUrl, OnnxModel};
+use crate::download::ModelUrl;
 
 #[derive(Debug, Clone)]
 pub enum DomainBasedImageClassification {
@@ -11,11 +11,5 @@ impl ModelUrl for DomainBasedImageClassification {
 		match self {
 			DomainBasedImageClassification::Mnist => "https://github.com/onnx/models/raw/main/vision/classification/mnist/model/mnist-8.onnx"
 		}
-	}
-}
-
-impl From<DomainBasedImageClassification> for OnnxModel {
-	fn from(model: DomainBasedImageClassification) -> Self {
-		OnnxModel::Vision(Vision::DomainBasedImageClassification(model))
 	}
 }

@@ -1,4 +1,4 @@
-use crate::download::{vision::Vision, ModelUrl, OnnxModel};
+use crate::download::ModelUrl;
 
 /// Image Manipulation
 ///
@@ -52,17 +52,5 @@ impl ModelUrl for FastNeuralStyleTransferStyle {
 				"https://github.com/onnx/models/raw/main/vision/style_transfer/fast_neural_style/model/pointilism-9.onnx"
 			}
 		}
-	}
-}
-
-impl From<ImageManipulation> for OnnxModel {
-	fn from(model: ImageManipulation) -> Self {
-		OnnxModel::Vision(Vision::ImageManipulation(model))
-	}
-}
-
-impl From<FastNeuralStyleTransferStyle> for OnnxModel {
-	fn from(style: FastNeuralStyleTransferStyle) -> Self {
-		OnnxModel::Vision(Vision::ImageManipulation(ImageManipulation::FastNeuralStyleTransfer(style)))
 	}
 }

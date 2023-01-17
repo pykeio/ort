@@ -33,20 +33,6 @@ macro_rules! ep_providers {
 	}
 }
 
-macro_rules! ep_if_available {
-	($($fn_name:ident($original:ident): $name:expr),*) => {
-		$(
-			/// Creates a new
-			#[doc = $name]
-			#[doc = " execution provider if available, otherwise falling back to CPU."]
-			pub fn $fn_name() -> Self {
-				let o = Self::$original();
-				if o.is_available() { o } else { Self::cpu() }
-			}
-		)*
-	}
-}
-
 macro_rules! ep_options {
 	($(
 		$(#[$meta:meta])*
@@ -92,20 +78,13 @@ impl ExecutionProvider {
 				.to_string_lossy()
 				.into_owned();
 			if self.provider == avail {
+				let _ = ortsys![unsafe ReleaseAvailableProviders(providers, num_providers)];
 				return true;
 			}
 		}
 
+		let _ = ortsys![unsafe ReleaseAvailableProviders(providers, num_providers)];
 		false
-	}
-
-	ep_if_available! {
-		cuda_if_available(cuda): "CUDA",
-		tensorrt_if_available(tensorrt): "TensorRT",
-		acl_if_available(acl): "ACL",
-		dnnl_if_available(dnnl): "oneDNN",
-		onednn_if_available(dnnl): "oneDNN",
-		coreml_if_available(coreml): "CoreML"
 	}
 
 	/// Configure this execution provider with the given option.
@@ -126,7 +105,7 @@ impl ExecutionProvider {
 pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, execution_providers: impl AsRef<[ExecutionProvider]>) {
 	let status_to_result_and_log = |ep: &'static str, status: *mut sys::OrtStatus| {
 		let result = status_to_result(status);
-		tracing::debug!("{ep} execution provider registration {status:?}");
+		tracing::debug!("{ep} execution provider registration {result:?}");
 		result
 	};
 	for ep in execution_providers.as_ref() {

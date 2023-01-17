@@ -8,8 +8,6 @@ use std::{
 use ort::error::OrtDownloadError;
 
 mod download {
-	use std::sync::Arc;
-
 	use image::{imageops::FilterType, ImageBuffer, Luma, Pixel, Rgb};
 	use ndarray::s;
 	use ort::{
@@ -26,12 +24,11 @@ mod download {
 	fn squeezenet_mushroom() -> OrtResult<()> {
 		const IMAGE_TO_LOAD: &str = "mushroom.png";
 
-		let environment = Arc::new(
-			Environment::builder()
-				.with_name("integration_test")
-				.with_log_level(LoggingLevel::Warning)
-				.build()?
-		);
+		let environment = Environment::builder()
+			.with_name("integration_test")
+			.with_log_level(LoggingLevel::Warning)
+			.build()?
+			.into_arc();
 
 		let session = SessionBuilder::new(&environment)?
 			.with_optimization_level(GraphOptimizationLevel::Level1)?
@@ -106,12 +103,11 @@ mod download {
 	fn mnist_5() -> OrtResult<()> {
 		const IMAGE_TO_LOAD: &str = "mnist_5.jpg";
 
-		let environment = Arc::new(
-			Environment::builder()
-				.with_name("integration_test")
-				.with_log_level(LoggingLevel::Warning)
-				.build()?
-		);
+		let environment = Environment::builder()
+			.with_name("integration_test")
+			.with_log_level(LoggingLevel::Warning)
+			.build()?
+			.into_arc();
 
 		let session = SessionBuilder::new(&environment)?
 			.with_optimization_level(GraphOptimizationLevel::Level1)?
@@ -185,12 +181,11 @@ mod download {
 	fn upsample() -> OrtResult<()> {
 		const IMAGE_TO_LOAD: &str = "mushroom.png";
 
-		let environment = Arc::new(
-			Environment::builder()
-				.with_name("integration_test")
-				.with_log_level(LoggingLevel::Warning)
-				.build()?
-		);
+		let environment = Environment::builder()
+			.with_name("integration_test")
+			.with_log_level(LoggingLevel::Warning)
+			.build()?
+			.into_arc();
 
 		let session = SessionBuilder::new(&environment)?
 			.with_optimization_level(GraphOptimizationLevel::Level1)?

@@ -11,10 +11,7 @@ See [the docs](https://docs.rs/ort) and [`examples/`](https://github.com/pykeio/
 - `fetch-models`: Enables fetching models from the ONNX Model Zoo; not recommended for production.
 - `generate-bindings`: Update/generate ONNX Runtime bindings with `bindgen`. Requires [libclang](https://clang.llvm.org/doxygen/group__CINDEX.html).
 - `copy-dylibs`: Copy dynamic libraries to the Cargo `target` folder.
-- `prefer-system-strategy`: Uses the `system` compile [strategy](#strategies) by default; requires users to provide ONNX Runtime libraries.
-    - `prefer-dynamic-libs`: By default, if the path pointed to by `ORT_LIB_LOCATION` contains static libraries, `ort` will link to them rather than dynamic libraries. This feature prefers linking to dynamic libraries instead.
-- `prefer-compile-strategy`: Uses the `compile` [strategy](#strategies) by default; will take a *very* long time, but allows for easy static linking, avoiding [the DLL hell](#shared-library-hell).
-    - *These features only apply when using the compile strategy:*
+- **Compile strategy features** - *These features only apply when using the compile strategy.*
     - `compile-static`: Compiles ONNX Runtime as a static library.
     - `mimalloc`: Uses the (usually) faster mimalloc memory allocation library instead of the platform default.
     - `experimental`: Compiles Microsoft experimental operators.

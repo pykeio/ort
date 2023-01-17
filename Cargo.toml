@@ -21,12 +21,10 @@ strip = true
 codegen-units = 1
 
 [package.metadata.docs.rs]
-features = [ "half", "fetch-models", "copy-dylibs", "disable-build-script" ]
+features = [ "half", "fetch-models", "copy-dylibs" ]
 
 [features]
 default = [ "half", "fetch-models", "copy-dylibs" ]
-# used to prevent issues with docs.rs
-disable-build-script = []
 
 profiling = [ "widestring" ]
 
@@ -35,9 +33,6 @@ generate-bindings = [ "bindgen" ]
 copy-dylibs = []
 
 # ONNX compile flags
-prefer-compile-strategy = []
-prefer-system-strategy = []
-prefer-dynamic-libs = []
 minimal-build = []
 experimental = []
 mimalloc = []

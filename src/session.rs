@@ -698,7 +698,6 @@ unsafe impl Sync for Session {}
 unsafe fn get_tensor_dimensions(tensor_info_ptr: *const sys::OrtTensorTypeAndShapeInfo) -> OrtResult<Vec<i64>> {
 	let mut num_dims = 0;
 	ortsys![GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> OrtError::GetDimensionsCount];
-	assert_ne!(num_dims, 0);
 
 	let mut node_dims: Vec<i64> = vec![0; num_dims as _];
 	ortsys![GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims) -> OrtError::GetDimensions];

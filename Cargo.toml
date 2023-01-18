@@ -1,6 +1,6 @@
 [package]
 name = "ort"
-description = "Yet another ONNX Runtime wrapper"
+description = "A Rust wrapper for ONNX Runtime 1.13 - Optimize and Accelerate Machine Learning Inferencing"
 version = "1.13.3"
 edition = "2021"
 license = "MIT/Apache-2.0"
@@ -32,7 +32,6 @@ fetch-models = [ "ureq" ]
 generate-bindings = [ "bindgen" ]
 copy-dylibs = []
 
-# ONNX compile flags
 minimal-build = []
 experimental = []
 mimalloc = []
@@ -62,7 +61,6 @@ num-complex = "0.4"
 num-traits = "0.2"
 thiserror = "1.0"
 
-# onnx
 ureq = { version = "2.1", optional = true }
 lazy_static = "1.4"
 tracing = "0.1"

@@ -1,4 +1,4 @@
-use std::{ffi, fmt::Debug, ops::Deref};
+use std::{ffi, fmt::Debug, mem::MaybeUninit, ops::Deref};
 
 use ndarray::Array;
 use tracing::{debug, error};
@@ -39,14 +39,18 @@ where
 	where
 		'm: 't // 'm outlives 't
 	{
-		let mut array = array.to_owned();
+		// Ensure that the array is contiguous in memory.
+		let mut contiguous_array: Array<MaybeUninit<T>, D> = Array::uninit(array.raw_dim());
+		array.assign_to(&mut contiguous_array);
+		let mut contiguous_array = unsafe { contiguous_array.assume_init() };
+
 		// where onnxruntime will write the tensor data to
 		let mut tensor_ptr: *mut sys::OrtValue = std::ptr::null_mut();
 		let tensor_ptr_ptr: *mut *mut sys::OrtValue = &mut tensor_ptr;
 
-		let shape: Vec<i64> = array.shape().iter().map(|d: &usize| *d as i64).collect();
+		let shape: Vec<i64> = contiguous_array.shape().iter().map(|d: &usize| *d as i64).collect();
 		let shape_ptr: *const i64 = shape.as_ptr();
-		let shape_len = array.shape().len();
+		let shape_len = contiguous_array.shape().len();
 
 		match T::tensor_element_data_type() {
 			TensorElementDataType::Float32
@@ -61,14 +65,14 @@ where
 			| TensorElementDataType::Uint64 => {
 				// primitive data is already suitably laid out in memory; provide it to
 				// onnxruntime as is
-				let tensor_values_ptr: *mut std::ffi::c_void = array.as_mut_ptr() as *mut std::ffi::c_void;
+				let tensor_values_ptr: *mut std::ffi::c_void = contiguous_array.as_mut_ptr() as *mut std::ffi::c_void;
 				assert_non_null_pointer(tensor_values_ptr, "TensorValues")?;
 
 				ortsys![
 					unsafe CreateTensorWithDataAsOrtValue(
 						memory_info.ptr,
 						tensor_values_ptr,
-						(array.len() * std::mem::size_of::<T>()) as _,
+						(contiguous_array.len() * std::mem::size_of::<T>()) as _,
 						shape_ptr,
 						shape_len as _,
 						T::tensor_element_data_type().into(),
@@ -84,14 +88,14 @@ where
 			#[cfg(feature = "half")]
 			TensorElementDataType::Bfloat16 | TensorElementDataType::Float16 => {
 				// f16 and bf16 are repr(transparent) to u16, so memory layout should be identical to onnxruntime
-				let tensor_values_ptr: *mut std::ffi::c_void = array.as_mut_ptr() as *mut std::ffi::c_void;
+				let tensor_values_ptr: *mut std::ffi::c_void = contiguous_array.as_mut_ptr() as *mut std::ffi::c_void;
 				assert_non_null_pointer(tensor_values_ptr, "TensorValues")?;
 
 				ortsys![
 					unsafe CreateTensorWithDataAsOrtValue(
 						memory_info.ptr,
 						tensor_values_ptr,
-						(array.len() * std::mem::size_of::<T>()) as _,
+						(contiguous_array.len() * std::mem::size_of::<T>()) as _,
 						shape_ptr,
 						shape_len as _,
 						T::tensor_element_data_type().into(),
@@ -112,7 +116,7 @@ where
 				];
 
 				// create null-terminated copies of each string, as per `FillStringTensor` docs
-				let null_terminated_copies: Vec<ffi::CString> = array
+				let null_terminated_copies: Vec<ffi::CString> = contiguous_array
 					.iter()
 					.map(|elt| {
 						let slice = elt.try_utf8_bytes().expect("String data type must provide utf8 bytes");
@@ -132,7 +136,7 @@ where
 
 		Ok(OrtTensor {
 			c_ptr: tensor_ptr,
-			array,
+			array: contiguous_array,
 			memory_info
 		})
 	}

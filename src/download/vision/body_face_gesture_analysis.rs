@@ -1,5 +1,8 @@
+//! Models for body, face, & gesture analysis.
+
 use crate::download::ModelUrl;
 
+/// Models for body, face, & gesture analysis.
 #[derive(Debug, Clone)]
 pub enum BodyFaceGestureAnalysis {
 	/// A CNN based model for face recognition which learns discriminative features of faces and produces embeddings for

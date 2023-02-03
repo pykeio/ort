@@ -530,7 +530,7 @@ fn generate_bindings(include_dir: &Path) {
 }
 
 fn main() {
-	if !std::env::var("DOCS_RS").is_ok() {
+	if std::env::var("DOCS_RS").is_err() {
 		let (install_dir, needs_link) = prepare_libort_dir();
 
 		let include_dir = install_dir.join("include");

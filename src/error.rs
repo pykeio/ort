@@ -1,3 +1,5 @@
+//! Types and helpers for handling ORT errors.
+
 use std::{io, path::PathBuf, string};
 
 use thiserror::Error;
@@ -7,9 +9,11 @@ use super::{char_p_to_string, ort, sys, tensor::TensorElementDataType};
 /// Type alias for the Result type returned by ORT functions.
 pub type OrtResult<T> = std::result::Result<T, OrtError>;
 
+/// An enum of all errors returned by ORT functions.
 #[non_exhaustive]
 #[derive(Error, Debug)]
 pub enum OrtError {
+	/// An error occurred when converting an FFI C string to a Rust `String`.
 	#[error("Failed to construct Rust String")]
 	FfiStringConversion(OrtApiError),
 	/// An error occurred while creating an ONNX environment.

@@ -1,5 +1,8 @@
+//! Models for domain-based image classification.
+
 use crate::download::ModelUrl;
 
+/// Models for domain-based image classification.
 #[derive(Debug, Clone)]
 pub enum DomainBasedImageClassification {
 	/// Handwritten digit prediction using CNN.

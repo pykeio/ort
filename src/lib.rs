@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 pub mod download;
 pub mod environment;
 pub mod error;
@@ -42,6 +44,11 @@ lazy_static! {
 	};
 }
 
+/// Attempts to acquire the global OrtApi object.
+///
+/// # Panics
+///
+/// Panics if another thread panicked while holding the API lock, or if the ONNX Runtime API could not be initialized.
 pub fn ort() -> sys::OrtApi {
 	let mut api_ref = G_ORT_API.lock().expect("failed to acquire OrtApi lock; another thread panicked?");
 	let api_ref_mut: &mut *mut sys::OrtApi = api_ref.get_mut();
@@ -176,15 +183,20 @@ extern_system_fn! {
 	}
 }
 
-/// ONNX Runtime logging level.
+/// The minimum logging level. Logs will be handled by the `tracing` crate.
 #[derive(Debug)]
 #[cfg_attr(not(windows), repr(u32))]
 #[cfg_attr(windows, repr(i32))]
 pub enum LoggingLevel {
+	/// Verbose logging level. This will log *a lot* of messages!
 	Verbose = sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_VERBOSE as OnnxEnumInt,
+	/// Info logging level.
 	Info = sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_INFO as OnnxEnumInt,
+	/// Warning logging level. Recommended to receive potentially important warnings.
 	Warning = sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_WARNING as OnnxEnumInt,
+	/// Error logging level.
 	Error = sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_ERROR as OnnxEnumInt,
+	/// Fatal logging level.
 	Fatal = sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_FATAL as OnnxEnumInt
 }
 
@@ -212,7 +224,7 @@ impl From<LoggingLevel> for sys::OrtLoggingLevel {
 /// The optimizations belonging to one level are performed after the optimizations of the previous level have been
 /// applied (e.g., extended optimizations are applied after basic optimizations have been applied).
 ///
-/// **All optimizations are enabled by default.**
+/// **All optimizations (i.e. [`GraphOptimizationLevel::Level3`]) are enabled by default.**
 ///
 /// # Online/offline mode
 /// All optimizations can be performed either online or offline. In online mode, when initializing an inference session,
@@ -233,6 +245,7 @@ impl From<LoggingLevel> for sys::OrtLoggingLevel {
 #[cfg_attr(not(windows), repr(u32))]
 #[cfg_attr(windows, repr(i32))]
 pub enum GraphOptimizationLevel {
+	/// Disables all graph optimizations.
 	Disable = sys::GraphOptimizationLevel_ORT_DISABLE_ALL as OnnxEnumInt,
 	/// Level 1 includes semantics-preserving graph rewrites which remove redundant nodes and redundant computation.
 	/// They run before graph partitioning and thus apply to all the execution providers. Available basic/level 1 graph
@@ -292,13 +305,13 @@ impl From<GraphOptimizationLevel> for sys::GraphOptimizationLevel {
 	}
 }
 
-/// Allocator type
+/// Execution provider allocator type.
 #[derive(Debug, Clone)]
 #[repr(i32)]
 pub enum AllocatorType {
-	/// Device allocator
+	/// Default device-specific allocator.
 	Device = sys::OrtAllocatorType_OrtDeviceAllocator,
-	/// Arena allocator
+	/// Arena allocator.
 	Arena = sys::OrtAllocatorType_OrtArenaAllocator
 }
 
@@ -311,17 +324,20 @@ impl From<AllocatorType> for sys::OrtAllocatorType {
 	}
 }
 
-/// Memory type
+/// Memory types for allocated memory.
 #[derive(Debug, Clone)]
 #[repr(i32)]
 pub enum MemType {
+	/// Any CPU memory used by non-CPU execution provider.
 	CPUInput = sys::OrtMemType_OrtMemTypeCPUInput,
+	/// CPU accessible memory outputted by non-CPU execution provider, i.e. CUDA_PINNED.
 	CPUOutput = sys::OrtMemType_OrtMemTypeCPUOutput,
-	/// Default memory type
+	/// The default allocator for an execution provider.
 	Default = sys::OrtMemType_OrtMemTypeDefault
 }
 
 impl MemType {
+	/// Temporary CPU accessible memory allocated by non-CPU execution provider, i.e. CUDA_PINNED.
 	pub const CPU: MemType = MemType::CPUOutput;
 }
 

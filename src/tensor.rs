@@ -148,6 +148,7 @@ impl_type_trait!(half::bf16, Bfloat16);
 /// would conflict with the implementations of [IntoTensorElementDataType] for primitive numeric
 /// types (which might implement [`AsRef<str>`] at some point in the future).
 pub trait Utf8Data {
+	/// Returns the contents of this value as a slice of UTF-8 bytes.
 	fn utf8_bytes(&self) -> &[u8];
 }
 

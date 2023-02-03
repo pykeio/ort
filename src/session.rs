@@ -1,3 +1,5 @@
+//! Contains the [`Session`] and [`SessionBuilder`] types for managing ONNX Runtime sessions and performing inference.
+
 #![allow(clippy::tabs_in_doc_comments)]
 
 #[cfg(not(target_family = "windows"))]
@@ -95,6 +97,7 @@ impl Drop for SessionBuilder {
 }
 
 impl SessionBuilder {
+	/// Creates a new session builder in the given environment.
 	pub fn new(env: &Arc<Environment>) -> OrtResult<Self> {
 		let mut session_options_ptr: *mut sys::OrtSessionOptions = std::ptr::null_mut();
 		ortsys![unsafe CreateSessionOptions(&mut session_options_ptr) -> OrtError::CreateSessionOptions; nonNull(session_options_ptr)];
@@ -673,14 +676,16 @@ impl Session {
 		Ok(())
 	}
 
+	/// Gets the session model metadata. See [`Metadata`] for more info.
 	pub fn metadata(&self) -> OrtResult<Metadata> {
 		let mut metadata_ptr: *mut sys::OrtModelMetadata = std::ptr::null_mut();
 		ortsys![unsafe SessionGetModelMetadata(self.session_ptr, &mut metadata_ptr) -> OrtError::GetModelMetadata; nonNull(metadata_ptr)];
 		Ok(Metadata::new(metadata_ptr, self.allocator_ptr))
 	}
 
-	/// Ends profiling for this session. Note that this must be explicitly called at the end of profiling, otherwise
-	/// the profiing file will be empty.
+	/// Ends profiling for this session.
+	///
+	/// Note that this must be explicitly called at the end of profiling, otherwise the profiing file will be empty.
 	#[cfg(feature = "profiling")]
 	pub fn end_profiling(&self) -> OrtResult<String> {
 		let mut profiling_name: *mut c_char = std::ptr::null_mut();

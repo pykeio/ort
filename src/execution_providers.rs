@@ -16,6 +16,10 @@ extern "C" {
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_DML(options: *mut sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> sys::OrtStatusPtr;
 }
 
+/// Execution provider container. See [the ONNX Runtime docs](https://onnxruntime.ai/docs/execution-providers/) for more
+/// info on execution providers. Execution providers are actually registered via the `with_execution_providers()`
+/// functions [`crate::SessionBuilder`] (per-session) or [`crate::EnvBuilder`] (default for all sessions in an
+/// environment).
 #[derive(Debug, Clone)]
 pub struct ExecutionProvider {
 	provider: String,
@@ -51,6 +55,9 @@ macro_rules! ep_options {
 }
 
 impl ExecutionProvider {
+	/// Creates an `ExecutionProvider` for the given execution provider name.
+	///
+	/// You probably want the dedicated methods instead, e.g. [`ExecutionProvider::cuda`].
 	pub fn new(provider: impl Into<String>) -> Self {
 		Self {
 			provider: provider.into(),
@@ -69,6 +76,8 @@ impl ExecutionProvider {
 		directml = "DmlExecutionProvider"
 	}
 
+	/// Returns `true` if this execution provider is available, `false` otherwise.
+	/// The CPU execution provider will always be available.
 	pub fn is_available(&self) -> bool {
 		let mut providers: *mut *mut c_char = std::ptr::null_mut();
 		let mut num_providers = 0;
@@ -90,9 +99,9 @@ impl ExecutionProvider {
 		false
 	}
 
-	/// Configure this execution provider with the given option.
-	pub fn with(mut self, k: impl Into<String>, v: impl Into<String>) -> Self {
-		self.options.insert(k.into(), v.into());
+	/// Configure this execution provider with the given option name and value
+	pub fn with(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+		self.options.insert(name.into(), value.into());
 		self
 	}
 
@@ -198,7 +207,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 			"DmlExecutionProvider" => {
 				let device_id = init_args.get("device_id").map_or(0, |s| s.parse::<i32>().unwrap_or(0));
 				// TODO: extended options with OrtSessionOptionsAppendExecutionProviderEx_DML
-				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_DML(options, device_id.into()) };
+				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_DML(options, device_id) };
 				if status_to_result_and_log("DirectML", status).is_ok() {
 					return; // EP found
 				}

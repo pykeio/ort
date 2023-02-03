@@ -1,7 +1,10 @@
+//! Models for image classification.
+
 #![allow(clippy::upper_case_acronyms)]
 
 use crate::download::ModelUrl;
 
+/// Models for image classification.
 #[derive(Debug, Clone)]
 pub enum ImageClassification {
 	/// Image classification aimed for mobile targets.
@@ -73,10 +76,15 @@ pub enum ResNet {
 
 #[derive(Debug, Clone)]
 pub enum ResNetV1 {
+	/// ResNet v1 with 18 layers.
 	ResNet18,
+	/// ResNet v1 with 34 layers.
 	ResNet34,
+	/// ResNet v1 with 50 layers.
 	ResNet50,
+	/// ResNet v1 with 101 layers.
 	ResNet101,
+	/// ResNet v1 with 152 layers.
 	ResNet152
 }
 
@@ -109,6 +117,7 @@ pub enum Vgg {
 /// power.
 #[derive(Debug, Clone)]
 pub enum ShuffleNetVersion {
+	/// The original ShuffleNet.
 	V1,
 	/// ShuffleNetV2 is an improved architecture that is the state-of-the-art in terms of speed and accuracy tradeoff
 	/// used for image classification.

@@ -1,5 +1,7 @@
 #![allow(clippy::upper_case_acronyms)]
 
+//! Models for machine language comprehension.
+
 use crate::download::ModelUrl;
 
 /// Machine comprehension models.
@@ -20,14 +22,18 @@ pub enum MachineComprehension {
 /// Large transformer-based model that predicts sentiment based on given input text.
 #[derive(Debug, Clone)]
 pub enum RoBERTa {
+	/// Base RoBERTa model.
 	RoBERTaBase,
+	/// RoBERTa model for sequence classification.
 	RoBERTaSequenceClassification
 }
 
 /// Generates synthetic text samples in response to the model being primed with an arbitrary input.
 #[derive(Debug, Clone)]
 pub enum GPT2 {
+	/// Base GPT-2 model.
 	GPT2,
+	/// GPT-2 model with a causal LM head.
 	GPT2LmHead
 }
 

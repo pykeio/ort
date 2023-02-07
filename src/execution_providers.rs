@@ -14,6 +14,8 @@ extern "C" {
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CoreML(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr;
 	#[cfg(feature = "directml")]
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_DML(options: *mut sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> sys::OrtStatusPtr;
+	#[cfg(feature = "rocm")]
+	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_ROCm(options: *mut sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> sys::OrtStatusPtr;
 }
 
 /// Execution provider container. See [the ONNX Runtime docs](https://onnxruntime.ai/docs/execution-providers/) for more
@@ -73,7 +75,8 @@ impl ExecutionProvider {
 		dnnl = "DnnlExecutionProvider",
 		onednn = "DnnlExecutionProvider",
 		coreml = "CoreMLExecutionProvider",
-		directml = "DmlExecutionProvider"
+		directml = "DmlExecutionProvider",
+		rocm = "ROCmExecutionProvider"
 	}
 
 	/// Returns `true` if this execution provider is available, `false` otherwise.
@@ -208,6 +211,14 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 				let device_id = init_args.get("device_id").map_or(0, |s| s.parse::<i32>().unwrap_or(0));
 				// TODO: extended options with OrtSessionOptionsAppendExecutionProviderEx_DML
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_DML(options, device_id) };
+				if status_to_result_and_log("DirectML", status).is_ok() {
+					return; // EP found
+				}
+			}
+			#[cfg(feature = "rocm")]
+			"ROCmExecutionProvider" => {
+				let device_id = init_args.get("device_id").map_or(0, |s| s.parse::<i32>().unwrap_or(0));
+				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_ROCm(options, device_id) };
 				if status_to_result_and_log("DirectML", status).is_ok() {
 					return; // EP found
 				}

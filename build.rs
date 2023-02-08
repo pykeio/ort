@@ -352,7 +352,45 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 				copy_libraries(&lib_dir.join("lib"), &PathBuf::from(env::var("OUT_DIR").unwrap()));
 			}
 
-			(lib_dir, true)
+			let mut needs_link = true;
+			if lib_dir.join("libonnxruntime_common.a").exists() {
+				println!("cargo:rustc-link-search=native={}", lib_dir.display());
+
+				let external_lib_dir = lib_dir.join("external");
+				println!("cargo:rustc-link-search=native={}", external_lib_dir.join("protobuf").join("cmake").display());
+				println!("cargo:rustc-link-lib=static=protobuf-lited");
+
+				println!("cargo:rustc-link-search=native={}", external_lib_dir.join("onnx").display());
+				println!("cargo:rustc-link-lib=static=onnx");
+				println!("cargo:rustc-link-lib=static=onnx_proto");
+
+				println!("cargo:rustc-link-search=native={}", external_lib_dir.join("nsync").display());
+				println!("cargo:rustc-link-lib=static=nsync_cpp");
+
+				println!("cargo:rustc-link-search=native={}", external_lib_dir.join("re2").display());
+				println!("cargo:rustc-link-lib=static=re2");
+
+				println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil-cpp").join("absl").join("base").display());
+				println!("cargo:rustc-link-lib=static=absl_base");
+				println!("cargo:rustc-link-lib=static=absl_throw_delegate");
+				println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil-cpp").join("absl").join("hash").display());
+				println!("cargo:rustc-link-lib=static=absl_hash");
+				println!("cargo:rustc-link-lib=static=absl_low_level_hash");
+				println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil-cpp").join("absl").join("container").display());
+				println!("cargo:rustc-link-lib=static=absl_raw_hash_set");
+
+				if cfg!(target_os = "macos") {
+					println!("cargo:rustc-link-lib=framework=Foundation");
+				}
+
+				println!("cargo:rustc-link-lib=onnxruntime_providers_shared");
+				#[cfg(feature = "rocm")]
+				println!("cargo:rustc-link-lib=onnxruntime_providers_rocm");
+
+				needs_link = false;
+			}
+
+			(lib_dir, needs_link)
 		}
 		"compile" => {
 			use std::process::Command;
@@ -479,15 +517,38 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 				}
 			}
 
-			// also need to link to onnx.lib and onnx_proto.lib
-			let external_lib_dir = lib_dir.parent().unwrap().join("external").join("onnx");
-			let external_lib_dir = if cfg!(target_os = "windows") { external_lib_dir.join(config) } else { external_lib_dir };
-			println!("cargo:rustc-link-search=native={}", external_lib_dir.display());
+			println!("cargo:rustc-link-search=native={}", lib_dir.display());
+
+			let external_lib_dir = lib_dir.join("external");
+			println!("cargo:rustc-link-search=native={}", external_lib_dir.join("protobuf").join("cmake").display());
+			println!("cargo:rustc-link-lib=static=protobuf-lited");
+
+			println!("cargo:rustc-link-search=native={}", external_lib_dir.join("onnx").display());
 			println!("cargo:rustc-link-lib=static=onnx");
 			println!("cargo:rustc-link-lib=static=onnx_proto");
 
+			println!("cargo:rustc-link-search=native={}", external_lib_dir.join("nsync").display());
+			println!("cargo:rustc-link-lib=static=nsync_cpp");
+
+			println!("cargo:rustc-link-search=native={}", external_lib_dir.join("re2").display());
+			println!("cargo:rustc-link-lib=static=re2");
+
+			println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil-cpp").join("absl").join("base").display());
+			println!("cargo:rustc-link-lib=static=absl_base");
+			println!("cargo:rustc-link-lib=static=absl_throw_delegate");
+			println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil-cpp").join("absl").join("hash").display());
+			println!("cargo:rustc-link-lib=static=absl_hash");
+			println!("cargo:rustc-link-lib=static=absl_low_level_hash");
+			println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil-cpp").join("absl").join("container").display());
+			println!("cargo:rustc-link-lib=static=absl_raw_hash_set");
+
+			if cfg!(target_os = "macos") {
+				println!("cargo:rustc-link-lib=framework=Foundation");
+			}
+
 			println!("cargo:rustc-link-lib=onnxruntime_providers_shared");
-			println!("cargo:rustc-link-search=native={}", lib_dir.display());
+			#[cfg(feature = "rocm")]
+			println!("cargo:rustc-link-lib=onnxruntime_providers_rocm");
 
 			(out_dir, false)
 		}

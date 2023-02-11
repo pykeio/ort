@@ -533,38 +533,38 @@ impl Session {
 	/// # Examples
 	///
 	/// ```
-	/// use std::sync::Arc;
-	/// use ort::{AllocatorType, Environment, ExecutionProvider, GraphOptimizationLevel, LoggingLevel, MemType, Session, SessionBuilder};
-	/// use ort::memory::MemoryInfo;
-	/// use ort::ort_value::Value;
-	///
-	/// let model_path = "yolov5n.onnx";
-	/// let input_mem_info = MemoryInfo::new(AllocatorType::Arena, MemType::CPUInput)?;
-	/// let output_mem_info = MemoryInfo::new(AllocatorType::Arena, MemType::CPUOutput)?;
-	/// let slice = v.into_boxed_slice();
-	/// let input_data = vec![0_f32; 1*3*416*416].into_boxed_slice();
-	/// let output_data = vec![0_f32; 1*10647*7].into_boxed_slice();
-	/// let input = Value::new_tensor_with_data(&input_mem_info, &input_data, &[1,3,416,416]).unwrap();
-	/// let mut output = Value::new_tensor_with_data(&output_mem_info, &output_data, &[1, 10647, 7]).unwrap();
-	/// let input_tensor = unsafe { input.as_ptr() };
-	/// let output_tensor = unsafe { output.as_mut_ptr() };
-	/// let mut providers = vec![
-	///             ExecutionProvider::tensorrt().with_device_id(device_id),
-	///             ExecutionProvider::cuda().with_device_id(device_id),
-	///         ];
-	/// let environment = Arc::new(Environment::builder()
-	///                 .with_name("")
-	///                 .with_log_level(LoggingLevel::Error)
-	///                 .with_execution_providers(&providers).build()?
-	///         );
-	/// let session: Session = SessionBuilder::new(&environment).unwrap()
+	///  use std::sync::Arc;
+	///  use ort::{AllocatorType, Environment, ExecutionProvider,
+	///      GraphOptimizationLevel, LoggingLevel,
+	///      MemType, Session, SessionBuilder};
+	///  use ort::memory::MemoryInfo;
+	///  use ort::ort_value::Value;
+	///  let model_path = "yolov5n.onnx";
+	///  let input_mem_info = MemoryInfo::new(AllocatorType::Arena, MemType::CPUInput).unwrap();
+	///  let output_mem_info = MemoryInfo::new(AllocatorType::Arena, MemType::CPUOutput).unwrap();
+	///  let input_data = vec![0_f32; 1*3*416*416].into_boxed_slice();
+	///  let output_data = vec![0_f32; 1*10647*7].into_boxed_slice();
+	///  let input = Value::new_tensor_with_data(&input_mem_info, &input_data, &[1,3,416,416]).unwrap();
+	///  let mut output = Value::new_tensor_with_data(&output_mem_info, &output_data, &[1, 10647, 7]).unwrap();
+	///  let input_tensor = unsafe { input.as_ptr() };
+	///  let output_tensor = unsafe { output.as_mut_ptr() };
+	///  let mut providers = vec![
+	///         ExecutionProvider::tensorrt().with_device_id(0),
+	///         ExecutionProvider::cuda().with_device_id(0),
+	///  ];
+	///  let environment = Arc::new(Environment::builder()
+	/// 	   .with_name("")
+	/// 	   .with_log_level(LoggingLevel::Error)
+	/// 	   .with_execution_providers(&providers).build().unwrap()
+	///  );
+	///  let session: Session = SessionBuilder::new(&environment).unwrap()
 	/// 	.with_optimization_level(GraphOptimizationLevel::Level3).unwrap()
 	/// 	.with_model_from_file(model_path).unwrap();
-	/// session.run_with_capi(&[input_tensor], &mut [output_tensor]).unwrap();
-	/// for i in 0..output_data.len(){
+	///  session.run_with_capi(&[input_tensor], &mut [output_tensor]).unwrap();
+	///  for i in 0..output_data.len(){
 	/// 	let i: f32 = output_data[i];
-	///     // do something...
-	/// }
+	/// 	// do something...
+	///  }
 	/// ```
 	#[inline]
 	pub fn run_with_capi(&self,

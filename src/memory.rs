@@ -3,7 +3,7 @@ use tracing::{debug, error};
 use super::{error::OrtResult, ortsys, sys, AllocatorType, MemType};
 
 #[derive(Debug)]
-pub(crate) struct MemoryInfo {
+pub struct MemoryInfo {
 	pub ptr: *mut sys::OrtMemoryInfo
 }
 

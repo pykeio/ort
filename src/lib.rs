@@ -9,6 +9,7 @@ pub mod metadata;
 pub mod session;
 pub mod sys;
 pub mod tensor;
+pub mod ort_value;
 
 use std::{
 	ffi::{self, CStr},

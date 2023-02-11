@@ -525,6 +525,81 @@ impl Drop for Session {
 }
 
 impl Session {
+	/// Use the original c api performing inference
+	///
+	/// Note that ONNX models can have multiple inputs; a `Vec<_>` is thus
+	/// use ort::ort_value::Value to wrap the input data raw pointer.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use std::sync::Arc;
+	/// use ort::{AllocatorType, Environment, ExecutionProvider, GraphOptimizationLevel, LoggingLevel, MemType, Session, SessionBuilder};
+	/// use ort::memory::MemoryInfo;
+	/// use ort::ort_value::Value;
+	///
+	/// let model_path = "yolov5n.onnx";
+	/// let input_mem_info = MemoryInfo::new(AllocatorType::Arena, MemType::CPUInput)?;
+	/// let output_mem_info = MemoryInfo::new(AllocatorType::Arena, MemType::CPUOutput)?;
+	/// let slice = v.into_boxed_slice();
+	/// let input_data = vec![0_f32; 1*3*416*416].into_boxed_slice();
+	/// let output_data = vec![0_f32; 1*10647*7].into_boxed_slice();
+	/// let input = Value::new_tensor_with_data(&input_mem_info, &input_data, &[1,3,416,416]).unwrap();
+	/// let mut output = Value::new_tensor_with_data(&output_mem_info, &output_data, &[1, 10647, 7]).unwrap();
+	/// let input_tensor = unsafe { input.as_ptr() };
+	/// let output_tensor = unsafe { output.as_mut_ptr() };
+	/// let mut providers = vec![
+	///             ExecutionProvider::tensorrt().with_device_id(device_id),
+	///             ExecutionProvider::cuda().with_device_id(device_id),
+	///         ];
+	/// let environment = Arc::new(Environment::builder()
+	///                 .with_name("")
+	///                 .with_log_level(LoggingLevel::Error)
+	///                 .with_execution_providers(&providers).build()?
+	///         );
+	/// let session: Session = SessionBuilder::new(&environment).unwrap()
+	/// 	.with_optimization_level(GraphOptimizationLevel::Level3).unwrap()
+	/// 	.with_model_from_file(model_path).unwrap();
+	/// session.run_with_capi(&[input_tensor], &mut [output_tensor]).unwrap();
+	/// for i in 0..output_data.len(){
+	/// 	let i: f32 = output_data[i];
+	///     // do something...
+	/// }
+	/// ```
+	#[inline]
+	pub fn run_with_capi(&self,
+						 inputs: &[*const sys::OrtValue],
+						 outputs: &mut [*mut sys::OrtValue],
+	) -> OrtResult<()>
+	{
+		let input_names: Vec<*const c_char> = self
+			.inputs
+			.iter()
+			.map(|input| input.name.clone())
+			.map(|n| CString::new(n).unwrap())
+			.map(|n| n.into_raw() as *const c_char)
+			.collect();
+		let output_names_cstring: Vec<CString> = self
+			.outputs
+			.iter()
+			.map(|output| output.name.clone())
+			.map(|n| CString::new(n).unwrap())
+			.collect();
+		let output_names: Vec<*const c_char> = output_names_cstring.iter().map(|n| n.as_ptr() as *const c_char).collect();
+		ortsys![
+			unsafe Run(
+				self.session_ptr,
+				std::ptr::null(),
+				input_names.as_ptr(),
+				inputs.as_ptr(),
+				input_names.len() as _,
+				output_names.as_ptr(),
+				output_names.len() as _,
+				outputs.as_mut_ptr()
+			) -> OrtError::SessionRun
+		];
+		Ok(())
+	}
 	/// Run the input data through the ONNX graph, performing inference.
 	///
 	/// Note that ONNX models can have multiple inputs; a `Vec<_>` is thus

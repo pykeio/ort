@@ -9,7 +9,7 @@ use std::{
 	str::FromStr
 };
 
-const ORT_VERSION: &str = "1.13.1";
+const ORT_VERSION: &str = "1.14.0";
 const ORT_RELEASE_BASE_URL: &str = "https://github.com/microsoft/onnxruntime/releases/download";
 const ORT_ENV_STRATEGY: &str = "ORT_STRATEGY";
 const ORT_ENV_SYSTEM_LIB_LOCATION: &str = "ORT_LIB_LOCATION";
@@ -567,6 +567,9 @@ fn generate_bindings(include_dir: &Path) {
 
 	let bindings = bindgen::Builder::default()
         .header("src/wrapper.h")
+		.allowlist_var("Ort.+|ORT.+")
+		.allowlist_function("Ort.+")
+		.allowlist_type("Ort.+")
         .clang_args(clang_args)
         // Tell cargo to invalidate the built crate whenever any of the included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))

@@ -55,7 +55,7 @@ If using shared libraries (as is the default with `ORT_STRATEGY=download`), you 
 
 ### Windows
 Some versions of Windows come bundled with an older vesrion of `onnxruntime.dll` in the System32 folder, which will cause an assertion error at runtime:
-```
+```plaintext
 The given version [13] is not supported, only version 1 to 10 is supported in this build.
 thread 'main' panicked at 'assertion failed: `(left != right)`
   left: `0x0`,

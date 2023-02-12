@@ -43,7 +43,7 @@ mod tests {
 
 	#[test]
 	fn create_memory_info() {
-		let memory_info = MemoryInfo::new(AllocatorType::Arena, MemType::Default).unwrap();
+		let memory_info = MemoryInfo::new(AllocatorType::Device, MemType::Default).unwrap();
 		std::mem::drop(memory_info);
 	}
 }

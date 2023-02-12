@@ -93,7 +93,6 @@ mod download {
 		probabilities.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
 		assert_eq!(class_labels[probabilities[0].0], "n07734744 mushroom", "Expecting class for {} to be a mushroom", IMAGE_TO_LOAD);
-
 		assert_eq!(probabilities[0].0, 947, "Expecting class for {} to be a mushroom (index 947 in labels file)", IMAGE_TO_LOAD);
 
 		Ok(())

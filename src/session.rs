@@ -105,7 +105,7 @@ impl SessionBuilder {
 		Ok(Self {
 			env: Arc::clone(env),
 			session_options_ptr,
-			allocator: AllocatorType::Arena,
+			allocator: AllocatorType::Device,
 			memory_type: MemType::Default,
 			custom_runtime_handles: Vec::new(),
 			execution_providers: Vec::new()
@@ -226,7 +226,7 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
-	/// Set the session's allocator. Defaults to [`AllocatorType::Arena`].
+	/// Set the session's allocator. Defaults to [`AllocatorType::Device`].
 	pub fn with_allocator(mut self, allocator: AllocatorType) -> OrtResult<Self> {
 		self.allocator = allocator;
 		Ok(self)
@@ -370,7 +370,7 @@ impl SessionBuilder {
 		let mut allocator_ptr: *mut sys::OrtAllocator = std::ptr::null_mut();
 		ortsys![unsafe GetAllocatorWithDefaultOptions(&mut allocator_ptr) -> OrtError::GetAllocator; nonNull(allocator_ptr)];
 
-		let memory_info = MemoryInfo::new(AllocatorType::Arena, MemType::Default)?;
+		let memory_info = MemoryInfo::new(AllocatorType::Device, MemType::Default)?;
 
 		// Extract input and output properties
 		let num_input_nodes = dangerous::extract_inputs_count(session_ptr)?;
@@ -424,7 +424,7 @@ impl SessionBuilder {
 		let mut allocator_ptr: *mut sys::OrtAllocator = std::ptr::null_mut();
 		ortsys![unsafe GetAllocatorWithDefaultOptions(&mut allocator_ptr) -> OrtError::GetAllocator; nonNull(allocator_ptr)];
 
-		let memory_info = MemoryInfo::new(AllocatorType::Arena, MemType::Default)?;
+		let memory_info = MemoryInfo::new(AllocatorType::Device, MemType::Default)?;
 
 		// Extract input and output properties
 		let num_input_nodes = dangerous::extract_inputs_count(session_ptr)?;

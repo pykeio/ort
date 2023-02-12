@@ -50,7 +50,7 @@ where
 
 		let shape: Vec<i64> = contiguous_array.shape().iter().map(|d: &usize| *d as i64).collect();
 		let shape_ptr: *const i64 = shape.as_ptr();
-		let shape_len = contiguous_array.shape().len();
+		let shape_len = shape.len();
 
 		match T::tensor_element_data_type() {
 			TensorElementDataType::Float32
@@ -200,7 +200,7 @@ mod tests {
 
 	#[test]
 	fn orttensor_from_array_0d_i32() -> OrtResult<()> {
-		let memory_info = MemoryInfo::new(AllocatorType::Arena, MemType::Default)?;
+		let memory_info = MemoryInfo::new(AllocatorType::Device, MemType::Default)?;
 		let array = arr0::<i32>(123);
 		let tensor = OrtTensor::from_array(&memory_info, ptr::null_mut(), &array)?;
 		let expected_shape: &[usize] = &[];
@@ -210,7 +210,7 @@ mod tests {
 
 	#[test]
 	fn orttensor_from_array_1d_i32() -> OrtResult<()> {
-		let memory_info = MemoryInfo::new(AllocatorType::Arena, MemType::Default)?;
+		let memory_info = MemoryInfo::new(AllocatorType::Device, MemType::Default)?;
 		let array = arr1(&[1_i32, 2, 3, 4, 5, 6]);
 		let tensor = OrtTensor::from_array(&memory_info, ptr::null_mut(), &array)?;
 		let expected_shape: &[usize] = &[6];
@@ -220,7 +220,7 @@ mod tests {
 
 	#[test]
 	fn orttensor_from_array_2d_i32() -> OrtResult<()> {
-		let memory_info = MemoryInfo::new(AllocatorType::Arena, MemType::Default)?;
+		let memory_info = MemoryInfo::new(AllocatorType::Device, MemType::Default)?;
 		let array = arr2(&[[1_i32, 2, 3, 4, 5, 6], [7, 8, 9, 10, 11, 12]]);
 		let tensor = OrtTensor::from_array(&memory_info, ptr::null_mut(), &array)?;
 		assert_eq!(tensor.shape(), &[2, 6]);
@@ -229,7 +229,7 @@ mod tests {
 
 	#[test]
 	fn orttensor_from_array_3d_i32() -> OrtResult<()> {
-		let memory_info = MemoryInfo::new(AllocatorType::Arena, MemType::Default)?;
+		let memory_info = MemoryInfo::new(AllocatorType::Device, MemType::Default)?;
 		let array = arr3(&[
 			[[1_i32, 2, 3, 4, 5, 6], [7, 8, 9, 10, 11, 12]],
 			[[13, 14, 15, 16, 17, 18], [19, 20, 21, 22, 23, 24]],
@@ -242,7 +242,7 @@ mod tests {
 
 	#[test]
 	fn orttensor_from_array_1d_string() -> OrtResult<()> {
-		let memory_info = MemoryInfo::new(AllocatorType::Arena, MemType::Default)?;
+		let memory_info = MemoryInfo::new(AllocatorType::Device, MemType::Default)?;
 		let array = arr1(&[String::from("foo"), String::from("bar"), String::from("baz")]);
 		let tensor = OrtTensor::from_array(&memory_info, ort_default_allocator()?, &array)?;
 		assert_eq!(tensor.shape(), &[3]);
@@ -251,7 +251,7 @@ mod tests {
 
 	#[test]
 	fn orttensor_from_array_3d_str() -> OrtResult<()> {
-		let memory_info = MemoryInfo::new(AllocatorType::Arena, MemType::Default)?;
+		let memory_info = MemoryInfo::new(AllocatorType::Device, MemType::Default)?;
 		let array = arr3(&[[["1", "2", "3"], ["4", "5", "6"]], [["7", "8", "9"], ["10", "11", "12"]]]);
 		let tensor = OrtTensor::from_array(&memory_info, ort_default_allocator()?, &array)?;
 		assert_eq!(tensor.shape(), &[2, 2, 3]);

@@ -56,8 +56,8 @@ pub enum TensorElementDataType {
 	String = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING as OnnxEnumInt,
 	/// Boolean, equivalent to Rust's `bool`.
 	Bool = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL as OnnxEnumInt,
-	#[cfg(feature = "half")]
 	/// 16-bit floating point number, equivalent to `half::f16` (requires the `half` crate).
+	#[cfg(feature = "half")]
 	Float16 = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16 as OnnxEnumInt,
 	/// 64-bit floating point number, equivalent to Rust's `f64`. Also known as `double`.
 	Float64 = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE as OnnxEnumInt,

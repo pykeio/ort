@@ -1,4 +1,4 @@
-use std::{ffi, fmt::Debug, mem::MaybeUninit, ops::Deref};
+use std::{ffi, fmt::Debug, ops::Deref};
 
 use ndarray::Array;
 use tracing::{debug, error};
@@ -40,9 +40,7 @@ where
 		'm: 't // 'm outlives 't
 	{
 		// Ensure that the array is contiguous in memory.
-		let mut contiguous_array: Array<MaybeUninit<T>, D> = Array::uninit(array.raw_dim());
-		array.assign_to(&mut contiguous_array);
-		let mut contiguous_array = unsafe { contiguous_array.assume_init() };
+		let mut contiguous_array: Array<T, D> = array.as_standard_layout().to_owned();
 
 		// where onnxruntime will write the tensor data to
 		let mut tensor_ptr: *mut sys::OrtValue = std::ptr::null_mut();

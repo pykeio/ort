@@ -24,11 +24,12 @@ codegen-units = 1
 features = [ "half", "fetch-models", "copy-dylibs" ]
 
 [features]
-default = [ "half", "fetch-models", "copy-dylibs" ]
+default = [ "half", "fetch-models", "download-binaries", "copy-dylibs" ]
 
 profiling = [ "widestring" ]
 
 fetch-models = [ "ureq" ]
+download-binaries = [ "ureq", "zip" ]
 generate-bindings = [ "bindgen" ]
 copy-dylibs = []
 
@@ -57,11 +58,9 @@ cann = []
 
 [dependencies]
 ndarray = "0.15"
-num-complex = "0.4"
-num-traits = "0.2"
 thiserror = "1.0"
 
-ureq = { version = "2.1", optional = true }
+ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }
 lazy_static = "1.4"
 tracing = "0.1"
 half = { version = "2.1", optional = true }
@@ -82,10 +81,9 @@ tokenizers = { version = "0.13", default-features = false, features = [ "onig" ]
 rand = "0.8"
 
 [build-dependencies]
-casey = "0.3"
 bindgen = { version = "0.63", optional = true }
-ureq = "2.1"
-zip = { version = "0.6", default-features = false, features = [ "deflate" ] }
+ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }
+zip = { version = "0.6", optional = true, default-features = false, features = [ "deflate" ] }
 
 [target.'cfg(not(target_os = "windows"))'.build-dependencies]
 flate2 = "1.0"

@@ -8,10 +8,16 @@
 See [the docs](https://docs.rs/ort) and [`examples/`](https://github.com/pykeio/ort/tree/main/examples) for more detailed information.
 
 ## Cargo features
-- **`fetch-models`**: Enables fetching models from the ONNX Model Zoo.
+> **Note:**
+> For developers using `ort` in a **library** (if you are developing an *app*, you can skip this part), it is heavily recommended to use `default-features = false` to avoid bringing in unnecessary bloat.
+> Cargo features are **additive**. Users of a library that requires `ort` with default features enabled **will not be able to remove those features**, and if the library isn't using them, it's just adding unnecessary bloat. This is especially true for the `fetch-models` feature, which you should almost never use in production.
+> Instead, you should enable `ort`'s default features in your *dev dependencies only*, and instruct downstream users to include `ort = { version = "...", features = [ "download-binaries" ] }` in their dependencies if they need it.
+
+- **`fetch-models` (default)**: Enables fetching models from the ONNX Model Zoo. Useful for quick testing with some common models. Not recommended in production.
+- **`download-binaries` (default)**: Enables downloading binaries via the `download` [strategy](#strategies). If disabled, the default behavior will be the `system` strategy.
+- **`copy-dylibs` (default)**: Copy dynamic libraries to the Cargo `target` folder.
+- **`half` (default)**: Builds support for `float16`/`bfloat16` ONNX tensors.
 - **`generate-bindings`**: Update/generate ONNX Runtime bindings with `bindgen`. Requires [libclang](https://clang.llvm.org/doxygen/group__CINDEX.html).
-- **`copy-dylibs`**: Copy dynamic libraries to the Cargo `target` folder.
-- **`half`**: Builds support for `float16`/`bfloat16` ONNX tensors.
 - **Execution providers**: These are required to use some execution providers. If you are using an execution provider not provided for your platform by the `download` strategy, you must use the `compile` or `system` strategies with binaries that support those execution providers, otherwise you'll run into linking errors.
     - Some EPs are not currently implemented due to a lack of hardware for testing. Please open an issue if your desired EP has a ⚠️
     - **`cuda`**: Enables the CUDA execution provider for Maxwell (7xx) NVIDIA GPUs and above. Requires CUDA v11.6+.
@@ -39,7 +45,7 @@ See [the docs](https://docs.rs/ort) and [`examples/`](https://github.com/pykeio/
 
 ## Strategies
 There are 3 'strategies' for obtaining and linking ONNX Runtime binaries. The strategy can be set with the `ORT_STRATEGY` environment variable.
-- **`download` (default)**: Downloads prebuilt ONNX Runtime from Microsoft. These binaries [may collect telemetry](https://github.com/microsoft/onnxruntime/blob/main/docs/Privacy.md).
+- **`download` (default)**: Downloads prebuilt ONNX Runtime from Microsoft. Only a few execution providers are available for download at the moment, namely CUDA and TensorRT. These binaries [may collect telemetry](https://github.com/microsoft/onnxruntime/blob/main/docs/Privacy.md). In the future, pyke may provide binaries with telemetry disabled and more execution providers available.
 - **`system`**: Links to ONNX Runtime binaries provided by the system or a path pointed to by the `ORT_LIB_LOCATION` environment variable. `ort` will automatically link to static or dynamic libraries depending on what is available in the `ORT_LIB_LOCATION` folder.
 - **`compile`**: Clones & compiles ONNX Runtime from source. This is **extremely slow**! It's recommended to use `system` instead.
 

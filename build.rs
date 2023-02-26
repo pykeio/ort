@@ -25,20 +25,20 @@ const PROTOBUF_RELEASE_BASE_URL: &str = "https://github.com/protocolbuffers/prot
 
 macro_rules! incompatible_providers {
 	($($provider:ident),*) => {
-		#[allow(unused_imports)]
-		use casey::upper;
 		$(
-			if env::var(concat!("CARGO_FEATURE_", stringify!(upper!($provider)))).is_ok() {
+			if env::var(concat!("CARGO_FEATURE_", stringify!($provider))).is_ok() {
 				panic!(concat!("Provider not available for this strategy and/or target: ", stringify!($provider)));
 			}
 		)*
 	}
 }
 
+#[cfg(feature = "download-binaries")]
 trait OnnxPrebuiltArchive {
 	fn as_onnx_str(&self) -> Cow<str>;
 }
 
+#[cfg(feature = "download-binaries")]
 #[derive(Debug)]
 enum Architecture {
 	X86,
@@ -47,6 +47,7 @@ enum Architecture {
 	Arm64
 }
 
+#[cfg(feature = "download-binaries")]
 impl FromStr for Architecture {
 	type Err = String;
 
@@ -61,6 +62,7 @@ impl FromStr for Architecture {
 	}
 }
 
+#[cfg(feature = "download-binaries")]
 impl OnnxPrebuiltArchive for Architecture {
 	fn as_onnx_str(&self) -> Cow<str> {
 		match self {
@@ -72,6 +74,7 @@ impl OnnxPrebuiltArchive for Architecture {
 	}
 }
 
+#[cfg(feature = "download-binaries")]
 #[derive(Debug)]
 #[allow(clippy::enum_variant_names)]
 enum Os {
@@ -80,6 +83,7 @@ enum Os {
 	MacOS
 }
 
+#[cfg(feature = "download-binaries")]
 impl Os {
 	fn archive_extension(&self) -> &'static str {
 		match self {
@@ -90,6 +94,7 @@ impl Os {
 	}
 }
 
+#[cfg(feature = "download-binaries")]
 impl FromStr for Os {
 	type Err = String;
 
@@ -103,6 +108,7 @@ impl FromStr for Os {
 	}
 }
 
+#[cfg(feature = "download-binaries")]
 impl OnnxPrebuiltArchive for Os {
 	fn as_onnx_str(&self) -> Cow<str> {
 		match self {
@@ -113,12 +119,14 @@ impl OnnxPrebuiltArchive for Os {
 	}
 }
 
+#[cfg(feature = "download-binaries")]
 #[derive(Debug)]
 enum Accelerator {
 	None,
 	Gpu
 }
 
+#[cfg(feature = "download-binaries")]
 impl OnnxPrebuiltArchive for Accelerator {
 	fn as_onnx_str(&self) -> Cow<str> {
 		match self {
@@ -128,6 +136,7 @@ impl OnnxPrebuiltArchive for Accelerator {
 	}
 }
 
+#[cfg(feature = "download-binaries")]
 #[derive(Debug)]
 struct Triplet {
 	os: Os,
@@ -135,6 +144,7 @@ struct Triplet {
 	accelerator: Accelerator
 }
 
+#[cfg(feature = "download-binaries")]
 impl OnnxPrebuiltArchive for Triplet {
 	fn as_onnx_str(&self) -> Cow<str> {
 		match (&self.os, &self.arch, &self.accelerator) {
@@ -161,6 +171,7 @@ impl OnnxPrebuiltArchive for Triplet {
 	}
 }
 
+#[cfg(feature = "download-binaries")]
 fn prebuilt_onnx_url() -> (PathBuf, String) {
 	let accelerator = if cfg!(feature = "cuda") || cfg!(feature = "tensorrt") {
 		Accelerator::Gpu
@@ -204,6 +215,7 @@ fn prebuilt_protoc_url() -> (PathBuf, String) {
 	(PathBuf::from(prebuilt_archive), prebuilt_url)
 }
 
+#[cfg(feature = "download-binaries")]
 fn download<P>(source_url: &str, target_file: P)
 where
 	P: AsRef<Path>
@@ -226,6 +238,7 @@ where
 	writer.write_all(&buffer).unwrap();
 }
 
+#[cfg(feature = "download-binaries")]
 fn extract_archive(filename: &Path, output: &Path) {
 	match filename.extension().map(|e| e.to_str()) {
 		Some(Some("zip")) => extract_zip(filename, output),
@@ -235,7 +248,7 @@ fn extract_archive(filename: &Path, output: &Path) {
 	}
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(feature = "download-binaries", not(target_os = "windows")))]
 fn extract_tgz(filename: &Path, output: &Path) {
 	let file = fs::File::open(&filename).unwrap();
 	let buf = io::BufReader::new(file);
@@ -244,6 +257,7 @@ fn extract_tgz(filename: &Path, output: &Path) {
 	archive.unpack(output).unwrap();
 }
 
+#[cfg(feature = "download-binaries")]
 fn extract_zip(filename: &Path, outpath: &Path) {
 	let file = fs::File::open(filename).unwrap();
 	let buf = io::BufReader::new(file);
@@ -288,6 +302,75 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 	}
 }
 
+fn system_strategy() -> (PathBuf, bool) {
+	let lib_dir = PathBuf::from(env::var(ORT_ENV_SYSTEM_LIB_LOCATION).expect("[ort] system strategy requires ORT_LIB_LOCATION env var to be set"));
+	#[cfg(feature = "copy-dylibs")]
+	{
+		copy_libraries(&lib_dir.join("lib"), &PathBuf::from(env::var("OUT_DIR").unwrap()));
+	}
+
+	let mut needs_link = true;
+	if lib_dir.join("libonnxruntime_common.a").exists() {
+		println!("cargo:rustc-link-search=native={}", lib_dir.display());
+
+		println!("cargo:rustc-link-lib=stdc++");
+
+		for lib in &["common", "flatbuffers", "framework", "graph", "mlas", "optimizer", "providers", "session", "util"] {
+			let lib_path = lib_dir.join(if cfg!(target_os = "windows") {
+				format!("onnxruntime_{lib}.lib")
+			} else {
+				format!("libonnxruntime_{lib}.a")
+			});
+			// sanity check, just make sure the library exists before we try to link to it
+			if lib_path.exists() {
+				println!("cargo:rustc-link-lib=static=onnxruntime_{lib}");
+			} else {
+				panic!("[ort] unable to find ONNX Runtime library: {}", lib_path.display());
+			}
+		}
+
+		let external_lib_dir = lib_dir.join("_deps");
+		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("protobuf-build").display());
+		println!("cargo:rustc-link-lib=static=protobuf-lited");
+
+		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("onnx-build").display());
+		println!("cargo:rustc-link-lib=static=onnx");
+		println!("cargo:rustc-link-lib=static=onnx_proto");
+
+		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("google_nsync-build").display());
+		println!("cargo:rustc-link-lib=static=nsync_cpp");
+
+		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("pytorch_cpuinfo-build").display());
+		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("pytorch_cpuinfo-build").join("deps").join("clog").display());
+		println!("cargo:rustc-link-lib=static=cpuinfo");
+		println!("cargo:rustc-link-lib=static=clog");
+
+		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("re2-build").display());
+		println!("cargo:rustc-link-lib=static=re2");
+
+		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil_cpp-build").join("absl").join("base").display());
+		println!("cargo:rustc-link-lib=static=absl_base");
+		println!("cargo:rustc-link-lib=static=absl_throw_delegate");
+		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil_cpp-build").join("absl").join("hash").display());
+		println!("cargo:rustc-link-lib=static=absl_hash");
+		println!("cargo:rustc-link-lib=static=absl_low_level_hash");
+		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil_cpp-build").join("absl").join("container").display());
+		println!("cargo:rustc-link-lib=static=absl_raw_hash_set");
+
+		if cfg!(target_os = "macos") {
+			println!("cargo:rustc-link-lib=framework=Foundation");
+		}
+
+		println!("cargo:rustc-link-lib=onnxruntime_providers_shared");
+		#[cfg(feature = "rocm")]
+		println!("cargo:rustc-link-lib=onnxruntime_providers_rocm");
+
+		needs_link = false;
+	}
+
+	(lib_dir, needs_link)
+}
+
 fn prepare_libort_dir() -> (PathBuf, bool) {
 	let strategy = env::var(ORT_ENV_STRATEGY);
 	println!("[ort] strategy: {:?}", strategy.as_ref().map(String::as_str).unwrap_or_else(|_| "unknown"));
@@ -295,29 +378,30 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 	let target = env::var("TARGET").unwrap();
 	let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
 	if target_arch.eq_ignore_ascii_case("aarch64") {
-		incompatible_providers![cuda, openvino, vitis_ai, tensorrt, migraphx, rocm];
+		incompatible_providers![CUDA, OPENVINO, VITIS_AI, TENSORRT, MIGRAPHX, ROCM];
 	} else if target_arch.eq_ignore_ascii_case("x86_64") {
-		incompatible_providers![vitis_ai, acl, armnn];
+		incompatible_providers![VITIS_AI, ACL, ARMNN];
 	} else {
 		panic!("unsupported target architecture: {target_arch}");
 	}
 
 	if target.contains("macos") {
-		incompatible_providers![cuda, openvino, tensorrt, directml, winml];
+		incompatible_providers![CUDA, OPENVINO, VITIS_AI, TENSORRT, winml];
 	} else if target.contains("windows") {
-		incompatible_providers![coreml, vitis_ai, acl, armnn];
+		incompatible_providers![COREML, VITIS_AI, ACL, ARMNN];
 	} else {
-		incompatible_providers![coreml, vitis_ai, directml, winml];
+		incompatible_providers![COREML, VITIS_AI, DIRECTML, WINML];
 	}
 
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_STRATEGY);
 
 	match strategy.as_ref().map_or("download", String::as_str) {
+		#[cfg(feature = "download-binaries")]
 		"download" => {
 			if target.contains("macos") {
-				incompatible_providers![cuda, onednn, openvino, openmp, vitis_ai, tvm, tensorrt, migraphx, directml, winml, acl, armnn, rocm];
+				incompatible_providers![CUDA, ONEDNN, OPENVINO, OPENMP, VITIS_AI, TVM, TENSORRT, MIGRAPHX, DIRECTML, WINML, ACML, ARMNN, ROCM];
 			} else {
-				incompatible_providers![onednn, coreml, openvino, openmp, vitis_ai, tvm, migraphx, directml, winml, acl, armnn, rocm];
+				incompatible_providers![ONEDNN, COREML, OPENVINO, OPENMP, VITIS_AI, TVM, DIRECTML, WINML, ACML, ARMNN, ROCM];
 			}
 
 			let (prebuilt_archive, prebuilt_url) = prebuilt_onnx_url();
@@ -345,74 +429,9 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 
 			(lib_dir, true)
 		}
-		"system" => {
-			let lib_dir = PathBuf::from(env::var(ORT_ENV_SYSTEM_LIB_LOCATION).expect("[ort] system strategy requires ORT_LIB_LOCATION env var to be set"));
-			#[cfg(feature = "copy-dylibs")]
-			{
-				copy_libraries(&lib_dir.join("lib"), &PathBuf::from(env::var("OUT_DIR").unwrap()));
-			}
-
-			let mut needs_link = true;
-			if lib_dir.join("libonnxruntime_common.a").exists() {
-				println!("cargo:rustc-link-search=native={}", lib_dir.display());
-
-				println!("cargo:rustc-link-lib=stdc++");
-
-				for lib in &["common", "flatbuffers", "framework", "graph", "mlas", "optimizer", "providers", "session", "util"] {
-					let lib_path = lib_dir.join(if cfg!(target_os = "windows") {
-						format!("onnxruntime_{lib}.lib")
-					} else {
-						format!("libonnxruntime_{lib}.a")
-					});
-					// sanity check, just make sure the library exists before we try to link to it
-					if lib_path.exists() {
-						println!("cargo:rustc-link-lib=static=onnxruntime_{lib}");
-					} else {
-						panic!("[ort] unable to find ONNX Runtime library: {}", lib_path.display());
-					}
-				}
-
-				let external_lib_dir = lib_dir.join("_deps");
-				println!("cargo:rustc-link-search=native={}", external_lib_dir.join("protobuf-build").display());
-				println!("cargo:rustc-link-lib=static=protobuf-lited");
-
-				println!("cargo:rustc-link-search=native={}", external_lib_dir.join("onnx-build").display());
-				println!("cargo:rustc-link-lib=static=onnx");
-				println!("cargo:rustc-link-lib=static=onnx_proto");
-
-				println!("cargo:rustc-link-search=native={}", external_lib_dir.join("google_nsync-build").display());
-				println!("cargo:rustc-link-lib=static=nsync_cpp");
-
-				println!("cargo:rustc-link-search=native={}", external_lib_dir.join("pytorch_cpuinfo-build").display());
-				println!("cargo:rustc-link-search=native={}", external_lib_dir.join("pytorch_cpuinfo-build").join("deps").join("clog").display());
-				println!("cargo:rustc-link-lib=static=cpuinfo");
-				println!("cargo:rustc-link-lib=static=clog");
-
-				println!("cargo:rustc-link-search=native={}", external_lib_dir.join("re2-build").display());
-				println!("cargo:rustc-link-lib=static=re2");
-
-				println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil_cpp-build").join("absl").join("base").display());
-				println!("cargo:rustc-link-lib=static=absl_base");
-				println!("cargo:rustc-link-lib=static=absl_throw_delegate");
-				println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil_cpp-build").join("absl").join("hash").display());
-				println!("cargo:rustc-link-lib=static=absl_hash");
-				println!("cargo:rustc-link-lib=static=absl_low_level_hash");
-				println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil_cpp-build").join("absl").join("container").display());
-				println!("cargo:rustc-link-lib=static=absl_raw_hash_set");
-
-				if cfg!(target_os = "macos") {
-					println!("cargo:rustc-link-lib=framework=Foundation");
-				}
-
-				println!("cargo:rustc-link-lib=onnxruntime_providers_shared");
-				#[cfg(feature = "rocm")]
-				println!("cargo:rustc-link-lib=onnxruntime_providers_rocm");
-
-				needs_link = false;
-			}
-
-			(lib_dir, needs_link)
-		}
+		#[cfg(not(feature = "download-binaries"))]
+		"download" | "system" => system_strategy(),
+		"system" => system_strategy(),
 		"compile" => {
 			use std::process::Command;
 

@@ -1,9 +1,9 @@
 <div align=center>
 	<h1><code>ort</code> - ONNX Runtime Rust bindings</h1>
-    <a href="https://app.codecov.io/gh/pykeio/ort" target="_blank"><img alt="Coverage Results" src="https://img.shields.io/codecov/c/gh/pykeio/ort?style=for-the-badge"></a> <a href="https://github.com/pykeio/ort/actions/workflows/test.yml"><img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/pykeio/ort/test.yml?branch=main&style=for-the-badge"></a><a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/d/ort?style=for-the-badge"></a>
+    <a href="https://app.codecov.io/gh/pykeio/ort" target="_blank"><img alt="Coverage Results" src="https://img.shields.io/codecov/c/gh/pykeio/ort?style=for-the-badge"></a> <a href="https://github.com/pykeio/ort/actions/workflows/test.yml"><img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/pykeio/ort/test.yml?branch=main&style=for-the-badge"></a> <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/d/ort?style=for-the-badge"></a>
 </div>
 
-`ort` is an ONNX Runtime wrapper for Rust based on [`onnxruntime-rs`](https://github.com/nbigaouette/onnxruntime-rs). `ort` is updated for ONNX Runtime 1.14.0 and contains many API improvements & fixes.
+`ort` is an [ONNX Runtime](https://onnxruntime.ai/) 1.14 wrapper for Rust based on [`onnxruntime-rs`](https://github.com/nbigaouette/onnxruntime-rs). ONNX Runtime accelerates ML inference on both CPU & GPU.
 
 See [the docs](https://docs.rs/ort) and [`examples/`](https://github.com/pykeio/ort/tree/main/examples) for more detailed information.
 
@@ -29,11 +29,11 @@ See [the docs](https://docs.rs/ort) and [`examples/`](https://github.com/pykeio/
     - ⚠️ **`nnapi`**: Enables the Android Neural Networks API (NNAPI) execution provider.
     - **`coreml`**: Enables the CoreML execution provider for macOS/iOS targets.
     - ⚠️ **`xnnpack`**: Enables the [XNNPACK](https://github.com/google/XNNPACK) backend for WebAssembly and Android.
-    - ⚠️ **`rocm`**: Enables the ROCm execution provider for AMD ROCm-enabled GPUs.
+    - ⚠️ **`migraphx`**: Enables the MIGraphX execution provider AMD GPUs.
+    - ⚠️ **`rocm`**: Enables the ROCm execution provider for AMD ROCm-enabled GPUs. ([#16](https://github.com/pykeio/ort/issues/16))
     - **`acl`**: Enables the ARM Compute Library execution provider for multi-core ARM v8 processors.
     - ⚠️ **`armnn`**: Enables the ArmNN execution provider for ARM v8 targets.
     - ⚠️ **`tvm`**: Enables the **preview** Apache TVM execution provider.
-    - ⚠️ **`migraphx`**: Enables the MIGraphX execution provider for Windows x86/x64 targets with dedicated AMD GPUs.
     - ⚠️ **`rknpu`**: Enables the RKNPU execution provider for Rockchip NPUs.
     - ⚠️ **`vitis`**: Enables Xilinx's Vitis-AI execution provider for U200/U250 accelerators.
     - ⚠️ **`cann`**: Enables the Huawei Compute Architecture for Neural Networks (CANN) execution provider.
@@ -101,3 +101,7 @@ macOS has the same limitations as Linux. If enabling rpath, note that the rpath 
 [target.x86_64-apple-darwin]
 rustflags = [ "-Clink-args=-Wl,-rpath,@loader_path" ]
 ```
+
+## Projects using `ort` ❤️
+- [Bloop](https://bloop.ai/)
+- [pyke Diffusers](https://github.com/pykeio/diffusers)

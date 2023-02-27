@@ -378,19 +378,19 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 	let target = env::var("TARGET").unwrap();
 	let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
 	if target_arch.eq_ignore_ascii_case("aarch64") {
-		incompatible_providers![CUDA, OPENVINO, VITIS_AI, TENSORRT, MIGRAPHX, ROCM];
+		incompatible_providers![CUDA, OPENVINO, VITIS, TENSORRT, MIGRAPHX, ROCM];
 	} else if target_arch.eq_ignore_ascii_case("x86_64") {
-		incompatible_providers![VITIS_AI, ACL, ARMNN];
+		incompatible_providers![ACL, ARMNN, CANN, RKNPU];
 	} else {
 		panic!("unsupported target architecture: {target_arch}");
 	}
 
 	if target.contains("macos") {
-		incompatible_providers![CUDA, OPENVINO, VITIS_AI, TENSORRT, winml];
+		incompatible_providers![CUDA, OPENVINO, VITIS, ACL, ARMNN, TENSORRT, WINML, CANN];
 	} else if target.contains("windows") {
-		incompatible_providers![COREML, VITIS_AI, ACL, ARMNN];
+		incompatible_providers![COREML, VITIS, ACL, ARMNN, ARMNN, CANN];
 	} else {
-		incompatible_providers![COREML, VITIS_AI, DIRECTML, WINML];
+		incompatible_providers![COREML, DIRECTML, WINML];
 	}
 
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_STRATEGY);
@@ -399,9 +399,9 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 		#[cfg(feature = "download-binaries")]
 		"download" => {
 			if target.contains("macos") {
-				incompatible_providers![CUDA, ONEDNN, OPENVINO, OPENMP, VITIS_AI, TVM, TENSORRT, MIGRAPHX, DIRECTML, WINML, ACML, ARMNN, ROCM];
+				incompatible_providers![CUDA, ONEDNN, OPENVINO, VITIS, TVM, TENSORRT, MIGRAPHX, DIRECTML, WINML, ACML, ARMNN, ROCM];
 			} else {
-				incompatible_providers![ONEDNN, COREML, OPENVINO, OPENMP, VITIS_AI, TVM, DIRECTML, WINML, ACML, ARMNN, ROCM];
+				incompatible_providers![ONEDNN, COREML, OPENVINO, VITIS, TVM, MIGRAPHX, DIRECTML, WINML, ACML, ARMNN, ROCM];
 			}
 
 			let (prebuilt_archive, prebuilt_url) = prebuilt_onnx_url();

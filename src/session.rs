@@ -11,6 +11,8 @@ use std::{env, path::PathBuf, time::Duration};
 use std::{
 	ffi::CString,
 	fmt::{self, Debug},
+	marker::PhantomData,
+	ops::Deref,
 	os::raw::c_char,
 	path::Path,
 	sync::Arc
@@ -392,15 +394,8 @@ impl SessionBuilder {
 		})
 	}
 
-	/// Load an ONNX graph from memory and commit the session
-	pub fn with_model_from_memory<B>(self, model_bytes: B) -> OrtResult<Session>
-	where
-		B: AsRef<[u8]>
-	{
-		self.with_model_from_memory_monomorphized(model_bytes.as_ref())
-	}
-
-	fn with_model_from_memory_monomorphized(self, model_bytes: &[u8]) -> OrtResult<Session> {
+	/// Load an ONNX graph from memory and commit the session.
+	pub fn with_model_from_memory<'s>(self, model_bytes: &'s [u8]) -> OrtResult<InMemorySession<'s>> {
 		let mut session_ptr: *mut sys::OrtSession = std::ptr::null_mut();
 
 		let env_ptr: *const sys::OrtEnv = self.env.env_ptr();
@@ -413,6 +408,17 @@ impl SessionBuilder {
 				.cloned()
 				.collect::<Vec<_>>()
 		);
+
+		let str_to_char = |s: &str| {
+			s.as_bytes()
+				.iter()
+				.chain(std::iter::once(&b'\0')) // Make sure we have a null terminated string
+				.map(|b| *b as std::os::raw::c_char)
+				.collect::<Vec<std::os::raw::c_char>>()
+		};
+		// Enable zero-copy deserialization for models in `.ort` format.
+		ortsys![unsafe AddSessionConfigEntry(self.session_options_ptr, str_to_char("session.use_ort_model_bytes_directly").as_ptr(), str_to_char("1").as_ptr())];
+		ortsys![unsafe AddSessionConfigEntry(self.session_options_ptr, str_to_char("session.use_ort_model_bytes_for_initializers").as_ptr(), str_to_char("1").as_ptr())];
 
 		let model_data = model_bytes.as_ptr() as *const std::ffi::c_void;
 		let model_data_length = model_bytes.len();
@@ -436,14 +442,15 @@ impl SessionBuilder {
 			.map(|i| dangerous::extract_output(session_ptr, allocator_ptr, i))
 			.collect::<OrtResult<Vec<Output>>>()?;
 
-		Ok(Session {
+		let session = Session {
 			env: Arc::clone(&self.env),
 			session_ptr,
 			allocator_ptr,
 			memory_info,
 			inputs,
 			outputs
-		})
+		};
+		Ok(InMemorySession { session, phantom: PhantomData })
 	}
 }
 
@@ -459,6 +466,19 @@ pub struct Session {
 	pub inputs: Vec<Input>,
 	/// Information about the ONNX's outputs as stored in loaded file
 	pub outputs: Vec<Output>
+}
+
+/// A [`Session`] with data stored in-memory.
+pub struct InMemorySession<'s> {
+	session: Session,
+	phantom: PhantomData<&'s ()>
+}
+
+impl<'s> Deref for InMemorySession<'s> {
+	type Target = Session;
+	fn deref(&self) -> &Self::Target {
+		&self.session
+	}
 }
 
 /// Information about an ONNX's input as stored in loaded file

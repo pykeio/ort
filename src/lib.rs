@@ -17,12 +17,12 @@ use std::{
 	sync::{atomic::AtomicPtr, Arc, Mutex}
 };
 
-pub use environment::Environment;
-pub use error::{OrtApiError, OrtError, OrtResult};
-pub use execution_providers::ExecutionProvider;
 use lazy_static::lazy_static;
-pub use session::{Session, SessionBuilder};
 
+pub use self::environment::Environment;
+pub use self::error::{OrtApiError, OrtError, OrtResult};
+pub use self::execution_providers::ExecutionProvider;
+pub use self::session::{InMemorySession, Session, SessionBuilder};
 use self::sys::OnnxEnumInt;
 
 macro_rules! extern_system_fn {

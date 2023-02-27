@@ -186,11 +186,13 @@ mod download {
 			.build()?
 			.into_arc();
 
+		let session_data =
+			std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("upsample.onnx")).expect("Could not open model from file");
 		let session = SessionBuilder::new(&environment)?
 			.with_optimization_level(GraphOptimizationLevel::Level1)?
 			.with_intra_threads(1)?
-			.with_model_from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("upsample.onnx"))
-			.expect("Could not open model from file");
+			.with_model_from_memory(&session_data)
+			.expect("Could not read model from memory");
 
 		let metadata = session.metadata()?;
 		assert_eq!(metadata.name()?, "tf2onnx");

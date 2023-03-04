@@ -430,7 +430,14 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 			(lib_dir, true)
 		}
 		#[cfg(not(feature = "download-binaries"))]
-		"download" | "system" => system_strategy(),
+		"download" => {
+			if env::var(ORT_ENV_SYSTEM_LIB_LOCATION).is_ok() {
+				return system_strategy();
+			}
+
+			println!("cargo:rustc-link-lib=add_ort_library_path_or_enable_feature_download-binaries_see_ort_docs");
+			(Default::default(), false)
+		}
 		"system" => system_strategy(),
 		"compile" => {
 			use std::process::Command;

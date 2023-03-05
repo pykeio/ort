@@ -14,8 +14,6 @@ extern "C" {
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CoreML(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr;
 	#[cfg(feature = "directml")]
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_DML(options: *mut sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> sys::OrtStatusPtr;
-	#[cfg(feature = "rocm")]
-	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_ROCm(options: *mut sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> sys::OrtStatusPtr;
 }
 
 /// Execution provider container. See [the ONNX Runtime docs](https://onnxruntime.ai/docs/execution-providers/) for more
@@ -217,9 +215,19 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 			}
 			#[cfg(feature = "rocm")]
 			"ROCmExecutionProvider" => {
-				let device_id = init_args.get("device_id").map_or(0, |s| s.parse::<i32>().unwrap_or(0));
-				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_ROCm(options, device_id) };
-				if status_to_result_and_log("DirectML", status).is_ok() {
+				let rocm_options = sys::OrtROCMProviderOptions {
+					device_id: 0,
+					miopen_conv_exhaustive_search: 0,
+					gpu_mem_limit: usize::MAX,
+					arena_extend_strategy: 0,
+					do_copy_in_default_stream: 1,
+					has_user_compute_stream: 0,
+					user_compute_stream: std::ptr::null_mut(),
+					default_memory_arena_cfg: std::ptr::null_mut(),
+					tunable_op_enabled: 0
+				};
+				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(options, &rocm_options)];
+				if status_to_result_and_log("ROCm", status).is_ok() {
 					return; // EP found
 				}
 			}

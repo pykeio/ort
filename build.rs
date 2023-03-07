@@ -385,7 +385,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 		panic!("unsupported target architecture: {target_arch}");
 	}
 
-	if target.contains("macos") {
+	if target.contains("darwin") {
 		incompatible_providers![CUDA, OPENVINO, VITIS, ACL, ARMNN, TENSORRT, WINML, CANN];
 	} else if target.contains("windows") {
 		incompatible_providers![COREML, VITIS, ACL, ARMNN, ARMNN, CANN];
@@ -398,7 +398,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 	match strategy.as_ref().map_or("download", String::as_str) {
 		#[cfg(feature = "download-binaries")]
 		"download" => {
-			if target.contains("macos") {
+			if target.contains("darwin") {
 				incompatible_providers![CUDA, ONEDNN, OPENVINO, VITIS, TVM, TENSORRT, MIGRAPHX, DIRECTML, WINML, ACML, ARMNN, ROCM];
 			} else {
 				incompatible_providers![ONEDNN, COREML, OPENVINO, VITIS, TVM, MIGRAPHX, DIRECTML, WINML, ACML, ARMNN, ROCM];

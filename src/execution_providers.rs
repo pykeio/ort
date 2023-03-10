@@ -4,6 +4,7 @@ use std::{collections::HashMap, ffi::CString, os::raw::c_char};
 
 use crate::{error::status_to_result, ortsys, sys, OrtApiError, OrtResult};
 
+#[cfg(not(feature = "load-dynamic"))]
 extern "C" {
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CPU(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr;
 	#[cfg(feature = "acl")]
@@ -118,6 +119,31 @@ impl ExecutionProvider {
 	}
 }
 
+macro_rules! get_ep_register {
+	($symbol:ident($($id:ident: $type:ty),*) -> $rt:ty) => {
+		#[cfg(feature = "load-dynamic")]
+		#[allow(non_snake_case)]
+		let $symbol = unsafe {
+			use crate::G_ORT_LIB;
+			let dylib = *G_ORT_LIB
+				.lock()
+				.expect("failed to acquire ONNX Runtime dylib lock; another thread panicked?")
+				.get_mut();
+			let symbol: Result<
+				libloading::Symbol<unsafe extern "C" fn($($id: $type),*) -> $rt>,
+				libloading::Error
+			> = (*dylib).get(stringify!($symbol).as_bytes());
+			match symbol {
+				Ok(symbol) => symbol,
+				Err(e) => {
+					tracing::info!("{}", e.to_string());
+					continue;
+				}
+			}
+		};
+	};
+}
+
 #[tracing::instrument(skip_all)]
 pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, execution_providers: impl AsRef<[ExecutionProvider]>) {
 	let status_to_result_and_log = |ep: &'static str, status: *mut sys::OrtStatus| {
@@ -129,11 +155,14 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 		let init_args = ep.options.clone();
 		match ep.provider.as_str() {
 			"CPUExecutionProvider" => {
-				let use_arena = init_args.get("use_arena").map_or(false, |s| s.parse::<bool>().unwrap_or(false));
-				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_CPU(options, use_arena.into()) };
-				if status_to_result_and_log("CPU", status).is_ok() {
-					return; // EP found
-				}
+				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_CPU(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr);
+				unsafe {
+					let use_arena = init_args.get("use_arena").map_or(false, |s| s.parse::<bool>().unwrap_or(false));
+					let status = OrtSessionOptionsAppendExecutionProvider_CPU(options, use_arena.into());
+					if status_to_result_and_log("CPU", status).is_ok() {
+						return; // EP found
+					}
+				};
 			}
 			#[cfg(feature = "cuda")]
 			"CUDAExecutionProvider" => {
@@ -181,6 +210,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 			}
 			#[cfg(feature = "acl")]
 			"AclExecutionProvider" => {
+				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr);
 				let use_arena = init_args.get("use_arena").map_or(false, |s| s.parse::<bool>().unwrap_or(false));
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_ACL(options, use_arena.into()) };
 				if status_to_result_and_log("ACL", status).is_ok() {
@@ -189,6 +219,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 			}
 			#[cfg(feature = "onednn")]
 			"DnnlExecutionProvider" => {
+				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Dnnl(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr);
 				let use_arena = init_args.get("use_arena").map_or(false, |s| s.parse::<bool>().unwrap_or(false));
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_Dnnl(options, use_arena.into()) };
 				if status_to_result_and_log("oneDNN", status).is_ok() {
@@ -197,6 +228,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 			}
 			#[cfg(feature = "coreml")]
 			"CoreMLExecutionProvider" => {
+				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_CoreML(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr);
 				// TODO: Support additional CoreML flags
 				// https://onnxruntime.ai/docs/execution-providers/CoreML-ExecutionProvider.html#available-options
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_CoreML(options, 0) };
@@ -206,6 +238,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 			}
 			#[cfg(feature = "directml")]
 			"DmlExecutionProvider" => {
+				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_DML(options: *mut sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> sys::OrtStatusPtr);
 				let device_id = init_args.get("device_id").map_or(0, |s| s.parse::<i32>().unwrap_or(0));
 				// TODO: extended options with OrtSessionOptionsAppendExecutionProviderEx_DML
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_DML(options, device_id) };

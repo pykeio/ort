@@ -34,13 +34,62 @@ macro_rules! extern_system_fn {
 
 pub(crate) use extern_system_fn;
 
+#[cfg(feature = "load-dynamic")]
+lazy_static! {
+	pub(crate) static ref G_ORT_DYLIB_PATH: Arc<String> = {
+		let path = match std::env::var("ORT_DYLIB_PATH") {
+			Ok(s) if !s.is_empty() => s,
+			#[cfg(target_os = "windows")]
+			_ => "onnxruntime.dll".to_owned(),
+			#[cfg(target_os = "linux")]
+			_ => "libonnxruntime.so".to_owned(),
+			#[cfg(target_os = "macos")]
+			_ => "libonnxruntime.dylib".to_owned()
+		};
+		Arc::new(path)
+	};
+	pub(crate) static ref G_ORT_LIB: Arc<Mutex<AtomicPtr<libloading::Library>>> = {
+		unsafe {
+			let lib = libloading::Library::new(&**G_ORT_DYLIB_PATH).unwrap_or_else(|_| panic!("could not load the library at `{}`", **G_ORT_DYLIB_PATH));
+			Arc::new(Mutex::new(AtomicPtr::new(Box::leak(Box::new(lib)) as *mut _)))
+		}
+	};
+}
+
 lazy_static! {
 	pub(crate) static ref G_ORT_API: Arc<Mutex<AtomicPtr<sys::OrtApi>>> = {
-		let base: *const sys::OrtApiBase = unsafe { sys::OrtGetApiBase() };
-		assert_ne!(base, ptr::null());
-		let get_api: extern_system_fn! { unsafe fn(u32) -> *const sys::OrtApi } = unsafe { (*base).GetApi.unwrap() };
-		let api: *const sys::OrtApi = unsafe { get_api(sys::ORT_API_VERSION) };
-		Arc::new(Mutex::new(AtomicPtr::new(api as *mut sys::OrtApi)))
+		#[cfg(feature = "load-dynamic")]
+		unsafe {
+			let dylib = *G_ORT_LIB
+				.lock()
+				.expect("failed to acquire ONNX Runtime dylib lock; another thread panicked?")
+				.get_mut();
+			let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const sys::OrtApiBase> = (*dylib).get(b"OrtGetApiBase").expect("");
+			let base: *const sys::OrtApiBase = base_getter();
+			assert_ne!(base, ptr::null());
+
+			let get_version_string: extern_system_fn! { unsafe fn () -> *const ffi::c_char } = (*base).GetVersionString.unwrap();
+			let version_string = get_version_string();
+			let version_string = CStr::from_ptr(version_string).to_string_lossy();
+			if version_string != "1.14.0" {
+				panic!(
+					"ort 1.14 is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.14.0', but got '{version_string}'",
+					**G_ORT_DYLIB_PATH
+				);
+			}
+
+			let get_api: extern_system_fn! { unsafe fn(u32) -> *const sys::OrtApi } = (*base).GetApi.unwrap();
+			let api: *const sys::OrtApi = get_api(sys::ORT_API_VERSION);
+			Arc::new(Mutex::new(AtomicPtr::new(api as *mut sys::OrtApi)))
+		}
+		#[cfg(not(feature = "load-dynamic"))]
+		{
+			let base: *const sys::OrtApiBase = unsafe { sys::OrtGetApiBase() };
+			assert_ne!(base, ptr::null());
+			let get_api: extern_system_fn! { unsafe fn(u32) -> *const sys::OrtApi } = unsafe { (*base).GetApi.unwrap() };
+			let api: *const sys::OrtApi = unsafe { get_api(sys::ORT_API_VERSION) };
+			Arc::new(Mutex::new(AtomicPtr::new(api as *mut sys::OrtApi)))
+		}
 	};
 }
 

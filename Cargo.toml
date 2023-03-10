@@ -31,6 +31,7 @@ profiling = [ "widestring" ]
 fetch-models = [ "ureq" ]
 download-binaries = [ "ureq", "zip" ]
 generate-bindings = [ "bindgen" ]
+load-dynamic = [ "libloading" ]
 copy-dylibs = []
 
 minimal-build = []
@@ -56,9 +57,12 @@ rknpu = []
 vitis = []
 cann = []
 
+__all-catch = []
+
 [dependencies]
 ndarray = "0.15"
 thiserror = "1.0"
+libloading = { version = "0.7", optional = true }
 
 ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }
 lazy_static = "1.4"

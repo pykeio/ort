@@ -13,6 +13,8 @@ const GEN_TOKENS: i32 = 45;
 const TOP_K: usize = 5;
 
 fn main() -> OrtResult<()> {
+	tracing_subscriber::fmt::init();
+
 	let mut rng = rand::thread_rng();
 
 	let environment = Arc::new(

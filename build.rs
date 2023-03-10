@@ -26,6 +26,7 @@ const PROTOBUF_RELEASE_BASE_URL: &str = "https://github.com/protocolbuffers/prot
 macro_rules! incompatible_providers {
 	($($provider:ident),*) => {
 		$(
+			#[cfg(not(feature = "__all-catch"))]
 			if env::var(concat!("CARGO_FEATURE_", stringify!($provider))).is_ok() {
 				panic!(concat!("Provider not available for this strategy and/or target: ", stringify!($provider)));
 			}
@@ -640,22 +641,39 @@ fn generate_bindings(include_dir: &Path) {
 	bindings.write_to_file(&generated_file).expect("Couldn't write bindings!");
 }
 
-fn main() {
-	if std::env::var("DOCS_RS").is_err() {
-		let (install_dir, needs_link) = prepare_libort_dir();
+fn real_main(link: bool) {
+	let (install_dir, needs_link) = prepare_libort_dir();
 
-		let include_dir = install_dir.join("include");
-		let lib_dir = install_dir.join("lib");
+	let include_dir = install_dir.join("include");
+	let lib_dir = install_dir.join("lib");
 
+	if link {
 		if needs_link {
 			println!("cargo:rustc-link-lib=onnxruntime");
 			println!("cargo:rustc-link-search=native={}", lib_dir.display());
 		}
 
-		println!("cargo:rerun-if-env-changed={}", ORT_ENV_STRATEGY);
 		println!("cargo:rerun-if-env-changed={}", ORT_ENV_SYSTEM_LIB_LOCATION);
+	}
 
-		#[cfg(feature = "generate-bindings")]
-		generate_bindings(&include_dir);
+	println!("cargo:rerun-if-env-changed={}", ORT_ENV_STRATEGY);
+
+	#[cfg(feature = "generate-bindings")]
+	generate_bindings(&include_dir);
+}
+
+fn main() {
+	if std::env::var("DOCS_RS").is_err() {
+		if cfg!(feature = "load-dynamic") {
+			// we only need to execute the real main step if we are using the download strategy...
+			if cfg!(feature = "download-binaries") && std::env::var(ORT_ENV_STRATEGY).as_ref().map_or("download", String::as_str) == "download" {
+				// but we don't need to link to the binaries we download (so all we are doing is downloading them and placing them in
+				// the output directory)
+				real_main(false);
+			}
+		} else {
+			// if we are not using the load-dynamic feature then we need to link to dylibs.
+			real_main(true);
+		}
 	}
 }

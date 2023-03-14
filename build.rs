@@ -311,7 +311,7 @@ fn system_strategy() -> (PathBuf, bool) {
 	}
 
 	let mut needs_link = true;
-	if lib_dir.join("libonnxruntime_common.a").exists() {
+	if lib_dir.join("libonnxruntime_common.a").exists() || lib_dir.join("onnxruntime_common.lib").exists() {
 		println!("cargo:rustc-link-search=native={}", lib_dir.display());
 
 		println!("cargo:rustc-link-lib=stdc++");

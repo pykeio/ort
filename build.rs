@@ -330,8 +330,14 @@ fn system_strategy() -> (PathBuf, bool) {
 		}
 
 		let external_lib_dir = lib_dir.join("_deps");
-		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("protobuf-build").display());
-		println!("cargo:rustc-link-lib=static=protobuf-lited");
+		let protobuf_build = external_lib_dir.join("protobuf-build");
+		println!("cargo:rustc-link-search=native={}", protobuf_build.display());
+		if protobuf_build.join("libprotobuf-lited.a").exists() || protobuf_build.join("protobuf-lited.lib").exists() {
+			println!("cargo:rustc-link-lib=static=protobuf-lited");
+		} else if protobuf_build.join("Release").is_dir() {
+			println!("cargo:rustc-link-search=native={}", protobuf_build.join("Release").display());
+			println!("cargo:rustc-link-lib=static=protobuf");
+		}
 
 		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("onnx-build").display());
 		println!("cargo:rustc-link-lib=static=onnx");

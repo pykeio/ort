@@ -57,8 +57,6 @@ rknpu = []
 vitis = []
 cann = []
 
-__all-catch = []
-
 [dependencies]
 ndarray = "0.15"
 thiserror = "1.0"

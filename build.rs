@@ -26,9 +26,8 @@ const PROTOBUF_RELEASE_BASE_URL: &str = "https://github.com/protocolbuffers/prot
 macro_rules! incompatible_providers {
 	($($provider:ident),*) => {
 		$(
-			#[cfg(not(feature = "__all-catch"))]
 			if env::var(concat!("CARGO_FEATURE_", stringify!($provider))).is_ok() {
-				panic!(concat!("Provider not available for this strategy and/or target: ", stringify!($provider)));
+				println!(concat!("cargo:warning=Provider not available for this strategy and/or target: ", stringify!($provider)));
 			}
 		)*
 	}

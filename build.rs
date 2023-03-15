@@ -395,14 +395,12 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 		incompatible_providers![CUDA, OPENVINO, VITIS, TENSORRT, MIGRAPHX, ROCM];
 	} else if target_arch.eq_ignore_ascii_case("x86_64") {
 		incompatible_providers![ACL, ARMNN, CANN, RKNPU];
-	} else {
-		panic!("unsupported target architecture: {target_arch}");
 	}
 
 	if target.contains("darwin") {
 		incompatible_providers![CUDA, OPENVINO, VITIS, ACL, ARMNN, TENSORRT, WINML, CANN];
 	} else if target.contains("windows") {
-		incompatible_providers![COREML, VITIS, ACL, ARMNN, ARMNN, CANN];
+		incompatible_providers![COREML, VITIS, ACL, ARMNN, CANN];
 	} else {
 		incompatible_providers![COREML, DIRECTML, WINML];
 	}

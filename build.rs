@@ -313,7 +313,11 @@ fn system_strategy() -> (PathBuf, bool) {
 	if lib_dir.join("libonnxruntime_common.a").exists() || lib_dir.join("onnxruntime_common.lib").exists() {
 		println!("cargo:rustc-link-search=native={}", lib_dir.display());
 
-		println!("cargo:rustc-link-lib=stdc++");
+		if cfg!(target_os = "macos") {
+			println!("cargo:rustc-link-lib=c++");
+		} else {
+			println!("cargo:rustc-link-lib=stdc++");
+		}
 
 		for lib in &["common", "flatbuffers", "framework", "graph", "mlas", "optimizer", "providers", "session", "util"] {
 			let lib_path = lib_dir.join(if cfg!(target_os = "windows") {
@@ -333,8 +337,13 @@ fn system_strategy() -> (PathBuf, bool) {
 		let protobuf_build = external_lib_dir.join("protobuf-build");
 		println!("cargo:rustc-link-search=native={}", protobuf_build.display());
 		if protobuf_build.join("libprotobuf-lited.a").exists() || protobuf_build.join("protobuf-lited.lib").exists() {
+			// protobuf debug
 			println!("cargo:rustc-link-lib=static=protobuf-lited");
+		} else if protobuf_build.join("libprotobuf-lite.a").exists() || protobuf_build.join("protobuf-lite.lib").exists() {
+			// release
+			println!("cargo:rustc-link-lib=static=protobuf-lite");
 		} else if protobuf_build.join("Release").is_dir() {
+			// release on windows might be different?
 			println!("cargo:rustc-link-search=native={}", protobuf_build.join("Release").display());
 			println!("cargo:rustc-link-lib=static=protobuf");
 		}
@@ -367,7 +376,6 @@ fn system_strategy() -> (PathBuf, bool) {
 			println!("cargo:rustc-link-lib=framework=Foundation");
 		}
 
-		println!("cargo:rustc-link-lib=onnxruntime_providers_shared");
 		#[cfg(feature = "rocm")]
 		println!("cargo:rustc-link-lib=onnxruntime_providers_rocm");
 

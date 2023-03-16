@@ -779,7 +779,7 @@ mod dangerous {
 		extract_io_count(f, session_ptr)
 	}
 
-	#[cfg(target_arch = "x86_64")]
+	#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 	fn extract_io_count(
 		f: extern_system_fn! { unsafe fn(*const sys::OrtSession, *mut usize) -> *mut sys::OrtStatus },
 		session_ptr: *mut sys::OrtSession
@@ -824,7 +824,7 @@ mod dangerous {
 		ortfree!(unsafe allocator_ptr, c_str);
 		Ok(name)
 	}
-	#[cfg(target_arch = "x86_64")]
+	#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 	fn extract_io_name(
 		f: extern_system_fn! { unsafe fn(
 			*const sys::OrtSession,
@@ -887,7 +887,7 @@ mod dangerous {
 		})
 	}
 
-	#[cfg(target_arch = "x86_64")]
+	#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 	fn extract_io(
 		f: extern_system_fn! { unsafe fn(
 			*const sys::OrtSession,

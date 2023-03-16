@@ -4,7 +4,7 @@ use std::{collections::HashMap, ffi::CString, os::raw::c_char};
 
 use crate::{error::status_to_result, ortsys, sys, OrtApiError, OrtResult};
 
-#[cfg(not(feature = "load-dynamic"))]
+#[cfg(all(not(feature = "load-dynamic"), not(target_arch = "x86")))]
 extern "C" {
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CPU(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr;
 	#[cfg(feature = "acl")]
@@ -15,6 +15,10 @@ extern "C" {
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CoreML(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr;
 	#[cfg(feature = "directml")]
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_DML(options: *mut sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> sys::OrtStatusPtr;
+}
+#[cfg(all(not(feature = "load-dynamic"), target_arch = "x86"))]
+extern "stdcall" {
+	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CPU(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr;
 }
 
 /// Execution provider container. See [the ONNX Runtime docs](https://onnxruntime.ai/docs/execution-providers/) for more

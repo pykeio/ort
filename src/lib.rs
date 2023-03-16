@@ -25,11 +25,19 @@ pub use self::execution_providers::ExecutionProvider;
 pub use self::session::{InMemorySession, Session, SessionBuilder};
 use self::sys::OnnxEnumInt;
 
+#[cfg(not(all(target_arch = "x86", target_os = "windows")))]
 macro_rules! extern_system_fn {
 	($(#[$meta:meta])* fn $($tt:tt)*) => ($(#[$meta])* extern "C" fn $($tt)*);
 	($(#[$meta:meta])* $vis:vis fn $($tt:tt)*) => ($(#[$meta])* $vis extern "C" fn $($tt)*);
 	($(#[$meta:meta])* unsafe fn $($tt:tt)*) => ($(#[$meta])* unsafe extern "C" fn $($tt)*);
 	($(#[$meta:meta])* $vis:vis unsafe fn $($tt:tt)*) => ($(#[$meta])* $vis unsafe extern "C" fn $($tt)*);
+}
+#[cfg(all(target_arch = "x86", target_os = "windows"))]
+macro_rules! extern_system_fn {
+	($(#[$meta:meta])* fn $($tt:tt)*) => ($(#[$meta])* extern "stdcall" fn $($tt)*);
+	($(#[$meta:meta])* $vis:vis fn $($tt:tt)*) => ($(#[$meta])* $vis extern "stdcall" fn $($tt)*);
+	($(#[$meta:meta])* unsafe fn $($tt:tt)*) => ($(#[$meta])* unsafe extern "stdcall" fn $($tt)*);
+	($(#[$meta:meta])* $vis:vis unsafe fn $($tt:tt)*) => ($(#[$meta])* $vis unsafe extern "stdcall" fn $($tt)*);
 }
 
 pub(crate) use extern_system_fn;
@@ -50,7 +58,7 @@ lazy_static! {
 	};
 	pub(crate) static ref G_ORT_LIB: Arc<Mutex<AtomicPtr<libloading::Library>>> = {
 		unsafe {
-			let lib = libloading::Library::new(&**G_ORT_DYLIB_PATH).unwrap_or_else(|_| panic!("could not load the library at `{}`", **G_ORT_DYLIB_PATH));
+			let lib = libloading::Library::new(&**G_ORT_DYLIB_PATH).unwrap_or_else(|e| panic!("could not load the library at `{}`: {e:?}", **G_ORT_DYLIB_PATH));
 			Arc::new(Mutex::new(AtomicPtr::new(Box::leak(Box::new(lib)) as *mut _)))
 		}
 	};

@@ -302,6 +302,17 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 	}
 }
 
+fn add_search_dir<P: AsRef<Path>>(base: P) {
+	let base = base.as_ref();
+	if base.join("Release").is_dir() {
+		println!("cargo:rustc-link-search=native={}", base.join("Release").display());
+	} else if base.join("Debug").is_dir() {
+		println!("cargo:rustc-link-search=native={}", base.join("Debug").display());
+	} else {
+		println!("cargo:rustc-link-search=native={}", base.display());
+	}
+}
+
 fn system_strategy() -> (PathBuf, bool) {
 	let lib_dir = PathBuf::from(env::var(ORT_ENV_SYSTEM_LIB_LOCATION).expect("[ort] system strategy requires ORT_LIB_LOCATION env var to be set"));
 	#[cfg(feature = "copy-dylibs")]
@@ -309,22 +320,32 @@ fn system_strategy() -> (PathBuf, bool) {
 		copy_libraries(&lib_dir.join("lib"), &PathBuf::from(env::var("OUT_DIR").unwrap()));
 	}
 
+	let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap().to_lowercase();
+	let platform_format_lib = |a: &str| {
+		if target_os.contains("windows") { format!("{}.lib", a) } else { format!("lib{}.a", a) }
+	};
+
+	let mut profile = String::new();
+	for i in ["Release", "Debug", "MinSizeRel", "RelWithDebInfo"] {
+		if lib_dir.join(i).exists() && lib_dir.join(i).join(platform_format_lib("onnxruntime_common")).exists() {
+			profile = String::from(i);
+			break;
+		}
+	}
+
 	let mut needs_link = true;
-	if lib_dir.join("libonnxruntime_common.a").exists() || lib_dir.join("onnxruntime_common.lib").exists() {
-		println!("cargo:rustc-link-search=native={}", lib_dir.display());
+	if lib_dir.join(&profile).join(platform_format_lib("onnxruntime_common")).exists() {
+		add_search_dir(&lib_dir);
+		add_search_dir(&lib_dir.join(&profile));
 
 		if cfg!(target_os = "macos") {
 			println!("cargo:rustc-link-lib=c++");
-		} else {
+		} else if cfg!(target_os = "linux") {
 			println!("cargo:rustc-link-lib=stdc++");
 		}
 
 		for lib in &["common", "flatbuffers", "framework", "graph", "mlas", "optimizer", "providers", "session", "util"] {
-			let lib_path = lib_dir.join(if cfg!(target_os = "windows") {
-				format!("onnxruntime_{lib}.lib")
-			} else {
-				format!("libonnxruntime_{lib}.a")
-			});
+			let lib_path = lib_dir.join(&profile).join(platform_format_lib(&format!("onnxruntime_{lib}")));
 			// sanity check, just make sure the library exists before we try to link to it
 			if lib_path.exists() {
 				println!("cargo:rustc-link-lib=static=onnxruntime_{lib}");
@@ -334,50 +355,48 @@ fn system_strategy() -> (PathBuf, bool) {
 		}
 
 		let external_lib_dir = lib_dir.join("_deps");
-		let protobuf_build = external_lib_dir.join("protobuf-build");
-		println!("cargo:rustc-link-search=native={}", protobuf_build.display());
-		if protobuf_build.join("libprotobuf-lited.a").exists() || protobuf_build.join("protobuf-lited.lib").exists() {
-			// protobuf debug
-			println!("cargo:rustc-link-lib=static=protobuf-lited");
-		} else if protobuf_build.join("libprotobuf-lite.a").exists() || protobuf_build.join("protobuf-lite.lib").exists() {
-			// release
-			println!("cargo:rustc-link-lib=static=protobuf-lite");
-		} else if protobuf_build.join("Release").is_dir() {
-			// release on windows might be different?
-			println!("cargo:rustc-link-search=native={}", protobuf_build.join("Release").display());
-			println!("cargo:rustc-link-lib=static=protobuf");
+
+		let protobuf_build = external_lib_dir.join("protobuf-build").join(&profile);
+		add_search_dir(&protobuf_build);
+		for lib in ["protobuf-lited", "protobuf-lite", "protobuf"] {
+			if target_os.contains("windows") && protobuf_build.join(platform_format_lib(&format!("lib{lib}"))).exists() {
+				println!("cargo:rustc-link-lib=static=lib{lib}")
+			} else if protobuf_build.join(platform_format_lib(lib)).exists() {
+				println!("cargo:rustc-link-lib=static={lib}");
+			}
 		}
 
-		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("onnx-build").display());
+		add_search_dir(external_lib_dir.join("onnx-build").join(&profile));
 		println!("cargo:rustc-link-lib=static=onnx");
 		println!("cargo:rustc-link-lib=static=onnx_proto");
 
-		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("google_nsync-build").display());
-		println!("cargo:rustc-link-lib=static=nsync_cpp");
+		// println!("cargo:rustc-link-search=native={}", external_lib_dir.join("google_nsync-build").display());
+		// println!("cargo:rustc-link-lib=static=nsync_cpp");
 
-		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("pytorch_cpuinfo-build").display());
-		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("pytorch_cpuinfo-build").join("deps").join("clog").display());
+		add_search_dir(external_lib_dir.join("pytorch_cpuinfo-build").join(&profile));
+		add_search_dir(external_lib_dir.join("pytorch_cpuinfo-build").join("deps").join("clog").join(&profile));
 		println!("cargo:rustc-link-lib=static=cpuinfo");
 		println!("cargo:rustc-link-lib=static=clog");
 
-		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("re2-build").display());
+		add_search_dir(external_lib_dir.join("re2-build").join(&profile));
 		println!("cargo:rustc-link-lib=static=re2");
 
-		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil_cpp-build").join("absl").join("base").display());
+		add_search_dir(external_lib_dir.join("abseil_cpp-build").join("absl").join("base").join(&profile));
 		println!("cargo:rustc-link-lib=static=absl_base");
 		println!("cargo:rustc-link-lib=static=absl_throw_delegate");
-		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil_cpp-build").join("absl").join("hash").display());
+		add_search_dir(external_lib_dir.join("abseil_cpp-build").join("absl").join("hash").join(&profile));
 		println!("cargo:rustc-link-lib=static=absl_hash");
+		println!("cargo:rustc-link-lib=static=absl_city");
 		println!("cargo:rustc-link-lib=static=absl_low_level_hash");
-		println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil_cpp-build").join("absl").join("container").display());
+		add_search_dir(external_lib_dir.join("abseil_cpp-build").join("absl").join("container").join(&profile));
 		println!("cargo:rustc-link-lib=static=absl_raw_hash_set");
 
 		if cfg!(target_os = "macos") {
 			println!("cargo:rustc-link-lib=framework=Foundation");
 		}
 
-		#[cfg(feature = "rocm")]
-		println!("cargo:rustc-link-lib=onnxruntime_providers_rocm");
+		// #[cfg(feature = "rocm")]
+		// println!("cargo:rustc-link-lib=onnxruntime_providers_rocm");
 
 		needs_link = false;
 	}

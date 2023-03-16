@@ -395,7 +395,7 @@ impl SessionBuilder {
 	}
 
 	/// Load an ONNX graph from memory and commit the session.
-	pub fn with_model_from_memory<'s>(self, model_bytes: &'s [u8]) -> OrtResult<InMemorySession<'s>> {
+	pub fn with_model_from_memory(self, model_bytes: &[u8]) -> OrtResult<InMemorySession<'_>> {
 		let mut session_ptr: *mut sys::OrtSession = std::ptr::null_mut();
 
 		let env_ptr: *const sys::OrtEnv = self.env.env_ptr();

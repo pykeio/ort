@@ -9,7 +9,7 @@ use std::{
 	str::FromStr
 };
 
-const ORT_VERSION: &str = "1.14.0";
+const ORT_VERSION: &str = "1.14.1";
 const ORT_RELEASE_BASE_URL: &str = "https://github.com/microsoft/onnxruntime/releases/download";
 const ORT_ENV_STRATEGY: &str = "ORT_STRATEGY";
 const ORT_ENV_SYSTEM_LIB_LOCATION: &str = "ORT_LIB_LOCATION";

@@ -315,10 +315,6 @@ fn add_search_dir<P: AsRef<Path>>(base: P) {
 
 fn system_strategy() -> (PathBuf, bool) {
 	let lib_dir = PathBuf::from(env::var(ORT_ENV_SYSTEM_LIB_LOCATION).expect("[ort] system strategy requires ORT_LIB_LOCATION env var to be set"));
-	#[cfg(feature = "copy-dylibs")]
-	{
-		copy_libraries(&lib_dir.join("lib"), &PathBuf::from(env::var("OUT_DIR").unwrap()));
-	}
 
 	let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap().to_lowercase();
 	let platform_format_lib = |a: &str| {
@@ -399,6 +395,15 @@ fn system_strategy() -> (PathBuf, bool) {
 		// println!("cargo:rustc-link-lib=onnxruntime_providers_rocm");
 
 		needs_link = false;
+	} else {
+		#[cfg(feature = "copy-dylibs")]
+		{
+			if lib_dir.join("lib").is_dir() {
+				copy_libraries(&lib_dir.join("lib"), &PathBuf::from(env::var("OUT_DIR").unwrap()));
+			} else if lib_dir.join(&profile).is_dir() {
+				copy_libraries(&lib_dir.join(profile), &PathBuf::from(env::var("OUT_DIR").unwrap()));
+			}
+		}
 	}
 
 	(lib_dir, needs_link)

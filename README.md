@@ -73,6 +73,7 @@ For prebuilt Microsoft binaries, you can enable the CUDA or TensorRT execution p
 ## Projects using `ort` ❤️
 - [Bloop](https://bloop.ai/)
 - [pyke Diffusers](https://github.com/pykeio/diffusers)
+- [edge-transformers](https://github.com/npc-engine/edge-transformers)
 
 ## FAQ
 

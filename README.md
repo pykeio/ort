@@ -12,7 +12,7 @@ See [the docs](https://docs.rs/ort) for more detailed information and the [`exam
 - [How to get binaries](#how-to-get-binaries)
   * [Strategies](#strategies)
 - [Execution providers](#execution-providers)
-- [Projects using `ort` ❤️](#projects-using--ort----)
+- [Projects using `ort` ❤️](#projects-using-ort-%EF%B8%8F)
 - [FAQ](#faq)
   * [I'm using a non-CPU execution provider, but it's still using the CPU!](#i-m-using-a-non-cpu-execution-provider--but-it-s-still-using-the-cpu-)
   * [My app exits with "status code `0xc000007b`" without logging anything!](#my-app-exits-with--status-code--0xc000007b---without-logging-anything-)
@@ -71,9 +71,9 @@ Execution providers will attempt to be registered in the order they are passed, 
 For prebuilt Microsoft binaries, you can enable the CUDA or TensorRT execution providers for Windows and Linux via the `cuda` and `tensorrt` Cargo features respectively. Microsoft does not provide prebuilt binaries for other execution providers, and thus enabling other EP features will fail when `ORT_STRATEGY=download`. To use other execution providers, you must build ONNX Runtime from source.
 
 ## Projects using `ort` ❤️
-- [Bloop](https://bloop.ai/)
-- [pyke Diffusers](https://github.com/pykeio/diffusers)
-- [edge-transformers](https://github.com/npc-engine/edge-transformers)
+- **[Bloop](https://bloop.ai/)** uses `ort` to power their semantic code search feature.
+- **[pyke Diffusers](https://github.com/pykeio/diffusers)** uses `ort` for efficient Stable Diffusion image generation on both CPUs & GPUs.
+- **[edge-transformers](https://github.com/npc-engine/edge-transformers)** uses `ort` for accelerated transformer model inference at the edge.
 
 ## FAQ
 

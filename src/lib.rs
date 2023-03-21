@@ -79,9 +79,9 @@ lazy_static! {
 			let get_version_string: extern_system_fn! { unsafe fn () -> *const ffi::c_char } = (*base).GetVersionString.unwrap();
 			let version_string = get_version_string();
 			let version_string = CStr::from_ptr(version_string).to_string_lossy();
-			if version_string != "1.14.0" {
+			if version_string != "1.14.1" {
 				panic!(
-					"ort 1.14 is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.14.0', but got '{version_string}'",
+					"ort 1.14 is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.14.1', but got '{version_string}'",
 					**G_ORT_DYLIB_PATH
 				);
 			}

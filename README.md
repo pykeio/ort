@@ -2,12 +2,15 @@
     <img src="docs/icon.png" width="350px">
 	<h1>Rust bindings for ONNX Runtime</h1>
     <a href="https://app.codecov.io/gh/pykeio/ort" target="_blank"><img alt="Coverage Results" src="https://img.shields.io/codecov/c/gh/pykeio/ort?style=for-the-badge"></a> <a href="https://github.com/pykeio/ort/actions/workflows/test.yml"><img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/pykeio/ort/test.yml?branch=main&style=for-the-badge"></a> <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/d/ort?style=for-the-badge"></a>
+    <br />
+    <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/v/ort?style=for-the-badge&label=ort&logo=rust"></a> <img alt="ONNX Runtime" src="https://img.shields.io/badge/onnxruntime-v1.14.1-blue?style=for-the-badge&logo=cplusplus">
 </div>
 
-`ort` is an (unofficial) [ONNX Runtime](https://onnxruntime.ai/) 1.14 wrapper for Rust based on the now-inactive [`onnxruntime-rs`](https://github.com/nbigaouette/onnxruntime-rs). ONNX Runtime accelerates ML inference on both CPU & GPU.
+`ort` is an (unofficial) [ONNX Runtime](https://onnxruntime.ai/) 1.14 wrapper for Rust based on the now inactive [`onnxruntime-rs`](https://github.com/nbigaouette/onnxruntime-rs). ONNX Runtime accelerates ML inference on both CPU & GPU.
 
-See [the docs](https://docs.rs/ort) for more detailed information and the [`examples`](https://github.com/pykeio/ort/tree/main/examples). If you have any questions, feel free to ask in the [`#📕｜ort` channel in the pyke Discord server](https://discord.gg/QHJMe7hnZP) or in [GitHub Discussions](https://github.com/pykeio/ort/discussions).
+See [the docs](https://docs.rs/ort) for more detailed information and the [`examples`](https://github.com/pykeio/ort/tree/main/examples). If you have any questions, feel free to ask in the [`#💬｜ort-discussions` and related channels in the pyke Discord server](https://discord.gg/uQtsNu2xMa) or in [GitHub Discussions](https://github.com/pykeio/ort/discussions).
 
+- [Feature comparison](#feature-comparison)
 - [Cargo features](#cargo-features)
 - [How to get binaries](#how-to-get-binaries)
   * [Strategies](#strategies)
@@ -18,6 +21,18 @@ See [the docs](https://docs.rs/ort) for more detailed information and the [`exam
   * [My app exits with "status code `0xc000007b`" without logging anything!](#my-app-exits-with--status-code--0xc000007b---without-logging-anything-)
   * ["thread 'main' panicked at 'assertion failed: `(left != right)`"](#-thread--main--panicked-at--assertion-failed----left----right---)
 - [Shared library hell](#shared-library-hell)
+
+## Feature comparison
+| Feature comparison     | **📕 ort** | **📗 [ors](https://github.com/HaoboGu/ors)** | **🪟 [onnxruntime-rs](https://github.com/microsoft/onnxruntime/tree/main/rust)** |
+|------------------------|-----------|-----------|----------------------|
+| Upstream version       | **v1.14.1** | v1.12.0 | v1.8               |
+| `dlopen()`?            | ✅         | ✅         | ❌                    |
+| Execution providers?   | ✅         | ❌         | ❌                    |
+| IOBinding?             | ❌ WIP     | ❌         | ❌                    |
+| String tensors?        | ✅         | ❌         | ⚠️ input only         |
+| Multiple output types? | ✅         | ✅         | ❌                    |
+| Multiple input types?  | ✅         | ✅         | ❌                    |
+| In-memory session?     | ✅         | ✅         | ✅                    |
 
 ## Cargo features
 > **Note:**
@@ -30,7 +45,7 @@ See [the docs](https://docs.rs/ort) for more detailed information and the [`exam
 - **`copy-dylibs` (default)**: Copies the dynamic libraries to the Cargo build folder - see [shared library hell](#shared-library-hell).
 - **`half` (default)**: Enables support for using `float16`/`bfloat16` tensors in Rust.
 - **`generate-bindings`**: Update the bindings to ONNX Runtime using `bindgen`. Requires [libclang](https://clang.llvm.org/doxygen/group__CINDEX.html).
-- **`load-dynamic`**: Loads the ONNX Runtime binaries at runtime without a link dependency on them. The path to the binary can be controlled with the environment variable `ORT_DYLIB_PATH=/path/to/libonnxruntime.so`. This is heavily recommended, as it mitigates the [shared library hell](#shared-library-hell).
+- **`load-dynamic`**: Loads the ONNX Runtime binaries at runtime via `dlopen()` without a link dependency on them. The path to the binary can be controlled with the environment variable `ORT_DYLIB_PATH=/path/to/libonnxruntime.so`. This is heavily recommended, as it mitigates the [shared library hell](#shared-library-hell).
 
 ## How to get binaries
 You can use either the 'traditional' way, involving a [strategy](#strategies), or the new (and preferred) way, using `load-dynamic`.
@@ -71,6 +86,8 @@ Execution providers will attempt to be registered in the order they are passed, 
 For prebuilt Microsoft binaries, you can enable the CUDA or TensorRT execution providers for Windows and Linux via the `cuda` and `tensorrt` Cargo features respectively. Microsoft does not provide prebuilt binaries for other execution providers, and thus enabling other EP features will fail when `ORT_STRATEGY=download`. To use other execution providers, you must build ONNX Runtime from source.
 
 ## Projects using `ort` ❤️
+<sub>[open a PR](https://github.com/pykeio/ort/pulls) to add your project here 🌟</sub>
+
 - **[Bloop](https://bloop.ai/)** uses `ort` to power their semantic code search feature.
 - **[pyke Diffusers](https://github.com/pykeio/diffusers)** uses `ort` for efficient Stable Diffusion image generation on both CPUs & GPUs.
 - **[edge-transformers](https://github.com/npc-engine/edge-transformers)** uses `ort` for accelerated transformer model inference at the edge.
@@ -120,7 +137,7 @@ Some versions of Windows come bundled with an older vesrion of `onnxruntime.dll`
 The given version [14] is not supported, only version 1 to 13 is supported in this build.
 thread 'main' panicked at 'assertion failed: `(left != right)`
   left: `0x0`,
- right: `0x0`', src\lib.rs:106:5
+ right: `0x0`', src\lib.rs:114:5
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ```
 

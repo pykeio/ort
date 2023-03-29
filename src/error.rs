@@ -214,7 +214,7 @@ pub(crate) fn assert_null_pointer<T>(ptr: *const T, name: &str) -> OrtResult<()>
 pub(crate) fn assert_non_null_pointer<T>(ptr: *const T, name: &str) -> OrtResult<()> {
 	(!ptr.is_null())
 		.then_some(())
-		.ok_or_else(|| OrtError::PointerShouldBeNull(name.to_owned()))
+		.ok_or_else(|| OrtError::PointerShouldNotBeNull(name.to_owned()))
 }
 
 impl From<OrtStatusWrapper> for std::result::Result<(), OrtApiError> {

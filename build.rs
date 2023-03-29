@@ -679,8 +679,11 @@ fn generate_bindings(include_dir: &Path) {
 fn real_main(link: bool) {
 	let (install_dir, needs_link) = prepare_libort_dir();
 
-	let include_dir = install_dir.join("include");
-	let lib_dir = install_dir.join("lib");
+	let (include_dir, lib_dir) = if install_dir.join("include").exists() && install_dir.join("lib").exists() {
+		(install_dir.join("include"), install_dir.join("lib"))
+	} else {
+		(install_dir.clone(), install_dir)
+	};
 
 	if link {
 		if needs_link {

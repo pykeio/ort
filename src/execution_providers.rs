@@ -179,7 +179,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 				assert_eq!(keys.len(), values.len()); // sanity check
 				let key_ptrs: Vec<*const c_char> = keys.iter().map(|k| k.as_ptr()).collect();
 				let value_ptrs: Vec<*const c_char> = values.iter().map(|v| v.as_ptr()).collect();
-				let status = ortsys![unsafe UpdateCUDAProviderOptions(cuda_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), keys.len())];
+				let status = ortsys![unsafe UpdateCUDAProviderOptions(cuda_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), keys.len() as _)];
 				if status_to_result_and_log("CUDA", status).is_err() {
 					ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
 					continue; // next EP

@@ -168,7 +168,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 					}
 				};
 			}
-			#[cfg(feature = "cuda")]
+			#[cfg(any(feature = "load-dynamic", feature = "cuda"))]
 			"CUDAExecutionProvider" => {
 				let mut cuda_options: *mut sys::OrtCUDAProviderOptionsV2 = std::ptr::null_mut();
 				if status_to_result_and_log("CUDA", ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)]).is_err() {
@@ -190,7 +190,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 					return; // EP found
 				}
 			}
-			#[cfg(feature = "tensorrt")]
+			#[cfg(any(feature = "load-dynamic", feature = "tensorrt"))]
 			"TensorRTExecutionProvider" => {
 				let mut tensorrt_options: *mut sys::OrtTensorRTProviderOptionsV2 = std::ptr::null_mut();
 				if status_to_result_and_log("TensorRT", ortsys![unsafe CreateTensorRTProviderOptions(&mut tensorrt_options)]).is_err() {
@@ -212,7 +212,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 					return; // EP found
 				}
 			}
-			#[cfg(feature = "acl")]
+			#[cfg(any(feature = "load-dynamic", feature = "acl"))]
 			"AclExecutionProvider" => {
 				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr);
 				let use_arena = init_args.get("use_arena").map_or(false, |s| s.parse::<bool>().unwrap_or(false));
@@ -221,7 +221,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 					return; // EP found
 				}
 			}
-			#[cfg(feature = "onednn")]
+			#[cfg(any(feature = "load-dynamic", feature = "onednn"))]
 			"DnnlExecutionProvider" => {
 				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Dnnl(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr);
 				let use_arena = init_args.get("use_arena").map_or(false, |s| s.parse::<bool>().unwrap_or(false));
@@ -230,7 +230,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 					return; // EP found
 				}
 			}
-			#[cfg(feature = "coreml")]
+			#[cfg(any(feature = "load-dynamic", feature = "coreml"))]
 			"CoreMLExecutionProvider" => {
 				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_CoreML(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr);
 				// TODO: Support additional CoreML flags
@@ -240,7 +240,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 					return; // EP found
 				}
 			}
-			#[cfg(feature = "directml")]
+			#[cfg(any(feature = "load-dynamic", feature = "directml"))]
 			"DmlExecutionProvider" => {
 				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_DML(options: *mut sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> sys::OrtStatusPtr);
 				let device_id = init_args.get("device_id").map_or(0, |s| s.parse::<i32>().unwrap_or(0));
@@ -250,7 +250,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 					return; // EP found
 				}
 			}
-			#[cfg(feature = "rocm")]
+			#[cfg(any(feature = "load-dynamic", feature = "rocm"))]
 			"ROCmExecutionProvider" => {
 				let rocm_options = sys::OrtROCMProviderOptions {
 					device_id: 0,

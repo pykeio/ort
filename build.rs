@@ -221,7 +221,7 @@ where
 	P: AsRef<Path>
 {
 	let resp = ureq::get(source_url)
-		.timeout(std::time::Duration::from_secs(300))
+		.timeout(std::time::Duration::from_secs(1800))
 		.call()
 		.unwrap_or_else(|err| panic!("[ort] failed to download {source_url}: {err:?}"));
 

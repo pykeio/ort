@@ -73,7 +73,7 @@ impl ExecutionProvider {
 	ep_providers! {
 		cpu = "CPUExecutionProvider",
 		cuda = "CUDAExecutionProvider",
-		tensorrt = "TensorRTExecutionProvider",
+		tensorrt = "TensorrtExecutionProvider",
 		acl = "AclExecutionProvider",
 		dnnl = "DnnlExecutionProvider",
 		onednn = "DnnlExecutionProvider",
@@ -191,7 +191,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 				}
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "tensorrt"))]
-			"TensorRTExecutionProvider" => {
+			"TensorrtExecutionProvider" => {
 				let mut tensorrt_options: *mut sys::OrtTensorRTProviderOptionsV2 = std::ptr::null_mut();
 				if status_to_result_and_log("TensorRT", ortsys![unsafe CreateTensorRTProviderOptions(&mut tensorrt_options)]).is_err() {
 					continue; // next EP

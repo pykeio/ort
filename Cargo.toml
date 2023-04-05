@@ -1,7 +1,7 @@
 [package]
 name = "ort"
 description = "A Rust wrapper for ONNX Runtime 1.14 - Optimize and Accelerate Machine Learning Inferencing"
-version = "1.14.3"
+version = "1.14.4"
 edition = "2021"
 license = "MIT/Apache-2.0"
 repository = "https://github.com/pykeio/ort"
@@ -9,7 +9,7 @@ readme = "README.md"
 keywords = [ "machine-learning", "ai", "ml" ]
 categories = [ "algorithms", "mathematics", "science" ]
 authors = [
-	"pyke.io",
+	"pyke.io <contact@pyke.io>",
 	"Nicolas Bigaouette <nbigaouette@gmail.com>"
 ]
 include = [ "src/", "examples/", "tests/", "toolchains/", "build.rs", "LICENSE", "README.md" ]

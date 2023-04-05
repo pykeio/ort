@@ -164,7 +164,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 					let use_arena = init_args.get("use_arena").map_or(false, |s| s.parse::<bool>().unwrap_or(false));
 					let status = OrtSessionOptionsAppendExecutionProvider_CPU(options, use_arena.into());
 					if status_to_result_and_log("CPU", status).is_ok() {
-						return; // EP found
+						continue; // EP found
 					}
 				};
 			}
@@ -187,7 +187,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(options, cuda_options)];
 				ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
 				if status_to_result_and_log("CUDA", status).is_ok() {
-					return; // EP found
+					continue; // EP found
 				}
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "tensorrt"))]
@@ -209,7 +209,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_TensorRT_V2(options, tensorrt_options)];
 				ortsys![unsafe ReleaseTensorRTProviderOptions(tensorrt_options)];
 				if status_to_result_and_log("TensorRT", status).is_ok() {
-					return; // EP found
+					continue; // EP found
 				}
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "acl"))]
@@ -218,7 +218,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 				let use_arena = init_args.get("use_arena").map_or(false, |s| s.parse::<bool>().unwrap_or(false));
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_ACL(options, use_arena.into()) };
 				if status_to_result_and_log("ACL", status).is_ok() {
-					return; // EP found
+					continue; // EP found
 				}
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "onednn"))]
@@ -227,7 +227,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 				let use_arena = init_args.get("use_arena").map_or(false, |s| s.parse::<bool>().unwrap_or(false));
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_Dnnl(options, use_arena.into()) };
 				if status_to_result_and_log("oneDNN", status).is_ok() {
-					return; // EP found
+					continue; // EP found
 				}
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "coreml"))]
@@ -237,7 +237,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 				// https://onnxruntime.ai/docs/execution-providers/CoreML-ExecutionProvider.html#available-options
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_CoreML(options, 0) };
 				if status_to_result_and_log("CoreML", status).is_ok() {
-					return; // EP found
+					continue; // EP found
 				}
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "directml"))]
@@ -247,7 +247,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 				// TODO: extended options with OrtSessionOptionsAppendExecutionProviderEx_DML
 				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_DML(options, device_id) };
 				if status_to_result_and_log("DirectML", status).is_ok() {
-					return; // EP found
+					continue; // EP found
 				}
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "rocm"))]
@@ -265,7 +265,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 				};
 				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(options, &rocm_options)];
 				if status_to_result_and_log("ROCm", status).is_ok() {
-					return; // EP found
+					continue; // EP found
 				}
 			}
 			_ => {}

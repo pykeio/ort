@@ -201,7 +201,7 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 				assert_eq!(keys.len(), values.len()); // sanity check
 				let key_ptrs: Vec<*const c_char> = keys.iter().map(|k| k.as_ptr()).collect();
 				let value_ptrs: Vec<*const c_char> = values.iter().map(|v| v.as_ptr()).collect();
-				let status = ortsys![unsafe UpdateTensorRTProviderOptions(tensorrt_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), keys.len())];
+				let status = ortsys![unsafe UpdateTensorRTProviderOptions(tensorrt_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), keys.len() as _)];
 				if status_to_result_and_log("TensorRT", status).is_err() {
 					ortsys![unsafe ReleaseTensorRTProviderOptions(tensorrt_options)];
 					continue; // next EP
@@ -252,10 +252,15 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "rocm"))]
 			"ROCmExecutionProvider" => {
+				#[cfg(target_arch = "aarch64")]
+				let gpu_mem_limit = u64::MAX;
+				#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+				let gpu_mem_limit = usize::MAX;
+
 				let rocm_options = sys::OrtROCMProviderOptions {
 					device_id: 0,
 					miopen_conv_exhaustive_search: 0,
-					gpu_mem_limit: usize::MAX,
+					gpu_mem_limit,
 					arena_extend_strategy: 0,
 					do_copy_in_default_stream: 1,
 					has_user_compute_stream: 0,

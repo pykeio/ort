@@ -19,7 +19,7 @@ use std::{
 };
 
 use ndarray::IxDyn;
-use tracing::{debug, error};
+use tracing::error;
 
 use super::{
 	char_p_to_string,
@@ -92,7 +92,6 @@ impl Drop for SessionBuilder {
 		if self.session_options_ptr.is_null() {
 			error!("Session options pointer is null, not dropping");
 		} else {
-			debug!("Dropping the session options.");
 			ortsys![unsafe ReleaseSessionOptions(self.session_options_ptr)];
 		}
 	}
@@ -532,7 +531,6 @@ impl Output {
 impl Drop for Session {
 	#[tracing::instrument]
 	fn drop(&mut self) {
-		debug!("Dropping the session.");
 		if self.session_ptr.is_null() {
 			error!("Session pointer is null, not dropping.");
 		} else {

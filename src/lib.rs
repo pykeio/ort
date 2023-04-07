@@ -214,7 +214,7 @@ extern_system_fn! {
 		assert_ne!(code_location, ptr::null());
 		let code_location = unsafe { CStr::from_ptr(code_location) }.to_str().unwrap_or("unknown");
 		assert_ne!(message, ptr::null());
-		let message = unsafe { CStr::from_ptr(message) };
+		let message = unsafe { CStr::from_ptr(message) }.to_str().unwrap_or("<invalid>");
 		assert_ne!(log_id, ptr::null());
 		let log_id = unsafe { CStr::from_ptr(log_id) };
 
@@ -231,11 +231,11 @@ extern_system_fn! {
 		let _enter = span.enter();
 
 		match log_level {
-			Level::TRACE => trace!("{:?}", message),
-			Level::DEBUG => debug!("{:?}", message),
-			Level::INFO => info!("{:?}", message),
-			Level::WARN => warn!("{:?}", message),
-			Level::ERROR => error!("{:?}", message)
+			Level::TRACE => trace!("{}", message),
+			Level::DEBUG => debug!("{}", message),
+			Level::INFO => info!("{}", message),
+			Level::WARN => warn!("{}", message),
+			Level::ERROR => error!("{}", message)
 		}
 	}
 }

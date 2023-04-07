@@ -1,5 +1,3 @@
-use tracing::{debug, error};
-
 use super::{error::OrtResult, ortsys, sys, AllocatorType, MemType};
 
 #[derive(Debug)]
@@ -10,8 +8,6 @@ pub(crate) struct MemoryInfo {
 impl MemoryInfo {
 	#[tracing::instrument]
 	pub fn new(allocator: AllocatorType, memory_type: MemType) -> OrtResult<Self> {
-		debug!("Creating new OrtMemoryInfo.");
-
 		let mut memory_info_ptr: *mut sys::OrtMemoryInfo = std::ptr::null_mut();
 		ortsys![
 			unsafe CreateCpuMemoryInfo(allocator.into(), memory_type.into(), &mut memory_info_ptr);
@@ -24,10 +20,7 @@ impl MemoryInfo {
 impl Drop for MemoryInfo {
 	#[tracing::instrument]
 	fn drop(&mut self) {
-		if self.ptr.is_null() {
-			error!("OrtMemoryInfo pointer is null, not dropping.");
-		} else {
-			debug!("Dropping OrtMemoryInfo");
+		if !self.ptr.is_null() {
 			ortsys![unsafe ReleaseMemoryInfo(self.ptr)];
 		}
 

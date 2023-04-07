@@ -84,7 +84,7 @@ impl Environment {
 		let mut environment_guard = G_ENV.lock().expect("Failed to acquire lock: another thread panicked?");
 		let g_env_ptr = environment_guard.env_ptr.get_mut();
 		if g_env_ptr.is_null() {
-			debug!("Environment not yet initialized, creating a new one.");
+			debug!("Environment not yet initialized, creating a new one");
 
 			let mut env_ptr: *mut sys::OrtEnv = std::ptr::null_mut();
 
@@ -98,7 +98,7 @@ impl Environment {
 			let status = unsafe { create_env_with_custom_logger(logging_function, logger_param, log_level.into(), cname.as_ptr(), &mut env_ptr) };
 			status_to_result(status).map_err(OrtError::CreateEnvironment)?;
 
-			debug!(env_ptr = format!("{:?}", env_ptr).as_str(), "Environment created.");
+			debug!(env_ptr = format!("{:?}", env_ptr).as_str(), "Environment created");
 
 			*g_env_ptr = env_ptr;
 			environment_guard.name = name;
@@ -116,7 +116,7 @@ impl Environment {
 			warn!(
 				name = environment_guard.name.as_str(),
 				env_ptr = format!("{:?}", environment_guard.env_ptr).as_str(),
-				"Environment already initialized, reusing it.",
+				"Environment already initialized for this thread, reusing it",
 			);
 
 			// NOTE: Cloning the lazy_static 'G_ENV' will increase its strong count by one.
@@ -141,7 +141,7 @@ impl Default for Environment {
 		let mut environment_guard = G_ENV.lock().expect("Failed to acquire lock: another thread panicked?");
 		let g_env_ptr = environment_guard.env_ptr.get_mut();
 		if g_env_ptr.is_null() {
-			debug!("Environment not yet initialized, creating a new one.");
+			debug!("Environment not yet initialized, creating a new one");
 
 			let mut env_ptr: *mut sys::OrtEnv = std::ptr::null_mut();
 
@@ -155,7 +155,7 @@ impl Default for Environment {
 			let status = unsafe { create_env_with_custom_logger(logging_function, logger_param, LoggingLevel::Warning.into(), cname.as_ptr(), &mut env_ptr) };
 			status_to_result(status).map_err(OrtError::CreateEnvironment).unwrap();
 
-			debug!(env_ptr = format!("{:?}", env_ptr).as_str(), "Environment created.");
+			debug!(env_ptr = format!("{:?}", env_ptr).as_str(), "Environment created");
 
 			*g_env_ptr = env_ptr;
 			environment_guard.name = "default".to_string();
@@ -186,7 +186,7 @@ impl Default for Environment {
 impl Drop for Environment {
 	#[tracing::instrument]
 	fn drop(&mut self) {
-		debug!(global_arc_count = Arc::strong_count(&G_ENV), "Dropping the Environment.",);
+		debug!(global_arc_count = Arc::strong_count(&G_ENV), "Dropping environment");
 
 		let mut environment_guard = self.env.lock().expect("Failed to acquire lock: another thread panicked?");
 
@@ -199,7 +199,7 @@ impl Drop for Environment {
 			let release_env = ort().ReleaseEnv.unwrap();
 			let env_ptr: *mut sys::OrtEnv = *environment_guard.env_ptr.get_mut();
 
-			debug!(global_arc_count = Arc::strong_count(&G_ENV), "Releasing the Environment.",);
+			debug!(global_arc_count = Arc::strong_count(&G_ENV), "Releasing environment");
 
 			assert_ne!(env_ptr, std::ptr::null_mut());
 			if env_ptr.is_null() {

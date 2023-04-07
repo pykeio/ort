@@ -1,7 +1,6 @@
 use std::{fmt::Debug, ops::Deref, ptr, rc};
 
 use ndarray::ArrayView;
-use tracing::debug;
 
 use super::{TensorData, TensorDataToType, TensorElementDataType};
 use crate::{memory::MemoryInfo, ortsys, sys, OrtError, OrtResult};
@@ -178,7 +177,6 @@ pub struct TensorPointerHolder {
 impl Drop for TensorPointerHolder {
 	#[tracing::instrument]
 	fn drop(&mut self) {
-		debug!("Dropping OrtOwnedTensor.");
 		ortsys![unsafe ReleaseValue(self.tensor_ptr)];
 
 		self.tensor_ptr = ptr::null_mut();

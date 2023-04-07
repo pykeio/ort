@@ -1,7 +1,7 @@
 use std::{ffi, fmt::Debug, ops::Deref};
 
 use ndarray::Array;
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::{
 	error::assert_non_null_pointer,
@@ -160,9 +160,8 @@ where
 	#[tracing::instrument(skip_all)]
 	fn drop(&mut self) {
 		// We need to let the C part free
-		debug!("Dropping Tensor.");
 		if self.c_ptr.is_null() {
-			error!("Null pointer, not calling free.");
+			error!("Null pointer in OrtTensor, not calling free.");
 		} else {
 			ortsys![unsafe ReleaseValue(self.c_ptr)];
 		}

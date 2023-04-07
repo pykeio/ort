@@ -140,7 +140,7 @@ macro_rules! get_ep_register {
 			match symbol {
 				Ok(symbol) => symbol,
 				Err(e) => {
-					tracing::info!("{}", e.to_string());
+					tracing::error!("error trying to load symbol `{}` for execution provider registration: {}", stringify!($symbol), e.to_string());
 					continue;
 				}
 			}
@@ -152,7 +152,15 @@ macro_rules! get_ep_register {
 pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, execution_providers: impl AsRef<[ExecutionProvider]>) {
 	let status_to_result_and_log = |ep: &'static str, status: *mut sys::OrtStatus| {
 		let result = status_to_result(status);
-		tracing::debug!("{ep} execution provider registration {result:?}");
+		match &result {
+			Err(e) => match e {
+				OrtApiError::Msg(msg) => tracing::error!("{ep} execution provider registration failed: {msg}"),
+				OrtApiError::IntoStringError(_) => {
+					tracing::error!("{ep} execution provider registration failed catastrophically (could not convert error message into string)")
+				}
+			},
+			Ok(_) => tracing::info!("{ep} execution provider registered successfully")
+		}
 		result
 	};
 	for ep in execution_providers.as_ref() {

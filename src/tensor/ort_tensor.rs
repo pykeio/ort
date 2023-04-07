@@ -157,7 +157,7 @@ where
 	T: IntoTensorElementDataType + Debug + Clone,
 	D: ndarray::Dimension
 {
-	#[tracing::instrument]
+	#[tracing::instrument(skip_all)]
 	fn drop(&mut self) {
 		// We need to let the C part free
 		debug!("Dropping Tensor.");

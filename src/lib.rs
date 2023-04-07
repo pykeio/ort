@@ -58,7 +58,9 @@ lazy_static! {
 	};
 	pub(crate) static ref G_ORT_LIB: Arc<Mutex<AtomicPtr<libloading::Library>>> = {
 		unsafe {
-			let lib = libloading::Library::new(&**G_ORT_DYLIB_PATH).unwrap_or_else(|e| panic!("could not load the library at `{}`: {e:?}", **G_ORT_DYLIB_PATH));
+			// resolve path relative to executable
+			let absolute_path = std::env::current_exe().expect("could not get current executable path").join(&**G_ORT_DYLIB_PATH);
+			let lib = libloading::Library::new(absolute_path).unwrap_or_else(|e| panic!("could not load the library at `{}`: {e:?}", **G_ORT_DYLIB_PATH));
 			Arc::new(Mutex::new(AtomicPtr::new(Box::leak(Box::new(lib)) as *mut _)))
 		}
 	};

@@ -60,7 +60,7 @@ lazy_static! {
 		unsafe {
 			// resolve path relative to executable
 			let absolute_path = std::env::current_exe().expect("could not get current executable path").join(&**G_ORT_DYLIB_PATH);
-			let lib = libloading::Library::new(absolute_path).unwrap_or_else(|e| panic!("could not load the library at `{}`: {e:?}", **G_ORT_DYLIB_PATH));
+			let lib = libloading::Library::new(&absolute_path).unwrap_or_else(|e| panic!("could not load the library at `{}`: {e:?}", absolute_path.display()));
 			Arc::new(Mutex::new(AtomicPtr::new(Box::leak(Box::new(lib)) as *mut _)))
 		}
 	};

@@ -670,8 +670,8 @@ impl Session {
 			if is {
 				error!(
 					"Input {i} has an unexpected dimensionality: got {} dims, but the model expected {}",
-					self.inputs[i].dimensions.len(),
-					input_arrays[i].shape().len()
+					input_arrays[i].shape().len(),
+					self.inputs[i].dimensions.len()
 				);
 				return Err(OrtError::NonMatchingDimensions(NonMatchingDimensionsError::InputsLength {
 					inference_input: input_arrays.iter().map(|input_array| input_array.shape()).collect(),
@@ -697,8 +697,8 @@ impl Session {
 			if is {
 				error!(
 					"Input {i} has an incompatible shape: got {:?}, but the model expected a shape like {:?}",
-					self.inputs[i].dimensions,
-					input_arrays[i].shape()
+					input_arrays[i].shape(),
+					self.inputs[i].dimensions
 				);
 				return Err(OrtError::NonMatchingDimensions(NonMatchingDimensionsError::InputsLength {
 					inference_input: input_arrays.iter().map(|input_array| input_array.shape().to_vec()).collect(),

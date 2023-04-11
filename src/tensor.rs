@@ -16,15 +16,10 @@
 
 pub mod ndarray_tensor;
 pub mod ort_owned_tensor;
-pub mod ort_tensor;
-pub mod type_dynamic_tensor;
 
 use std::{ffi, fmt, ptr, rc, result, string};
 
 pub use ort_owned_tensor::{DynOrtTensor, OrtOwnedTensor};
-pub use ort_tensor::OrtTensor;
-pub use type_dynamic_tensor::FromArray;
-pub use type_dynamic_tensor::InputTensor;
 
 use super::{
 	ortsys,

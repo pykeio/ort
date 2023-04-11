@@ -1,20 +1,26 @@
-use std::sync::Arc;
+use std::{
+	io::{self, Write},
+	sync::Arc
+};
 
-use ndarray::{array, concatenate, s, Array1, Axis};
+use ndarray::{array, concatenate, s, Array1, Axis, IxDyn};
 use ort::{
 	download::language::machine_comprehension::GPT2,
-	tensor::{DynOrtTensor, FromArray, InputTensor, OrtOwnedTensor},
+	tensor::{DynOrtTensor, OrtOwnedTensor},
+	value::InputValue,
 	Environment, ExecutionProvider, GraphOptimizationLevel, OrtResult, SessionBuilder
 };
 use rand::Rng;
 use tokenizers::Tokenizer;
 
-const GEN_TOKENS: i32 = 45;
+const PROMPT: &str = "The corsac fox (Vulpes corsac), also known simply as a corsac, is a medium-sized fox found in";
+const GEN_TOKENS: i32 = 90;
 const TOP_K: usize = 5;
 
 fn main() -> OrtResult<()> {
 	tracing_subscriber::fmt::init();
 
+	let mut stdout = io::stdout();
 	let mut rng = rand::thread_rng();
 
 	let environment = Arc::new(
@@ -30,17 +36,18 @@ fn main() -> OrtResult<()> {
 		.with_model_downloaded(GPT2::GPT2LmHead)?;
 
 	let tokenizer = Tokenizer::from_file("tests/data/gpt2-tokenizer.json").unwrap();
-	let tokens = tokenizer
-		.encode("The corsac fox (Vulpes corsac), also known simply as a corsac, is a medium-sized fox found in", false)
-		.unwrap();
+	let tokens = tokenizer.encode(PROMPT, false).unwrap();
 	let tokens = tokens.get_ids().iter().map(|i| *i as i64).collect::<Vec<_>>();
 
 	let tokens = &mut Array1::from_iter(tokens.iter().cloned());
 
+	print!("{PROMPT}");
+	stdout.flush().unwrap();
+
 	for _ in 0..GEN_TOKENS {
 		let n_tokens = &tokens.shape()[0];
 		let array = tokens.clone().insert_axis(Axis(0)).into_shape((1, 1, *n_tokens)).unwrap();
-		let outputs: Vec<DynOrtTensor<ndarray::Dim<ndarray::IxDynImpl>>> = session.run([InputTensor::from_array(array.into_dyn())])?;
+		let outputs: Vec<DynOrtTensor<IxDyn>> = session.run(&[InputValue::from(array)])?;
 		let generated_tokens: OrtOwnedTensor<f32, _> = outputs[0].try_extract().unwrap();
 		let generated_tokens = generated_tokens.view();
 
@@ -56,9 +63,13 @@ fn main() -> OrtResult<()> {
 
 		let token = probabilities[rng.gen_range(0..=TOP_K)].0;
 		*tokens = concatenate![Axis(0), *tokens, array![token.try_into().unwrap()]];
-		let sentence = tokenizer.decode(tokens.iter().map(|i| *i as u32).collect::<Vec<_>>(), true).unwrap();
-		println!("{}", sentence);
+
+		let token_str = tokenizer.decode(vec![token as _], true).unwrap();
+		print!("{}", token_str);
+		stdout.flush().unwrap();
 	}
+
+	println!();
 
 	Ok(())
 }

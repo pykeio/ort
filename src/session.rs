@@ -30,14 +30,12 @@ use super::{
 	memory::MemoryInfo,
 	metadata::Metadata,
 	ort, ortsys, sys,
-	tensor::{
-		type_dynamic_tensor::{InputOrtTensor, InputTensor},
-		DynOrtTensor, TensorElementDataType
-	},
+	tensor::{DynOrtTensor, TensorElementDataType},
 	AllocatorType, GraphOptimizationLevel, MemType
 };
 #[cfg(feature = "fetch-models")]
 use super::{download::ModelUrl, error::OrtDownloadError};
+use crate::value::{InputOrtValue, InputTensor, InputValue};
 
 /// Type used to create a session using the _builder pattern_.
 ///
@@ -547,12 +545,12 @@ impl Session {
 	///
 	/// Note that ONNX models can have multiple inputs; a `Vec<_>` is thus
 	/// used for the input data here.
-	pub fn run<'s, 'm>(&'s self, input_arrays: impl AsRef<[InputTensor]>) -> OrtResult<Vec<DynOrtTensor<'m, IxDyn>>>
+	pub fn run<'s, 'm, 'v, 'i>(&'s self, input_values: &'i [InputValue<'v>]) -> OrtResult<Vec<DynOrtTensor<'m, IxDyn>>>
 	where
-		's: 'm // 's outlives 'm (session outlives memory info)
+		's: 'm, // 's outlives 'm (session outlives memory info)
+		'i: 'v
 	{
-		let input_arrays = input_arrays.as_ref();
-		self.validate_input_shapes(input_arrays)?;
+		self.validate_input_shapes(input_values)?;
 
 		// Build arguments to Run()
 
@@ -575,11 +573,11 @@ impl Session {
 		let mut output_tensor_ptrs: Vec<*mut sys::OrtValue> = vec![std::ptr::null_mut(); self.outputs.len()];
 
 		// The C API expects pointers for the arrays (pointers to C-arrays)
-		let input_memory_info = MemoryInfo::new(AllocatorType::Device, MemType::Default)?;
-		let input_ort_tensors: Vec<InputOrtTensor> = input_arrays
+		let input_memory_info = MemoryInfo::new(AllocatorType::Device, MemType::CPUInput)?;
+		let input_ort_tensors: Vec<InputOrtValue> = input_values
 			.iter()
-			.map(|input_tensor| InputOrtTensor::from_input_tensor(&input_memory_info, self.allocator_ptr, input_tensor))
-			.collect::<OrtResult<Vec<InputOrtTensor>>>()?;
+			.map(|input_tensor| InputOrtValue::from_input_value(&input_memory_info, self.allocator_ptr, input_tensor))
+			.collect::<OrtResult<Vec<InputOrtValue>>>()?;
 		let input_ort_values: Vec<*const sys::OrtValue> = input_ort_tensors.iter().map(|input_array_ort| input_array_ort.c_ptr()).collect();
 
 		let run_options_ptr: *const sys::OrtRunOptions = std::ptr::null();
@@ -596,6 +594,8 @@ impl Session {
 				output_tensor_ptrs.as_mut_ptr()
 			) -> OrtError::SessionRun
 		];
+
+		std::mem::drop(input_ort_values);
 
 		let output_memory_info = &self.memory_info;
 		let outputs: OrtResult<Vec<DynOrtTensor<ndarray::Dim<ndarray::IxDynImpl>>>> = output_tensor_ptrs
@@ -631,15 +631,12 @@ impl Session {
 		outputs
 	}
 
-	fn validate_input_shapes(&self, input_arrays: impl AsRef<[InputTensor]>) -> OrtResult<()> {
-		// ******************************************************************
-		// FIXME: Properly handle errors here
-		// Make sure all dimensions match (except dynamic ones)
-		let input_arrays = input_arrays.as_ref();
+	fn validate_input_shapes<'v>(&self, input_values: impl AsRef<[InputValue<'v>]>) -> OrtResult<()> {
+		let input_arrays = input_values.as_ref();
 
 		// Verify length of inputs
 		if input_arrays.len() != self.inputs.len() {
-			error!("Non-matching number of inputs: {} (inference) vs {} (model)", input_arrays.len(), self.inputs.len());
+			error!("Unexpected number of inputs: received {} inputs, but the model expects {}", input_arrays.len(), self.inputs.len());
 			return Err(OrtError::NonMatchingDimensions(NonMatchingDimensionsError::InputsCount {
 				inference_input_count: 0,
 				model_input_count: 0,
@@ -649,47 +646,65 @@ impl Session {
 		}
 
 		// Verify length of each individual inputs
-
-		let inputs_different_length = input_arrays.iter().zip(self.inputs.iter()).any(|(l, r)| match l {
-			InputTensor::FloatTensor(input) => input.shape().len() != r.dimensions.len(),
-			#[cfg(feature = "half")]
-			InputTensor::Float16Tensor(input) => input.shape().len() != r.dimensions.len(),
-			#[cfg(feature = "half")]
-			InputTensor::Bfloat16Tensor(input) => input.shape().len() != r.dimensions.len(),
-			InputTensor::Uint8Tensor(input) => input.shape().len() != r.dimensions.len(),
-			InputTensor::Int8Tensor(input) => input.shape().len() != r.dimensions.len(),
-			InputTensor::Uint16Tensor(input) => input.shape().len() != r.dimensions.len(),
-			InputTensor::Int16Tensor(input) => input.shape().len() != r.dimensions.len(),
-			InputTensor::Int32Tensor(input) => input.shape().len() != r.dimensions.len(),
-			InputTensor::Int64Tensor(input) => input.shape().len() != r.dimensions.len(),
-			InputTensor::DoubleTensor(input) => input.shape().len() != r.dimensions.len(),
-			InputTensor::Uint32Tensor(input) => input.shape().len() != r.dimensions.len(),
-			InputTensor::Uint64Tensor(input) => input.shape().len() != r.dimensions.len(),
-			InputTensor::StringTensor(input) => input.shape().len() != r.dimensions.len()
+		let inputs_different_length = input_arrays.iter().zip(self.inputs.iter()).map(|(l, r)| match l {
+			InputValue::Tensor(tensor) => match tensor {
+				InputTensor::Float(input) => input.shape().len() != r.dimensions.len(),
+				#[cfg(feature = "half")]
+				InputTensor::Float16(input) => input.shape().len() != r.dimensions.len(),
+				#[cfg(feature = "half")]
+				InputTensor::Bfloat16(input) => input.shape().len() != r.dimensions.len(),
+				InputTensor::Uint8(input) => input.shape().len() != r.dimensions.len(),
+				InputTensor::Int8(input) => input.shape().len() != r.dimensions.len(),
+				InputTensor::Uint16(input) => input.shape().len() != r.dimensions.len(),
+				InputTensor::Int16(input) => input.shape().len() != r.dimensions.len(),
+				InputTensor::Int32(input) => input.shape().len() != r.dimensions.len(),
+				InputTensor::Int64(input) => input.shape().len() != r.dimensions.len(),
+				InputTensor::Double(input) => input.shape().len() != r.dimensions.len(),
+				InputTensor::Uint32(input) => input.shape().len() != r.dimensions.len(),
+				InputTensor::Uint64(input) => input.shape().len() != r.dimensions.len(),
+				InputTensor::String(input) => input.shape().len() != r.dimensions.len()
+			},
+			_ => unimplemented!()
 		});
-		if inputs_different_length {
-			error!("Different input lengths: {:?} vs {:?}", self.inputs, input_arrays);
-			return Err(OrtError::NonMatchingDimensions(NonMatchingDimensionsError::InputsLength {
-				inference_input: input_arrays.iter().map(|input_array| input_array.shape().to_vec()).collect(),
-				model_input: self.inputs.iter().map(|input| input.dimensions.clone()).collect()
-			}));
+		for (i, is) in inputs_different_length.enumerate() {
+			if is {
+				error!(
+					"Input {i} has an unexpected dimensionality: got {} dims, but the model expected {}",
+					self.inputs[i].dimensions.len(),
+					input_arrays[i].shape().len()
+				);
+				return Err(OrtError::NonMatchingDimensions(NonMatchingDimensionsError::InputsLength {
+					inference_input: input_arrays.iter().map(|input_array| input_array.shape()).collect(),
+					model_input: self.inputs.iter().map(|input| input.dimensions.clone()).collect()
+				}));
+			}
 		}
 
 		// Verify shape of each individual inputs
-		let inputs_different_shape = input_arrays.iter().zip(self.inputs.iter()).any(|(l, r)| {
-			let l_shape = l.shape();
-			let r_shape = r.dimensions.as_slice();
-			l_shape.iter().zip(r_shape.iter()).any(|(l2, r2)| match r2 {
-				Some(r3) => *r3 as usize != *l2,
-				None => false // None means dynamic size; in that case shape always match
-			})
+		let inputs_different_shape = input_arrays.iter().zip(self.inputs.iter()).map(|(l, r)| {
+			if let InputValue::Tensor(l) = l {
+				let l_shape = l.shape();
+				let r_shape = r.dimensions.as_slice();
+				l_shape.iter().zip(r_shape.iter()).any(|(l2, r2)| match r2 {
+					Some(r3) => *r3 as usize != *l2,
+					None => false // None means dynamic size; in that case shape always match
+				})
+			} else {
+				false
+			}
 		});
-		if inputs_different_shape {
-			error!("Different input lengths: {:?} vs {:?}", self.inputs, input_arrays);
-			return Err(OrtError::NonMatchingDimensions(NonMatchingDimensionsError::InputsLength {
-				inference_input: input_arrays.iter().map(|input_array| input_array.shape().to_vec()).collect(),
-				model_input: self.inputs.iter().map(|input| input.dimensions.clone()).collect()
-			}));
+		for (i, is) in inputs_different_shape.enumerate() {
+			if is {
+				error!(
+					"Input {i} has an incompatible shape: got {:?}, but the model expected a shape like {:?}",
+					self.inputs[i].dimensions,
+					input_arrays[i].shape()
+				);
+				return Err(OrtError::NonMatchingDimensions(NonMatchingDimensionsError::InputsLength {
+					inference_input: input_arrays.iter().map(|input_array| input_array.shape().to_vec()).collect(),
+					model_input: self.inputs.iter().map(|input| input.dimensions.clone()).collect()
+				}));
+			}
 		}
 
 		Ok(())

@@ -290,7 +290,9 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 					continue; // EP found
 				}
 			}
-			_ => {}
+			ep => {
+				tracing::warn!("`ort` was not compiled to enable {ep} - you may be missing a Cargo feature to enable it.");
+			}
 		};
 	}
 }

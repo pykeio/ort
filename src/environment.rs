@@ -1,18 +1,18 @@
 use std::collections::HashMap;
 use std::{
 	ffi::CString,
-	sync::{atomic::AtomicPtr, Arc, Mutex},
+	sync::{atomic::AtomicPtr, Arc, Mutex}
 };
 
-use crate::sys::OrtStatusPtr;
 use lazy_static::lazy_static;
 use tracing::{debug, error, warn};
 
 use super::{
 	custom_logger,
 	error::{status_to_result, OrtError, OrtResult},
-	ort, ortsys, sys, ExecutionProvider, LoggingLevel,
+	ort, ortsys, sys, ExecutionProvider, LoggingLevel
 };
+use crate::sys::OrtStatusPtr;
 
 lazy_static! {
 	static ref G_ENV: Arc<Mutex<EnvironmentSingleton>> = Arc::new(Mutex::new(EnvironmentSingleton {
@@ -24,7 +24,7 @@ lazy_static! {
 #[derive(Debug)]
 struct EnvironmentSingleton {
 	name: String,
-	env_ptr: AtomicPtr<sys::OrtEnv>,
+	env_ptr: AtomicPtr<sys::OrtEnv>
 }
 
 /// An [`Environment`] is the main entry point of the ONNX Runtime.
@@ -50,7 +50,7 @@ struct EnvironmentSingleton {
 #[derive(Debug, Clone)]
 pub struct Environment {
 	env: Arc<Mutex<EnvironmentSingleton>>,
-	pub(crate) execution_providers: Vec<ExecutionProvider>,
+	pub(crate) execution_providers: Vec<ExecutionProvider>
 }
 
 impl Environment {
@@ -61,7 +61,7 @@ impl Environment {
 			name: "default".into(),
 			log_level: LoggingLevel::Warning,
 			execution_providers: Vec::new(),
-			global_thread_pool_options: vec![],
+			global_thread_pool_options: vec![]
 		}
 	}
 
@@ -84,7 +84,7 @@ impl Environment {
 		let logging_function: sys::OrtLoggingFunction = Some(custom_logger);
 		// FIXME: What should go here?
 		let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
-		let cname = CString::new(name.clone()).unwrap();
+		let cname = CString::new(name).unwrap();
 		let create_env_with_custom_logger = ortsys![CreateEnvWithCustomLogger];
 		let status = unsafe { create_env_with_custom_logger(logging_function, logger_param, log_level.into(), cname.as_ptr(), &mut env_ptr) };
 		(status, env_ptr)
@@ -95,7 +95,7 @@ impl Environment {
 		let logging_function: sys::OrtLoggingFunction = Some(custom_logger);
 		let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
 		let mut thread_options: *mut sys::OrtThreadingOptions = std::ptr::null_mut();
-		let cname = CString::new(name.clone()).unwrap();
+		let cname = CString::new(name).unwrap();
 		let create_thread_options = ortsys![CreateThreadingOptions];
 		let release_thread_options = ortsys![ReleaseThreadingOptions];
 		let create_env_with_global_thread_pool = ortsys![CreateEnvWithCustomLoggerAndGlobalThreadPools];
@@ -123,18 +123,20 @@ impl Environment {
 		if !options.is_empty() {
 			warn!("Unknown options passed to create_global_thread_pool_env: {:?}", options);
 		}
-		let status = unsafe { create_env_with_global_thread_pool(logging_function, logger_param, log_level.into(), cname.as_ptr(), thread_options, &mut env_ptr) };
+		let status =
+			unsafe { create_env_with_global_thread_pool(logging_function, logger_param, log_level.into(), cname.as_ptr(), thread_options, &mut env_ptr) };
 		unsafe {
 			release_thread_options(thread_options);
 		}
 		(status, env_ptr)
 	}
+
 	fn new(
 		name: String,
 		log_level: LoggingLevel,
 		execution_providers: Vec<ExecutionProvider>,
 		create_env_fn: fn(&str, LoggingLevel, HashMap<String, String>) -> (OrtStatusPtr, *mut sys::OrtEnv),
-		options: HashMap<String, String>,
+		options: HashMap<String, String>
 	) -> OrtResult<Environment> {
 		// NOTE: Because 'G_ENV' is a lazy_static, locking it will, initially, create
 		//      a new Arc<Mutex<EnvironmentSingleton>> with a strong count of 1.
@@ -159,7 +161,7 @@ impl Environment {
 			//          * one inside the 'Environment' returned
 			Ok(Environment {
 				env: G_ENV.clone(),
-				execution_providers,
+				execution_providers
 			})
 		} else {
 			warn!(
@@ -175,7 +177,7 @@ impl Environment {
 			//          * one inside the 'Environment' returned
 			Ok(Environment {
 				env: G_ENV.clone(),
-				execution_providers,
+				execution_providers
 			})
 		}
 	}
@@ -216,7 +218,7 @@ impl Default for Environment {
 			//          * one inside the 'Environment' returned
 			Environment {
 				env: G_ENV.clone(),
-				execution_providers: vec![],
+				execution_providers: vec![]
 			}
 		} else {
 			// NOTE: Cloning the lazy_static 'G_ENV' will increase its strong count by one.
@@ -226,7 +228,7 @@ impl Default for Environment {
 			//          * one inside the 'Environment' returned
 			Environment {
 				env: G_ENV.clone(),
-				execution_providers: vec![],
+				execution_providers: vec![]
 			}
 		}
 	}
@@ -277,7 +279,7 @@ pub struct EnvBuilder {
 	name: String,
 	log_level: LoggingLevel,
 	execution_providers: Vec<ExecutionProvider>,
-	global_thread_pool_options: Vec<(String, String)>,
+	global_thread_pool_options: Vec<(String, String)>
 }
 
 impl EnvBuilder {
@@ -288,7 +290,7 @@ impl EnvBuilder {
 	/// parameters will be ignored.
 	pub fn with_name<S>(mut self, name: S) -> EnvBuilder
 	where
-		S: Into<String>,
+		S: Into<String>
 	{
 		self.name = name.into();
 		self
@@ -357,7 +359,7 @@ impl EnvBuilder {
 				self.log_level,
 				self.execution_providers,
 				Environment::create_global_thread_pool_env,
-				self.global_thread_pool_options.clone().into_iter().collect(),
+				self.global_thread_pool_options.clone().into_iter().collect()
 			)
 		}
 	}
@@ -382,7 +384,7 @@ mod tests {
 	}
 
 	struct ConcurrentTestRun {
-		lock: Arc<RwLock<()>>,
+		lock: Arc<RwLock<()>>
 	}
 
 	lazy_static! {
@@ -450,22 +452,24 @@ mod tests {
 		assert_eq!(main_env.name(), initial_name);
 		assert_eq!(main_env.env_ptr() as usize, main_env_ptr);
 
-		assert!((0..10)
-			.map(|t| {
-				let initial_name_cloned = initial_name.clone();
-				std::thread::spawn(move || {
-					let name = format!("concurrent_environment_creation: {}", t);
-					let env = Environment::builder()
-						.with_name(name)
-						.with_log_level(LoggingLevel::Warning)
-						.build()
-						.unwrap();
+		assert!(
+			(0..10)
+				.map(|t| {
+					let initial_name_cloned = initial_name.clone();
+					std::thread::spawn(move || {
+						let name = format!("concurrent_environment_creation: {}", t);
+						let env = Environment::builder()
+							.with_name(name)
+							.with_log_level(LoggingLevel::Warning)
+							.build()
+							.unwrap();
 
-					assert_eq!(env.name(), initial_name_cloned);
-					assert_eq!(env.env_ptr() as usize, main_env_ptr);
+						assert_eq!(env.name(), initial_name_cloned);
+						assert_eq!(env.env_ptr() as usize, main_env_ptr);
+					})
 				})
-			})
-			.map(|child| child.join())
-			.all(|r| std::result::Result::is_ok(&r)));
+				.map(|child| child.join())
+				.all(|r| std::result::Result::is_ok(&r))
+		);
 	}
 }

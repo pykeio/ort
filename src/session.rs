@@ -15,7 +15,7 @@ use std::{
 	ops::Deref,
 	os::raw::c_char,
 	path::Path,
-	sync::Arc
+	sync::Arc,
 };
 
 use ndarray::IxDyn;
@@ -32,9 +32,9 @@ use super::{
 	ort, ortsys, sys,
 	tensor::{
 		type_dynamic_tensor::{InputOrtTensor, InputTensor},
-		DynOrtTensor, TensorElementDataType
+		DynOrtTensor, TensorElementDataType,
 	},
-	AllocatorType, GraphOptimizationLevel, MemType
+	AllocatorType, GraphOptimizationLevel, MemType,
 };
 #[cfg(feature = "fetch-models")]
 use super::{download::ModelUrl, error::OrtDownloadError};
@@ -69,7 +69,7 @@ pub struct SessionBuilder {
 	allocator: AllocatorType,
 	memory_type: MemType,
 	custom_runtime_handles: Vec<*mut std::os::raw::c_void>,
-	execution_providers: Vec<ExecutionProvider>
+	execution_providers: Vec<ExecutionProvider>,
 }
 
 impl Debug for SessionBuilder {
@@ -109,7 +109,7 @@ impl SessionBuilder {
 			allocator: AllocatorType::Device,
 			memory_type: MemType::Default,
 			custom_runtime_handles: Vec::new(),
-			execution_providers: Vec::new()
+			execution_providers: Vec::new(),
 		})
 	}
 
@@ -170,15 +170,9 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
-
 	/// Configure the session to disable per session thread pool. Used
 	/// when using global thread pool
-	/// in parallel, this sets the maximum number of threads to use to run them in parallel.
-	///
-	/// This has no effect when the session execution mode is set to `Sequential`.
-	///
-	/// For configuring the number of threads used to parallelize the execution within nodes, see
-	/// [`SessionBuilder::with_intra_threads()`].
+	/// [`SessionBuilder::with_per_session_threads_disabled()`].
 	pub fn with_per_session_threads_disabled(self) -> OrtResult<Self> {
 		ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr) -> OrtError::CreateSessionOptions];
 		Ok(self)
@@ -283,7 +277,7 @@ impl SessionBuilder {
 	#[cfg(feature = "fetch-models")]
 	pub fn with_model_downloaded<M>(self, model: M) -> OrtResult<Session>
 	where
-		M: ModelUrl
+		M: ModelUrl,
 	{
 		self.with_model_downloaded_monomorphized(model.fetch_url())
 	}
@@ -299,7 +293,7 @@ impl SessionBuilder {
 	#[tracing::instrument]
 	fn download_to<P>(&self, url: &str, download_dir: P) -> OrtResult<PathBuf>
 	where
-		P: AsRef<Path> + std::fmt::Debug
+		P: AsRef<Path> + std::fmt::Debug,
 	{
 		let model_filename = PathBuf::from(url.split('/').last().unwrap());
 		let model_filepath = download_dir.as_ref().join(model_filename);
@@ -330,7 +324,7 @@ impl SessionBuilder {
 			} else {
 				Err(OrtDownloadError::CopyError {
 					expected: len as u64,
-					io: bytes_io_count
+					io: bytes_io_count,
 				}
 				.into())
 			}
@@ -343,12 +337,12 @@ impl SessionBuilder {
 	/// Loads an ONNX model from a file and builds the session.
 	pub fn with_model_from_file<P>(self, model_filepath_ref: P) -> OrtResult<Session>
 	where
-		P: AsRef<Path>
+		P: AsRef<Path>,
 	{
 		let model_filepath = model_filepath_ref.as_ref();
 		if !model_filepath.exists() {
 			return Err(OrtError::FileDoesNotExist {
-				filename: model_filepath.to_path_buf()
+				filename: model_filepath.to_path_buf(),
 			});
 		}
 
@@ -373,7 +367,7 @@ impl SessionBuilder {
 				.iter()
 				.chain(&self.env.execution_providers)
 				.cloned()
-				.collect::<Vec<_>>()
+				.collect::<Vec<_>>(),
 		);
 
 		let env_ptr: *const sys::OrtEnv = self.env.env_ptr();
@@ -402,7 +396,7 @@ impl SessionBuilder {
 			allocator_ptr,
 			memory_info,
 			inputs,
-			outputs
+			outputs,
 		})
 	}
 
@@ -418,7 +412,7 @@ impl SessionBuilder {
 				.iter()
 				.chain(&self.env.execution_providers)
 				.cloned()
-				.collect::<Vec<_>>()
+				.collect::<Vec<_>>(),
 		);
 
 		let str_to_char = |s: &str| {
@@ -460,7 +454,7 @@ impl SessionBuilder {
 			allocator_ptr,
 			memory_info,
 			inputs,
-			outputs
+			outputs,
 		};
 		Ok(InMemorySession { session, phantom: PhantomData })
 	}
@@ -477,13 +471,13 @@ pub struct Session {
 	/// Information about the ONNX's inputs as stored in loaded file
 	pub inputs: Vec<Input>,
 	/// Information about the ONNX's outputs as stored in loaded file
-	pub outputs: Vec<Output>
+	pub outputs: Vec<Output>,
 }
 
 /// A [`Session`] with data stored in-memory.
 pub struct InMemorySession<'s> {
 	session: Session,
-	phantom: PhantomData<&'s ()>
+	phantom: PhantomData<&'s ()>,
 }
 
 impl<'s> Deref for InMemorySession<'s> {
@@ -503,7 +497,7 @@ pub struct Input {
 	/// Shape of the input layer
 	///
 	/// C API uses a i64 for the dimensions. We use an unsigned of the same range of the positive values.
-	pub dimensions: Vec<Option<u32>>
+	pub dimensions: Vec<Option<u32>>,
 }
 
 /// Information about an ONNX's output as stored in loaded file
@@ -516,7 +510,7 @@ pub struct Output {
 	/// Shape of the output layer
 	///
 	/// C API uses a i64 for the dimensions. We use an unsigned of the same range of the positive values.
-	pub dimensions: Vec<Option<u32>>
+	pub dimensions: Vec<Option<u32>>,
 }
 
 impl Input {
@@ -562,7 +556,7 @@ impl Session {
 	/// used for the input data here.
 	pub fn run<'s, 'm>(&'s self, input_arrays: impl AsRef<[InputTensor]>) -> OrtResult<Vec<DynOrtTensor<'m, IxDyn>>>
 	where
-		's: 'm // 's outlives 'm (session outlives memory info)
+		's: 'm, // 's outlives 'm (session outlives memory info)
 	{
 		let input_arrays = input_arrays.as_ref();
 		self.validate_input_shapes(input_arrays)?;
@@ -657,7 +651,7 @@ impl Session {
 				inference_input_count: 0,
 				model_input_count: 0,
 				inference_input: input_arrays.iter().map(|input_array| input_array.shape().to_vec()).collect(),
-				model_input: self.inputs.iter().map(|input| input.dimensions.clone()).collect()
+				model_input: self.inputs.iter().map(|input| input.dimensions.clone()).collect(),
 			}));
 		}
 
@@ -678,13 +672,13 @@ impl Session {
 			InputTensor::DoubleTensor(input) => input.shape().len() != r.dimensions.len(),
 			InputTensor::Uint32Tensor(input) => input.shape().len() != r.dimensions.len(),
 			InputTensor::Uint64Tensor(input) => input.shape().len() != r.dimensions.len(),
-			InputTensor::StringTensor(input) => input.shape().len() != r.dimensions.len()
+			InputTensor::StringTensor(input) => input.shape().len() != r.dimensions.len(),
 		});
 		if inputs_different_length {
 			error!("Different input lengths: {:?} vs {:?}", self.inputs, input_arrays);
 			return Err(OrtError::NonMatchingDimensions(NonMatchingDimensionsError::InputsLength {
 				inference_input: input_arrays.iter().map(|input_array| input_array.shape().to_vec()).collect(),
-				model_input: self.inputs.iter().map(|input| input.dimensions.clone()).collect()
+				model_input: self.inputs.iter().map(|input| input.dimensions.clone()).collect(),
 			}));
 		}
 
@@ -694,14 +688,14 @@ impl Session {
 			let r_shape = r.dimensions.as_slice();
 			l_shape.iter().zip(r_shape.iter()).any(|(l2, r2)| match r2 {
 				Some(r3) => *r3 as usize != *l2,
-				None => false // None means dynamic size; in that case shape always match
+				None => false, // None means dynamic size; in that case shape always match
 			})
 		});
 		if inputs_different_shape {
 			error!("Different input lengths: {:?} vs {:?}", self.inputs, input_arrays);
 			return Err(OrtError::NonMatchingDimensions(NonMatchingDimensionsError::InputsLength {
 				inference_input: input_arrays.iter().map(|input_array| input_array.shape().to_vec()).collect(),
-				model_input: self.inputs.iter().map(|input| input.dimensions.clone()).collect()
+				model_input: self.inputs.iter().map(|input| input.dimensions.clone()).collect(),
 			}));
 		}
 
@@ -753,7 +747,7 @@ unsafe fn extract_data_type(tensor_info_ptr: *const sys::OrtTensorTypeAndShapeIn
 /// resulting `*OrtTensorTypeAndShapeInfo` before returning.
 unsafe fn call_with_tensor_info<F, T>(tensor_ptr: *const sys::OrtValue, mut f: F) -> OrtResult<T>
 where
-	F: FnMut(*const sys::OrtTensorTypeAndShapeInfo) -> OrtResult<T>
+	F: FnMut(*const sys::OrtTensorTypeAndShapeInfo) -> OrtResult<T>,
 {
 	let mut tensor_info_ptr: *mut sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
 	ortsys![GetTensorTypeAndShape(tensor_ptr, &mut tensor_info_ptr) -> OrtError::GetTensorTypeAndShape];
@@ -793,7 +787,7 @@ mod dangerous {
 	#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 	fn extract_io_count(
 		f: extern_system_fn! { unsafe fn(*const sys::OrtSession, *mut usize) -> *mut sys::OrtStatus },
-		session_ptr: *mut sys::OrtSession
+		session_ptr: *mut sys::OrtSession,
 	) -> OrtResult<usize> {
 		let mut num_nodes = 0;
 		let status = unsafe { f(session_ptr, &mut num_nodes) };
@@ -808,7 +802,7 @@ mod dangerous {
 	#[cfg(target_arch = "aarch64")]
 	fn extract_io_count(
 		f: extern_system_fn! { unsafe fn(*const sys::OrtSession, *mut u64) -> *mut sys::OrtStatus },
-		session_ptr: *mut sys::OrtSession
+		session_ptr: *mut sys::OrtSession,
 	) -> OrtResult<usize> {
 		let mut num_nodes = 0;
 		let status = unsafe { f(session_ptr, &mut num_nodes) };
@@ -845,7 +839,7 @@ mod dangerous {
 		) -> *mut sys::OrtStatus },
 		session_ptr: *mut sys::OrtSession,
 		allocator_ptr: *mut sys::OrtAllocator,
-		i: usize
+		i: usize,
 	) -> OrtResult<String> {
 		let mut name_bytes: *mut c_char = std::ptr::null_mut();
 
@@ -865,7 +859,7 @@ mod dangerous {
 		) -> *mut sys::OrtStatus },
 		session_ptr: *mut sys::OrtSession,
 		allocator_ptr: *mut sys::OrtAllocator,
-		i: usize
+		i: usize,
 	) -> OrtResult<String> {
 		let mut name_bytes: *mut c_char = std::ptr::null_mut();
 
@@ -883,7 +877,7 @@ mod dangerous {
 		Ok(Input {
 			name: input_name,
 			input_type,
-			dimensions
+			dimensions,
 		})
 	}
 
@@ -894,7 +888,7 @@ mod dangerous {
 		Ok(Output {
 			name: output_name,
 			output_type,
-			dimensions
+			dimensions,
 		})
 	}
 
@@ -906,7 +900,7 @@ mod dangerous {
 			*mut *mut sys::OrtTypeInfo,
 		) -> *mut sys::OrtStatus },
 		session_ptr: *mut sys::OrtSession,
-		i: usize
+		i: usize,
 	) -> OrtResult<(TensorElementDataType, Vec<Option<u32>>)> {
 		let mut typeinfo_ptr: *mut sys::OrtTypeInfo = std::ptr::null_mut();
 
@@ -932,7 +926,7 @@ mod dangerous {
 			*mut *mut sys::OrtTypeInfo,
 		) -> *mut sys::OrtStatus },
 		session_ptr: *mut sys::OrtSession,
-		i: usize
+		i: usize,
 	) -> OrtResult<(TensorElementDataType, Vec<Option<u32>>)> {
 		let mut typeinfo_ptr: *mut sys::OrtTypeInfo = std::ptr::null_mut();
 

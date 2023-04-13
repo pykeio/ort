@@ -1,17 +1,17 @@
+use std::collections::HashMap;
 use std::{
 	ffi::CString,
-	sync::{atomic::AtomicPtr, Arc, Mutex}
+	sync::{atomic::AtomicPtr, Arc, Mutex},
 };
-use std::collections::HashMap;
 
+use crate::sys::OrtStatusPtr;
 use lazy_static::lazy_static;
 use tracing::{debug, error, warn};
-use crate::sys::OrtStatusPtr;
 
 use super::{
 	custom_logger,
 	error::{status_to_result, OrtError, OrtResult},
-	ort, ortsys, sys, ExecutionProvider, LoggingLevel
+	ort, ortsys, sys, ExecutionProvider, LoggingLevel,
 };
 
 lazy_static! {
@@ -24,7 +24,7 @@ lazy_static! {
 #[derive(Debug)]
 struct EnvironmentSingleton {
 	name: String,
-	env_ptr: AtomicPtr<sys::OrtEnv>
+	env_ptr: AtomicPtr<sys::OrtEnv>,
 }
 
 /// An [`Environment`] is the main entry point of the ONNX Runtime.
@@ -50,7 +50,7 @@ struct EnvironmentSingleton {
 #[derive(Debug, Clone)]
 pub struct Environment {
 	env: Arc<Mutex<EnvironmentSingleton>>,
-	pub(crate) execution_providers: Vec<ExecutionProvider>
+	pub(crate) execution_providers: Vec<ExecutionProvider>,
 }
 
 impl Environment {
@@ -61,7 +61,7 @@ impl Environment {
 			name: "default".into(),
 			log_level: LoggingLevel::Warning,
 			execution_providers: Vec::new(),
-			global_thread_pool_options: vec![]
+			global_thread_pool_options: vec![],
 		}
 	}
 
@@ -97,26 +97,43 @@ impl Environment {
 		let create_thread_options = ortsys![CreateThreadingOptions];
 		let release_thread_options = ortsys![ReleaseThreadingOptions];
 		let create_env_with_global_thread_pool = ortsys![CreateEnvWithGlobalThreadPools];
-		let set_global_intra_op_thread_affinity	 = ortsys![SetGlobalIntraOpThreadAffinity];
+		let set_global_intra_op_thread_affinity = ortsys![SetGlobalIntraOpThreadAffinity];
 		let set_global_intra_op_num_threads = ortsys![SetGlobalIntraOpNumThreads];
 		let set_global_inter_op_num_threads = ortsys![SetGlobalInterOpNumThreads];
 		let set_global_spin_control = ortsys![SetGlobalSpinControl];
-		unsafe { create_thread_options(&mut thread_options); }
-		options.remove("inter_op_parallelism").map(|v| unsafe { set_global_inter_op_num_threads(thread_options, v.parse::<i32>().unwrap()) });
-		options.remove("intra_op_parallelism").map(|v| unsafe { set_global_intra_op_num_threads(thread_options, v.parse::<i32>().unwrap()) });
-		options.remove("spin_control").map(|v| unsafe { set_global_spin_control(thread_options, v.parse::<i32>().unwrap()) }); //1 for spin, 0 for non spin control
+		unsafe {
+			create_thread_options(&mut thread_options);
+		}
+		options
+			.remove("inter_op_parallelism")
+			.map(|v| unsafe { set_global_inter_op_num_threads(thread_options, v.parse::<i32>().unwrap()) });
+		options
+			.remove("intra_op_parallelism")
+			.map(|v| unsafe { set_global_intra_op_num_threads(thread_options, v.parse::<i32>().unwrap()) });
+		options
+			.remove("spin_control")
+			.map(|v| unsafe { set_global_spin_control(thread_options, v.parse::<i32>().unwrap()) }); //1 for spin, 0 for non spin control
 		options.remove("intra_op_thread_affinity").map(|v| unsafe {
 			let c_str = CString::new(v).unwrap();
-			set_global_intra_op_thread_affinity(thread_options, c_str.as_ptr()) }); //1 for spin, 0 for non spin control
+			set_global_intra_op_thread_affinity(thread_options, c_str.as_ptr())
+		}); //1 for spin, 0 for non spin control
 
 		if !options.is_empty() {
 			warn!("Unknown options passed to create_global_thread_pool_env: {:?}", options);
 		}
 		let status = unsafe { create_env_with_global_thread_pool(log_level.into(), cname.as_ptr(), thread_options, &mut env_ptr) };
-		unsafe { release_thread_options(thread_options); }
+		unsafe {
+			release_thread_options(thread_options);
+		}
 		(status, env_ptr)
 	}
-	fn new(name: String, log_level: LoggingLevel, execution_providers: Vec<ExecutionProvider>, create_env_fn: fn(&str, LoggingLevel, HashMap<String, String>) -> (OrtStatusPtr, *mut sys::OrtEnv), options: HashMap<String, String>) -> OrtResult<Environment> {
+	fn new(
+		name: String,
+		log_level: LoggingLevel,
+		execution_providers: Vec<ExecutionProvider>,
+		create_env_fn: fn(&str, LoggingLevel, HashMap<String, String>) -> (OrtStatusPtr, *mut sys::OrtEnv),
+		options: HashMap<String, String>,
+	) -> OrtResult<Environment> {
 		// NOTE: Because 'G_ENV' is a lazy_static, locking it will, initially, create
 		//      a new Arc<Mutex<EnvironmentSingleton>> with a strong count of 1.
 		//      Cloning it to embed it inside the 'Environment' to return
@@ -140,7 +157,7 @@ impl Environment {
 			//          * one inside the 'Environment' returned
 			Ok(Environment {
 				env: G_ENV.clone(),
-				execution_providers
+				execution_providers,
 			})
 		} else {
 			warn!(
@@ -156,7 +173,7 @@ impl Environment {
 			//          * one inside the 'Environment' returned
 			Ok(Environment {
 				env: G_ENV.clone(),
-				execution_providers
+				execution_providers,
 			})
 		}
 	}
@@ -197,7 +214,7 @@ impl Default for Environment {
 			//          * one inside the 'Environment' returned
 			Environment {
 				env: G_ENV.clone(),
-				execution_providers: vec![]
+				execution_providers: vec![],
 			}
 		} else {
 			// NOTE: Cloning the lazy_static 'G_ENV' will increase its strong count by one.
@@ -207,7 +224,7 @@ impl Default for Environment {
 			//          * one inside the 'Environment' returned
 			Environment {
 				env: G_ENV.clone(),
-				execution_providers: vec![]
+				execution_providers: vec![],
 			}
 		}
 	}
@@ -269,7 +286,7 @@ impl EnvBuilder {
 	/// parameters will be ignored.
 	pub fn with_name<S>(mut self, name: S) -> EnvBuilder
 	where
-		S: Into<String>
+		S: Into<String>,
 	{
 		self.name = name.into();
 		self
@@ -333,7 +350,13 @@ impl EnvBuilder {
 		if self.global_thread_pool_options.is_empty() {
 			Environment::new(self.name, self.log_level, self.execution_providers, Environment::create_custom_log_env, vec![].into_iter().collect())
 		} else {
-			Environment::new(self.name, self.log_level, self.execution_providers, Environment::create_global_thread_pool_env, self.global_thread_pool_options.clone().into_iter().collect())
+			Environment::new(
+				self.name,
+				self.log_level,
+				self.execution_providers,
+				Environment::create_global_thread_pool_env,
+				self.global_thread_pool_options.clone().into_iter().collect(),
+			)
 		}
 	}
 }
@@ -357,7 +380,7 @@ mod tests {
 	}
 
 	struct ConcurrentTestRun {
-		lock: Arc<RwLock<()>>
+		lock: Arc<RwLock<()>>,
 	}
 
 	lazy_static! {
@@ -417,30 +440,30 @@ mod tests {
 		let _concurrent_run_lock_guard = CONCURRENT_TEST_RUN.single_test_run();
 
 		let initial_name = String::from("concurrent_environment_creation");
-		let main_env = Environment::new(initial_name.clone(), LoggingLevel::Warning, Vec::new(), Environment::create_custom_log_env, vec![].into_iter().collect()).unwrap();
+		let main_env =
+			Environment::new(initial_name.clone(), LoggingLevel::Warning, Vec::new(), Environment::create_custom_log_env, vec![].into_iter().collect())
+				.unwrap();
 		let main_env_ptr = main_env.env_ptr() as usize;
 
 		assert_eq!(main_env.name(), initial_name);
 		assert_eq!(main_env.env_ptr() as usize, main_env_ptr);
 
-		assert!(
-			(0..10)
-				.map(|t| {
-					let initial_name_cloned = initial_name.clone();
-					std::thread::spawn(move || {
-						let name = format!("concurrent_environment_creation: {}", t);
-						let env = Environment::builder()
-							.with_name(name)
-							.with_log_level(LoggingLevel::Warning)
-							.build()
-							.unwrap();
+		assert!((0..10)
+			.map(|t| {
+				let initial_name_cloned = initial_name.clone();
+				std::thread::spawn(move || {
+					let name = format!("concurrent_environment_creation: {}", t);
+					let env = Environment::builder()
+						.with_name(name)
+						.with_log_level(LoggingLevel::Warning)
+						.build()
+						.unwrap();
 
-						assert_eq!(env.name(), initial_name_cloned);
-						assert_eq!(env.env_ptr() as usize, main_env_ptr);
-					})
+					assert_eq!(env.name(), initial_name_cloned);
+					assert_eq!(env.env_ptr() as usize, main_env_ptr);
 				})
-				.map(|child| child.join())
-				.all(|r| std::result::Result::is_ok(&r))
-		);
+			})
+			.map(|child| child.join())
+			.all(|r| std::result::Result::is_ok(&r)));
 	}
 }

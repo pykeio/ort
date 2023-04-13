@@ -120,6 +120,13 @@ impl ExecutionProvider {
 		///
 		/// Supported backends: DirectML
 		pub fn with_device_id(i32) = device_id;
+		/// By default, the CoreML EP will be enabled for all compatible Apple devices. Setting this option will only
+		/// enable CoreML EP for Apple devices with a compatible Apple Neural Engine (ANE).
+		///
+		/// **Note**: Enabling this option does not guarantee the entire model to be executed using ANE only.
+		///
+		/// Supported backends: CoreML
+		pub fn with_ane_only(bool) = ane_only;
 	}
 }
 
@@ -241,9 +248,11 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 			#[cfg(any(feature = "load-dynamic", feature = "coreml"))]
 			"CoreMLExecutionProvider" => {
 				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_CoreML(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr);
-				// TODO: Support additional CoreML flags
-				// https://onnxruntime.ai/docs/execution-providers/CoreML-ExecutionProvider.html#available-options
-				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_CoreML(options, 0) };
+				let mut coreml_flags = 0;
+				if init_args.get("ane_only").map_or(false, |s| s.parse::<bool>().unwrap_or(false)) {
+					coreml_flags |= 0x004; // COREML_FLAG_ONLY_ENABLE_DEVICE_WITH_ANE
+				}
+				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_CoreML(options, coreml_flags) };
 				if status_to_result_and_log("CoreML", status).is_ok() {
 					continue; // EP found
 				}
@@ -281,7 +290,9 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 					continue; // EP found
 				}
 			}
-			_ => {}
+			ep => {
+				tracing::warn!("`ort` was not compiled to enable {ep} - you may be missing a Cargo feature to enable it.");
+			}
 		};
 	}
 }

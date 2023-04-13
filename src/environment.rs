@@ -4,7 +4,8 @@ use std::{
 };
 
 use lazy_static::lazy_static;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
+use crate::sys::OrtStatusPtr;
 
 use super::{
 	custom_logger,
@@ -58,7 +59,8 @@ impl Environment {
 		EnvBuilder {
 			name: "default".into(),
 			log_level: LoggingLevel::Warning,
-			execution_providers: Vec::new()
+			execution_providers: Vec::new(),
+			use_global_thread_pool: false
 		}
 	}
 
@@ -76,7 +78,35 @@ impl Environment {
 		*self.env.lock().unwrap().env_ptr.get_mut()
 	}
 
-	fn new(name: String, log_level: LoggingLevel, execution_providers: Vec<ExecutionProvider>) -> OrtResult<Environment> {
+	fn create_custom_log_env(name: &str, log_level: LoggingLevel) -> (OrtStatusPtr, *mut sys::OrtEnv) {
+		let mut env_ptr: *mut sys::OrtEnv = std::ptr::null_mut();
+		let logging_function: sys::OrtLoggingFunction = Some(custom_logger);
+		// FIXME: What should go here?
+		let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
+		let cname = CString::new(name.clone()).unwrap();
+		let create_env_with_custom_logger = ortsys![CreateEnvWithCustomLogger];
+		let status = unsafe { create_env_with_custom_logger(logging_function, logger_param, log_level.into(), cname.as_ptr(), &mut env_ptr) };
+		(status, env_ptr)
+	}
+
+	fn create_global_thread_pool_env(name: &str, log_level: LoggingLevel) -> (OrtStatusPtr, *mut sys::OrtEnv) {
+		let mut env_ptr: *mut sys::OrtEnv = std::ptr::null_mut();
+		let mut thread_options: *mut sys::OrtThreadingOptions = std::ptr::null_mut();
+		let cname = CString::new(name.clone()).unwrap();
+		let create_thread_options = ortsys![CreateThreadingOptions];
+		let release_thread_options = ortsys![ReleaseThreadingOptions];
+		let create_env_with_global_thread_pool = ortsys![CreateEnvWithGlobalThreadPools];
+		let set_global_intra_op_num_threads = ortsys![SetGlobalIntraOpNumThreads];
+		let set_global_inter_op_num_threads = ortsys![SetGlobalInterOpNumThreads];
+		info!("use global thread pool");
+		unsafe { create_thread_options(&mut thread_options); }
+		unsafe { set_global_inter_op_num_threads(thread_options, 1); }
+		unsafe { set_global_intra_op_num_threads(thread_options, 8); }
+		let status = unsafe { create_env_with_global_thread_pool(log_level.into(), cname.as_ptr(), thread_options, &mut env_ptr) };
+		unsafe { release_thread_options(thread_options); }
+		(status, env_ptr)
+	}
+	fn new(name: String, log_level: LoggingLevel, execution_providers: Vec<ExecutionProvider>, create_env_fn: fn(&str, LoggingLevel) -> (OrtStatusPtr, *mut sys::OrtEnv)) -> OrtResult<Environment> {
 		// NOTE: Because 'G_ENV' is a lazy_static, locking it will, initially, create
 		//      a new Arc<Mutex<EnvironmentSingleton>> with a strong count of 1.
 		//      Cloning it to embed it inside the 'Environment' to return
@@ -85,17 +115,7 @@ impl Environment {
 		let g_env_ptr = environment_guard.env_ptr.get_mut();
 		if g_env_ptr.is_null() {
 			debug!("Environment not yet initialized, creating a new one");
-
-			let mut env_ptr: *mut sys::OrtEnv = std::ptr::null_mut();
-
-			let logging_function: sys::OrtLoggingFunction = Some(custom_logger);
-			// FIXME: What should go here?
-			let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
-
-			let cname = CString::new(name.clone()).unwrap();
-
-			let create_env_with_custom_logger = ortsys![CreateEnvWithCustomLogger];
-			let status = unsafe { create_env_with_custom_logger(logging_function, logger_param, log_level.into(), cname.as_ptr(), &mut env_ptr) };
+			let (status, env_ptr) = create_env_fn(name.as_str(), log_level);
 			status_to_result(status).map_err(OrtError::CreateEnvironment)?;
 
 			debug!(env_ptr = format!("{:?}", env_ptr).as_str(), "Environment created");
@@ -227,7 +247,8 @@ impl Drop for Environment {
 pub struct EnvBuilder {
 	name: String,
 	log_level: LoggingLevel,
-	execution_providers: Vec<ExecutionProvider>
+	execution_providers: Vec<ExecutionProvider>,
+	use_global_thread_pool: bool,
 }
 
 impl EnvBuilder {
@@ -293,9 +314,17 @@ impl EnvBuilder {
 		self
 	}
 
+	pub fn with_global_thread_pool(mut self) -> EnvBuilder {
+		self.use_global_thread_pool = true;
+		self
+	}
 	/// Commit the configuration to a new [`Environment`].
 	pub fn build(self) -> OrtResult<Environment> {
-		Environment::new(self.name, self.log_level, self.execution_providers)
+		if self.use_global_thread_pool {
+			Environment::new(self.name, self.log_level, self.execution_providers, Environment::create_global_thread_pool_env)
+		} else {
+			Environment::new(self.name, self.log_level, self.execution_providers, Environment::create_custom_log_env)
+		}
 	}
 }
 
@@ -378,7 +407,7 @@ mod tests {
 		let _concurrent_run_lock_guard = CONCURRENT_TEST_RUN.single_test_run();
 
 		let initial_name = String::from("concurrent_environment_creation");
-		let main_env = Environment::new(initial_name.clone(), LoggingLevel::Warning, Vec::new()).unwrap();
+		let main_env = Environment::new(initial_name.clone(), LoggingLevel::Warning, Vec::new(), Environment::create_custom_log_env).unwrap();
 		let main_env_ptr = main_env.env_ptr() as usize;
 
 		assert_eq!(main_env.name(), initial_name);

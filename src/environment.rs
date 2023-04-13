@@ -92,11 +92,13 @@ impl Environment {
 
 	fn create_global_thread_pool_env(name: &str, log_level: LoggingLevel, mut options: HashMap<String, String>) -> (OrtStatusPtr, *mut sys::OrtEnv) {
 		let mut env_ptr: *mut sys::OrtEnv = std::ptr::null_mut();
+		let logging_function: sys::OrtLoggingFunction = Some(custom_logger);
+		let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
 		let mut thread_options: *mut sys::OrtThreadingOptions = std::ptr::null_mut();
 		let cname = CString::new(name.clone()).unwrap();
 		let create_thread_options = ortsys![CreateThreadingOptions];
 		let release_thread_options = ortsys![ReleaseThreadingOptions];
-		let create_env_with_global_thread_pool = ortsys![CreateEnvWithGlobalThreadPools];
+		let create_env_with_global_thread_pool = ortsys![CreateEnvWithCustomLoggerAndGlobalThreadPools];
 		let set_global_intra_op_thread_affinity = ortsys![SetGlobalIntraOpThreadAffinity];
 		let set_global_intra_op_num_threads = ortsys![SetGlobalIntraOpNumThreads];
 		let set_global_inter_op_num_threads = ortsys![SetGlobalInterOpNumThreads];
@@ -121,7 +123,7 @@ impl Environment {
 		if !options.is_empty() {
 			warn!("Unknown options passed to create_global_thread_pool_env: {:?}", options);
 		}
-		let status = unsafe { create_env_with_global_thread_pool(log_level.into(), cname.as_ptr(), thread_options, &mut env_ptr) };
+		let status = unsafe { create_env_with_global_thread_pool(logging_function, logger_param, log_level.into(), cname.as_ptr(), thread_options, &mut env_ptr) };
 		unsafe {
 			release_thread_options(thread_options);
 		}

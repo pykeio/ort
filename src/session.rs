@@ -170,6 +170,13 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
+	/// Configure the session to disable per session thread pool. Used
+	/// when using global thread pool
+	/// [`SessionBuilder::with_per_session_threads_disabled()`].
+	pub fn with_per_session_threads_disabled(self) -> OrtResult<Self> {
+		ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr) -> OrtError::CreateSessionOptions];
+		Ok(self)
+	}
 	/// Configure the session to use a number of threads to parallelize the execution of the graph. If nodes can be run
 	/// in parallel, this sets the maximum number of threads to use to run them in parallel.
 	///

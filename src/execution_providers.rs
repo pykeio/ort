@@ -23,8 +23,8 @@ extern "stdcall" {
 
 /// Execution provider container. See [the ONNX Runtime docs](https://onnxruntime.ai/docs/execution-providers/) for more
 /// info on execution providers. Execution providers are actually registered via the `with_execution_providers()`
-/// functions [`crate::SessionBuilder`] (per-session) or [`crate::EnvBuilder`] (default for all sessions in an
-/// environment).
+/// functions [`crate::SessionBuilder`] (per-session) or [`EnvBuilder`](crate::environment::EnvBuilder) (default for all
+/// sessions in an environment).
 #[derive(Debug, Clone)]
 pub struct ExecutionProvider {
 	provider: String,

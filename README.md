@@ -1,5 +1,5 @@
 <div align=center>
-    <img src="docs/icon.png" width="350px">
+    <img src="https://raw.githubusercontent.com/pykeio/ort/main/docs/icon.png" width="350px">
 	<h1>Rust bindings for ONNX Runtime</h1>
     <a href="https://app.codecov.io/gh/pykeio/ort" target="_blank"><img alt="Coverage Results" src="https://img.shields.io/codecov/c/gh/pykeio/ort?style=for-the-badge"></a> <a href="https://github.com/pykeio/ort/actions/workflows/test.yml"><img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/pykeio/ort/test.yml?branch=main&style=for-the-badge"></a> <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/d/ort?style=for-the-badge"></a>
     <br />

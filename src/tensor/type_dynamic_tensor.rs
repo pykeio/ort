@@ -44,9 +44,9 @@ pub enum InputTensor {
 }
 
 /// This tensor is used to copy an [`ndarray::Array`](https://docs.rs/ndarray/latest/ndarray/type.Array.html)
-/// from InputTensor to the runtime's memory with support to multiple input tensor types.
+/// from [`InputTensor`] to the runtime's memory with support to multiple input tensor types.
 ///
-/// **NOTE**: The type is not meant to be used directly, use an InputTensor constructed from
+/// **NOTE**: The type is not meant to be used directly, use an [`InputTensor`] constructed from
 /// [`ndarray::Array`](https://docs.rs/ndarray/latest/ndarray/type.Array.html) instead.
 #[derive(Debug)]
 #[allow(missing_docs)]

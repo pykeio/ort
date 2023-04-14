@@ -39,14 +39,11 @@ use super::{
 #[cfg(feature = "fetch-models")]
 use super::{download::ModelUrl, error::OrtDownloadError};
 
-/// Type used to create a session using the _builder pattern_.
+/// Type used to create a session using the _builder pattern_. Once created, you can use the different methods to
+/// configure the session.
 ///
-/// A `SessionBuilder` is created by calling the [`Environment::session()`] method on the environment.
-///
-/// Once created, you can use the different methods to configure the session.
-///
-/// Once configured, use the [`SessionBuilder::with_model_from_file()`] method to "commit" the builder configuration
-/// into a [`Session`].
+/// Once configured, use the [`SessionBuilder::with_model_from_file`](crate::SessionBuilder::with_model_from_file)
+/// method to "commit" the builder configuration into a [`Session`].
 ///
 /// # Example
 ///
@@ -54,7 +51,11 @@ use super::{download::ModelUrl, error::OrtDownloadError};
 /// # use std::{error::Error, sync::Arc};
 /// # use ort::{Environment, LoggingLevel, GraphOptimizationLevel, SessionBuilder};
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// let environment = Arc::new(Environment::builder().with_name("test").with_log_level(LoggingLevel::Verbose).build()?);
+/// let environment = Environment::builder()
+/// 	.with_name("test")
+/// 	.with_log_level(LoggingLevel::Verbose)
+/// 	.build()?
+/// 	.into_arc();
 /// let mut session = SessionBuilder::new(&environment)?
 /// 	.with_optimization_level(GraphOptimizationLevel::Level1)?
 /// 	.with_intra_threads(1)?
@@ -170,13 +171,14 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
-	/// Configure the session to disable per session thread pool. Used
-	/// when using global thread pool
-	/// [`SessionBuilder::with_per_session_threads_disabled()`].
-	pub fn with_per_session_threads_disabled(self) -> OrtResult<Self> {
+	/// Configure the session to disable per-session thread pool, instead using the environment's global thread pool.
+	/// This must be used with an environment created with
+	/// [`EnvBuilder::with_global_thread_pool`](crate::environment::EnvBuilder::with_global_thread_pool) enabled.
+	pub fn with_disable_per_session_threads(self) -> OrtResult<Self> {
 		ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr) -> OrtError::CreateSessionOptions];
 		Ok(self)
 	}
+
 	/// Configure the session to use a number of threads to parallelize the execution of the graph. If nodes can be run
 	/// in parallel, this sets the maximum number of threads to use to run them in parallel.
 	///

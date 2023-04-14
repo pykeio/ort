@@ -9,10 +9,10 @@
 //! output values. Once "extracted" from the runtime environment, this tensor will contain an [`ndarray::ArrayView`]
 //! containing _a view_ of the data. When going out of scope, this tensor will free the required memory on the C side.
 //!
-//! **NOTE**: Tensors are not meant to be created directly. When performing inference, the [`Session::run`] method takes
-//! an `ndarray::Array` as input (taking ownership of it) and will convert it internally to an [`OrtTensor`]. After
-//! inference, a [`OrtOwnedTensor`] will be returned by the method which can be derefed into its internal
-//! [`ndarray::ArrayView`].
+//! **NOTE**: Tensors are not meant to be created directly. When performing inference, the
+//! [`Session::run`](crate::Session::run) method takes an `ndarray::Array` as input (taking ownership of it) and will
+//! convert it internally to an [`OrtTensor`]. After inference, a [`OrtOwnedTensor`] will be returned by the method
+//! which can be derefed into its internal [`ndarray::ArrayView`].
 
 pub mod ndarray_tensor;
 pub mod ort_owned_tensor;
@@ -143,9 +143,9 @@ impl_type_trait!(half::bf16, Bfloat16);
 
 /// Adapter for common Rust string types to ONNX strings.
 ///
-/// It should be easy to use both [`String`] and `&str` as [TensorElementDataType::String] data, but
+/// It should be easy to use both [`String`] and `&str` as [`TensorElementDataType::String`] data, but
 /// we can't define an automatic implementation for anything that implements [`AsRef<str>`] as it
-/// would conflict with the implementations of [IntoTensorElementDataType] for primitive numeric
+/// would conflict with the implementations of [`IntoTensorElementDataType`] for primitive numeric
 /// types (which might implement [`AsRef<str>`] at some point in the future).
 pub trait Utf8Data {
 	/// Returns the contents of this value as a slice of UTF-8 bytes.

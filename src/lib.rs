@@ -104,7 +104,7 @@ lazy_static! {
 	};
 }
 
-/// Attempts to acquire the global OrtApi object.
+/// Attempts to acquire the global [`sys::OrtApi`] object.
 ///
 /// # Panics
 ///
@@ -397,7 +397,7 @@ pub enum MemType {
 }
 
 impl MemType {
-	/// Temporary CPU accessible memory allocated by non-CPU execution provider, i.e. CUDA_PINNED.
+	/// Temporary CPU accessible memory allocated by non-CPU execution provider, i.e. `CUDA_PINNED`.
 	pub const CPU: MemType = MemType::CPUOutput;
 }
 

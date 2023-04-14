@@ -12,7 +12,6 @@ use super::{
 	error::{status_to_result, OrtError, OrtResult},
 	ort, ortsys, sys, ExecutionProvider, LoggingLevel
 };
-use crate::sys::OrtStatusPtr;
 
 lazy_static! {
 	static ref G_ENV: Arc<Mutex<EnvironmentSingleton>> = Arc::new(Mutex::new(EnvironmentSingleton {
@@ -26,6 +25,8 @@ struct EnvironmentSingleton {
 	name: String,
 	env_ptr: AtomicPtr<sys::OrtEnv>
 }
+
+type CreateEnvFunction = fn(&str, LoggingLevel, HashMap<String, String>) -> (sys::OrtStatusPtr, *mut sys::OrtEnv);
 
 /// An [`Environment`] is the main entry point of the ONNX Runtime.
 ///
@@ -79,7 +80,7 @@ impl Environment {
 		*self.env.lock().unwrap().env_ptr.get_mut()
 	}
 
-	fn create_custom_log_env(name: &str, log_level: LoggingLevel, _: HashMap<String, String>) -> (OrtStatusPtr, *mut sys::OrtEnv) {
+	fn create_custom_log_env(name: &str, log_level: LoggingLevel, _: HashMap<String, String>) -> (sys::OrtStatusPtr, *mut sys::OrtEnv) {
 		let mut env_ptr: *mut sys::OrtEnv = std::ptr::null_mut();
 		let logging_function: sys::OrtLoggingFunction = Some(custom_logger);
 		// FIXME: What should go here?
@@ -90,7 +91,7 @@ impl Environment {
 		(status, env_ptr)
 	}
 
-	fn create_global_thread_pool_env(name: &str, log_level: LoggingLevel, mut options: HashMap<String, String>) -> (OrtStatusPtr, *mut sys::OrtEnv) {
+	fn create_global_thread_pool_env(name: &str, log_level: LoggingLevel, mut options: HashMap<String, String>) -> (sys::OrtStatusPtr, *mut sys::OrtEnv) {
 		let mut env_ptr: *mut sys::OrtEnv = std::ptr::null_mut();
 		let logging_function: sys::OrtLoggingFunction = Some(custom_logger);
 		let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
@@ -135,7 +136,7 @@ impl Environment {
 		name: String,
 		log_level: LoggingLevel,
 		execution_providers: Vec<ExecutionProvider>,
-		create_env_fn: fn(&str, LoggingLevel, HashMap<String, String>) -> (OrtStatusPtr, *mut sys::OrtEnv),
+		create_env_fn: CreateEnvFunction,
 		options: HashMap<String, String>
 	) -> OrtResult<Environment> {
 		// NOTE: Because 'G_ENV' is a lazy_static, locking it will, initially, create
@@ -307,7 +308,8 @@ impl EnvBuilder {
 	}
 
 	/// Configures a list of execution providers sessions created under this environment will use by default. Sessions
-	/// may override these via [`SessionBuilder::with_execution_providers()`].
+	/// may override these via
+	/// [`SessionBuilder::with_execution_providers`](crate::SessionBuilder::with_execution_providers).
 	///
 	/// Execution providers are loaded in the order they are provided until a suitable execution provider is found. Most
 	/// execution providers will silently fail if they are unavailable or misconfigured (see notes below), however, some
@@ -345,10 +347,15 @@ impl EnvBuilder {
 		self
 	}
 
+	/// Enables the global thread pool for this environment.
+	///
+	/// Sessions will only use the global thread pool if they are created with
+	/// [`SessionBuilder::with_disable_per_session_threads`](crate::SessionBuilder::with_disable_per_session_threads).
 	pub fn with_global_thread_pool(mut self, options: Vec<(String, String)>) -> EnvBuilder {
 		self.global_thread_pool_options = options;
 		self
 	}
+
 	/// Commit the configuration to a new [`Environment`].
 	pub fn build(self) -> OrtResult<Environment> {
 		if self.global_thread_pool_options.is_empty() {
@@ -359,7 +366,7 @@ impl EnvBuilder {
 				self.log_level,
 				self.execution_providers,
 				Environment::create_global_thread_pool_env,
-				self.global_thread_pool_options.clone().into_iter().collect()
+				self.global_thread_pool_options.into_iter().collect()
 			)
 		}
 	}

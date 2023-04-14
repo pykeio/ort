@@ -9,7 +9,7 @@ use crate::{memory::MemoryInfo, ortsys, sys, OrtError, OrtResult};
 ///
 /// Since different outputs for the same model can have different types, this type is used to allow
 /// the user to dynamically query each output's type and extract the appropriate tensor type with
-/// [try_extract].
+/// [`DynOrtTensor::try_extract`].
 #[derive(Debug)]
 pub struct DynOrtTensor<'m, D>
 where
@@ -115,7 +115,7 @@ where
 	}
 }
 
-/// An intermediate step on the way to an ArrayView.
+/// An intermediate step on the way to an [`ArrayView`].
 // Since Deref has to produce a reference, and the referent can't be a local in deref(), it must
 // be a field in a struct. This struct exists only to hold that field.
 // Its lifetime 's is bound to the TensorData its view was created around, not the underlying tensor

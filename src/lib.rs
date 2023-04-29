@@ -49,7 +49,7 @@ lazy_static! {
 			Ok(s) if !s.is_empty() => s,
 			#[cfg(target_os = "windows")]
 			_ => "onnxruntime.dll".to_owned(),
-			#[cfg(target_os = "linux")]
+			#[cfg(any(target_os = "linux", target_os = "android"))]
 			_ => "libonnxruntime.so".to_owned(),
 			#[cfg(target_os = "macos")]
 			_ => "libonnxruntime.dylib".to_owned()

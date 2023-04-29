@@ -801,6 +801,21 @@ mod dangerous {
 		Ok(num_nodes)
 	}
 
+	#[cfg(all(target_arch = "arm"))]
+	fn extract_io_count(
+		f: extern_system_fn! { unsafe fn(*const sys::OrtSession, *mut u32) -> *mut sys::OrtStatus },
+		session_ptr: *mut sys::OrtSession
+	) -> OrtResult<usize> {
+		let mut num_nodes = 0;
+		let status = unsafe { f(session_ptr, &mut num_nodes) };
+		status_to_result(status).map_err(OrtError::GetInOutCount)?;
+		assert_null_pointer(status, "SessionStatus")?;
+		(num_nodes != 0)
+			.then_some(())
+			.ok_or_else(|| OrtError::GetInOutCount(OrtApiError::Msg("No nodes in model".to_owned())))?;
+		Ok(num_nodes as _)
+	}
+
 	#[cfg(target_arch = "aarch64")]
 	fn extract_io_count(
 		f: extern_system_fn! { unsafe fn(*const sys::OrtSession, *mut u64) -> *mut sys::OrtStatus },
@@ -846,6 +861,26 @@ mod dangerous {
 		let mut name_bytes: *mut c_char = std::ptr::null_mut();
 
 		let status = unsafe { f(session_ptr, i, allocator_ptr, &mut name_bytes) };
+		status_to_result(status).map_err(OrtError::GetInputName)?;
+		assert_non_null_pointer(name_bytes, "InputName")?;
+
+		raw_pointer_to_string(allocator_ptr, name_bytes)
+	}
+	#[cfg(target_arch = "arm")]
+	fn extract_io_name(
+		f: extern_system_fn! { unsafe fn(
+			*const sys::OrtSession,
+			u32,
+			*mut sys::OrtAllocator,
+			*mut *mut c_char,
+		) -> *mut sys::OrtStatus },
+		session_ptr: *mut sys::OrtSession,
+		allocator_ptr: *mut sys::OrtAllocator,
+		i: usize
+	) -> OrtResult<String> {
+		let mut name_bytes: *mut c_char = std::ptr::null_mut();
+
+		let status = unsafe { f(session_ptr, i as _, allocator_ptr, &mut name_bytes) };
 		status_to_result(status).map_err(OrtError::GetInputName)?;
 		assert_non_null_pointer(name_bytes, "InputName")?;
 
@@ -907,6 +942,32 @@ mod dangerous {
 		let mut typeinfo_ptr: *mut sys::OrtTypeInfo = std::ptr::null_mut();
 
 		let status = unsafe { f(session_ptr, i, &mut typeinfo_ptr) };
+		status_to_result(status).map_err(OrtError::GetTypeInfo)?;
+		assert_non_null_pointer(typeinfo_ptr, "TypeInfo")?;
+
+		let mut tensor_info_ptr: *const sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+		ortsys![unsafe CastTypeInfoToTensorInfo(typeinfo_ptr, &mut tensor_info_ptr) -> OrtError::CastTypeInfoToTensorInfo; nonNull(tensor_info_ptr)];
+
+		let io_type: TensorElementDataType = unsafe { extract_data_type(tensor_info_ptr)? };
+		let node_dims = unsafe { get_tensor_dimensions(tensor_info_ptr)? };
+
+		ortsys![unsafe ReleaseTypeInfo(typeinfo_ptr)];
+
+		Ok((io_type, node_dims.into_iter().map(|d| if d == -1 { None } else { Some(d as u32) }).collect()))
+	}
+	#[cfg(target_arch = "arm")]
+	fn extract_io(
+		f: extern_system_fn! { unsafe fn(
+			*const sys::OrtSession,
+			u32,
+			*mut *mut sys::OrtTypeInfo,
+		) -> *mut sys::OrtStatus },
+		session_ptr: *mut sys::OrtSession,
+		i: usize
+	) -> OrtResult<(TensorElementDataType, Vec<Option<u32>>)> {
+		let mut typeinfo_ptr: *mut sys::OrtTypeInfo = std::ptr::null_mut();
+
+		let status = unsafe { f(session_ptr, i as _, &mut typeinfo_ptr) };
 		status_to_result(status).map_err(OrtError::GetTypeInfo)?;
 		assert_non_null_pointer(typeinfo_ptr, "TypeInfo")?;
 

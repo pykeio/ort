@@ -15,6 +15,8 @@ extern "C" {
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CoreML(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr;
 	#[cfg(feature = "directml")]
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_DML(options: *mut sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> sys::OrtStatusPtr;
+	#[cfg(feature = "nnapi")]
+	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr;
 }
 #[cfg(all(not(feature = "load-dynamic"), target_arch = "x86"))]
 extern "stdcall" {
@@ -79,7 +81,8 @@ impl ExecutionProvider {
 		onednn = "DnnlExecutionProvider",
 		coreml = "CoreMLExecutionProvider",
 		directml = "DmlExecutionProvider",
-		rocm = "ROCmExecutionProvider"
+		rocm = "ROCmExecutionProvider",
+		nnapi = "NnapiExecutionProvider"
 	}
 
 	/// Returns `true` if this execution provider is available, `false` otherwise.
@@ -127,6 +130,18 @@ impl ExecutionProvider {
 		///
 		/// Supported backends: CoreML
 		pub fn with_ane_only(bool) = ane_only;
+		/// Enable fp16 relaxation. May improve performance, but can also slightly reduce precision.
+		///
+		/// Supported backends: NNAPI
+		pub fn with_fp16_relaxation(bool) = fp16_relaxation;
+		/// Prevents NNAPI from using CPU devices. NNAPI is more efficient using GPU or NPU for execution, and NNAPI
+		/// might fall back to its own CPU implementation for operations not supported by the GPU/NPU. However, the
+		/// CPU implementation of NNAPI might be less efficient than the optimized versions of operators provided by
+		/// ORT's default MLAS execution provider. It might be better to disable the NNAPI CPU fallback and instead
+		/// use MLAS kernels. This option is only available after Android API level 29.
+		///
+		/// Supported backends: NNAPI
+		pub fn with_cpu_disabled(bool) = cpu_disabled;
 	}
 }
 
@@ -271,6 +286,8 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 			"ROCmExecutionProvider" => {
 				#[cfg(target_arch = "aarch64")]
 				let gpu_mem_limit = u64::MAX;
+				#[cfg(target_arch = "aarch64")]
+				let gpu_mem_limit = u32::MAX;
 				#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 				let gpu_mem_limit = usize::MAX;
 
@@ -287,6 +304,21 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 				};
 				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(options, &rocm_options)];
 				if status_to_result_and_log("ROCm", status).is_ok() {
+					continue; // EP found
+				}
+			}
+			#[cfg(any(feature = "load-dynamic", feature = "nnapi"))]
+			"NnapiExecutionProvider" => {
+				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr);
+				let mut nnapi_flags = 0;
+				if init_args.get("fp16_relaxation").map_or(false, |s| s.parse::<bool>().unwrap_or(false)) {
+					nnapi_flags |= 0x001; // NNAPI_FLAG_USE_FP16
+				}
+				if init_args.get("cpu_disabled").map_or(false, |s| s.parse::<bool>().unwrap_or(false)) {
+					nnapi_flags |= 0x004; // NNAPI_FLAG_CPU_DISABLED
+				}
+				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_Nnapi(options, nnapi_flags) };
+				if status_to_result_and_log("NNAPI", status).is_ok() {
 					continue; // EP found
 				}
 			}

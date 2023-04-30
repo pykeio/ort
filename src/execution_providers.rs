@@ -284,17 +284,10 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "rocm"))]
 			"ROCmExecutionProvider" => {
-				#[cfg(target_arch = "aarch64")]
-				let gpu_mem_limit = u64::MAX;
-				#[cfg(target_arch = "aarch64")]
-				let gpu_mem_limit = u32::MAX;
-				#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-				let gpu_mem_limit = usize::MAX;
-
 				let rocm_options = sys::OrtROCMProviderOptions {
 					device_id: 0,
 					miopen_conv_exhaustive_search: 0,
-					gpu_mem_limit,
+					gpu_mem_limit: std::os::raw::c_ulong::MAX,
 					arena_extend_strategy: 0,
 					do_copy_in_default_stream: 1,
 					has_user_compute_stream: 0,

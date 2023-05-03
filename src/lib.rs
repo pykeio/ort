@@ -89,17 +89,17 @@ lazy_static! {
 			let version_string = get_version_string();
 			let version_string = CStr::from_ptr(version_string).to_string_lossy();
 			let lib_minor_version = version_string.split('.').nth(1).map(|x| x.parse::<u32>().unwrap_or(0)).unwrap_or(0);
-			if lib_minor_version < 14 {
-				panic!(
+			match lib_minor_version.cmp(&14) {
+				std::cmp::Ordering::Less => panic!(
 					"ort 1.14 is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.14.x', but got '{version_string}'",
 					**G_ORT_DYLIB_PATH
-				);
-			} else if lib_minor_version > 14 {
-				warn!(
+				),
+				std::cmp::Ordering::Greater => warn!(
 					"ort 1.14 may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.14.x', but got '{version_string}'",
 					**G_ORT_DYLIB_PATH
-				);
-			}
+				),
+				std::cmp::Ordering::Equal => {}
+			};
 			let get_api: extern_system_fn! { unsafe fn(u32) -> *const sys::OrtApi } = (*base).GetApi.unwrap();
 			let api: *const sys::OrtApi = get_api(sys::ORT_API_VERSION);
 			Arc::new(Mutex::new(AtomicPtr::new(api as *mut sys::OrtApi)))

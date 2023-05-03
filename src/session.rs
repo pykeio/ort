@@ -400,6 +400,101 @@ impl SessionBuilder {
 		})
 	}
 
+	/// Loads an ONNX model from a file, replacing external data with data provided in initializers.
+	///
+	/// This will find initialized tensors with external data in the graph with the provided names and replace them with
+	/// the provided tensors. The replacement will occur before any optimizations take place, and the data will be
+	/// copied into the graph. Tensors replaced by this function must be using external data. (you cannot replace a
+	/// non-external tensor)
+	pub fn with_model_from_file_and_external_initializers<'v, 'i, P>(
+		self,
+		model_filepath_ref: P,
+		initializers: &'i [(String, InputValue<'v>)]
+	) -> OrtResult<Session>
+	where
+		'i: 'v,
+		P: AsRef<Path>
+	{
+		let model_filepath = model_filepath_ref.as_ref();
+		if !model_filepath.exists() {
+			return Err(OrtError::FileDoesNotExist {
+				filename: model_filepath.to_path_buf()
+			});
+		}
+
+		// Build an OsString, then a vector of bytes to pass to C
+		let model_path = std::ffi::OsString::from(model_filepath);
+		#[cfg(target_family = "windows")]
+		let model_path: Vec<u16> = model_path
+            .encode_wide()
+            .chain(std::iter::once(0)) // Make sure we have a null terminated string
+            .collect();
+		#[cfg(not(target_family = "windows"))]
+		let model_path: Vec<std::os::raw::c_char> = model_path
+            .as_bytes()
+            .iter()
+            .chain(std::iter::once(&b'\0')) // Make sure we have a null terminated string
+            .map(|b| *b as std::os::raw::c_char)
+            .collect();
+
+		apply_execution_providers(
+			self.session_options_ptr,
+			self.execution_providers
+				.iter()
+				.chain(&self.env.execution_providers)
+				.cloned()
+				.collect::<Vec<_>>()
+		);
+
+		let env_ptr: *const sys::OrtEnv = self.env.env_ptr();
+
+		let memory_info = MemoryInfo::new(AllocatorType::Device, MemType::Default)?;
+		let mut allocator_ptr: *mut sys::OrtAllocator = std::ptr::null_mut();
+		ortsys![unsafe GetAllocatorWithDefaultOptions(&mut allocator_ptr) -> OrtError::GetAllocator; nonNull(allocator_ptr)];
+
+		let initializer_names: Vec<CString> = initializers
+			.iter()
+			.map(|(name, _)| CString::new(name.as_str()).unwrap())
+			.map(|n| CString::new(n).unwrap())
+			.collect();
+		let initializer_names_ptr: Vec<*const c_char> = initializer_names.iter().map(|n| n.as_ptr() as *const c_char).collect();
+
+		let initializers: Vec<InputOrtValue> = initializers
+			.iter()
+			.map(|(_, input_tensor)| InputOrtValue::from_input_value(&memory_info, allocator_ptr, input_tensor))
+			.collect::<OrtResult<Vec<InputOrtValue>>>()?;
+		let initializers: Vec<*const sys::OrtValue> = initializers.iter().map(|input_array_ort| input_array_ort.c_ptr()).collect();
+		if !initializers.is_empty() {
+			assert_eq!(initializer_names.len(), initializers.len());
+			ortsys![unsafe AddExternalInitializers(self.session_options_ptr, initializer_names_ptr.as_ptr(), initializers.as_ptr(), initializers.len()) -> OrtError::CreateSession];
+		}
+
+		let mut session_ptr: *mut sys::OrtSession = std::ptr::null_mut();
+		ortsys![unsafe CreateSession(env_ptr, model_path.as_ptr(), self.session_options_ptr, &mut session_ptr) -> OrtError::CreateSession; nonNull(session_ptr)];
+
+		std::mem::drop(initializer_names);
+		std::mem::drop(initializers);
+
+		// Extract input and output properties
+		let num_input_nodes = dangerous::extract_inputs_count(session_ptr)?;
+		let num_output_nodes = dangerous::extract_outputs_count(session_ptr)?;
+		let inputs = (0..num_input_nodes)
+			.map(|i| dangerous::extract_input(session_ptr, allocator_ptr, i))
+			.collect::<OrtResult<Vec<Input>>>()?;
+		let outputs = (0..num_output_nodes)
+			.map(|i| dangerous::extract_output(session_ptr, allocator_ptr, i))
+			.collect::<OrtResult<Vec<Output>>>()?;
+
+		Ok(Session {
+			env: Arc::clone(&self.env),
+			session_ptr,
+			allocator_ptr,
+			memory_info,
+			inputs,
+			outputs
+		})
+	}
+
 	/// Load an ONNX graph from memory and commit the session.
 	pub fn with_model_from_memory(self, model_bytes: &[u8]) -> OrtResult<InMemorySession<'_>> {
 		let mut session_ptr: *mut sys::OrtSession = std::ptr::null_mut();

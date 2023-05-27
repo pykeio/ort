@@ -92,6 +92,7 @@ For prebuilt Microsoft binaries, you can enable the CUDA or TensorRT execution p
 - **[Bloop](https://bloop.ai/)** uses `ort` to power their semantic code search feature.
 - **[pyke Diffusers](https://github.com/pykeio/diffusers)** uses `ort` for efficient Stable Diffusion image generation on both CPUs & GPUs.
 - **[edge-transformers](https://github.com/npc-engine/edge-transformers)** uses `ort` for accelerated transformer model inference at the edge.
+- **[Ortex](https://github.com/relaypro-open/ortex)** uses `ort` for safe ONNX Runtime bindings in Elixir.
 
 ## FAQ
 

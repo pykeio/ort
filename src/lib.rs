@@ -64,7 +64,12 @@ lazy_static! {
 			let absolute_path = if path.is_absolute() {
 				path
 			} else {
-				std::env::current_exe().expect("could not get current executable path").parent().unwrap().join(path)
+				let relative = std::env::current_exe().expect("could not get current executable path").parent().unwrap().join(&path);
+				if relative.exists() {
+					relative
+				} else {
+					path
+				}
 			};
 			let lib = libloading::Library::new(&absolute_path).unwrap_or_else(|e| panic!("could not load the library at `{}`: {e:?}", absolute_path.display()));
 			Arc::new(Mutex::new(AtomicPtr::new(Box::leak(Box::new(lib)) as *mut _)))

@@ -3,6 +3,7 @@ use std::path::Path;
 use image::{ImageBuffer, Pixel, Rgb};
 use ort::{
 	environment::Environment,
+	execution_providers::CPUExecutionProviderOptions,
 	tensor::{DynOrtTensor, OrtOwnedTensor},
 	value::InputValue,
 	ExecutionProvider, GraphOptimizationLevel, LoggingLevel, OrtResult, SessionBuilder
@@ -37,7 +38,7 @@ fn upsample() -> OrtResult<()> {
 	let environment = Environment::builder()
 		.with_name("integration_test")
 		.with_log_level(LoggingLevel::Warning)
-		.with_execution_providers(vec![ExecutionProvider::cpu().with_use_arena(true)])
+		.with_execution_providers([ExecutionProvider::CPU(CPUExecutionProviderOptions { use_arena: true })])
 		.build()?
 		.into_arc();
 

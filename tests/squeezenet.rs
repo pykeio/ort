@@ -30,14 +30,14 @@ fn squeezenet_mushroom() -> OrtResult<()> {
 	let session = SessionBuilder::new(&environment)?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
-		.with_execution_providers(vec![
+		.with_execution_providers([
 			// this is just to ensure that execution providers don't crash if init fails.
-			ExecutionProvider::cuda(),
-			ExecutionProvider::tensorrt(),
-			ExecutionProvider::directml(),
-			ExecutionProvider::onednn(),
-			ExecutionProvider::coreml(),
-			ExecutionProvider::cpu(),
+			ExecutionProvider::CUDA(Default::default()),
+			ExecutionProvider::TensorRT(Default::default()),
+			ExecutionProvider::DirectML(Default::default()),
+			ExecutionProvider::OneDNN(Default::default()),
+			ExecutionProvider::CoreML(Default::default()),
+			ExecutionProvider::CPU(Default::default())
 		])?
 		.with_model_downloaded(ImageClassification::SqueezeNet)
 		.expect("Could not download model from file");

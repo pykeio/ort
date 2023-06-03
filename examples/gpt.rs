@@ -26,7 +26,7 @@ fn main() -> OrtResult<()> {
 	let environment = Arc::new(
 		Environment::builder()
 			.with_name("GPT-2")
-			.with_execution_providers([ExecutionProvider::cuda()])
+			.with_execution_providers([ExecutionProvider::CUDA(Default::default())])
 			.build()?
 	);
 

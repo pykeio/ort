@@ -9,8 +9,8 @@ fn vectorizer() -> OrtResult<()> {
 	let environment = Environment::default().into_arc();
 
 	#[cfg(not(feature = "cuda"))]
-	assert_eq!(ExecutionProvider::cuda().is_available(), false);
-	assert!(ExecutionProvider::cpu().is_available());
+	assert_eq!(ExecutionProvider::CUDA(Default::default()).is_available(), false);
+	assert!(ExecutionProvider::CPU(Default::default()).is_available());
 
 	let session = SessionBuilder::new(&environment)?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?

@@ -123,13 +123,19 @@ pub enum OrtError {
 	#[error("Failed to retrieve model metadata: {0}")]
 	GetModelMetadata(OrtApiError),
 	/// The user tried to extract the wrong type of tensor from the underlying data
-	#[error("Data type mismatch: was {:?}, tried to convert to {:?}", actual, requested)]
+	#[error("Data type mismatch: was {actual:?}, tried to convert to {requested:?}")]
 	DataTypeMismatch {
 		/// The actual type of the ort output
 		actual: TensorElementDataType,
 		/// The type corresponding to the attempted conversion into a Rust type, not equal to `actual`
 		requested: TensorElementDataType
-	}
+	},
+	#[error("Error trying to load symbol `{symbol}` from dynamic library: {error}")]
+	DlLoad { symbol: &'static str, error: String },
+	#[error("{0}")]
+	ExecutionProvider(OrtApiError),
+	#[error("Execution provider `{0}` was not registered because its corresponding Cargo feature is disabled.")]
+	ExecutionProviderNotRegistered(&'static str)
 }
 
 /// Error used when the input dimensions defined in the model and passed from an inference call do not match.

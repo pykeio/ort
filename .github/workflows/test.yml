@@ -39,3 +39,29 @@ jobs:
         # do not run doctests until rust-lang/cargo#10469 is merged
         run: |
           cargo test --verbose --lib
+  cross-compile:
+    name: Cross-platform compile
+    runs-on: ${{ matrix.platform.os }}
+    needs: [test]
+    strategy:
+      matrix:
+        platform:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            command: test
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            command: test
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            command: test
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+            command: build
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build/test
+        uses: houseabsolute/actions-rust-cross@v0
+        with:
+          command: ${{ matrix.platform.command }}
+          target: ${{ matrix.platform.target }}

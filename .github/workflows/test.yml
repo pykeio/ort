@@ -60,6 +60,18 @@ jobs:
             command: build
     steps:
       - uses: actions/checkout@v3
+      - name: Fix ring dependency for Windows ARM64
+        if: matrix.platform.target == 'aarch64-pc-windows-msvc'
+        shell: pwsh
+        run: |
+          @('', '[patch.crates-io]',
+          'ring = { git = "https://github.com/awakecoding/ring", branch = "0.16.20_alpha" }') | % {
+            Add-Content -Path "Cargo.toml" -Value $_
+          }
+          $VSINSTALLDIR = $(vswhere.exe -latest -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath)
+          $VCINSTALLDIR = Join-Path $VSINSTALLDIR "VC"
+          $LLVM_ROOT = Join-Path $VCINSTALLDIR "Tools\Llvm\x64"
+          echo "PATH=$Env:PATH;${LLVM_ROOT}\bin" >> $Env:GITHUB_ENV
       - name: Build/test
         uses: houseabsolute/actions-rust-cross@v0
         with:

@@ -674,7 +674,8 @@ impl Session {
 			InputTensor::DoubleTensor(input) => input.shape().len() != r.dimensions.len(),
 			InputTensor::Uint32Tensor(input) => input.shape().len() != r.dimensions.len(),
 			InputTensor::Uint64Tensor(input) => input.shape().len() != r.dimensions.len(),
-			InputTensor::StringTensor(input) => input.shape().len() != r.dimensions.len()
+			InputTensor::StringTensor(input) => input.shape().len() != r.dimensions.len(),
+			InputTensor::BooleanTensor(input) => input.shape().len() != r.dimensions.len()
 		});
 		if inputs_different_length {
 			error!("Different input lengths: {:?} vs {:?}", self.inputs, input_arrays);

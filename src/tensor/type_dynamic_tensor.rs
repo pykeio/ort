@@ -40,7 +40,8 @@ pub enum InputTensor {
 	DoubleTensor(Array<f64, IxDyn>),
 	Uint32Tensor(Array<u32, IxDyn>),
 	Uint64Tensor(Array<u64, IxDyn>),
-	StringTensor(Array<String, IxDyn>)
+	StringTensor(Array<String, IxDyn>),
+	BooleanTensor(Array<bool, IxDyn>)
 }
 
 /// This tensor is used to copy an [`ndarray::Array`](https://docs.rs/ndarray/latest/ndarray/type.Array.html)
@@ -65,7 +66,8 @@ pub enum InputOrtTensor<'t> {
 	DoubleTensor(OrtTensor<'t, f64, IxDyn>),
 	Uint32Tensor(OrtTensor<'t, u32, IxDyn>),
 	Uint64Tensor(OrtTensor<'t, u64, IxDyn>),
-	StringTensor(OrtTensor<'t, String, IxDyn>)
+	StringTensor(OrtTensor<'t, String, IxDyn>),
+	BooleanTensor(OrtTensor<'t, bool, IxDyn>)
 }
 
 impl InputTensor {
@@ -86,7 +88,8 @@ impl InputTensor {
 			InputTensor::DoubleTensor(x) => x.shape(),
 			InputTensor::Uint32Tensor(x) => x.shape(),
 			InputTensor::Uint64Tensor(x) => x.shape(),
-			InputTensor::StringTensor(x) => x.shape()
+			InputTensor::StringTensor(x) => x.shape(),
+			InputTensor::BooleanTensor(x) => x.shape()
 		}
 	}
 }
@@ -106,6 +109,7 @@ impl_convert_trait!(f64, InputTensor::DoubleTensor);
 impl_convert_trait!(u32, InputTensor::Uint32Tensor);
 impl_convert_trait!(u64, InputTensor::Uint64Tensor);
 impl_convert_trait!(String, InputTensor::StringTensor);
+impl_convert_trait!(bool, InputTensor::BooleanTensor);
 
 impl<'t> InputOrtTensor<'t> {
 	pub(crate) fn from_input_tensor<'m, 'i>(
@@ -131,7 +135,8 @@ impl<'t> InputOrtTensor<'t> {
 			InputTensor::DoubleTensor(array) => Ok(InputOrtTensor::DoubleTensor(OrtTensor::from_array(memory_info, allocator_ptr, array)?)),
 			InputTensor::Uint32Tensor(array) => Ok(InputOrtTensor::Uint32Tensor(OrtTensor::from_array(memory_info, allocator_ptr, array)?)),
 			InputTensor::Uint64Tensor(array) => Ok(InputOrtTensor::Uint64Tensor(OrtTensor::from_array(memory_info, allocator_ptr, array)?)),
-			InputTensor::StringTensor(array) => Ok(InputOrtTensor::StringTensor(OrtTensor::from_array(memory_info, allocator_ptr, array)?))
+			InputTensor::StringTensor(array) => Ok(InputOrtTensor::StringTensor(OrtTensor::from_array(memory_info, allocator_ptr, array)?)),
+			InputTensor::BooleanTensor(array) => Ok(InputOrtTensor::BooleanTensor(OrtTensor::from_array(memory_info, allocator_ptr, array)?))
 		}
 	}
 
@@ -151,7 +156,8 @@ impl<'t> InputOrtTensor<'t> {
 			InputOrtTensor::DoubleTensor(x) => x.c_ptr,
 			InputOrtTensor::Uint32Tensor(x) => x.c_ptr,
 			InputOrtTensor::Uint64Tensor(x) => x.c_ptr,
-			InputOrtTensor::StringTensor(x) => x.c_ptr
+			InputOrtTensor::StringTensor(x) => x.c_ptr,
+			InputOrtTensor::BooleanTensor(x) => x.c_ptr
 		}
 	}
 }

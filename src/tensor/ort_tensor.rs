@@ -60,7 +60,8 @@ where
 			| TensorElementDataType::Int64
 			| TensorElementDataType::Float64
 			| TensorElementDataType::Uint32
-			| TensorElementDataType::Uint64 => {
+			| TensorElementDataType::Uint64
+			| TensorElementDataType::Bool => {
 				// primitive data is already suitably laid out in memory; provide it to
 				// onnxruntime as is
 				let tensor_values_ptr: *mut std::ffi::c_void = contiguous_array.as_mut_ptr() as *mut std::ffi::c_void;

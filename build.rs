@@ -9,7 +9,7 @@ use std::{
 	str::FromStr
 };
 
-const ORT_VERSION: &str = "1.14.1";
+const ORT_VERSION: &str = "1.15.0";
 const ORT_RELEASE_BASE_URL: &str = "https://github.com/microsoft/onnxruntime/releases/download";
 const ORT_ENV_STRATEGY: &str = "ORT_STRATEGY";
 const ORT_ENV_SYSTEM_LIB_LOCATION: &str = "ORT_LIB_LOCATION";
@@ -639,43 +639,6 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 	}
 }
 
-#[cfg(feature = "generate-bindings")]
-fn generate_bindings(include_dir: &Path) {
-	let clang_args = &[
-		format!("-I{}", include_dir.display()),
-		format!("-I{}", include_dir.join("onnxruntime").join("core").join("session").display())
-	];
-
-	println!("cargo:rerun-if-changed=src/wrapper.h");
-
-	let bindings = bindgen::Builder::default()
-        .header("src/wrapper.h")
-		.allowlist_var("Ort.+|ORT.+")
-		.allowlist_function("Ort.+")
-		.allowlist_type("Ort.+")
-        .clang_args(clang_args)
-        // Tell cargo to invalidate the built crate whenever any of the included header files changed.
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
-        // Set `size_t` to be translated to `usize` for win32 compatibility.
-        .size_t_is_usize(env::var("CARGO_CFG_TARGET_ARCH").unwrap().contains("x86"))
-        // Format using rustfmt
-        .rustfmt_bindings(true)
-        .rustified_enum("*")
-        .generate()
-        .expect("Unable to generate bindings");
-
-	// Write the bindings to (source controlled) src/onnx/bindings/<os>/<arch>/bindings.rs
-	let generated_file = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
-		.join("src")
-		.join("bindings")
-		.join(env::var("CARGO_CFG_TARGET_OS").unwrap())
-		.join(env::var("CARGO_CFG_TARGET_ARCH").unwrap())
-		.join("bindings.rs");
-	println!("cargo:rerun-if-changed={generated_file:?}");
-	fs::create_dir_all(generated_file.parent().unwrap()).unwrap();
-	bindings.write_to_file(&generated_file).expect("Couldn't write bindings!");
-}
-
 fn real_main(link: bool) {
 	let (install_dir, needs_link) = prepare_libort_dir();
 
@@ -695,9 +658,6 @@ fn real_main(link: bool) {
 	}
 
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_STRATEGY);
-
-	#[cfg(feature = "generate-bindings")]
-	generate_bindings(&include_dir);
 }
 
 fn main() {

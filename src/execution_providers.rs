@@ -1,15 +1,16 @@
-#![allow(unused_imports)]
+#![allow(unused)]
 
 use std::{
 	collections::HashMap,
 	ffi::{c_void, CString},
-	os::raw::c_char
+	os::raw::c_char,
+	ptr
 };
 
 use crate::{
 	error::status_to_result,
 	ortsys,
-	sys::{self, OrtArenaCfg},
+	sys::{self, size_t, OrtArenaCfg},
 	OrtApiError, OrtError, OrtResult
 };
 
@@ -249,7 +250,7 @@ pub struct OpenVINOExecutionProviderOptions {
 	/// This option is only alvailable when OpenVINO EP is built with OpenCL flags enabled. It takes in the remote
 	/// context i.e the `cl_context` address as a void pointer.
 	pub context: *mut c_void,
-	///  	This option enables OpenCL queue throttling for GPU devices (reduces CPU utilization when using GPU).
+	/// This option enables OpenCL queue throttling for GPU devices (reduces CPU utilization when using GPU).
 	pub enable_opencl_throttling: bool,
 	/// This option if enabled works for dynamic shaped models whose shape will be set dynamically based on the infer
 	/// input image/data shape at run time in CPU. This gives best result for running multiple inferences with varied
@@ -299,7 +300,18 @@ pub struct DirectMLExecutionProviderOptions {
 	pub device_id: u32
 }
 
-pub use sys::OrtROCMProviderOptions as ROCmExecutionProviderOptions;
+#[derive(Debug, Clone, Default)]
+pub struct ROCmExecutionProviderOptions {
+	pub device_id: i32,
+	pub miopen_conv_exhaustive_search: bool,
+	pub gpu_mem_limit: size_t,
+	pub arena_extend_strategy: ArenaExtendStrategy,
+	pub do_copy_in_default_stream: bool,
+	pub user_compute_stream: Option<*mut c_void>,
+	pub default_memory_arena_cfg: Option<*mut sys::OrtArenaCfg>,
+	pub tunable_op_enable: bool,
+	pub tunable_op_tuning_enable: bool
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct NNAPIExecutionProviderOptions {
@@ -390,16 +402,16 @@ fn bool_as_int(x: bool) -> i32 {
 impl ExecutionProvider {
 	pub fn as_str(&self) -> &'static str {
 		match self {
-			&Self::CPU(_) => "CPUExecutionProvider",
-			&Self::CUDA(_) => "CUDAExecutionProvider",
-			&Self::TensorRT(_) => "TensorrtExecutionProvider",
-			&Self::OpenVINO(_) => "OpenVINOExecutionProvider",
-			&Self::ACL(_) => "AclExecutionProvider",
-			&Self::OneDNN(_) => "DnnlExecutionProvider",
-			&Self::CoreML(_) => "CoreMLExecutionProvider",
-			&Self::DirectML(_) => "DmlExecutionProvider",
-			&Self::ROCm(_) => "ROCmExecutionProvider",
-			&Self::NNAPI(_) => "NnapiExecutionProvider"
+			Self::CPU(_) => "CPUExecutionProvider",
+			Self::CUDA(_) => "CUDAExecutionProvider",
+			Self::TensorRT(_) => "TensorrtExecutionProvider",
+			Self::OpenVINO(_) => "OpenVINOExecutionProvider",
+			Self::ACL(_) => "AclExecutionProvider",
+			Self::OneDNN(_) => "DnnlExecutionProvider",
+			Self::CoreML(_) => "CoreMLExecutionProvider",
+			Self::DirectML(_) => "DmlExecutionProvider",
+			Self::ROCm(_) => "ROCmExecutionProvider",
+			Self::NNAPI(_) => "NnapiExecutionProvider"
 		}
 	}
 
@@ -548,7 +560,22 @@ impl ExecutionProvider {
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "rocm"))]
 			&Self::ROCm(options) => {
-				status_to_result(ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(session_options, options as *const _)])
+				let rocm_options = sys::OrtROCMProviderOptions {
+					device_id: options.device_id,
+					miopen_conv_exhaustive_search: bool_as_int(options.miopen_conv_exhaustive_search),
+					gpu_mem_limit: options.gpu_mem_limit as _,
+					arena_extend_strategy: match options.arena_extend_strategy {
+						ArenaExtendStrategy::NextPowerOfTwo => 0,
+						ArenaExtendStrategy::SameAsRequested => 1
+					},
+					do_copy_in_default_stream: bool_as_int(options.do_copy_in_default_stream),
+					has_user_compute_stream: bool_as_int(options.user_compute_stream.is_some()),
+					user_compute_stream: options.user_compute_stream.unwrap_or(ptr::null_mut()),
+					default_memory_arena_cfg: options.default_memory_arena_cfg.unwrap_or(ptr::null_mut()),
+					tunable_op_enable: bool_as_int(options.tunable_op_enable),
+					tunable_op_tuning_enable: bool_as_int(options.tunable_op_tuning_enable)
+				};
+				status_to_result(ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(session_options, &rocm_options as *const _)])
 					.map_err(OrtError::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "nnapi"))]

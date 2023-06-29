@@ -2,11 +2,8 @@ use std::path::Path;
 
 use image::{ImageBuffer, Pixel, Rgb};
 use ort::{
-	environment::Environment,
-	execution_providers::CPUExecutionProviderOptions,
-	tensor::{DynOrtTensor, OrtOwnedTensor},
-	value::InputValue,
-	ExecutionProvider, GraphOptimizationLevel, LoggingLevel, OrtResult, SessionBuilder
+	environment::Environment, execution_providers::CPUExecutionProviderOptions, tensor::OrtOwnedTensor, value::Value, ExecutionProvider,
+	GraphOptimizationLevel, LoggingLevel, OrtResult, SessionBuilder
 };
 use test_log::test;
 
@@ -62,19 +59,22 @@ fn upsample() -> OrtResult<()> {
 		.unwrap()
 		.to_rgb8();
 
-	let array = ndarray::Array::from_shape_fn((1, 224, 224, 3), |(_, j, i, c)| {
-		let pixel = image_buffer.get_pixel(i as u32, j as u32);
-		let channels = pixel.channels();
+	let array = ndarray::CowArray::from(
+		ndarray::Array::from_shape_fn((1, 224, 224, 3), |(_, j, i, c)| {
+			let pixel = image_buffer.get_pixel(i as u32, j as u32);
+			let channels = pixel.channels();
 
-		// range [0, 255] -> range [0, 1]
-		(channels[c] as f32) / 255.0
-	});
+			// range [0, 255] -> range [0, 1]
+			(channels[c] as f32) / 255.0
+		})
+		.into_dyn()
+	);
 
 	// Just one input
-	let input_tensor_values = &[InputValue::from(array.into_dyn())];
+	let input_tensor_values = vec![Value::from_array(session.allocator(), &array)?];
 
 	// Perform the inference
-	let outputs: Vec<DynOrtTensor<ndarray::Dim<ndarray::IxDynImpl>>> = session.run(input_tensor_values)?;
+	let outputs: Vec<Value> = session.run(input_tensor_values)?;
 
 	assert_eq!(outputs.len(), 1);
 	let output: OrtOwnedTensor<'_, f32, ndarray::Dim<ndarray::IxDynImpl>> = outputs[0].try_extract()?;

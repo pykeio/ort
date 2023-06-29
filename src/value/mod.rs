@@ -1,28 +1,19 @@
-use std::{collections::HashMap, ffi, fmt::Debug, marker::PhantomData, ptr};
+use std::{ffi, fmt::Debug, ptr, sync::Arc};
 
 use ndarray::{Array, ArrayView, CowArray, Dimension, IxDyn};
 
 use crate::{
 	error::assert_non_null_pointer,
 	memory::MemoryInfo,
-	ortsys, sys,
-	tensor::{IntoTensorElementDataType, TensorElementDataType},
-	OrtError, OrtResult
+	ortsys,
+	session::SessionPointerHolder,
+	sys,
+	tensor::{IntoTensorElementDataType, OrtOwnedTensor, TensorDataToType, TensorElementDataType},
+	AllocatorType, MemType, OrtError, OrtResult
 };
 
-pub enum MapKey {
-	Int8(i8),
-	Int16(i16),
-	Int32(i32),
-	Int64(i64),
-	Uint8(u8),
-	Uint16(u16),
-	Uint32(u32),
-	Uint64(u64),
-	String(String)
-}
-
-pub enum InputTensor<'v> {
+#[derive(Debug)]
+pub enum DynArrayRef<'v> {
 	Float(CowArray<'v, f32, IxDyn>),
 	#[cfg(feature = "half")]
 	Float16(CowArray<'v, half::f16, IxDyn>),
@@ -34,115 +25,107 @@ pub enum InputTensor<'v> {
 	Int16(CowArray<'v, i16, IxDyn>),
 	Int32(CowArray<'v, i32, IxDyn>),
 	Int64(CowArray<'v, i64, IxDyn>),
+	Bool(CowArray<'v, bool, IxDyn>),
 	Double(CowArray<'v, f64, IxDyn>),
 	Uint32(CowArray<'v, u32, IxDyn>),
 	Uint64(CowArray<'v, u64, IxDyn>),
 	String(CowArray<'v, String, IxDyn>)
 }
 
-impl<'v> InputTensor<'v> {
+impl<'v> DynArrayRef<'v> {
 	pub fn shape(&self) -> &[usize] {
 		match self {
-			InputTensor::Float(x) => x.shape(),
+			DynArrayRef::Float(x) => x.shape(),
 			#[cfg(feature = "half")]
-			InputTensor::Float16(x) => x.shape(),
+			DynArrayRef::Float16(x) => x.shape(),
 			#[cfg(feature = "half")]
-			InputTensor::Bfloat16(x) => x.shape(),
-			InputTensor::Uint8(x) => x.shape(),
-			InputTensor::Int8(x) => x.shape(),
-			InputTensor::Uint16(x) => x.shape(),
-			InputTensor::Int16(x) => x.shape(),
-			InputTensor::Int32(x) => x.shape(),
-			InputTensor::Int64(x) => x.shape(),
-			InputTensor::Double(x) => x.shape(),
-			InputTensor::Uint32(x) => x.shape(),
-			InputTensor::Uint64(x) => x.shape(),
-			InputTensor::String(x) => x.shape()
+			DynArrayRef::Bfloat16(x) => x.shape(),
+			DynArrayRef::Uint8(x) => x.shape(),
+			DynArrayRef::Int8(x) => x.shape(),
+			DynArrayRef::Uint16(x) => x.shape(),
+			DynArrayRef::Int16(x) => x.shape(),
+			DynArrayRef::Int32(x) => x.shape(),
+			DynArrayRef::Int64(x) => x.shape(),
+			DynArrayRef::Bool(x) => x.shape(),
+			DynArrayRef::Double(x) => x.shape(),
+			DynArrayRef::Uint32(x) => x.shape(),
+			DynArrayRef::Uint64(x) => x.shape(),
+			DynArrayRef::String(x) => x.shape()
 		}
 	}
 }
 
 macro_rules! impl_convert_trait {
 	($type_:ty, $variant:expr) => {
-		impl<'v, D: Dimension> From<ArrayView<'v, $type_, D>> for InputTensor<'v> {
-			fn from(array: ArrayView<'v, $type_, D>) -> InputTensor<'v> {
+		impl<'v, D: Dimension> From<ArrayView<'v, $type_, D>> for DynArrayRef<'v> {
+			fn from(array: ArrayView<'v, $type_, D>) -> DynArrayRef<'v> {
 				$variant(CowArray::from(array.into_dyn()))
 			}
 		}
-		impl<'v, D: Dimension> From<Array<$type_, D>> for InputTensor<'v> {
-			fn from(array: Array<$type_, D>) -> InputTensor<'v> {
+		impl<'v, D: Dimension> From<Array<$type_, D>> for DynArrayRef<'v> {
+			fn from(array: Array<$type_, D>) -> DynArrayRef<'v> {
 				$variant(CowArray::from(array.into_dyn()))
 			}
 		}
-		impl<'v, D: Dimension> From<CowArray<'v, $type_, D>> for InputTensor<'v> {
-			fn from(array: CowArray<'v, $type_, D>) -> InputTensor<'v> {
+		impl<'v, D: Dimension> From<CowArray<'v, $type_, D>> for DynArrayRef<'v> {
+			fn from(array: CowArray<'v, $type_, D>) -> DynArrayRef<'v> {
 				$variant(array.into_dyn())
 			}
 		}
 	};
 }
 
-impl_convert_trait!(f32, InputTensor::Float);
+impl_convert_trait!(f32, DynArrayRef::Float);
 #[cfg(feature = "half")]
-impl_convert_trait!(half::f16, InputTensor::Float16);
+impl_convert_trait!(half::f16, DynArrayRef::Float16);
 #[cfg(feature = "half")]
-impl_convert_trait!(half::bf16, InputTensor::Bfloat16);
-impl_convert_trait!(u8, InputTensor::Uint8);
-impl_convert_trait!(i8, InputTensor::Int8);
-impl_convert_trait!(u16, InputTensor::Uint16);
-impl_convert_trait!(i16, InputTensor::Int16);
-impl_convert_trait!(i32, InputTensor::Int32);
-impl_convert_trait!(i64, InputTensor::Int64);
-impl_convert_trait!(f64, InputTensor::Double);
-impl_convert_trait!(u32, InputTensor::Uint32);
-impl_convert_trait!(u64, InputTensor::Uint64);
-impl_convert_trait!(String, InputTensor::String);
+impl_convert_trait!(half::bf16, DynArrayRef::Bfloat16);
+impl_convert_trait!(u8, DynArrayRef::Uint8);
+impl_convert_trait!(i8, DynArrayRef::Int8);
+impl_convert_trait!(u16, DynArrayRef::Uint16);
+impl_convert_trait!(i16, DynArrayRef::Int16);
+impl_convert_trait!(i32, DynArrayRef::Int32);
+impl_convert_trait!(i64, DynArrayRef::Int64);
+impl_convert_trait!(f64, DynArrayRef::Double);
+impl_convert_trait!(u32, DynArrayRef::Uint32);
+impl_convert_trait!(u64, DynArrayRef::Uint64);
+impl_convert_trait!(bool, DynArrayRef::Bool);
+impl_convert_trait!(String, DynArrayRef::String);
 
-pub enum InputValue<'v> {
-	Tensor(InputTensor<'v>),
-	Sequence(Vec<InputValue<'v>>),
-	Map(HashMap<MapKey, InputValue<'v>>)
-}
-
-impl<'v, T: Into<InputTensor<'v>>> From<T> for InputValue<'v> {
-	fn from(value: T) -> Self {
-		Self::Tensor(value.into())
+#[derive(Debug)]
+pub enum Value<'v> {
+	RustOwned {
+		ptr: *mut sys::OrtValue,
+		array: DynArrayRef<'v>,
+		memory_info: MemoryInfo
+	},
+	CppOwned {
+		ptr: *mut sys::OrtValue,
+		session: Arc<SessionPointerHolder>
 	}
 }
 
-impl<'v> InputValue<'v> {
-	pub fn shape(&self) -> Vec<usize> {
-		match self {
-			InputValue::Tensor(tensor) => tensor.shape().to_vec(),
-			InputValue::Sequence(seq) => vec![seq.len()],
-			InputValue::Map(map) => vec![map.len()]
-		}
+unsafe impl<'v> Send for Value<'v> {}
+unsafe impl<'v> Sync for Value<'v> {}
+
+impl Value<'static> {
+	pub fn from_raw(ptr: *mut sys::OrtValue, session: Arc<SessionPointerHolder>) -> Value<'static> {
+		Value::CppOwned { ptr, session }
 	}
 }
 
-pub struct OrtRustOwnedValue<'m, 'v, T> {
-	pub(crate) c_ptr: *mut sys::OrtValue,
-	#[allow(unused)]
-	owned_value: T,
-	value_ref: PhantomData<&'v ()>,
-	memory_info: PhantomData<&'m MemoryInfo>
-}
-
-impl<'m, 'v, T> OrtRustOwnedValue<'m, 'v, CowArray<'v, T, IxDyn>>
-where
-	//'m: 'v,
-	T: IntoTensorElementDataType + Debug + Clone
-{
-	pub(crate) fn from_array<'i>(
-		memory_info: &'m MemoryInfo,
+impl<'v> Value<'v> {
+	pub fn from_array<'i, T: IntoTensorElementDataType + Debug + Clone>(
 		allocator_ptr: *mut sys::OrtAllocator,
 		array: &'i CowArray<'v, T, IxDyn>
-	) -> OrtResult<OrtRustOwnedValue<'m, 'v, CowArray<'v, T, IxDyn>>>
+	) -> OrtResult<Value<'v>>
 	where
-		'v: 'm,
-		'i: 'v
+		'i: 'v,
+		DynArrayRef<'v>: From<CowArray<'v, T, IxDyn>>
 	{
 		let mut contiguous_array: CowArray<'v, T, IxDyn> = array.as_standard_layout();
+
+		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemType::Default)?;
 
 		let mut value_ptr: *mut sys::OrtValue = ptr::null_mut();
 		let value_ptr_ptr: *mut *mut sys::OrtValue = &mut value_ptr;
@@ -161,7 +144,8 @@ where
 			| TensorElementDataType::Int64
 			| TensorElementDataType::Float64
 			| TensorElementDataType::Uint32
-			| TensorElementDataType::Uint64 => {
+			| TensorElementDataType::Uint64
+			| TensorElementDataType::Bool => {
 				// primitive data is already suitably laid out in memory; provide it to
 				// onnxruntime as is
 				let tensor_values_ptr: *mut std::ffi::c_void = contiguous_array.as_mut_ptr() as *mut std::ffi::c_void;
@@ -228,87 +212,82 @@ where
 
 				ortsys![unsafe FillStringTensor(value_ptr, string_pointers.as_ptr(), string_pointers.len() as _) -> OrtError::FillStringTensor];
 			}
-			_ => unimplemented!("Tensor element data type {:?} not yet implemented", T::tensor_element_data_type())
 		}
 
 		assert_non_null_pointer(value_ptr, "Value")?;
 
-		Ok(OrtRustOwnedValue {
-			c_ptr: value_ptr,
-			owned_value: contiguous_array,
-			value_ref: PhantomData,
-			memory_info: PhantomData
+		Ok(Value::RustOwned {
+			ptr: value_ptr,
+			array: contiguous_array.into(),
+			memory_info
 		})
 	}
-}
 
-pub enum InputOrtValue<'m, 'v> {
-	FloatTensor(OrtRustOwnedValue<'m, 'v, CowArray<'v, f32, IxDyn>>),
-	#[cfg(feature = "half")]
-	Float16Tensor(OrtRustOwnedValue<'m, 'v, CowArray<'v, half::f16, IxDyn>>),
-	#[cfg(feature = "half")]
-	Bfloat16Tensor(OrtRustOwnedValue<'m, 'v, CowArray<'v, half::bf16, IxDyn>>),
-	Uint8Tensor(OrtRustOwnedValue<'m, 'v, CowArray<'v, u8, IxDyn>>),
-	Int8Tensor(OrtRustOwnedValue<'m, 'v, CowArray<'v, i8, IxDyn>>),
-	Uint16Tensor(OrtRustOwnedValue<'m, 'v, CowArray<'v, u16, IxDyn>>),
-	Int16Tensor(OrtRustOwnedValue<'m, 'v, CowArray<'v, i16, IxDyn>>),
-	Int32Tensor(OrtRustOwnedValue<'m, 'v, CowArray<'v, i32, IxDyn>>),
-	Int64Tensor(OrtRustOwnedValue<'m, 'v, CowArray<'v, i64, IxDyn>>),
-	DoubleTensor(OrtRustOwnedValue<'m, 'v, CowArray<'v, f64, IxDyn>>),
-	Uint32Tensor(OrtRustOwnedValue<'m, 'v, CowArray<'v, u32, IxDyn>>),
-	Uint64Tensor(OrtRustOwnedValue<'m, 'v, CowArray<'v, u64, IxDyn>>),
-	StringTensor(OrtRustOwnedValue<'m, 'v, CowArray<'v, String, IxDyn>>)
-}
-
-impl<'m, 'v> InputOrtValue<'m, 'v> {
-	pub(crate) fn from_input_value<'i>(
-		memory_info: &'m MemoryInfo,
-		allocator_ptr: *mut sys::OrtAllocator,
-		input_value: &'i InputValue<'v>
-	) -> OrtResult<InputOrtValue<'m, 'v>>
-	where
-		'v: 'm,
-		'i: 'v
-	{
-		match input_value {
-			InputValue::Tensor(tensor) => match tensor {
-				InputTensor::Float(array) => Ok(InputOrtValue::FloatTensor(OrtRustOwnedValue::from_array(memory_info, allocator_ptr, array)?)),
-				#[cfg(feature = "half")]
-				InputTensor::Float16(array) => Ok(InputOrtValue::Float16Tensor(OrtRustOwnedValue::from_array(memory_info, allocator_ptr, array)?)),
-				#[cfg(feature = "half")]
-				InputTensor::Bfloat16(array) => Ok(InputOrtValue::Bfloat16Tensor(OrtRustOwnedValue::from_array(memory_info, allocator_ptr, array)?)),
-				InputTensor::Uint8(array) => Ok(InputOrtValue::Uint8Tensor(OrtRustOwnedValue::from_array(memory_info, allocator_ptr, array)?)),
-				InputTensor::Int8(array) => Ok(InputOrtValue::Int8Tensor(OrtRustOwnedValue::from_array(memory_info, allocator_ptr, array)?)),
-				InputTensor::Uint16(array) => Ok(InputOrtValue::Uint16Tensor(OrtRustOwnedValue::from_array(memory_info, allocator_ptr, array)?)),
-				InputTensor::Int16(array) => Ok(InputOrtValue::Int16Tensor(OrtRustOwnedValue::from_array(memory_info, allocator_ptr, array)?)),
-				InputTensor::Int32(array) => Ok(InputOrtValue::Int32Tensor(OrtRustOwnedValue::from_array(memory_info, allocator_ptr, array)?)),
-				InputTensor::Int64(array) => Ok(InputOrtValue::Int64Tensor(OrtRustOwnedValue::from_array(memory_info, allocator_ptr, array)?)),
-				InputTensor::Double(array) => Ok(InputOrtValue::DoubleTensor(OrtRustOwnedValue::from_array(memory_info, allocator_ptr, array)?)),
-				InputTensor::Uint32(array) => Ok(InputOrtValue::Uint32Tensor(OrtRustOwnedValue::from_array(memory_info, allocator_ptr, array)?)),
-				InputTensor::Uint64(array) => Ok(InputOrtValue::Uint64Tensor(OrtRustOwnedValue::from_array(memory_info, allocator_ptr, array)?)),
-				InputTensor::String(array) => Ok(InputOrtValue::StringTensor(OrtRustOwnedValue::from_array(memory_info, allocator_ptr, array)?))
-			},
-			_ => unimplemented!()
+	pub fn ptr(&self) -> *mut sys::OrtValue {
+		match self {
+			Self::CppOwned { ptr, .. } => *ptr,
+			Self::RustOwned { ptr, .. } => *ptr
 		}
 	}
 
-	pub(crate) fn c_ptr(&self) -> *const sys::OrtValue {
+	pub fn is_tensor(&self) -> OrtResult<bool> {
+		let mut result = 0;
+		ortsys![unsafe IsTensor(self.ptr(), &mut result) -> OrtError::GetTensorElementType];
+		Ok(result == 1)
+	}
+
+	pub fn try_extract<'t, T>(&self) -> OrtResult<OrtOwnedTensor<'t, T, IxDyn>>
+	where
+		T: TensorDataToType + Clone + Debug,
+		'v: 't
+	{
+		let mut tensor_info_ptr: *mut sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> OrtError::GetTensorTypeAndShape];
+
+		let res = {
+			let mut num_dims = 0;
+			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> OrtError::GetDimensionsCount];
+
+			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
+			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims) -> OrtError::GetDimensions];
+			let shape = IxDyn(&node_dims.iter().map(|&n| n as usize).collect::<Vec<_>>());
+
+			let mut type_sys = sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> OrtError::GetTensorElementType];
+			assert_ne!(type_sys, sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
+			let data_type: TensorElementDataType = type_sys.into();
+			if data_type != T::tensor_element_data_type() {
+				Err(OrtError::DataTypeMismatch {
+					actual: data_type,
+					requested: T::tensor_element_data_type()
+				})
+			} else {
+				// Note: Both tensor and array will point to the same data, nothing is copied.
+				// As such, there is no need to free the pointer used to create the ArrayView.
+				assert_ne!(self.ptr(), ptr::null_mut());
+
+				let mut is_tensor = 0;
+				ortsys![unsafe IsTensor(self.ptr(), &mut is_tensor) -> OrtError::FailedTensorCheck];
+				assert_eq!(is_tensor, 1);
+
+				let mut len = 0;
+				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> OrtError::GetTensorShapeElementCount];
+
+				let data = T::extract_data(shape, len, self.ptr())?;
+				Ok(OrtOwnedTensor { data })
+			}
+		};
+		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
+		res
+	}
+}
+
+impl<'v> Drop for Value<'v> {
+	fn drop(&mut self) {
+		ortsys![unsafe ReleaseValue(self.ptr())];
 		match self {
-			InputOrtValue::FloatTensor(x) => x.c_ptr,
-			#[cfg(feature = "half")]
-			InputOrtValue::Float16Tensor(x) => x.c_ptr,
-			#[cfg(feature = "half")]
-			InputOrtValue::Bfloat16Tensor(x) => x.c_ptr,
-			InputOrtValue::Uint8Tensor(x) => x.c_ptr,
-			InputOrtValue::Int8Tensor(x) => x.c_ptr,
-			InputOrtValue::Uint16Tensor(x) => x.c_ptr,
-			InputOrtValue::Int16Tensor(x) => x.c_ptr,
-			InputOrtValue::Int32Tensor(x) => x.c_ptr,
-			InputOrtValue::Int64Tensor(x) => x.c_ptr,
-			InputOrtValue::DoubleTensor(x) => x.c_ptr,
-			InputOrtValue::Uint32Tensor(x) => x.c_ptr,
-			InputOrtValue::Uint64Tensor(x) => x.c_ptr,
-			InputOrtValue::StringTensor(x) => x.c_ptr
+			Self::CppOwned { ptr, .. } => *ptr = ptr::null_mut(),
+			Self::RustOwned { ptr, .. } => *ptr = ptr::null_mut()
 		}
 	}
 }

@@ -76,7 +76,7 @@ impl Environment {
 		Arc::new(self)
 	}
 
-	pub(crate) fn env_ptr(&self) -> *const sys::OrtEnv {
+	pub fn ptr(&self) -> *const sys::OrtEnv {
 		*self.env.lock().unwrap().env_ptr.get_mut()
 	}
 
@@ -454,10 +454,10 @@ mod tests {
 		let main_env =
 			Environment::new(initial_name.clone(), LoggingLevel::Warning, Vec::new(), Environment::create_custom_log_env, vec![].into_iter().collect())
 				.unwrap();
-		let main_env_ptr = main_env.env_ptr() as usize;
+		let main_env_ptr = main_env.ptr() as usize;
 
 		assert_eq!(main_env.name(), initial_name);
-		assert_eq!(main_env.env_ptr() as usize, main_env_ptr);
+		assert_eq!(main_env.ptr() as usize, main_env_ptr);
 
 		assert!(
 			(0..10)
@@ -472,7 +472,7 @@ mod tests {
 							.unwrap();
 
 						assert_eq!(env.name(), initial_name_cloned);
-						assert_eq!(env.env_ptr() as usize, main_env_ptr);
+						assert_eq!(env.ptr() as usize, main_env_ptr);
 					})
 				})
 				.map(|child| child.join())

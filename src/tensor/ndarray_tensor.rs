@@ -9,7 +9,7 @@ use ndarray::{Array, ArrayBase};
 /// * `S`: [`ndarray::ArrayBase`](https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html)'s data container
 /// * `T`: Type contained inside the tensor (for example `f32`)
 /// * `D`: Tensor's dimension ([`ndarray::Dimension`](https://docs.rs/ndarray/latest/ndarray/trait.Dimension.html))
-pub trait NdArrayTensor<S, T, D> {
+pub trait NdArrayExtensions<S, T, D> {
 	/// Calculate the [softmax](https://en.wikipedia.org/wiki/Softmax_function) of the tensor along a given axis
 	///
 	/// # Trait Bounds
@@ -31,7 +31,7 @@ pub trait NdArrayTensor<S, T, D> {
 		T: ndarray::NdFloat + std::ops::SubAssign + std::ops::DivAssign;
 }
 
-impl<S, T, D> NdArrayTensor<S, T, D> for ArrayBase<S, D>
+impl<S, T, D> NdArrayExtensions<S, T, D> for ArrayBase<S, D>
 where
 	D: ndarray::RemoveAxis,
 	S: ndarray::RawData + ndarray::Data + ndarray::RawData<Elem = T>,

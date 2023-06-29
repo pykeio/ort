@@ -24,13 +24,12 @@ codegen-units = 1
 features = [ "half", "fetch-models", "copy-dylibs" ]
 
 [features]
-default = [ "half", "fetch-models", "download-binaries", "copy-dylibs" ]
+default = [ "half", "download-binaries", "copy-dylibs" ]
 
 profiling = [ "widestring" ]
 
 fetch-models = [ "ureq" ]
 download-binaries = [ "ureq", "zip" ]
-generate-bindings = [ "bindgen" ]
 load-dynamic = [ "libloading" ]
 copy-dylibs = []
 
@@ -83,7 +82,6 @@ tokenizers = { version = "0.13", default-features = false, features = [ "onig" ]
 rand = "0.8"
 
 [build-dependencies]
-bindgen = { version = "0.63", optional = true }
 ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }
 zip = { version = "0.6", optional = true, default-features = false, features = [ "deflate" ] }
 

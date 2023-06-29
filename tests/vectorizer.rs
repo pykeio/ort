@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use ndarray::{ArrayD, IxDyn};
-use ort::{environment::Environment, value::InputValue, ExecutionProvider, GraphOptimizationLevel, OrtResult, SessionBuilder};
+use ort::{environment::Environment, value::Value, ExecutionProvider, GraphOptimizationLevel, OrtResult, SessionBuilder};
 use test_log::test;
 
 #[test]
@@ -23,10 +23,10 @@ fn vectorizer() -> OrtResult<()> {
 	assert_eq!(metadata.description()?, "test description");
 	assert_eq!(metadata.custom("custom_key")?.as_deref(), Some("custom_value"));
 
-	let array = ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap();
+	let array = ndarray::CowArray::from(ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap().into_dyn());
 
 	// Just one input
-	let input_tensor_values = &[InputValue::from(array.into_dyn())];
+	let input_tensor_values = vec![Value::from_array(session.allocator(), &array)?];
 
 	// Perform the inference
 	let outputs = session.run(input_tensor_values)?;

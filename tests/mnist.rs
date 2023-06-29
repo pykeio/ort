@@ -2,11 +2,8 @@ use std::path::Path;
 
 use image::{imageops::FilterType, ImageBuffer, Luma, Pixel};
 use ort::{
-	download::vision::DomainBasedImageClassification,
-	environment::Environment,
-	tensor::{ndarray_tensor::NdArrayTensor, DynOrtTensor, OrtOwnedTensor},
-	value::InputValue,
-	GraphOptimizationLevel, LoggingLevel, OrtResult, SessionBuilder
+	download::vision::DomainBasedImageClassification, environment::Environment, tensor::OrtOwnedTensor, value::Value, GraphOptimizationLevel, LoggingLevel,
+	NdArrayExtensions, OrtResult, SessionBuilder
 };
 use test_log::test;
 
@@ -42,19 +39,22 @@ fn mnist_5() -> OrtResult<()> {
 		.resize(input0_shape[2] as u32, input0_shape[3] as u32, FilterType::Nearest)
 		.to_luma8();
 
-	let array = ndarray::Array::from_shape_fn((1, 1, 28, 28), |(_, c, j, i)| {
-		let pixel = image_buffer.get_pixel(i as u32, j as u32);
-		let channels = pixel.channels();
+	let array = ndarray::CowArray::from(
+		ndarray::Array::from_shape_fn((1, 1, 28, 28), |(_, c, j, i)| {
+			let pixel = image_buffer.get_pixel(i as u32, j as u32);
+			let channels = pixel.channels();
 
-		// range [0, 255] -> range [0, 1]
-		(channels[c] as f32) / 255.0
-	});
+			// range [0, 255] -> range [0, 1]
+			(channels[c] as f32) / 255.0
+		})
+		.into_dyn()
+	);
 
 	// Batch of 1
-	let input_tensor_values = &[InputValue::from(array.into_dyn())];
+	let input_tensor_values = vec![Value::from_array(session.allocator(), &array)?];
 
 	// Perform the inference
-	let outputs: Vec<DynOrtTensor<ndarray::Dim<ndarray::IxDynImpl>>> = session.run(input_tensor_values)?;
+	let outputs: Vec<Value> = session.run(input_tensor_values)?;
 
 	let output: OrtOwnedTensor<_, _> = outputs[0].try_extract()?;
 	let mut probabilities: Vec<(usize, f32)> = output.view().softmax(ndarray::Axis(1)).iter().copied().enumerate().collect::<Vec<_>>();

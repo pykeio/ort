@@ -25,9 +25,12 @@ pub enum OrtError {
 	/// Error occurred when creating an ONNX session.
 	#[error("Failed to create ONNX Runtime session: {0}")]
 	CreateSession(OrtApiError),
+	/// Error occurred when creating an IO binding.
+	#[error("Failed to create IO binding: {0}")]
+	CreateIoBinding(OrtApiError),
 	/// Error occurred when creating an ONNX allocator.
-	#[error("Failed to get ONNX allocator: {0}")]
-	GetAllocator(OrtApiError),
+	#[error("Failed to create ONNX allocator: {0}")]
+	CreateAllocator(OrtApiError),
 	/// Error occurred when counting ONNX session input/output count.
 	#[error("Failed to get input or output count: {0}")]
 	GetInOutCount(OrtApiError),
@@ -88,6 +91,9 @@ pub enum OrtError {
 	/// Error occurred when downloading a pre-trained ONNX model from the [ONNX Model Zoo](https://github.com/onnx/models).
 	#[error("Failed to download ONNX model: {0}")]
 	DownloadError(#[from] OrtDownloadError),
+	/// Type of input data and the ONNX model do not match.
+	#[error("Data types do not match: expected {model:?}, got {input:?}")]
+	NonMatchingDataTypes { input: TensorElementDataType, model: TensorElementDataType },
 	/// Dimensions of input data and the ONNX model do not match.
 	#[error("Dimensions do not match: {0:?}")]
 	NonMatchingDimensions(NonMatchingDimensionsError),
@@ -135,7 +141,9 @@ pub enum OrtError {
 	#[error("{0}")]
 	ExecutionProvider(OrtApiError),
 	#[error("Execution provider `{0}` was not registered because its corresponding Cargo feature is disabled.")]
-	ExecutionProviderNotRegistered(&'static str)
+	ExecutionProviderNotRegistered(&'static str),
+	#[error("Expected tensor to be on CPU in order to get data, but had allocation device `{0}`.")]
+	TensorNotOnCpu(&'static str)
 }
 
 /// Error used when the input dimensions defined in the model and passed from an inference call do not match.

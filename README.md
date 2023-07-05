@@ -25,10 +25,10 @@ See [the docs](https://docs.rs/ort) for more detailed information and the [`exam
 ## Feature comparison
 | Feature comparison     | **📕 ort** | **📗 [ors](https://github.com/HaoboGu/ors)** | **🪟 [onnxruntime-rs](https://github.com/microsoft/onnxruntime/tree/main/rust)** |
 |------------------------|-----------|-----------|----------------------|
-| Upstream version       | **v1.14.1** | v1.12.0 | v1.8               |
+| Upstream version       | **v1.15.1** | v1.12.0 | v1.8               |
 | `dlopen()`?            | ✅         | ✅         | ❌                    |
 | Execution providers?   | ✅         | ❌         | ❌                    |
-| IOBinding?             | ❌ WIP     | ❌         | ❌                    |
+| IOBinding?             | ✅         | ❌         | ❌                    |
 | String tensors?        | ✅         | ❌         | ⚠️ input only         |
 | Multiple output types? | ✅         | ✅         | ❌                    |
 | Multiple input types?  | ✅         | ✅         | ❌                    |
@@ -37,14 +37,14 @@ See [the docs](https://docs.rs/ort) for more detailed information and the [`exam
 ## Cargo features
 > **Note:**
 > For developers using `ort` in a **library** (if you are developing an *app*, you can skip this part), it is heavily recommended to use `default-features = false` to avoid bringing in unnecessary bloat.
-> Cargo features are **additive**. Users of a library that requires `ort` with default features enabled **will not be able to remove those features**, and if the library isn't using them, it's just adding unnecessary bloat. This is especially true for the `fetch-models` feature, which you should almost never use in production.
-> Instead, you should enable `ort`'s default features in your *dev dependencies only*, and instruct downstream users to include `ort = { version = "...", features = [ "download-binaries" ] }` in their dependencies if they need it.
+> Cargo features are **additive**. Users of a library that requires `ort` with default features enabled **will not be able to remove those features**, and if the library isn't using them, it's just adding unnecessary bloat and inflating compile times.
+> Instead, you should enable `ort`'s default features in your *dev dependencies only*.
+> Disabling default features will disable `download-binaries`, so you should instruct downstream users to include `ort = { version = "...", features = [ "download-binaries" ] }` in their dependencies if they need it.
 
-- **`fetch-models` (default)**: Enables fetching models from the ONNX Model Zoo. Useful for quick testing with some common models like YOLOv4, GPT-2, and ResNet. Not recommended in production.
 - **`download-binaries` (default)**: Enables downloading binaries via the `download` [strategy](#strategies). If disabled, the default behavior will be the `system` strategy.
 - **`copy-dylibs` (default)**: Copies the dynamic libraries to the Cargo build folder - see [shared library hell](#shared-library-hell).
 - **`half` (default)**: Enables support for using `float16`/`bfloat16` tensors in Rust.
-- **`generate-bindings`**: Update the bindings to ONNX Runtime using `bindgen`. Requires [libclang](https://clang.llvm.org/doxygen/group__CINDEX.html).
+- **`fetch-models`**: Enables fetching models from the ONNX Model Zoo. Useful for quick testing with some common models like YOLOv4, GPT-2, and ResNet. Not recommended in production.
 - **`load-dynamic`**: Loads the ONNX Runtime binaries at runtime via `dlopen()` without a link dependency on them. The path to the binary can be controlled with the environment variable `ORT_DYLIB_PATH=/path/to/libonnxruntime.so`. This is heavily recommended, as it mitigates the [shared library hell](#shared-library-hell).
 
 ## How to get binaries

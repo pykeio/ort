@@ -115,6 +115,7 @@ impl Value<'static> {
 }
 
 impl<'v> Value<'v> {
+	#[allow(clippy::not_unsafe_ptr_arg_deref)]
 	pub fn from_array<'i, T: IntoTensorElementDataType + Debug + Clone>(
 		allocator_ptr: *mut sys::OrtAllocator,
 		array: &'i CowArray<'v, T, IxDyn>
@@ -249,7 +250,7 @@ impl<'v> Value<'v> {
 			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> OrtError::GetDimensionsCount];
 
 			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims) -> OrtError::GetDimensions];
+			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> OrtError::GetDimensions];
 			let shape = IxDyn(&node_dims.iter().map(|&n| n as usize).collect::<Vec<_>>());
 
 			let mut type_sys = sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;

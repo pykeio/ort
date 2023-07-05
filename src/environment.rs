@@ -54,6 +54,9 @@ pub struct Environment {
 	pub(crate) execution_providers: Vec<ExecutionProvider>
 }
 
+unsafe impl Send for Environment {}
+unsafe impl Sync for Environment {}
+
 impl Environment {
 	/// Create a new environment builder using default values
 	/// (name: `default`, log level: [`LoggingLevel::Warning`])

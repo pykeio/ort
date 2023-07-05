@@ -281,6 +281,7 @@ impl TensorDataToType for String {
 		TensorElementDataType::String
 	}
 
+	#[allow(clippy::not_unsafe_ptr_arg_deref)]
 	fn extract_data<'t, D: ndarray::Dimension>(shape: D, tensor_element_len: usize, tensor_ptr: *mut sys::OrtValue) -> OrtResult<TensorData<'t, Self, D>> {
 		// Total length of string data, not including \0 suffix
 		let mut total_length = 0;
@@ -296,7 +297,7 @@ impl TensorDataToType for String {
 		// length calculations easy
 		let mut offsets = vec![0; tensor_element_len + 1];
 
-		ortsys![unsafe GetStringTensorContent(tensor_ptr, string_contents.as_mut_ptr() as *mut ffi::c_void, total_length, offsets.as_mut_ptr(), tensor_element_len as _) -> OrtError::GetStringTensorContent];
+		ortsys![unsafe GetStringTensorContent(tensor_ptr, string_contents.as_mut_ptr() as *mut ffi::c_void, total_length as _, offsets.as_mut_ptr(), tensor_element_len as _) -> OrtError::GetStringTensorContent];
 
 		// final offset = overall length so that per-string length calculations work for the last string
 		debug_assert_eq!(0, offsets[tensor_element_len]);

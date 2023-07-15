@@ -74,6 +74,6 @@ jobs:
         with:
           command: ${{ matrix.platform.command }}
           target: ${{ matrix.platform.target }}
-          args: "--features fetch-models -- --skip vectorizer"
+          args: "--features fetch-models"
         env:
           LC_ALL: C

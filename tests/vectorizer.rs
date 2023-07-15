@@ -5,6 +5,7 @@ use ort::{environment::Environment, value::Value, ExecutionProvider, GraphOptimi
 use test_log::test;
 
 #[test]
+#[cfg(not(target_arch = "aarch64"))]
 fn vectorizer() -> OrtResult<()> {
 	let environment = Environment::default().into_arc();
 

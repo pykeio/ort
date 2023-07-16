@@ -1,8 +1,18 @@
-#![allow(unused_imports)]
+#![allow(unused)]
 
-use std::{collections::HashMap, ffi::CString, os::raw::c_char};
+use std::{
+	collections::HashMap,
+	ffi::{c_void, CString},
+	os::raw::c_char,
+	ptr
+};
 
-use crate::{error::status_to_result, ortsys, sys, OrtApiError, OrtResult};
+use crate::{
+	error::status_to_result,
+	ortsys,
+	sys::{self, size_t, OrtArenaCfg},
+	OrtApiError, OrtError, OrtResult
+};
 
 #[cfg(all(not(feature = "load-dynamic"), not(target_arch = "x86")))]
 extern "C" {
@@ -23,126 +33,306 @@ extern "stdcall" {
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CPU(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr;
 }
 
-/// Execution provider container. See [the ONNX Runtime docs](https://onnxruntime.ai/docs/execution-providers/) for more
-/// info on execution providers. Execution providers are actually registered via the `with_execution_providers()`
-/// functions [`crate::SessionBuilder`] (per-session) or [`EnvBuilder`](crate::environment::EnvBuilder) (default for all
-/// sessions in an environment).
+#[derive(Debug, Clone, Default)]
+pub struct CPUExecutionProviderOptions {
+	pub use_arena: bool
+}
+
+/// The strategy for extending the device memory arena.
 #[derive(Debug, Clone)]
-pub struct ExecutionProvider {
-	provider: String,
-	options: HashMap<String, String>
+pub enum ArenaExtendStrategy {
+	/// (Default) Subsequent extensions extend by larger amounts (multiplied by powers of two)
+	NextPowerOfTwo,
+	/// Memory extends by the requested amount.
+	SameAsRequested
 }
 
-macro_rules! ep_providers {
-	($($fn_name:ident = $name:expr),*) => {
-		$(
-			/// Creates a new `
-			#[doc = $name]
-			#[doc = "` configuration object."]
-			pub fn $fn_name() -> Self {
-				Self::new($name)
-			}
-		)*
+impl Default for ArenaExtendStrategy {
+	fn default() -> Self {
+		Self::NextPowerOfTwo
 	}
 }
 
-macro_rules! ep_options {
-	($(
-		$(#[$meta:meta])*
-		pub fn $fn_name:ident($opt_type:ty) = $option_name:ident;
-	)*) => {
-		$(
-			$(#[$meta])*
-			pub fn $fn_name(mut self, v: $opt_type) -> Self {
-				self = self.with(stringify!($option_name), v.to_string());
-				self
-			}
-		)*
-	}
-}
-
-impl ExecutionProvider {
-	/// Creates an `ExecutionProvider` for the given execution provider name.
+/// The type of search done for cuDNN convolution algorithms.
+#[derive(Debug, Clone)]
+pub enum CUDAExecutionProviderCuDNNConvAlgoSearch {
+	/// Expensive exhaustive benchmarking using [`cudnnFindConvolutionForwardAlgorithmEx`][exhaustive].
+	/// This function will attempt all possible algorithms for `cudnnConvolutionForward` to find the fastest algorithm.
+	/// Exhaustive search trades off between memory usage and speed. The first execution of a graph will be slow while
+	/// possible convolution algorithms are tested.
 	///
-	/// You probably want the dedicated methods instead, e.g. [`ExecutionProvider::cuda`].
-	pub fn new(provider: impl Into<String>) -> Self {
+	/// [exhaustive]: https://docs.nvidia.com/deeplearning/cudnn/api/index.html#cudnnFindConvolutionForwardAlgorithmEx
+	Exhaustive,
+	/// Lightweight heuristic-based search using [`cudnnGetConvolutionForwardAlgorithm_v7`][heuristic].
+	/// Heuristic search sorts available convolution algorithms by expected (based on internal heuristic) relative
+	/// performance.
+	///
+	/// [heuristic]: https://docs.nvidia.com/deeplearning/cudnn/api/index.html#cudnnGetConvolutionForwardAlgorithm_v7
+	Heuristic,
+	/// Uses the default convolution algorithm, [`CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM`][fwdalgo].
+	/// The default algorithm may not have the best performance depending on specific hardware used. It's recommended to
+	/// use [`Exhaustive`] or [`Heuristic`] to search for a faster algorithm instead. However, `Default` does have its
+	/// uses, such as when available memory is tight.
+	///
+	/// > **NOTE**: This name may be confusing as this is not the default search algorithm for the CUDA EP. The default
+	/// > search algorithm is actually [`Exhaustive`].
+	///
+	/// [fwdalgo]: https://docs.nvidia.com/deeplearning/cudnn/api/index.html#cudnnConvolutionFwdAlgo_t
+	/// [`Exhaustive`]: CUDAExecutionProviderCuDNNConvAlgoSearch::Exhaustive
+	/// [`Heuristic`]: CUDAExecutionProviderCuDNNConvAlgoSearch::Heuristic
+	Default
+}
+
+impl Default for CUDAExecutionProviderCuDNNConvAlgoSearch {
+	fn default() -> Self {
+		Self::Exhaustive
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct CUDAExecutionProviderOptions {
+	pub device_id: u32,
+	/// The size limit of the device memory arena in bytes. This size limit is only for the execution provider’s arena.
+	/// The total device memory usage may be higher.
+	pub gpu_mem_limit: usize,
+	/// The strategy for extending the device memory arena. See [`ArenaExtendStrategy`].
+	pub arena_extend_strategy: ArenaExtendStrategy,
+	/// ORT leverages cuDNN for convolution operations and the first step in this process is to determine an
+	/// “optimal” convolution algorithm to use while performing the convolution operation for the given input
+	/// configuration (input shape, filter shape, etc.) in each `Conv` node. This option controlls the type of search
+	/// done for cuDNN convolution algorithms. See [`CUDAExecutionProviderCuDNNConvAlgoSearch`] for more info.
+	pub cudnn_conv_algo_search: CUDAExecutionProviderCuDNNConvAlgoSearch,
+	/// Whether to do copies in the default stream or use separate streams. The recommended setting is true. If false,
+	/// there are race conditions and possibly better performance.
+	pub do_copy_in_default_stream: bool,
+	/// ORT leverages cuDNN for convolution operations and the first step in this process is to determine an
+	/// “optimal” convolution algorithm to use while performing the convolution operation for the given input
+	/// configuration (input shape, filter shape, etc.) in each `Conv` node. This sub-step involves querying cuDNN for a
+	/// “workspace” memory size and have this allocated so that cuDNN can use this auxiliary memory while determining
+	/// the “optimal” convolution algorithm to use.
+	///
+	/// When `cudnn_conv_use_max_workspace` is false, ORT will clamp the workspace size to 32 MB, which may lead to
+	/// cuDNN selecting a suboptimal convolution algorithm. The recommended (and default) value is `true`.
+	pub cudnn_conv_use_max_workspace: bool,
+	/// ORT leverages cuDNN for convolution operations. While cuDNN only takes 4-D or 5-D tensors as input for
+	/// convolution operations, dimension padding is needed if the input is a 3-D tensor. Given an input tensor of shape
+	/// `[N, C, D]`, it can be padded to `[N, C, D, 1]` or `[N, C, 1, D]`. While both of these padding methods produce
+	/// the same output, the performance may differ because different convolution algorithms are selected,
+	/// especially on some devices such as A100. By default, the input is padded to `[N, C, D, 1]`. Set this option to
+	/// true to instead use `[N, C, 1, D]`.
+	pub cudnn_conv1d_pad_to_nc1d: bool,
+	/// ORT supports the usage of CUDA Graphs to remove CPU overhead associated with launching CUDA kernels
+	/// sequentially. To enable the usage of CUDA Graphs, set `enable_cuda_graph` to true.
+	/// Currently, there are some constraints with regards to using the CUDA Graphs feature:
+	///
+	/// - Models with control-flow ops (i.e. If, Loop and Scan ops) are not supported.
+	/// - Usage of CUDA Graphs is limited to models where-in all the model ops (graph nodes) can be partitioned to the
+	///   CUDA EP.
+	/// - The input/output types of models must be tensors.
+	/// - Shapes of inputs/outputs cannot change across inference calls. Dynamic shape models are supported, but the
+	///   input/output shapes must be the same across each inference call.
+	/// - By design, CUDA Graphs is designed to read from/write to the same CUDA virtual memory addresses during the
+	///   graph replaying step as it does during the graph capturing step. Due to this requirement, usage of this
+	///   feature requires using IOBinding so as to bind memory which will be used as input(s)/output(s) for the CUDA
+	///   Graph machinery to read from/write to (please see samples below).
+	/// - While updating the input(s) for subsequent inference calls, the fresh input(s) need to be copied over to the
+	///   corresponding CUDA memory location(s) of the bound `OrtValue` input(s). This is due to the fact that the
+	///   “graph replay” will require reading inputs from the same CUDA virtual memory addresses.
+	/// - Multi-threaded usage is currently not supported, i.e. `run()` MAY NOT be invoked on the same `Session` object
+	///   from multiple threads while using CUDA Graphs.
+	///
+	/// > **NOTE**: The very first `run()` performs a variety of tasks under the hood like making CUDA memory
+	/// > allocations, capturing the CUDA graph for the model, and then performing a graph replay to ensure that the
+	/// > graph runs. Due to this, the latency associated with the first `run()` is bound to be high. Subsequent
+	/// > `run()`s only perform graph replays of the graph captured and cached in the first `run()`.
+	pub enable_cuda_graph: bool,
+	/// Whether to use strict mode in the `SkipLayerNormalization` implementation. The default and recommanded setting
+	/// is `false`. If enabled, accuracy may improve slightly, but performance may decrease.
+	pub enable_skip_layer_norm_strict_mode: bool
+}
+
+impl Default for CUDAExecutionProviderOptions {
+	fn default() -> Self {
 		Self {
-			provider: provider.into(),
-			options: HashMap::new()
+			device_id: 0,
+			gpu_mem_limit: usize::MAX,
+			arena_extend_strategy: ArenaExtendStrategy::NextPowerOfTwo,
+			cudnn_conv_algo_search: CUDAExecutionProviderCuDNNConvAlgoSearch::Exhaustive,
+			do_copy_in_default_stream: true,
+			cudnn_conv_use_max_workspace: true,
+			cudnn_conv1d_pad_to_nc1d: false,
+			enable_cuda_graph: false,
+			enable_skip_layer_norm_strict_mode: false
 		}
 	}
+}
 
-	ep_providers! {
-		cpu = "CPUExecutionProvider",
-		cuda = "CUDAExecutionProvider",
-		tensorrt = "TensorrtExecutionProvider",
-		acl = "AclExecutionProvider",
-		dnnl = "DnnlExecutionProvider",
-		onednn = "DnnlExecutionProvider",
-		coreml = "CoreMLExecutionProvider",
-		directml = "DmlExecutionProvider",
-		rocm = "ROCmExecutionProvider",
-		nnapi = "NnapiExecutionProvider"
-	}
+#[derive(Debug, Clone)]
+pub struct TensorRTExecutionProviderOptions {
+	pub device_id: u32,
+	pub max_workspace_size: u32,
+	pub max_partition_iterations: u32,
+	pub min_subgraph_size: u32,
+	pub fp16_enable: bool,
+	pub int8_enable: bool,
+	pub int8_calibration_table_name: String,
+	pub int8_use_native_calibration_table: bool,
+	pub dla_enable: bool,
+	pub dla_core: u32,
+	pub engine_cache_enable: bool,
+	pub engine_cache_path: String,
+	pub dump_subgraphs: bool,
+	pub force_sequential_engine_build: bool,
+	pub enable_context_memory_sharing: bool,
+	pub layer_norm_fp32_fallback: bool,
+	pub timing_cache_enable: bool,
+	pub force_timing_cache: bool,
+	pub detailed_build_log: bool,
+	pub enable_build_heuristics: bool,
+	pub enable_sparsity: bool,
+	pub builder_optimization_level: u8,
+	pub auxiliary_streams: i8,
+	pub tactic_sources: String,
+	pub extra_plugin_lib_paths: String,
+	pub profile_min_shapes: String,
+	pub profile_max_shapes: String,
+	pub profile_opt_shapes: String
+}
 
-	/// Returns `true` if this execution provider is available, `false` otherwise.
-	/// The CPU execution provider will always be available.
-	pub fn is_available(&self) -> bool {
-		let mut providers: *mut *mut c_char = std::ptr::null_mut();
-		let mut num_providers = 0;
-		if status_to_result(ortsys![unsafe GetAvailableProviders(&mut providers, &mut num_providers)]).is_err() {
-			return false;
+impl Default for TensorRTExecutionProviderOptions {
+	fn default() -> Self {
+		Self {
+			device_id: 0,
+			max_workspace_size: 1073741824,
+			max_partition_iterations: 1000,
+			min_subgraph_size: 1,
+			fp16_enable: false,
+			int8_enable: false,
+			int8_calibration_table_name: String::new(),
+			int8_use_native_calibration_table: false,
+			dla_enable: false,
+			dla_core: 0,
+			engine_cache_enable: false,
+			engine_cache_path: String::new(),
+			dump_subgraphs: false,
+			force_sequential_engine_build: false,
+			enable_context_memory_sharing: false,
+			layer_norm_fp32_fallback: false,
+			timing_cache_enable: false,
+			force_timing_cache: false,
+			detailed_build_log: false,
+			enable_build_heuristics: false,
+			enable_sparsity: false,
+			builder_optimization_level: 3,
+			auxiliary_streams: -1,
+			tactic_sources: String::new(),
+			extra_plugin_lib_paths: String::new(),
+			profile_min_shapes: String::new(),
+			profile_max_shapes: String::new(),
+			profile_opt_shapes: String::new()
 		}
+	}
+}
 
-		for i in 0..num_providers {
-			let avail = unsafe { std::ffi::CStr::from_ptr(*providers.offset(i as isize)) }
-				.to_string_lossy()
-				.into_owned();
-			if self.provider == avail {
-				let _ = ortsys![unsafe ReleaseAvailableProviders(providers, num_providers)];
-				return true;
-			}
+#[derive(Debug, Clone)]
+pub struct OpenVINOExecutionProviderOptions {
+	/// Overrides the accelerator hardware type and precision with these values at runtime. If this option is not
+	/// explicitly set, default hardware and precision specified during build time is used.
+	pub device_type: Option<String>,
+	/// Selects a particular hardware device for inference. If this option is not explicitly set, an arbitrary free
+	/// device will be automatically selected by OpenVINO runtime.
+	pub device_id: Option<String>,
+	/// Overrides the accelerator default value of number of threads with this value at runtime. If this option is not
+	/// explicitly set, default value of 8 is used during build time.
+	pub num_threads: usize,
+	/// Explicitly specify the path to save and load the blobs enabling model caching feature.
+	pub cache_dir: Option<String>,
+	/// This option is only alvailable when OpenVINO EP is built with OpenCL flags enabled. It takes in the remote
+	/// context i.e the `cl_context` address as a void pointer.
+	pub context: *mut c_void,
+	/// This option enables OpenCL queue throttling for GPU devices (reduces CPU utilization when using GPU).
+	pub enable_opencl_throttling: bool,
+	/// This option if enabled works for dynamic shaped models whose shape will be set dynamically based on the infer
+	/// input image/data shape at run time in CPU. This gives best result for running multiple inferences with varied
+	/// shaped images/data.
+	pub enable_dynamic_shapes: bool,
+	pub enable_vpu_fast_compile: bool
+}
+
+impl Default for OpenVINOExecutionProviderOptions {
+	fn default() -> Self {
+		Self {
+			device_type: None,
+			device_id: None,
+			num_threads: 8,
+			cache_dir: None,
+			context: std::ptr::null_mut(),
+			enable_opencl_throttling: false,
+			enable_dynamic_shapes: false,
+			enable_vpu_fast_compile: false
 		}
-
-		let _ = ortsys![unsafe ReleaseAvailableProviders(providers, num_providers)];
-		false
 	}
+}
 
-	/// Configure this execution provider with the given option name and value
-	pub fn with(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-		self.options.insert(name.into(), value.into());
-		self
-	}
+#[derive(Debug, Clone, Default)]
+pub struct OneDNNExecutionProviderOptions {
+	pub use_arena: bool
+}
 
-	ep_options! {
-		/// Whether or not to use the arena allocator.
-		///
-		/// Supported backends: CPU, ACL, oneDNN
-		pub fn with_use_arena(bool) = use_arena;
-		/// The device ID to initialize the execution provider on.
-		///
-		/// Supported backends: DirectML
-		pub fn with_device_id(i32) = device_id;
-		/// By default, the CoreML EP will be enabled for all compatible Apple devices. Setting this option will only
-		/// enable CoreML EP for Apple devices with a compatible Apple Neural Engine (ANE).
-		///
-		/// **Note**: Enabling this option does not guarantee the entire model to be executed using ANE only.
-		///
-		/// Supported backends: CoreML
-		pub fn with_ane_only(bool) = ane_only;
-		/// Enable fp16 relaxation. May improve performance, but can also slightly reduce precision.
-		///
-		/// Supported backends: NNAPI
-		pub fn with_fp16_relaxation(bool) = fp16_relaxation;
-		/// Prevents NNAPI from using CPU devices. NNAPI is more efficient using GPU or NPU for execution, and NNAPI
-		/// might fall back to its own CPU implementation for operations not supported by the GPU/NPU. However, the
-		/// CPU implementation of NNAPI might be less efficient than the optimized versions of operators provided by
-		/// ORT's default MLAS execution provider. It might be better to disable the NNAPI CPU fallback and instead
-		/// use MLAS kernels. This option is only available after Android API level 29.
-		///
-		/// Supported backends: NNAPI
-		pub fn with_cpu_disabled(bool) = cpu_disabled;
-	}
+#[derive(Debug, Clone, Default)]
+pub struct ACLExecutionProviderOptions {
+	pub use_arena: bool
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CoreMLExecutionProviderOptions {
+	/// Limit CoreML to running on CPU only. This may decrease the performance but will provide reference output value
+	/// without precision loss, which is useful for validation.
+	pub use_cpu_only: bool,
+	/// Enable CoreML EP to run on a subgraph in the body of a control flow operator (i.e. a Loop, Scan or If operator).
+	pub enable_on_subgraph: bool,
+	/// By default the CoreML EP will be enabled for all compatible Apple devices. Setting this option will only enable
+	/// CoreML EP for Apple devices with a compatible Apple Neural Engine (ANE). Note, enabling this option does not
+	/// guarantee the entire model to be executed using ANE only.
+	pub only_enable_device_with_ane: bool
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct DirectMLExecutionProviderOptions {
+	pub device_id: u32
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ROCmExecutionProviderOptions {
+	pub device_id: i32,
+	pub miopen_conv_exhaustive_search: bool,
+	pub gpu_mem_limit: size_t,
+	pub arena_extend_strategy: ArenaExtendStrategy,
+	pub do_copy_in_default_stream: bool,
+	pub user_compute_stream: Option<*mut c_void>,
+	pub default_memory_arena_cfg: Option<*mut sys::OrtArenaCfg>,
+	pub tunable_op_enable: bool,
+	pub tunable_op_tuning_enable: bool
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct NNAPIExecutionProviderOptions {
+	/// Use fp16 relaxation in NNAPI EP. This may improve performance but can also reduce accuracy due to the lower
+	/// precision.
+	pub use_fp16: bool,
+	/// Use the NCHW layout in NNAPI EP. This is only available for Android API level 29 and higher. Please note that
+	/// for now, NNAPI might have worse performance using NCHW compared to using NHWC.
+	pub use_nchw: bool,
+	/// Prevents NNAPI from using CPU devices. NNAPI is more efficient using GPU or NPU for execution, and NNAPI
+	/// might fall back to its own CPU implementation for operations not supported by the GPU/NPU. However, the
+	/// CPU implementation of NNAPI might be less efficient than the optimized versions of operators provided by
+	/// ORT's default MLAS execution provider. It might be better to disable the NNAPI CPU fallback and instead
+	/// use MLAS kernels. This option is only available after Android API level 29.
+	pub disable_cpu: bool,
+	/// Using CPU only in NNAPI EP, this may decrease the perf but will provide reference output value without precision
+	/// loss, which is useful for validation. This option is only available for Android API level 29 and higher, and
+	/// will be ignored for Android API level 28 and lower.
+	pub cpu_only: bool
 }
 
 macro_rules! get_ep_register {
@@ -162,166 +352,298 @@ macro_rules! get_ep_register {
 			match symbol {
 				Ok(symbol) => symbol,
 				Err(e) => {
-					tracing::error!("error trying to load symbol `{}` for execution provider registration: {}", stringify!($symbol), e.to_string());
-					continue;
+					return Err(OrtError::DlLoad { symbol: stringify!($symbol), error: e.to_string() });
 				}
 			}
 		};
 	};
 }
 
-#[tracing::instrument(skip_all)]
-pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, execution_providers: impl AsRef<[ExecutionProvider]>) {
-	let status_to_result_and_log = |ep: &'static str, status: *mut sys::OrtStatus| {
-		let result = status_to_result(status);
-		match &result {
-			Err(e) => match e {
-				OrtApiError::Msg(msg) => tracing::error!("{ep} execution provider registration failed: {msg}"),
-				OrtApiError::IntoStringError(_) => {
-					tracing::error!("{ep} execution provider registration failed catastrophically (could not convert error message into string)")
-				}
-			},
-			Ok(_) => tracing::info!("{ep} execution provider registered successfully")
+/// Execution provider container. See [the ONNX Runtime docs](https://onnxruntime.ai/docs/execution-providers/) for more
+/// info on execution providers. Execution providers are actually registered via the functions [`crate::SessionBuilder`]
+/// (per-session) or [`EnvBuilder`](crate::environment::EnvBuilder) (default for all sessions in an environment).
+#[derive(Debug, Clone)]
+pub enum ExecutionProvider {
+	CPU(CPUExecutionProviderOptions),
+	CUDA(CUDAExecutionProviderOptions),
+	TensorRT(TensorRTExecutionProviderOptions),
+	OpenVINO(OpenVINOExecutionProviderOptions),
+	ACL(ACLExecutionProviderOptions),
+	OneDNN(OneDNNExecutionProviderOptions),
+	CoreML(CoreMLExecutionProviderOptions),
+	DirectML(DirectMLExecutionProviderOptions),
+	ROCm(ROCmExecutionProviderOptions),
+	NNAPI(NNAPIExecutionProviderOptions)
+}
+
+macro_rules! map_keys {
+	($($fn_name:ident = $ex:expr),*) => {
+		{
+			let mut keys = Vec::<CString>::new();
+			let mut values = Vec::<CString>::new();
+			$(
+				keys.push(CString::new(stringify!($fn_name)).unwrap());
+				values.push(CString::new(($ex).to_string().as_str()).unwrap());
+			)*
+			assert_eq!(keys.len(), values.len()); // sanity check
+			let key_ptrs: Vec<*const c_char> = keys.iter().map(|k| k.as_ptr()).collect();
+			let value_ptrs: Vec<*const c_char> = values.iter().map(|v| v.as_ptr()).collect();
+			(key_ptrs, value_ptrs, keys.len(), keys, values)
 		}
-		result
 	};
-	for ep in execution_providers.as_ref() {
-		let init_args = ep.options.clone();
-		match ep.provider.as_str() {
-			"CPUExecutionProvider" => {
+}
+
+#[inline]
+fn bool_as_int(x: bool) -> i32 {
+	match x {
+		true => 1,
+		false => 0
+	}
+}
+
+impl ExecutionProvider {
+	pub fn as_str(&self) -> &'static str {
+		match self {
+			Self::CPU(_) => "CPUExecutionProvider",
+			Self::CUDA(_) => "CUDAExecutionProvider",
+			Self::TensorRT(_) => "TensorrtExecutionProvider",
+			Self::OpenVINO(_) => "OpenVINOExecutionProvider",
+			Self::ACL(_) => "AclExecutionProvider",
+			Self::OneDNN(_) => "DnnlExecutionProvider",
+			Self::CoreML(_) => "CoreMLExecutionProvider",
+			Self::DirectML(_) => "DmlExecutionProvider",
+			Self::ROCm(_) => "ROCmExecutionProvider",
+			Self::NNAPI(_) => "NnapiExecutionProvider"
+		}
+	}
+
+	/// Returns `true` if this execution provider is available, `false` otherwise.
+	/// The CPU execution provider will always be available.
+	pub fn is_available(&self) -> bool {
+		let mut providers: *mut *mut c_char = std::ptr::null_mut();
+		let mut num_providers = 0;
+		if status_to_result(ortsys![unsafe GetAvailableProviders(&mut providers, &mut num_providers)]).is_err() {
+			return false;
+		}
+
+		for i in 0..num_providers {
+			let avail = unsafe { std::ffi::CStr::from_ptr(*providers.offset(i as isize)) }
+				.to_string_lossy()
+				.into_owned();
+			if self.as_str() == avail {
+				let _ = ortsys![unsafe ReleaseAvailableProviders(providers, num_providers)];
+				return true;
+			}
+		}
+
+		let _ = ortsys![unsafe ReleaseAvailableProviders(providers, num_providers)];
+		false
+	}
+
+	pub(crate) fn apply(&self, session_options: *mut sys::OrtSessionOptions) -> OrtResult<()> {
+		match &self {
+			&Self::CPU(options) => {
 				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_CPU(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr);
-				unsafe {
-					let use_arena = init_args.get("use_arena").map_or(false, |s| s.parse::<bool>().unwrap_or(false));
-					let status = OrtSessionOptionsAppendExecutionProvider_CPU(options, use_arena.into());
-					if status_to_result_and_log("CPU", status).is_ok() {
-						continue; // EP found
-					}
-				};
+				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_CPU(session_options, options.use_arena.into()) })
+					.map_err(OrtError::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "cuda"))]
-			"CUDAExecutionProvider" => {
+			&Self::CUDA(options) => {
 				let mut cuda_options: *mut sys::OrtCUDAProviderOptionsV2 = std::ptr::null_mut();
-				if status_to_result_and_log("CUDA", ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)]).is_err() {
-					continue; // next EP
-				}
-				let keys: Vec<CString> = init_args.keys().map(|k| CString::new(k.as_str()).unwrap()).collect();
-				let values: Vec<CString> = init_args.values().map(|v| CString::new(v.as_str()).unwrap()).collect();
-				assert_eq!(keys.len(), values.len()); // sanity check
-				let key_ptrs: Vec<*const c_char> = keys.iter().map(|k| k.as_ptr()).collect();
-				let value_ptrs: Vec<*const c_char> = values.iter().map(|v| v.as_ptr()).collect();
-				let status = ortsys![unsafe UpdateCUDAProviderOptions(cuda_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), keys.len() as _)];
-				if status_to_result_and_log("CUDA", status).is_err() {
+				status_to_result(ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)]).map_err(OrtError::ExecutionProvider)?;
+				let (key_ptrs, value_ptrs, len, keys, values) = map_keys! {
+					device_id = options.device_id,
+					arena_extend_strategy = match options.arena_extend_strategy {
+						ArenaExtendStrategy::NextPowerOfTwo => "kNextPowerOfTwo",
+						ArenaExtendStrategy::SameAsRequested => "kSameAsRequested"
+					},
+					cudnn_conv_algo_search = match options.cudnn_conv_algo_search {
+						CUDAExecutionProviderCuDNNConvAlgoSearch::Exhaustive => "EXHAUSTIVE",
+						CUDAExecutionProviderCuDNNConvAlgoSearch::Heuristic => "HEURISTIC",
+						CUDAExecutionProviderCuDNNConvAlgoSearch::Default => "DEFAULT"
+					},
+					do_copy_in_default_stream = bool_as_int(options.do_copy_in_default_stream),
+					cudnn_conv_use_max_workspace = bool_as_int(options.cudnn_conv_use_max_workspace),
+					cudnn_conv1d_pad_to_nc1d = bool_as_int(options.cudnn_conv1d_pad_to_nc1d),
+					enable_cuda_graph = bool_as_int(options.enable_cuda_graph),
+					enable_skip_layer_norm_strict_mode = bool_as_int(options.enable_skip_layer_norm_strict_mode)
+				};
+				if let Err(e) = status_to_result(ortsys![unsafe UpdateCUDAProviderOptions(cuda_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), len as _)])
+					.map_err(OrtError::ExecutionProvider)
+				{
 					ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
-					continue; // next EP
+					std::mem::drop((keys, values));
+					return Err(e);
 				}
-				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(options, cuda_options)];
+
+				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(session_options, cuda_options)];
 				ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
-				if status_to_result_and_log("CUDA", status).is_ok() {
-					continue; // EP found
-				}
+				std::mem::drop((keys, values));
+				status_to_result(status).map_err(OrtError::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "tensorrt"))]
-			"TensorrtExecutionProvider" => {
-				let mut tensorrt_options: *mut sys::OrtTensorRTProviderOptionsV2 = std::ptr::null_mut();
-				if status_to_result_and_log("TensorRT", ortsys![unsafe CreateTensorRTProviderOptions(&mut tensorrt_options)]).is_err() {
-					continue; // next EP
+			&Self::TensorRT(options) => {
+				let mut trt_options: *mut sys::OrtTensorRTProviderOptionsV2 = std::ptr::null_mut();
+				status_to_result(ortsys![unsafe CreateTensorRTProviderOptions(&mut trt_options)]).map_err(OrtError::ExecutionProvider)?;
+				let (key_ptrs, value_ptrs, len, keys, values) = map_keys! {
+					device_id = options.device_id,
+					trt_max_workspace_size = options.max_workspace_size,
+					trt_max_partition_iterations = options.max_partition_iterations,
+					trt_min_subgraph_size = options.min_subgraph_size,
+					trt_fp16_enable = bool_as_int(options.fp16_enable),
+					trt_int8_enable = bool_as_int(options.int8_enable),
+					trt_int8_calibration_table_name = options.int8_calibration_table_name,
+					trt_dla_enable = bool_as_int(options.dla_enable),
+					trt_dla_core = options.dla_core,
+					trt_engine_cache_enable = bool_as_int(options.engine_cache_enable),
+					trt_engine_cache_path = options.engine_cache_path,
+					trt_dump_subgraphs = bool_as_int(options.dump_subgraphs),
+					trt_force_sequential_engine_build = bool_as_int(options.force_sequential_engine_build),
+					trt_context_memory_sharing_enable = bool_as_int(options.enable_context_memory_sharing),
+					trt_layer_norm_fp32_fallback = bool_as_int(options.layer_norm_fp32_fallback),
+					trt_timing_cache_enable = bool_as_int(options.timing_cache_enable),
+					trt_force_timing_cache = bool_as_int(options.force_timing_cache),
+					trt_detailed_build_log = bool_as_int(options.detailed_build_log),
+					trt_build_heuristics_enable = bool_as_int(options.enable_build_heuristics),
+					trt_sparsity_enable = bool_as_int(options.enable_sparsity),
+					trt_builder_optimization_level = options.builder_optimization_level,
+					trt_auxiliary_streams = options.auxiliary_streams,
+					trt_tactic_sources = options.tactic_sources,
+					trt_extra_plugin_lib_paths = options.extra_plugin_lib_paths,
+					trt_profile_min_shapes = options.profile_min_shapes,
+					trt_profile_max_shapes = options.profile_max_shapes,
+					trt_profile_opt_shapes = options.profile_opt_shapes
+				};
+				if let Err(e) = status_to_result(ortsys![unsafe UpdateTensorRTProviderOptions(trt_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), len as _)])
+					.map_err(OrtError::ExecutionProvider)
+				{
+					ortsys![unsafe ReleaseTensorRTProviderOptions(trt_options)];
+					std::mem::drop((keys, values));
+					return Err(e);
 				}
-				let keys: Vec<CString> = init_args.keys().map(|k| CString::new(k.as_str()).unwrap()).collect();
-				let values: Vec<CString> = init_args.values().map(|v| CString::new(v.as_str()).unwrap()).collect();
-				assert_eq!(keys.len(), values.len()); // sanity check
-				let key_ptrs: Vec<*const c_char> = keys.iter().map(|k| k.as_ptr()).collect();
-				let value_ptrs: Vec<*const c_char> = values.iter().map(|v| v.as_ptr()).collect();
-				let status = ortsys![unsafe UpdateTensorRTProviderOptions(tensorrt_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), keys.len() as _)];
-				if status_to_result_and_log("TensorRT", status).is_err() {
-					ortsys![unsafe ReleaseTensorRTProviderOptions(tensorrt_options)];
-					continue; // next EP
-				}
-				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_TensorRT_V2(options, tensorrt_options)];
-				ortsys![unsafe ReleaseTensorRTProviderOptions(tensorrt_options)];
-				if status_to_result_and_log("TensorRT", status).is_ok() {
-					continue; // EP found
-				}
+
+				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_TensorRT_V2(session_options, trt_options)];
+				ortsys![unsafe ReleaseTensorRTProviderOptions(trt_options)];
+				std::mem::drop((keys, values));
+				status_to_result(status).map_err(OrtError::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "acl"))]
-			"AclExecutionProvider" => {
+			&Self::ACL(options) => {
 				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr);
-				let use_arena = init_args.get("use_arena").map_or(false, |s| s.parse::<bool>().unwrap_or(false));
-				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_ACL(options, use_arena.into()) };
-				if status_to_result_and_log("ACL", status).is_ok() {
-					continue; // EP found
-				}
+				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_ACL(session_options, options.use_arena.into()) })
+					.map_err(OrtError::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "onednn"))]
-			"DnnlExecutionProvider" => {
+			&Self::OneDNN(options) => {
 				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Dnnl(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr);
-				let use_arena = init_args.get("use_arena").map_or(false, |s| s.parse::<bool>().unwrap_or(false));
-				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_Dnnl(options, use_arena.into()) };
-				if status_to_result_and_log("oneDNN", status).is_ok() {
-					continue; // EP found
-				}
+				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_Dnnl(session_options, options.use_arena.into()) })
+					.map_err(OrtError::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "coreml"))]
-			"CoreMLExecutionProvider" => {
+			&Self::CoreML(options) => {
 				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_CoreML(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr);
-				let mut coreml_flags = 0;
-				if init_args.get("ane_only").map_or(false, |s| s.parse::<bool>().unwrap_or(false)) {
-					coreml_flags |= 0x004; // COREML_FLAG_ONLY_ENABLE_DEVICE_WITH_ANE
+				let mut flags = 0;
+				if options.use_cpu_only {
+					flags |= 0x001;
 				}
-				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_CoreML(options, coreml_flags) };
-				if status_to_result_and_log("CoreML", status).is_ok() {
-					continue; // EP found
+				if options.enable_on_subgraph {
+					flags |= 0x002;
 				}
+				if options.only_enable_device_with_ane {
+					flags |= 0x004;
+				}
+				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_CoreML(session_options, flags) }).map_err(OrtError::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "directml"))]
-			"DmlExecutionProvider" => {
+			&Self::DirectML(options) => {
 				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_DML(options: *mut sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> sys::OrtStatusPtr);
-				let device_id = init_args.get("device_id").map_or(0, |s| s.parse::<i32>().unwrap_or(0));
-				// TODO: extended options with OrtSessionOptionsAppendExecutionProviderEx_DML
-				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_DML(options, device_id) };
-				if status_to_result_and_log("DirectML", status).is_ok() {
-					continue; // EP found
-				}
+				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_DML(session_options, options.device_id as _) })
+					.map_err(OrtError::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "rocm"))]
-			"ROCmExecutionProvider" => {
-				#[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
-				let gpu_mem_limit = std::os::raw::c_ulong::MAX;
-				#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-				let gpu_mem_limit = usize::MAX;
+			&Self::ROCm(options) => {
 				let rocm_options = sys::OrtROCMProviderOptions {
-					device_id: 0,
-					miopen_conv_exhaustive_search: 0,
-					gpu_mem_limit,
-					arena_extend_strategy: 0,
-					do_copy_in_default_stream: 1,
-					has_user_compute_stream: 0,
-					user_compute_stream: std::ptr::null_mut(),
-					default_memory_arena_cfg: std::ptr::null_mut(),
-					tunable_op_enabled: 0
+					device_id: options.device_id,
+					miopen_conv_exhaustive_search: bool_as_int(options.miopen_conv_exhaustive_search),
+					gpu_mem_limit: options.gpu_mem_limit as _,
+					arena_extend_strategy: match options.arena_extend_strategy {
+						ArenaExtendStrategy::NextPowerOfTwo => 0,
+						ArenaExtendStrategy::SameAsRequested => 1
+					},
+					do_copy_in_default_stream: bool_as_int(options.do_copy_in_default_stream),
+					has_user_compute_stream: bool_as_int(options.user_compute_stream.is_some()),
+					user_compute_stream: options.user_compute_stream.unwrap_or(ptr::null_mut()),
+					default_memory_arena_cfg: options.default_memory_arena_cfg.unwrap_or(ptr::null_mut()),
+					tunable_op_enable: bool_as_int(options.tunable_op_enable),
+					tunable_op_tuning_enable: bool_as_int(options.tunable_op_tuning_enable)
 				};
-				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(options, &rocm_options)];
-				if status_to_result_and_log("ROCm", status).is_ok() {
-					continue; // EP found
-				}
+				status_to_result(ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(session_options, &rocm_options as *const _)])
+					.map_err(OrtError::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "nnapi"))]
-			"NnapiExecutionProvider" => {
+			&Self::NNAPI(options) => {
 				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr);
-				let mut nnapi_flags = 0;
-				if init_args.get("fp16_relaxation").map_or(false, |s| s.parse::<bool>().unwrap_or(false)) {
-					nnapi_flags |= 0x001; // NNAPI_FLAG_USE_FP16
+				let mut flags = 0;
+				if options.use_fp16 {
+					flags |= 0x001;
 				}
-				if init_args.get("cpu_disabled").map_or(false, |s| s.parse::<bool>().unwrap_or(false)) {
-					nnapi_flags |= 0x004; // NNAPI_FLAG_CPU_DISABLED
+				if options.use_nchw {
+					flags |= 0x002;
 				}
-				let status = unsafe { OrtSessionOptionsAppendExecutionProvider_Nnapi(options, nnapi_flags) };
-				if status_to_result_and_log("NNAPI", status).is_ok() {
-					continue; // EP found
+				if options.disable_cpu {
+					flags |= 0x004;
 				}
+				if options.cpu_only {
+					flags |= 0x008;
+				}
+				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_Nnapi(session_options, flags) }).map_err(OrtError::ExecutionProvider)?;
 			}
-			ep => {
-				tracing::warn!("`ort` was not compiled to enable {ep} - you may be missing a Cargo feature to enable it.");
+			#[cfg(any(feature = "load-dynamic", feature = "openvino"))]
+			&Self::OpenVINO(options) => {
+				let openvino_options = sys::OrtOpenVINOProviderOptions {
+					device_type: options
+						.device_type
+						.clone()
+						.map(|x| x.as_bytes().as_ptr() as *const c_char)
+						.unwrap_or_else(ptr::null),
+					device_id: options
+						.device_id
+						.clone()
+						.map(|x| x.as_bytes().as_ptr() as *const c_char)
+						.unwrap_or_else(ptr::null),
+					num_of_threads: options.num_threads,
+					cache_dir: options
+						.cache_dir
+						.clone()
+						.map(|x| x.as_bytes().as_ptr() as *const c_char)
+						.unwrap_or_else(ptr::null),
+					context: options.context,
+					enable_opencl_throttling: bool_as_int(options.enable_opencl_throttling) as _,
+					enable_dynamic_shapes: bool_as_int(options.enable_dynamic_shapes) as _,
+					enable_vpu_fast_compile: bool_as_int(options.enable_vpu_fast_compile) as _
+				};
+				status_to_result(ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO(session_options, &openvino_options as *const _)])
+					.map_err(OrtError::ExecutionProvider)?;
 			}
-		};
+			_ => return Err(OrtError::ExecutionProviderNotRegistered(self.as_str()))
+		}
+		Ok(())
 	}
+}
+
+#[tracing::instrument(skip_all)]
+pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, execution_providers: impl AsRef<[ExecutionProvider]>) {
+	for ex in execution_providers.as_ref() {
+		if let Err(e) = ex.apply(options) {
+			if let &OrtError::ExecutionProviderNotRegistered(_) = &e {
+				tracing::debug!("{}", e);
+			} else {
+				tracing::warn!("An error occurred when attempting to register `{}`: {e}", ex.as_str());
+			}
+		} else {
+			tracing::info!("Successfully registered `{}`", ex.as_str());
+			return;
+		}
+	}
+	tracing::warn!("No execution providers registered successfully. Falling back to CPU.");
 }

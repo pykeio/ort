@@ -4,11 +4,13 @@ pub mod download;
 pub mod environment;
 pub mod error;
 pub mod execution_providers;
+pub mod io_binding;
 pub mod memory;
 pub mod metadata;
 pub mod session;
 pub mod sys;
 pub mod tensor;
+pub mod value;
 
 use std::{
 	ffi::{self, CStr},
@@ -23,8 +25,11 @@ use tracing::warn;
 pub use self::environment::Environment;
 pub use self::error::{OrtApiError, OrtError, OrtResult};
 pub use self::execution_providers::ExecutionProvider;
+pub use self::io_binding::IoBinding;
+pub use self::memory::{AllocationDevice, MemoryInfo};
 pub use self::session::{InMemorySession, Session, SessionBuilder};
-use self::sys::OnnxEnumInt;
+pub use self::tensor::NdArrayExtensions;
+pub use self::value::Value;
 
 #[cfg(not(all(target_arch = "x86", target_os = "windows")))]
 macro_rules! extern_system_fn {
@@ -93,17 +98,17 @@ lazy_static! {
 			let version_string = get_version_string();
 			let version_string = CStr::from_ptr(version_string).to_string_lossy();
 			let lib_minor_version = version_string.split('.').nth(1).map(|x| x.parse::<u32>().unwrap_or(0)).unwrap_or(0);
-			if lib_minor_version < 14 {
-				panic!(
+			match lib_minor_version.cmp(&14) {
+				std::cmp::Ordering::Less => panic!(
 					"ort 1.14 is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.14.x', but got '{version_string}'",
 					**G_ORT_DYLIB_PATH
-				);
-			} else if lib_minor_version > 14 {
-				warn!(
+				),
+				std::cmp::Ordering::Greater => warn!(
 					"ort 1.14 may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.14.x', but got '{version_string}'",
 					**G_ORT_DYLIB_PATH
-				);
-			}
+				),
+				std::cmp::Ordering::Equal => {}
+			};
 			let get_api: extern_system_fn! { unsafe fn(u32) -> *const sys::OrtApi } = (*base).GetApi.unwrap();
 			let api: *const sys::OrtApi = get_api(sys::ORT_API_VERSION);
 			Arc::new(Mutex::new(AtomicPtr::new(api as *mut sys::OrtApi)))
@@ -219,12 +224,11 @@ extern_system_fn! {
 		use tracing::{span, Level, trace, debug, warn, info, error};
 
 		let log_level = match severity {
-			sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_VERBOSE => Level::TRACE,
-			sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_INFO => Level::DEBUG,
-			sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_WARNING => Level::INFO,
-			sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_ERROR => Level::WARN,
-			sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_FATAL => Level::ERROR,
-			_ => Level::TRACE
+			sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE => Level::TRACE,
+			sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_INFO => Level::DEBUG,
+			sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING => Level::INFO,
+			sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_ERROR => Level::WARN,
+			sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_FATAL => Level::ERROR
 		};
 
 		assert_ne!(category, ptr::null());
@@ -260,29 +264,27 @@ extern_system_fn! {
 
 /// The minimum logging level. Logs will be handled by the `tracing` crate.
 #[derive(Debug)]
-#[cfg_attr(not(windows), repr(u32))]
-#[cfg_attr(windows, repr(i32))]
 pub enum LoggingLevel {
 	/// Verbose logging level. This will log *a lot* of messages!
-	Verbose = sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_VERBOSE as OnnxEnumInt,
+	Verbose,
 	/// Info logging level.
-	Info = sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_INFO as OnnxEnumInt,
+	Info,
 	/// Warning logging level. Recommended to receive potentially important warnings.
-	Warning = sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_WARNING as OnnxEnumInt,
+	Warning,
 	/// Error logging level.
-	Error = sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_ERROR as OnnxEnumInt,
+	Error,
 	/// Fatal logging level.
-	Fatal = sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_FATAL as OnnxEnumInt
+	Fatal
 }
 
 impl From<LoggingLevel> for sys::OrtLoggingLevel {
 	fn from(logging_level: LoggingLevel) -> Self {
 		match logging_level {
-			LoggingLevel::Verbose => sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_VERBOSE,
-			LoggingLevel::Info => sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_INFO,
-			LoggingLevel::Warning => sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_WARNING,
-			LoggingLevel::Error => sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_ERROR,
-			LoggingLevel::Fatal => sys::OrtLoggingLevel_ORT_LOGGING_LEVEL_FATAL
+			LoggingLevel::Verbose => sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
+			LoggingLevel::Info => sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_INFO,
+			LoggingLevel::Warning => sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING,
+			LoggingLevel::Error => sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_ERROR,
+			LoggingLevel::Fatal => sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_FATAL
 		}
 	}
 }
@@ -317,11 +319,9 @@ impl From<LoggingLevel> for sys::OrtLoggingLevel {
 ///   when the offline model is saved. For example, if model has layout optimized for AVX2, the offline model would
 ///   require CPUs that support AVX2.
 #[derive(Debug)]
-#[cfg_attr(not(windows), repr(u32))]
-#[cfg_attr(windows, repr(i32))]
 pub enum GraphOptimizationLevel {
 	/// Disables all graph optimizations.
-	Disable = sys::GraphOptimizationLevel_ORT_DISABLE_ALL as OnnxEnumInt,
+	Disable,
 	/// Level 1 includes semantics-preserving graph rewrites which remove redundant nodes and redundant computation.
 	/// They run before graph partitioning and thus apply to all the execution providers. Available basic/level 1 graph
 	/// optimizations are as follows:
@@ -342,7 +342,7 @@ pub enum GraphOptimizationLevel {
 	///   * Conv BatchNorm Fusion
 	///   * Relu Clip Fusion
 	///   * Reshape Fusion
-	Level1 = sys::GraphOptimizationLevel_ORT_ENABLE_BASIC as OnnxEnumInt,
+	Level1,
 	#[rustfmt::skip]
 	/// Level 2 optimizations include complex node fusions. They are run after graph partitioning and are only applied to
 	/// the nodes assigned to the CPU or CUDA execution provider. Available extended/level 2 graph optimizations are as follows:
@@ -363,52 +363,50 @@ pub enum GraphOptimizationLevel {
 	/// > **NOTE**: To optimize performance of the BERT model, approximation is used in GELU Approximation and Attention
 	/// Fusion for the CUDA execution provider. The impact on accuracy is negligible based on our evaluation; F1 score
 	/// for a BERT model on SQuAD v1.1 is almost the same (87.05 vs 87.03).
-	Level2 = sys::GraphOptimizationLevel_ORT_ENABLE_EXTENDED as OnnxEnumInt,
+	Level2,
 	/// Level 3 optimizations include memory layout optimizations, which may optimize the graph to use the NCHWc memory
 	/// layout rather than NCHW to improve spatial locality for some targets.
-	Level3 = sys::GraphOptimizationLevel_ORT_ENABLE_ALL as OnnxEnumInt
+	Level3
 }
 
 impl From<GraphOptimizationLevel> for sys::GraphOptimizationLevel {
 	fn from(val: GraphOptimizationLevel) -> Self {
 		match val {
-			GraphOptimizationLevel::Disable => sys::GraphOptimizationLevel_ORT_DISABLE_ALL,
-			GraphOptimizationLevel::Level1 => sys::GraphOptimizationLevel_ORT_ENABLE_BASIC,
-			GraphOptimizationLevel::Level2 => sys::GraphOptimizationLevel_ORT_ENABLE_EXTENDED,
-			GraphOptimizationLevel::Level3 => sys::GraphOptimizationLevel_ORT_ENABLE_ALL
+			GraphOptimizationLevel::Disable => sys::GraphOptimizationLevel::ORT_DISABLE_ALL,
+			GraphOptimizationLevel::Level1 => sys::GraphOptimizationLevel::ORT_ENABLE_BASIC,
+			GraphOptimizationLevel::Level2 => sys::GraphOptimizationLevel::ORT_ENABLE_EXTENDED,
+			GraphOptimizationLevel::Level3 => sys::GraphOptimizationLevel::ORT_ENABLE_ALL
 		}
 	}
 }
 
 /// Execution provider allocator type.
-#[derive(Debug, Clone)]
-#[repr(i32)]
+#[derive(Debug, Copy, Clone)]
 pub enum AllocatorType {
 	/// Default device-specific allocator.
-	Device = sys::OrtAllocatorType_OrtDeviceAllocator,
+	Device,
 	/// Arena allocator.
-	Arena = sys::OrtAllocatorType_OrtArenaAllocator
+	Arena
 }
 
 impl From<AllocatorType> for sys::OrtAllocatorType {
 	fn from(val: AllocatorType) -> Self {
 		match val {
-			AllocatorType::Device => sys::OrtAllocatorType_OrtDeviceAllocator,
-			AllocatorType::Arena => sys::OrtAllocatorType_OrtArenaAllocator
+			AllocatorType::Device => sys::OrtAllocatorType::OrtDeviceAllocator,
+			AllocatorType::Arena => sys::OrtAllocatorType::OrtArenaAllocator
 		}
 	}
 }
 
 /// Memory types for allocated memory.
-#[derive(Debug, Clone)]
-#[repr(i32)]
+#[derive(Debug, Copy, Clone)]
 pub enum MemType {
 	/// Any CPU memory used by non-CPU execution provider.
-	CPUInput = sys::OrtMemType_OrtMemTypeCPUInput,
+	CPUInput,
 	/// CPU accessible memory outputted by non-CPU execution provider, i.e. CUDA_PINNED.
-	CPUOutput = sys::OrtMemType_OrtMemTypeCPUOutput,
+	CPUOutput,
 	/// The default allocator for an execution provider.
-	Default = sys::OrtMemType_OrtMemTypeDefault
+	Default
 }
 
 impl MemType {
@@ -419,9 +417,9 @@ impl MemType {
 impl From<MemType> for sys::OrtMemType {
 	fn from(val: MemType) -> Self {
 		match val {
-			MemType::CPUInput => sys::OrtMemType_OrtMemTypeCPUInput,
-			MemType::CPUOutput => sys::OrtMemType_OrtMemTypeCPUOutput,
-			MemType::Default => sys::OrtMemType_OrtMemTypeDefault
+			MemType::CPUInput => sys::OrtMemType::OrtMemTypeCPUInput,
+			MemType::CPUOutput => sys::OrtMemType::OrtMemTypeCPUOutput,
+			MemType::Default => sys::OrtMemType::OrtMemTypeDefault
 		}
 	}
 }

@@ -38,7 +38,7 @@ jobs:
       - name: Run tests
         # do not run doctests until rust-lang/cargo#10469 is merged
         run: |
-          cargo test --verbose --lib
+          cargo test --verbose --lib --features fetch-models
   cross-compile:
     name: Cross-platform compile
     runs-on: ${{ matrix.platform.os }}
@@ -55,9 +55,6 @@ jobs:
           - target: x86_64-apple-darwin
             os: macos-latest
             command: test
-          - target: aarch64-pc-windows-msvc
-            os: windows-latest
-            command: build
     steps:
       - uses: actions/checkout@v3
       - name: Fix ring dependency for Windows ARM64
@@ -77,3 +74,6 @@ jobs:
         with:
           command: ${{ matrix.platform.command }}
           target: ${{ matrix.platform.target }}
+          args: "--features fetch-models"
+        env:
+          LC_ALL: C

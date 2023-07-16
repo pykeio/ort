@@ -3,10 +3,10 @@
 	<h1>Rust bindings for ONNX Runtime</h1>
     <a href="https://app.codecov.io/gh/pykeio/ort" target="_blank"><img alt="Coverage Results" src="https://img.shields.io/codecov/c/gh/pykeio/ort?style=for-the-badge"></a> <a href="https://github.com/pykeio/ort/actions/workflows/test.yml"><img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/pykeio/ort/test.yml?branch=main&style=for-the-badge"></a> <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/d/ort?style=for-the-badge"></a>
     <br />
-    <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/v/ort?style=for-the-badge&label=ort&logo=rust"></a> <img alt="ONNX Runtime" src="https://img.shields.io/badge/onnxruntime-v1.14.1-blue?style=for-the-badge&logo=cplusplus">
+    <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/v/ort?style=for-the-badge&label=ort&logo=rust"></a> <img alt="ONNX Runtime" src="https://img.shields.io/badge/onnxruntime-v1.15.1-blue?style=for-the-badge&logo=cplusplus">
 </div>
 
-`ort` is an (unofficial) [ONNX Runtime](https://onnxruntime.ai/) 1.14 wrapper for Rust based on the now inactive [`onnxruntime-rs`](https://github.com/nbigaouette/onnxruntime-rs). ONNX Runtime accelerates ML inference on both CPU & GPU.
+`ort` is an (unofficial) [ONNX Runtime](https://onnxruntime.ai/) 1.15 wrapper for Rust based on the now inactive [`onnxruntime-rs`](https://github.com/nbigaouette/onnxruntime-rs). ONNX Runtime accelerates ML inference on both CPU & GPU.
 
 See [the docs](https://docs.rs/ort) for more detailed information and the [`examples`](https://github.com/pykeio/ort/tree/main/examples). If you have any questions, feel free to ask in the [`#💬｜ort-discussions` and related channels in the pyke Discord server](https://discord.gg/uQtsNu2xMa) or in [GitHub Discussions](https://github.com/pykeio/ort/discussions).
 
@@ -25,10 +25,10 @@ See [the docs](https://docs.rs/ort) for more detailed information and the [`exam
 ## Feature comparison
 | Feature comparison     | **📕 ort** | **📗 [ors](https://github.com/HaoboGu/ors)** | **🪟 [onnxruntime-rs](https://github.com/microsoft/onnxruntime/tree/main/rust)** |
 |------------------------|-----------|-----------|----------------------|
-| Upstream version       | **v1.14.1** | v1.12.0 | v1.8               |
+| Upstream version       | **v1.15.1** | v1.12.0 | v1.8               |
 | `dlopen()`?            | ✅         | ✅         | ❌                    |
 | Execution providers?   | ✅         | ❌         | ❌                    |
-| IOBinding?             | ❌ WIP     | ❌         | ❌                    |
+| IOBinding?             | ✅         | ❌         | ❌                    |
 | String tensors?        | ✅         | ❌         | ⚠️ input only         |
 | Multiple output types? | ✅         | ✅         | ❌                    |
 | Multiple input types?  | ✅         | ✅         | ❌                    |
@@ -37,14 +37,14 @@ See [the docs](https://docs.rs/ort) for more detailed information and the [`exam
 ## Cargo features
 > **Note:**
 > For developers using `ort` in a **library** (if you are developing an *app*, you can skip this part), it is heavily recommended to use `default-features = false` to avoid bringing in unnecessary bloat.
-> Cargo features are **additive**. Users of a library that requires `ort` with default features enabled **will not be able to remove those features**, and if the library isn't using them, it's just adding unnecessary bloat. This is especially true for the `fetch-models` feature, which you should almost never use in production.
-> Instead, you should enable `ort`'s default features in your *dev dependencies only*, and instruct downstream users to include `ort = { version = "...", features = [ "download-binaries" ] }` in their dependencies if they need it.
+> Cargo features are **additive**. Users of a library that requires `ort` with default features enabled **will not be able to remove those features**, and if the library isn't using them, it's just adding unnecessary bloat and inflating compile times.
+> Instead, you should enable `ort`'s default features in your *dev dependencies only*.
+> Disabling default features will disable `download-binaries`, so you should instruct downstream users to include `ort = { version = "...", features = [ "download-binaries" ] }` in their dependencies if they need it.
 
-- **`fetch-models` (default)**: Enables fetching models from the ONNX Model Zoo. Useful for quick testing with some common models like YOLOv4, GPT-2, and ResNet. Not recommended in production.
 - **`download-binaries` (default)**: Enables downloading binaries via the `download` [strategy](#strategies). If disabled, the default behavior will be the `system` strategy.
 - **`copy-dylibs` (default)**: Copies the dynamic libraries to the Cargo build folder - see [shared library hell](#shared-library-hell).
 - **`half` (default)**: Enables support for using `float16`/`bfloat16` tensors in Rust.
-- **`generate-bindings`**: Update the bindings to ONNX Runtime using `bindgen`. Requires [libclang](https://clang.llvm.org/doxygen/group__CINDEX.html).
+- **`fetch-models`**: Enables fetching models from the ONNX Model Zoo. Useful for quick testing with some common models like YOLOv4, GPT-2, and ResNet. Not recommended in production.
 - **`load-dynamic`**: Loads the ONNX Runtime binaries at runtime via `dlopen()` without a link dependency on them. The path to the binary can be controlled with the environment variable `ORT_DYLIB_PATH=/path/to/libonnxruntime.so`. This is heavily recommended, as it mitigates the [shared library hell](#shared-library-hell).
 
 ## How to get binaries
@@ -63,15 +63,15 @@ To use other execution providers, you must explicitly enable them via their Carg
 
 - ✅ **`cuda`**: Enables the CUDA execution provider for Maxwell (7xx) NVIDIA GPUs and above. Requires CUDA v11.6+.
 - ✅ **`tensorrt`**: Enables the TensorRT execution provider for GeForce 9xx series NVIDIA GPUs and above; requires CUDA v11.4+ and TensorRT v8.4+.
-- ⚠️ **`openvino`**: Enables the OpenVINO execution provider for 6th+ generation Intel Core CPUs.
+- ✅ **`openvino`**: Enables the OpenVINO execution provider for 6th+ generation Intel Core CPUs.
 - ✅ **`onednn`**: Enables the Intel oneDNN execution provider for x86/x64 targets.
 - ✅ **`directml`**: Enables the DirectML execution provider for Windows x86/x64 targets with dedicated GPUs supporting DirectX 12.
 - ⚠️ **`snpe`**: Enables the SNPE execution provider for Qualcomm Snapdragon CPUs & Adreno GPUs.
-- ⚠️ **`nnapi`**: Enables the Android Neural Networks API (NNAPI) execution provider.
+- ❓ **`nnapi`**: Enables the Android Neural Networks API (NNAPI) execution provider. (needs testing - [#45](https://github.com/pykeio/ort/issues/45))
 - ✅ **`coreml`**: Enables the CoreML execution provider for macOS/iOS targets.
 - ⚠️ **`xnnpack`**: Enables the [XNNPACK](https://github.com/google/XNNPACK) backend for WebAssembly and Android.
 - ⚠️ **`migraphx`**: Enables the MIGraphX execution provider AMD GPUs.
-- ⚠️ **`rocm`**: Enables the ROCm execution provider for AMD ROCm-enabled GPUs. ([#16](https://github.com/pykeio/ort/issues/16))
+- ❓ **`rocm`**: Enables the ROCm execution provider for AMD ROCm-enabled GPUs. ([#16](https://github.com/pykeio/ort/issues/16))
 - ✅ **`acl`**: Enables the ARM Compute Library execution provider for multi-core ARM v8 processors.
 - ⚠️ **`armnn`**: Enables the ArmNN execution provider for ARM v8 targets.
 - ⚠️ **`tvm`**: Enables the **preview** Apache TVM execution provider.

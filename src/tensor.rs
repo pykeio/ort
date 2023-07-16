@@ -16,86 +16,99 @@
 
 pub mod ndarray_tensor;
 pub mod ort_owned_tensor;
-pub mod ort_tensor;
-pub mod type_dynamic_tensor;
 
-use std::{ffi, fmt, ptr, rc, result, string};
+use std::{ffi, fmt, ptr, result, string};
 
-pub use ort_owned_tensor::{DynOrtTensor, OrtOwnedTensor};
-pub use ort_tensor::OrtTensor;
-pub use type_dynamic_tensor::FromArray;
-pub use type_dynamic_tensor::InputTensor;
-
-use super::{
-	ortsys,
-	sys::{self as sys, OnnxEnumInt},
-	tensor::ort_owned_tensor::TensorPointerHolder,
-	OrtError, OrtResult
-};
+pub use self::ndarray_tensor::NdArrayExtensions;
+pub use self::ort_owned_tensor::OrtOwnedTensor;
+use super::{ortsys, sys, OrtError, OrtResult};
 
 /// Enum mapping ONNX Runtime's supported tensor data types.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-#[cfg_attr(not(windows), repr(u32))]
-#[cfg_attr(windows, repr(i32))]
 pub enum TensorElementDataType {
 	/// 32-bit floating point number, equivalent to Rust's `f32`.
-	Float32 = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT as OnnxEnumInt,
+	Float32,
 	/// Unsigned 8-bit integer, equivalent to Rust's `u8`.
-	Uint8 = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8 as OnnxEnumInt,
+	Uint8,
 	/// Signed 8-bit integer, equivalent to Rust's `i8`.
-	Int8 = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8 as OnnxEnumInt,
+	Int8,
 	/// Unsigned 16-bit integer, equivalent to Rust's `u16`.
-	Uint16 = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16 as OnnxEnumInt,
+	Uint16,
 	/// Signed 16-bit integer, equivalent to Rust's `i16`.
-	Int16 = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16 as OnnxEnumInt,
+	Int16,
 	/// Signed 32-bit integer, equivalent to Rust's `i32`.
-	Int32 = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32 as OnnxEnumInt,
+	Int32,
 	/// Signed 64-bit integer, equivalent to Rust's `i64`.
-	Int64 = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64 as OnnxEnumInt,
+	Int64,
 	/// String, equivalent to Rust's `String`.
-	String = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING as OnnxEnumInt,
+	String,
 	/// Boolean, equivalent to Rust's `bool`.
-	Bool = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL as OnnxEnumInt,
+	Bool,
 	/// 16-bit floating point number, equivalent to `half::f16` (requires the `half` crate).
 	#[cfg(feature = "half")]
-	Float16 = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16 as OnnxEnumInt,
+	Float16,
 	/// 64-bit floating point number, equivalent to Rust's `f64`. Also known as `double`.
-	Float64 = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE as OnnxEnumInt,
+	Float64,
 	/// Unsigned 32-bit integer, equivalent to Rust's `u32`.
-	Uint32 = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32 as OnnxEnumInt,
+	Uint32,
 	/// Unsigned 64-bit integer, equivalent to Rust's `u64`.
-	Uint64 = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64 as OnnxEnumInt,
+	Uint64,
 	// /// Complex 64-bit floating point number, equivalent to Rust's `num_complex::Complex<f64>`.
-	// Complex64 = sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX64 as OnnxEnumInt,
+	// Complex64,
 	// TODO: `num_complex` crate doesn't support i128 provided by the `decimal` crate.
 	// /// Complex 128-bit floating point number, equivalent to Rust's `num_complex::Complex<f128>`.
-	// Complex128 = sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX128 as OnnxEnumInt,
+	// Complex128,
 	/// Brain 16-bit floating point number, equivalent to `half::bf16` (requires the `half` crate).
 	#[cfg(feature = "half")]
-	Bfloat16 = sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16 as OnnxEnumInt
+	Bfloat16
 }
 
 impl From<TensorElementDataType> for sys::ONNXTensorElementDataType {
 	fn from(val: TensorElementDataType) -> Self {
 		match val {
-			TensorElementDataType::Float32 => sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
-			TensorElementDataType::Uint8 => sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8,
-			TensorElementDataType::Int8 => sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8,
-			TensorElementDataType::Uint16 => sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16,
-			TensorElementDataType::Int16 => sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16,
-			TensorElementDataType::Int32 => sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32,
-			TensorElementDataType::Int64 => sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
-			TensorElementDataType::String => sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING,
-			TensorElementDataType::Bool => sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL,
+			TensorElementDataType::Float32 => sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
+			TensorElementDataType::Uint8 => sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8,
+			TensorElementDataType::Int8 => sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8,
+			TensorElementDataType::Uint16 => sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16,
+			TensorElementDataType::Int16 => sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16,
+			TensorElementDataType::Int32 => sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32,
+			TensorElementDataType::Int64 => sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
+			TensorElementDataType::String => sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING,
+			TensorElementDataType::Bool => sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL,
 			#[cfg(feature = "half")]
-			TensorElementDataType::Float16 => sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16,
-			TensorElementDataType::Float64 => sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE,
-			TensorElementDataType::Uint32 => sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32,
-			TensorElementDataType::Uint64 => sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64,
+			TensorElementDataType::Float16 => sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16,
+			TensorElementDataType::Float64 => sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE,
+			TensorElementDataType::Uint32 => sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32,
+			TensorElementDataType::Uint64 => sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64,
 			// TensorElementDataType::Complex64 => sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX64,
 			// TensorElementDataType::Complex128 => sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX128,
 			#[cfg(feature = "half")]
-			TensorElementDataType::Bfloat16 => sys::ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16
+			TensorElementDataType::Bfloat16 => sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16
+		}
+	}
+}
+impl From<sys::ONNXTensorElementDataType> for TensorElementDataType {
+	fn from(val: sys::ONNXTensorElementDataType) -> Self {
+		match val {
+			sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT => TensorElementDataType::Float32,
+			sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8 => TensorElementDataType::Uint8,
+			sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8 => TensorElementDataType::Int8,
+			sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16 => TensorElementDataType::Uint16,
+			sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16 => TensorElementDataType::Int16,
+			sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32 => TensorElementDataType::Int32,
+			sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64 => TensorElementDataType::Int64,
+			sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING => TensorElementDataType::String,
+			sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL => TensorElementDataType::Bool,
+			#[cfg(feature = "half")]
+			sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16 => TensorElementDataType::Float16,
+			sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE => TensorElementDataType::Float64,
+			sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32 => TensorElementDataType::Uint32,
+			sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64 => TensorElementDataType::Uint64,
+			// sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX64 => TensorElementDataType::Complex64,
+			// sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX128 => TensorElementDataType::Complex128,
+			#[cfg(feature = "half")]
+			sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16 => TensorElementDataType::Bfloat16,
+			_ => panic!("Invalid ONNXTensorElementDataType value")
 		}
 	}
 }
@@ -180,7 +193,7 @@ pub trait TensorDataToType: Sized + fmt::Debug + Clone {
 	fn tensor_element_data_type() -> TensorElementDataType;
 
 	/// Extract an `ArrayView` from the ORT-owned tensor.
-	fn extract_data<'t, D>(shape: D, tensor_element_len: usize, tensor_ptr: rc::Rc<TensorPointerHolder>) -> OrtResult<TensorData<'t, Self, D>>
+	fn extract_data<'t, D>(shape: D, tensor_element_len: usize, tensor_ptr: *mut sys::OrtValue) -> OrtResult<TensorData<'t, Self, D>>
 	where
 		D: ndarray::Dimension;
 }
@@ -198,7 +211,7 @@ where
 	/// primitive numeric types.
 	TensorPtr {
 		/// The pointer ONNX Runtime produced. Kept alive so that `array_view` is valid.
-		ptr: rc::Rc<TensorPointerHolder>,
+		ptr: *mut sys::OrtValue,
 		/// A view into `ptr`.
 		array_view: ndarray::ArrayView<'t, T, D>
 	},
@@ -219,11 +232,11 @@ macro_rules! impl_prim_type_from_ort_trait {
 				TensorElementDataType::$variant
 			}
 
-			fn extract_data<'t, D>(shape: D, _tensor_element_len: usize, tensor_ptr: rc::Rc<TensorPointerHolder>) -> OrtResult<TensorData<'t, Self, D>>
+			fn extract_data<'t, D>(shape: D, _tensor_element_len: usize, tensor_ptr: *mut sys::OrtValue) -> OrtResult<TensorData<'t, Self, D>>
 			where
 				D: ndarray::Dimension
 			{
-				extract_primitive_array(shape, tensor_ptr.tensor_ptr).map(|v| TensorData::TensorPtr { ptr: tensor_ptr, array_view: v })
+				extract_primitive_array(shape, tensor_ptr).map(|v| TensorData::TensorPtr { ptr: tensor_ptr, array_view: v })
 			}
 		}
 	};
@@ -268,14 +281,11 @@ impl TensorDataToType for String {
 		TensorElementDataType::String
 	}
 
-	fn extract_data<'t, D: ndarray::Dimension>(
-		shape: D,
-		tensor_element_len: usize,
-		tensor_ptr: rc::Rc<TensorPointerHolder>
-	) -> OrtResult<TensorData<'t, Self, D>> {
+	#[allow(clippy::not_unsafe_ptr_arg_deref)]
+	fn extract_data<'t, D: ndarray::Dimension>(shape: D, tensor_element_len: usize, tensor_ptr: *mut sys::OrtValue) -> OrtResult<TensorData<'t, Self, D>> {
 		// Total length of string data, not including \0 suffix
 		let mut total_length = 0;
-		ortsys![unsafe GetStringTensorDataLength(tensor_ptr.tensor_ptr, &mut total_length) -> OrtError::GetStringTensorDataLength];
+		ortsys![unsafe GetStringTensorDataLength(tensor_ptr, &mut total_length) -> OrtError::GetStringTensorDataLength];
 
 		// In the JNI impl of this, tensor_element_len was included in addition to total_length,
 		// but that seems contrary to the docs of GetStringTensorDataLength, and those extra bytes
@@ -287,7 +297,7 @@ impl TensorDataToType for String {
 		// length calculations easy
 		let mut offsets = vec![0; tensor_element_len + 1];
 
-		ortsys![unsafe GetStringTensorContent(tensor_ptr.tensor_ptr, string_contents.as_mut_ptr() as *mut ffi::c_void, total_length, offsets.as_mut_ptr(), tensor_element_len as _) -> OrtError::GetStringTensorContent];
+		ortsys![unsafe GetStringTensorContent(tensor_ptr, string_contents.as_mut_ptr() as *mut ffi::c_void, total_length as _, offsets.as_mut_ptr(), tensor_element_len as _) -> OrtError::GetStringTensorContent];
 
 		// final offset = overall length so that per-string length calculations work for the last string
 		debug_assert_eq!(0, offsets[tensor_element_len]);

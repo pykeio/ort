@@ -47,7 +47,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --all-targets
+          args: --all-targets --features fetch-models
   coverage:
     name: Code coverage
     runs-on: ubuntu-latest
@@ -75,7 +75,7 @@ jobs:
         run: cargo install cargo-tarpaulin
       - name: Generate code coverage
         run: |
-          cargo tarpaulin --verbose --timeout 120 --out Xml
+          cargo tarpaulin --features fetch-models --verbose --timeout 120 --out Xml
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v2
         with:

@@ -1,86 +1,9 @@
-use std::{fmt::Debug, ops::Deref, ptr, rc};
+use std::{fmt::Debug, ops::Deref, ptr};
 
 use ndarray::ArrayView;
 
-use super::{TensorData, TensorDataToType, TensorElementDataType};
-use crate::{memory::MemoryInfo, ortsys, sys, OrtError, OrtResult};
-
-/// A wrapper around a tensor produced by onnxruntime inference.
-///
-/// Since different outputs for the same model can have different types, this type is used to allow
-/// the user to dynamically query each output's type and extract the appropriate tensor type with
-/// [`DynOrtTensor::try_extract`].
-#[derive(Debug)]
-pub struct DynOrtTensor<'m, D>
-where
-	D: ndarray::Dimension
-{
-	tensor_ptr_holder: rc::Rc<TensorPointerHolder>,
-	#[allow(dead_code)]
-	memory_info: &'m MemoryInfo,
-	shape: D,
-	tensor_element_len: usize,
-	data_type: TensorElementDataType
-}
-
-impl<'m, D> DynOrtTensor<'m, D>
-where
-	D: ndarray::Dimension
-{
-	pub(crate) fn new(
-		tensor_ptr: *mut sys::OrtValue,
-		memory_info: &'m MemoryInfo,
-		shape: D,
-		tensor_element_len: usize,
-		data_type: TensorElementDataType
-	) -> DynOrtTensor<'m, D> {
-		DynOrtTensor {
-			tensor_ptr_holder: rc::Rc::from(TensorPointerHolder { tensor_ptr }),
-			memory_info,
-			shape,
-			tensor_element_len,
-			data_type
-		}
-	}
-
-	/// The ONNX data type this tensor contains.
-	pub fn data_type(&self) -> TensorElementDataType {
-		self.data_type
-	}
-
-	/// Extract a tensor containing `T`.
-	///
-	/// Where the type permits it, the tensor will be a view into existing memory.
-	///
-	/// # Errors
-	///
-	/// An error will be returned if `T`'s ONNX type doesn't match this tensor's type, or if an
-	/// onnxruntime error occurs.
-	pub fn try_extract<'t, T>(&self) -> OrtResult<OrtOwnedTensor<'t, T, D>>
-	where
-		T: TensorDataToType + Clone + Debug,
-		'm: 't, // mem info outlives tensor
-		D: 't
-	{
-		if self.data_type != T::tensor_element_data_type() {
-			Err(OrtError::DataTypeMismatch {
-				actual: self.data_type,
-				requested: T::tensor_element_data_type()
-			})
-		} else {
-			// Note: Both tensor and array will point to the same data, nothing is copied.
-			// As such, there is no need to free the pointer used to create the ArrayView.
-			assert_ne!(self.tensor_ptr_holder.tensor_ptr, ptr::null_mut());
-
-			let mut is_tensor = 0;
-			ortsys![unsafe IsTensor(self.tensor_ptr_holder.tensor_ptr, &mut is_tensor) -> OrtError::FailedTensorCheck];
-			assert_eq!(is_tensor, 1);
-
-			let data = T::extract_data(self.shape.clone(), self.tensor_element_len, rc::Rc::clone(&self.tensor_ptr_holder))?;
-			Ok(OrtOwnedTensor { data })
-		}
-	}
-}
+use super::{TensorData, TensorDataToType};
+use crate::{ortsys, sys};
 
 /// Tensor containing data owned by the ONNX Runtime C library, used to return values from inference.
 ///
@@ -98,7 +21,7 @@ where
 	T: TensorDataToType,
 	D: ndarray::Dimension
 {
-	data: TensorData<'t, T, D>
+	pub(crate) data: TensorData<'t, T, D>
 }
 
 impl<'t, T, D> OrtOwnedTensor<'t, T, D>

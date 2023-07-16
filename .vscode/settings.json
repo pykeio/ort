@@ -7,5 +7,6 @@
 		"editor.semanticHighlighting.enabled": true
 	},
 	"rust-analyzer.cachePriming.enable": true,
-	"rust-analyzer.diagnostics.experimental.enable": true
+	"rust-analyzer.diagnostics.experimental.enable": true,
+	"rust-analyzer.showUnlinkedFileNotification": false
 }

@@ -11,6 +11,7 @@ on:
       - 'Cargo.toml'
       - '.cargo/**/*'
       - 'tests/**/*'
+      - 'codecov.yml'
   pull_request:
     paths:
       - '.github/workflows/code-quality.yml'
@@ -19,6 +20,7 @@ on:
       - 'Cargo.toml'
       - '.cargo/**/*'
       - 'tests/**/*'
+      - 'codecov.yml'
 env:
   RUST_BACKTRACE: 1
   CARGO_INCREMENTAL: 0

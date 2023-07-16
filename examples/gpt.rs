@@ -1,12 +1,9 @@
-use std::{
-	io::{self, Write},
-	sync::Arc
-};
+use std::io::{self, Write};
 
 use ndarray::{array, concatenate, s, Array1, Axis, CowArray};
 use ort::{
-	download::language::machine_comprehension::GPT2, tensor::OrtOwnedTensor, value::Value, Environment, ExecutionProvider, GraphOptimizationLevel, OrtResult,
-	SessionBuilder
+	download::language::machine_comprehension::GPT2, tensor::OrtOwnedTensor, Environment, ExecutionProvider, GraphOptimizationLevel, OrtResult, SessionBuilder,
+	Value
 };
 use rand::Rng;
 use tokenizers::Tokenizer;
@@ -21,12 +18,11 @@ fn main() -> OrtResult<()> {
 	let mut stdout = io::stdout();
 	let mut rng = rand::thread_rng();
 
-	let environment = Arc::new(
-		Environment::builder()
-			.with_name("GPT-2")
-			.with_execution_providers([ExecutionProvider::CUDA(Default::default())])
-			.build()?
-	);
+	let environment = Environment::builder()
+		.with_name("GPT-2")
+		.with_execution_providers([ExecutionProvider::CUDA(Default::default())])
+		.build()?
+		.into_arc();
 
 	let session = SessionBuilder::new(&environment)?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?

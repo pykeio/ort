@@ -25,8 +25,11 @@ use tracing::warn;
 pub use self::environment::Environment;
 pub use self::error::{OrtApiError, OrtError, OrtResult};
 pub use self::execution_providers::ExecutionProvider;
+pub use self::io_binding::IoBinding;
+pub use self::memory::{AllocationDevice, MemoryInfo};
 pub use self::session::{InMemorySession, Session, SessionBuilder};
 pub use self::tensor::NdArrayExtensions;
+pub use self::value::Value;
 
 #[cfg(not(all(target_arch = "x86", target_os = "windows")))]
 macro_rules! extern_system_fn {

@@ -50,7 +50,6 @@ impl From<&str> for AllocationDevice {
 #[derive(Debug)]
 pub struct MemoryInfo {
 	pub(crate) ptr: *mut sys::OrtMemoryInfo,
-	pub(crate) allocation_device: AllocationDevice,
 	pub(crate) should_release: bool
 }
 
@@ -64,7 +63,6 @@ impl MemoryInfo {
 		];
 		Ok(Self {
 			ptr: memory_info_ptr,
-			allocation_device: AllocationDevice::CPU,
 			should_release: true
 		})
 	}
@@ -79,12 +77,12 @@ impl MemoryInfo {
 		];
 		Ok(Self {
 			ptr: memory_info_ptr,
-			allocation_device,
 			should_release: true
 		})
 	}
 
-	pub(crate) fn get_allocation_device(memory_info_ptr: *const sys::OrtMemoryInfo) -> OrtResult<AllocationDevice> {
+	#[allow(clippy::not_unsafe_ptr_arg_deref)]
+	pub fn allocation_device(memory_info_ptr: *const sys::OrtMemoryInfo) -> OrtResult<AllocationDevice> {
 		let mut name_ptr: *const c_char = std::ptr::null_mut();
 		ortsys![unsafe MemoryInfoGetName(memory_info_ptr, &mut name_ptr) -> OrtError::CreateCpuMemoryInfo; nonNull(name_ptr)];
 		let name: String = unsafe { CStr::from_ptr(name_ptr) }.to_string_lossy().to_string();

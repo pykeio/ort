@@ -33,7 +33,7 @@ use super::{
 };
 #[cfg(feature = "fetch-models")]
 use super::{download::ModelUrl, error::OrtDownloadError};
-use crate::value::Value;
+use crate::{io_binding::IoBinding, value::Value};
 
 /// Type used to create a session using the _builder pattern_. Once created, you can use the different methods to
 /// configure the session.
@@ -638,6 +638,10 @@ impl Session {
 		self.allocator_ptr
 	}
 
+	pub fn bind(&self) -> OrtResult<IoBinding> {
+		IoBinding::new(self)
+	}
+
 	/// Run the input data through the ONNX graph, performing inference.
 	///
 	/// Note that ONNX models can have multiple inputs; a `Vec<_>` is thus
@@ -703,6 +707,12 @@ impl Session {
 		cstrings?;
 
 		Ok(outputs)
+	}
+
+	pub fn run_with_binding<'s, 'a: 's>(&'a self, binding: &IoBinding<'s>) -> OrtResult<()> {
+		let run_options_ptr: *const sys::OrtRunOptions = std::ptr::null();
+		ortsys![unsafe RunWithBinding(self.session_ptr.inner, run_options_ptr, binding.ptr) -> OrtError::SessionRun];
+		Ok(())
 	}
 
 	/// Gets the session model metadata. See [`Metadata`] for more info.

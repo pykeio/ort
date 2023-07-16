@@ -255,7 +255,8 @@ pub struct OpenVINOExecutionProviderOptions {
 	/// This option if enabled works for dynamic shaped models whose shape will be set dynamically based on the infer
 	/// input image/data shape at run time in CPU. This gives best result for running multiple inferences with varied
 	/// shaped images/data.
-	pub enable_dynamic_shapes: bool
+	pub enable_dynamic_shapes: bool,
+	pub enable_vpu_fast_compile: bool
 }
 
 impl Default for OpenVINOExecutionProviderOptions {
@@ -267,7 +268,8 @@ impl Default for OpenVINOExecutionProviderOptions {
 			cache_dir: None,
 			context: std::ptr::null_mut(),
 			enable_opencl_throttling: false,
-			enable_dynamic_shapes: false
+			enable_dynamic_shapes: false,
+			enable_vpu_fast_compile: false
 		}
 	}
 }
@@ -595,6 +597,33 @@ impl ExecutionProvider {
 					flags |= 0x008;
 				}
 				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_Nnapi(session_options, flags) }).map_err(OrtError::ExecutionProvider)?;
+			}
+			#[cfg(any(feature = "load-dynamic", feature = "openvino"))]
+			&Self::OpenVINO(options) => {
+				let openvino_options = sys::OrtOpenVINOProviderOptions {
+					device_type: options
+						.device_type
+						.clone()
+						.map(|x| x.as_bytes().as_ptr() as *const c_char)
+						.unwrap_or_else(ptr::null),
+					device_id: options
+						.device_id
+						.clone()
+						.map(|x| x.as_bytes().as_ptr() as *const c_char)
+						.unwrap_or_else(ptr::null),
+					num_of_threads: options.num_threads,
+					cache_dir: options
+						.cache_dir
+						.clone()
+						.map(|x| x.as_bytes().as_ptr() as *const c_char)
+						.unwrap_or_else(ptr::null),
+					context: options.context,
+					enable_opencl_throttling: bool_as_int(options.enable_opencl_throttling) as _,
+					enable_dynamic_shapes: bool_as_int(options.enable_dynamic_shapes) as _,
+					enable_vpu_fast_compile: bool_as_int(options.enable_vpu_fast_compile) as _
+				};
+				status_to_result(ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO(session_options, &openvino_options as *const _)])
+					.map_err(OrtError::ExecutionProvider)?;
 			}
 			_ => return Err(OrtError::ExecutionProviderNotRegistered(self.as_str()))
 		}

@@ -3,10 +3,10 @@
 	<h1>Rust bindings for ONNX Runtime</h1>
     <a href="https://app.codecov.io/gh/pykeio/ort" target="_blank"><img alt="Coverage Results" src="https://img.shields.io/codecov/c/gh/pykeio/ort?style=for-the-badge"></a> <a href="https://github.com/pykeio/ort/actions/workflows/test.yml"><img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/pykeio/ort/test.yml?branch=main&style=for-the-badge"></a> <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/d/ort?style=for-the-badge"></a>
     <br />
-    <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/v/ort?style=for-the-badge&label=ort&logo=rust"></a> <img alt="ONNX Runtime" src="https://img.shields.io/badge/onnxruntime-v1.14.1-blue?style=for-the-badge&logo=cplusplus">
+    <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/v/ort?style=for-the-badge&label=ort&logo=rust"></a> <img alt="ONNX Runtime" src="https://img.shields.io/badge/onnxruntime-v1.15.1-blue?style=for-the-badge&logo=cplusplus">
 </div>
 
-`ort` is an (unofficial) [ONNX Runtime](https://onnxruntime.ai/) 1.14 wrapper for Rust based on the now inactive [`onnxruntime-rs`](https://github.com/nbigaouette/onnxruntime-rs). ONNX Runtime accelerates ML inference on both CPU & GPU.
+`ort` is an (unofficial) [ONNX Runtime](https://onnxruntime.ai/) 1.15 wrapper for Rust based on the now inactive [`onnxruntime-rs`](https://github.com/nbigaouette/onnxruntime-rs). ONNX Runtime accelerates ML inference on both CPU & GPU.
 
 See [the docs](https://docs.rs/ort) for more detailed information and the [`examples`](https://github.com/pykeio/ort/tree/main/examples). If you have any questions, feel free to ask in the [`#💬｜ort-discussions` and related channels in the pyke Discord server](https://discord.gg/uQtsNu2xMa) or in [GitHub Discussions](https://github.com/pykeio/ort/discussions).
 
@@ -63,15 +63,15 @@ To use other execution providers, you must explicitly enable them via their Carg
 
 - ✅ **`cuda`**: Enables the CUDA execution provider for Maxwell (7xx) NVIDIA GPUs and above. Requires CUDA v11.6+.
 - ✅ **`tensorrt`**: Enables the TensorRT execution provider for GeForce 9xx series NVIDIA GPUs and above; requires CUDA v11.4+ and TensorRT v8.4+.
-- ⚠️ **`openvino`**: Enables the OpenVINO execution provider for 6th+ generation Intel Core CPUs.
+- ✅ **`openvino`**: Enables the OpenVINO execution provider for 6th+ generation Intel Core CPUs.
 - ✅ **`onednn`**: Enables the Intel oneDNN execution provider for x86/x64 targets.
 - ✅ **`directml`**: Enables the DirectML execution provider for Windows x86/x64 targets with dedicated GPUs supporting DirectX 12.
 - ⚠️ **`snpe`**: Enables the SNPE execution provider for Qualcomm Snapdragon CPUs & Adreno GPUs.
-- ⚠️ **`nnapi`**: Enables the Android Neural Networks API (NNAPI) execution provider.
+- ❓ **`nnapi`**: Enables the Android Neural Networks API (NNAPI) execution provider. (needs testing - [#45](https://github.com/pykeio/ort/issues/45))
 - ✅ **`coreml`**: Enables the CoreML execution provider for macOS/iOS targets.
 - ⚠️ **`xnnpack`**: Enables the [XNNPACK](https://github.com/google/XNNPACK) backend for WebAssembly and Android.
 - ⚠️ **`migraphx`**: Enables the MIGraphX execution provider AMD GPUs.
-- ⚠️ **`rocm`**: Enables the ROCm execution provider for AMD ROCm-enabled GPUs. ([#16](https://github.com/pykeio/ort/issues/16))
+- ❓ **`rocm`**: Enables the ROCm execution provider for AMD ROCm-enabled GPUs. ([#16](https://github.com/pykeio/ort/issues/16))
 - ✅ **`acl`**: Enables the ARM Compute Library execution provider for multi-core ARM v8 processors.
 - ⚠️ **`armnn`**: Enables the ArmNN execution provider for ARM v8 targets.
 - ⚠️ **`tvm`**: Enables the **preview** Apache TVM execution provider.

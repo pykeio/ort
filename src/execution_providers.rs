@@ -244,7 +244,7 @@ pub struct OpenVINOExecutionProviderOptions {
 	pub device_id: Option<String>,
 	/// Overrides the accelerator default value of number of threads with this value at runtime. If this option is not
 	/// explicitly set, default value of 8 is used during build time.
-	pub num_threads: usize,
+	pub num_threads: size_t,
 	/// Explicitly specify the path to save and load the blobs enabling model caching feature.
 	pub cache_dir: Option<String>,
 	/// This option is only alvailable when OpenVINO EP is built with OpenCL flags enabled. It takes in the remote

@@ -22,7 +22,7 @@ impl<'s> IoBinding<'s> {
 		Ok(Self { ptr, session })
 	}
 
-	pub fn bind_input<'a, 'b: 'a, 'c: 'b, S: AsRef<str> + Clone + Debug>(&'a mut self, name: S, ort_value: &'c Value<'b>) -> OrtResult<()> {
+	pub fn bind_input<'a, 'b: 'a, S: AsRef<str> + Clone + Debug>(&'a mut self, name: S, ort_value: Value<'b>) -> OrtResult<()> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
 		ortsys![unsafe BindInput(self.ptr, cname.as_ptr(), ort_value.ptr()) -> OrtError::CreateIoBinding];

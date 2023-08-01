@@ -187,3 +187,4 @@ WixTools/
 **/*.onnx
 **/*.ort
 !tests/data/*.onnx
+!tests/data/*.ort

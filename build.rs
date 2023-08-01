@@ -250,7 +250,7 @@ fn extract_archive(filename: &Path, output: &Path) {
 
 #[cfg(all(feature = "download-binaries", not(target_os = "windows")))]
 fn extract_tgz(filename: &Path, output: &Path) {
-	let file = fs::File::open(&filename).unwrap();
+	let file = fs::File::open(filename).unwrap();
 	let buf = io::BufReader::new(file);
 	let tar = flate2::read::GzDecoder::new(buf);
 	let mut archive = tar::Archive::new(tar);

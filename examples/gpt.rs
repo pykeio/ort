@@ -59,7 +59,7 @@ fn main() -> OrtResult<()> {
 		let token = probabilities[rng.gen_range(0..=TOP_K)].0;
 		tokens = CowArray::from(concatenate![Axis(0), tokens, array![token.try_into().unwrap()]]);
 
-		let token_str = tokenizer.decode(vec![token as _], true).unwrap();
+		let token_str = tokenizer.decode(&[token as _], true).unwrap();
 		print!("{}", token_str);
 		stdout.flush().unwrap();
 	}

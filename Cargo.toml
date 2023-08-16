@@ -80,7 +80,7 @@ ureq = "2.1"
 image = "0.24"
 test-log = { version = "0.2", default-features = false, features = [ "trace" ] }
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
-tokenizers = { version = "0.13", default-features = false, features = [ "onig" ] }
+tokenizers = { version = ">=0.13.4", default-features = false, features = [ "onig" ] }
 rand = "0.8"
 
 [build-dependencies]

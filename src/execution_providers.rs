@@ -334,6 +334,67 @@ pub struct NNAPIExecutionProviderOptions {
 	/// will be ignored for Android API level 28 and lower.
 	pub cpu_only: bool
 }
+#[derive(Debug, Clone)]
+enum QNNExecutionHTPPerformanceMode {
+	/// Default mode.
+	Default,
+	Burst,
+	Balanced,
+	HighPerformance,
+	HighPowerSaver,
+	LowPowerSaver,
+	LowBalanced,
+	PowerSaver,
+	SustainedHighPerformance
+}
+
+impl QNNExecutionHTPPerformanceMode {
+	fn as_str(&self) -> &'static str {
+		match self {
+			QNNExecutionHTPPerformanceMode::Default => "default",
+			QNNExecutionHTPPerformanceMode::Burst => "burst",
+			QNNExecutionHTPPerformanceMode::Balanced => "balanced",
+			QNNExecutionHTPPerformanceMode::HighPerformance => "high_performance",
+			QNNExecutionHTPPerformanceMode::HighPowerSaver => "high_power_saver",
+			QNNExecutionHTPPerformanceMode::LowPowerSaver => "low_power_saver",
+			QNNExecutionHTPPerformanceMode::LowBalanced => "low_balanced",
+			QNNExecutionHTPPerformanceMode::PowerSaver => "power_saver",
+			QNNExecutionHTPPerformanceMode::SustainedHighPerformance => "sustained_high_performance"
+		}
+	}
+}
+#[derive(Debug, Clone)]
+pub struct QNNExecutionProviderOptions {
+	/// The file path to QNN backend library.On Linux/Android: libQnnCpu.so for CPU backend, libQnnHtp.so for GPU
+	/// backend.
+	backend_path: String,
+	/// true to enable QNN graph creation from cached QNN context file. If it's enabled: QNN EP will
+	/// load from cached QNN context binary if it exist. It will generate a context binary file if it's not exist
+	qnn_context_cache_enable: bool,
+	/// explicitly provide the QNN context cache file. Default to model_file.onnx.bin if not provided.
+	qnn_context_cache_path: Option<String>,
+	/// QNN profiling level, options: "off", "basic", "detailed". Default to off.
+	profiling_level: Option<String>,
+	/// Allows client to set up RPC control latency in microseconds.
+	rpc_control_latency: Option<u32>,
+	/// QNN performance mode, options: "burst", "balanced", "default", "high_performance",
+	/// "high_power_saver", "low_balanced", "low_power_saver", "power_saver", "sustained_high_performance". Default to
+	/// "default".
+	htp_performance_mode: Option<QNNExecutionHTPPerformanceMode>
+}
+
+impl Default for QNNExecutionProviderOptions {
+	fn default() -> Self {
+		Self {
+			backend_path: String::from("libQnnHtp.so"),
+			qnn_context_cache_enable: false,
+			qnn_context_cache_path: Some(String::from("model_file.onnx.bin")),
+			profiling_level: Some(String::from("off")),
+			rpc_control_latency: Some(10),
+			htp_performance_mode: Some(QNNExecutionHTPPerformanceMode::Default)
+		}
+	}
+}
 
 macro_rules! get_ep_register {
 	($symbol:ident($($id:ident: $type:ty),*) -> $rt:ty) => {
@@ -373,7 +434,8 @@ pub enum ExecutionProvider {
 	CoreML(CoreMLExecutionProviderOptions),
 	DirectML(DirectMLExecutionProviderOptions),
 	ROCm(ROCmExecutionProviderOptions),
-	NNAPI(NNAPIExecutionProviderOptions)
+	NNAPI(NNAPIExecutionProviderOptions),
+	QNN(QNNExecutionProviderOptions)
 }
 
 macro_rules! map_keys {
@@ -413,7 +475,8 @@ impl ExecutionProvider {
 			Self::CoreML(_) => "CoreMLExecutionProvider",
 			Self::DirectML(_) => "DmlExecutionProvider",
 			Self::ROCm(_) => "ROCmExecutionProvider",
-			Self::NNAPI(_) => "NnapiExecutionProvider"
+			Self::NNAPI(_) => "NnapiExecutionProvider",
+			Self::QNN(_) => "QNNExecutionProvider"
 		}
 	}
 
@@ -624,6 +687,25 @@ impl ExecutionProvider {
 				};
 				status_to_result(ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO(session_options, &openvino_options as *const _)])
 					.map_err(OrtError::ExecutionProvider)?;
+			}
+			#[cfg(any(feature = "load-dynamic", feature = "qnn"))]
+			&Self::QNN(options) => {
+				let (key_ptrs, value_ptrs, len, keys, values) = map_keys! {
+					backend_path = options.backend_path,
+					profiling_level = options.profiling_level.clone().unwrap_or("off".to_string()),
+					qnn_context_cache_enable = bool_as_int(options.qnn_context_cache_enable),
+					qnn_context_cache_path = options.qnn_context_cache_path.clone().unwrap_or("model_file.onnx.bin".to_string()),
+					htp_performance_mode = options.htp_performance_mode.clone().unwrap_or(QNNExecutionHTPPerformanceMode::Default).as_str(),
+					rpc_control_latency = options.rpc_control_latency.unwrap_or(10)
+				};
+				status_to_result(ortsys![unsafe SessionOptionsAppendExecutionProvider(
+					session_options,
+					CString::new("QNN").unwrap().as_ptr(),
+					key_ptrs.as_ptr(),
+					value_ptrs.as_ptr(),
+					len as _,
+				)])
+				.map_err(OrtError::ExecutionProvider)?;
 			}
 			_ => return Err(OrtError::ExecutionProviderNotRegistered(self.as_str()))
 		}

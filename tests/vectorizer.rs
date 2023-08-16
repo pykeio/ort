@@ -1,17 +1,13 @@
 use std::path::Path;
 
 use ndarray::{ArrayD, IxDyn};
-use ort::{environment::Environment, value::Value, ExecutionProvider, GraphOptimizationLevel, OrtResult, SessionBuilder};
+use ort::{inputs, Environment, GraphOptimizationLevel, OrtResult, SessionBuilder, Value};
 use test_log::test;
 
 #[test]
 #[cfg(not(target_arch = "aarch64"))]
 fn vectorizer() -> OrtResult<()> {
 	let environment = Environment::default().into_arc();
-
-	#[cfg(not(feature = "cuda"))]
-	assert_eq!(ExecutionProvider::CUDA(Default::default()).is_available(), false);
-	assert!(ExecutionProvider::CPU(Default::default()).is_available());
 
 	let session = SessionBuilder::new(&environment)?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
@@ -27,12 +23,12 @@ fn vectorizer() -> OrtResult<()> {
 	let array = ndarray::CowArray::from(ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap().into_dyn());
 
 	// Just one input
-	let input_tensor_values = vec![Value::from_array(session.allocator(), &array)?];
+	let input_tensor_values = inputs![Value::from_array(Some(session.allocator()), &array)?];
 
 	// Perform the inference
 	let outputs = session.run(input_tensor_values)?;
 	assert_eq!(
-		*outputs[0].try_extract::<f32>()?.view(),
+		*outputs[0].extract_tensor::<f32>()?.view(),
 		ArrayD::from_shape_vec(IxDyn(&[1, 9]), vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 			.unwrap()
 			.view()

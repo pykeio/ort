@@ -1,3 +1,5 @@
+//! Provides [`OrtOwnedTensor`], a temporary view of tensor data owned by ONNX Runtime in C++.
+
 use std::{fmt::Debug, ops::Deref, ptr};
 
 use ndarray::ArrayView;

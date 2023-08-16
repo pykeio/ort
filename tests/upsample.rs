@@ -1,10 +1,7 @@
 use std::path::Path;
 
 use image::{ImageBuffer, Pixel, Rgb};
-use ort::{
-	environment::Environment, execution_providers::CPUExecutionProviderOptions, tensor::OrtOwnedTensor, value::Value, ExecutionProvider,
-	GraphOptimizationLevel, LoggingLevel, OrtResult, SessionBuilder
-};
+use ort::{inputs, Environment, GraphOptimizationLevel, LoggingLevel, OrtOwnedTensor, OrtResult, SessionBuilder, Value};
 use test_log::test;
 
 /// This test verifies that dynamically sized inputs and outputs work. It loads and runs
@@ -35,7 +32,6 @@ fn upsample() -> OrtResult<()> {
 	let environment = Environment::builder()
 		.with_name("integration_test")
 		.with_log_level(LoggingLevel::Warning)
-		.with_execution_providers([ExecutionProvider::CPU(CPUExecutionProviderOptions { use_arena: true })])
 		.build()?
 		.into_arc();
 
@@ -70,14 +66,11 @@ fn upsample() -> OrtResult<()> {
 		.into_dyn()
 	);
 
-	// Just one input
-	let input_tensor_values = vec![Value::from_array(session.allocator(), &array)?];
-
 	// Perform the inference
-	let outputs: Vec<Value> = session.run(input_tensor_values)?;
+	let outputs = session.run(inputs![&array])?;
 
 	assert_eq!(outputs.len(), 1);
-	let output: OrtOwnedTensor<'_, f32, ndarray::Dim<ndarray::IxDynImpl>> = outputs[0].try_extract()?;
+	let output: OrtOwnedTensor<'_, f32, ndarray::Dim<ndarray::IxDynImpl>> = outputs[0].extract_tensor()?;
 
 	// The image should have doubled in size
 	assert_eq!(output.view().shape(), [1, 448, 448, 3]);

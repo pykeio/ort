@@ -2,8 +2,8 @@ use std::io::{self, Write};
 
 use ndarray::{array, concatenate, s, Array1, Axis, CowArray};
 use ort::{
-	download::language::machine_comprehension::GPT2, tensor::OrtOwnedTensor, Environment, ExecutionProvider, GraphOptimizationLevel, OrtResult, SessionBuilder,
-	Value
+	download::language::machine_comprehension::GPT2, inputs, CUDAExecutionProviderOptions, Environment, ExecutionProvider, GraphOptimizationLevel,
+	OrtOwnedTensor, OrtResult, SessionBuilder, Value
 };
 use rand::Rng;
 use tokenizers::Tokenizer;
@@ -20,7 +20,7 @@ fn main() -> OrtResult<()> {
 
 	let environment = Environment::builder()
 		.with_name("GPT-2")
-		.with_execution_providers([ExecutionProvider::CUDA(Default::default())])
+		.with_execution_providers([ExecutionProvider::CUDA(CUDAExecutionProviderOptions::default())])
 		.build()?
 		.into_arc();
 
@@ -41,9 +41,8 @@ fn main() -> OrtResult<()> {
 	for _ in 0..GEN_TOKENS {
 		let n_tokens = tokens.shape()[0];
 		let array = tokens.clone().insert_axis(Axis(0)).into_shape((1, 1, n_tokens)).unwrap().into_dyn();
-		let inputs = vec![Value::from_array(session.allocator(), &array)?];
-		let outputs: Vec<Value> = session.run(inputs)?;
-		let generated_tokens: OrtOwnedTensor<f32, _> = outputs[0].try_extract()?;
+		let outputs = session.run(inputs![&array])?;
+		let generated_tokens: OrtOwnedTensor<f32, _> = outputs["output1"].extract_tensor()?;
 		let generated_tokens = generated_tokens.view();
 
 		let probabilities = &mut generated_tokens
@@ -59,7 +58,7 @@ fn main() -> OrtResult<()> {
 		let token = probabilities[rng.gen_range(0..=TOP_K)].0;
 		tokens = CowArray::from(concatenate![Axis(0), tokens, array![token.try_into().unwrap()]]);
 
-		let token_str = tokenizer.decode(vec![token as _], true).unwrap();
+		let token_str = tokenizer.decode(&[token as _], true).unwrap();
 		print!("{}", token_str);
 		stdout.flush().unwrap();
 	}

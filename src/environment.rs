@@ -1,10 +1,9 @@
-use std::collections::HashMap;
 use std::{
 	ffi::CString,
 	sync::{atomic::AtomicPtr, Arc, Mutex}
 };
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use tracing::{debug, error, warn};
 
 use super::{
@@ -13,12 +12,12 @@ use super::{
 	ort, ortsys, sys, ExecutionProvider, LoggingLevel
 };
 
-lazy_static! {
-	static ref G_ENV: Arc<Mutex<EnvironmentSingleton>> = Arc::new(Mutex::new(EnvironmentSingleton {
+static G_ENV: Lazy<Arc<Mutex<EnvironmentSingleton>>> = Lazy::new(|| {
+	Arc::new(Mutex::new(EnvironmentSingleton {
 		name: String::from("uninitialized"),
 		env_ptr: AtomicPtr::new(std::ptr::null_mut())
-	}));
-}
+	}))
+});
 
 #[derive(Debug)]
 struct EnvironmentSingleton {
@@ -26,12 +25,17 @@ struct EnvironmentSingleton {
 	env_ptr: AtomicPtr<sys::OrtEnv>
 }
 
-type CreateEnvFunction = fn(&str, LoggingLevel, HashMap<String, String>) -> (sys::OrtStatusPtr, *mut sys::OrtEnv);
+#[derive(Debug, Default, Clone)]
+pub struct EnvironmentGlobalThreadPoolOptions {
+	pub inter_op_parallelism: Option<i32>,
+	pub intra_op_parallelism: Option<i32>,
+	pub spin_control: Option<bool>,
+	pub intra_op_thread_affinity: Option<String>
+}
 
 /// An [`Environment`] is the main entry point of the ONNX Runtime.
 ///
-/// Only one ONNX environment can be created per process. A singleton (through `lazy_static!()`) is used to enforce
-/// this.
+/// Only one ONNX environment can be created per process. A singleton is used to enforce this.
 ///
 /// Once an environment is created, a [`super::Session`] can be obtained from it.
 ///
@@ -60,12 +64,12 @@ unsafe impl Sync for Environment {}
 impl Environment {
 	/// Create a new environment builder using default values
 	/// (name: `default`, log level: [`LoggingLevel::Warning`])
-	pub fn builder() -> EnvBuilder {
-		EnvBuilder {
+	pub fn builder() -> EnvironmentBuilder {
+		EnvironmentBuilder {
 			name: "default".into(),
 			log_level: LoggingLevel::Warning,
 			execution_providers: Vec::new(),
-			global_thread_pool_options: vec![]
+			global_thread_pool_options: None
 		}
 	}
 
@@ -79,117 +83,14 @@ impl Environment {
 		Arc::new(self)
 	}
 
-	pub fn ptr(&self) -> *const sys::OrtEnv {
+	pub(crate) fn ptr(&self) -> *const sys::OrtEnv {
 		*self.env.lock().unwrap().env_ptr.get_mut()
-	}
-
-	fn create_custom_log_env(name: &str, log_level: LoggingLevel, _: HashMap<String, String>) -> (sys::OrtStatusPtr, *mut sys::OrtEnv) {
-		let mut env_ptr: *mut sys::OrtEnv = std::ptr::null_mut();
-		let logging_function: sys::OrtLoggingFunction = Some(custom_logger);
-		// FIXME: What should go here?
-		let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
-		let cname = CString::new(name).unwrap();
-		let create_env_with_custom_logger = ortsys![CreateEnvWithCustomLogger];
-		let status = unsafe { create_env_with_custom_logger(logging_function, logger_param, log_level.into(), cname.as_ptr(), &mut env_ptr) };
-		(status, env_ptr)
-	}
-
-	fn create_global_thread_pool_env(name: &str, log_level: LoggingLevel, mut options: HashMap<String, String>) -> (sys::OrtStatusPtr, *mut sys::OrtEnv) {
-		let mut env_ptr: *mut sys::OrtEnv = std::ptr::null_mut();
-		let logging_function: sys::OrtLoggingFunction = Some(custom_logger);
-		let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
-		let mut thread_options: *mut sys::OrtThreadingOptions = std::ptr::null_mut();
-		let cname = CString::new(name).unwrap();
-		let create_thread_options = ortsys![CreateThreadingOptions];
-		let release_thread_options = ortsys![ReleaseThreadingOptions];
-		let create_env_with_global_thread_pool = ortsys![CreateEnvWithCustomLoggerAndGlobalThreadPools];
-		let set_global_intra_op_thread_affinity = ortsys![SetGlobalIntraOpThreadAffinity];
-		let set_global_intra_op_num_threads = ortsys![SetGlobalIntraOpNumThreads];
-		let set_global_inter_op_num_threads = ortsys![SetGlobalInterOpNumThreads];
-		let set_global_spin_control = ortsys![SetGlobalSpinControl];
-		unsafe {
-			create_thread_options(&mut thread_options);
-		}
-		options
-			.remove("inter_op_parallelism")
-			.map(|v| unsafe { set_global_inter_op_num_threads(thread_options, v.parse::<i32>().unwrap()) });
-		options
-			.remove("intra_op_parallelism")
-			.map(|v| unsafe { set_global_intra_op_num_threads(thread_options, v.parse::<i32>().unwrap()) });
-		options
-			.remove("spin_control")
-			.map(|v| unsafe { set_global_spin_control(thread_options, v.parse::<i32>().unwrap()) }); //1 for spin, 0 for non spin control
-		options.remove("intra_op_thread_affinity").map(|v| unsafe {
-			let c_str = CString::new(v).unwrap();
-			set_global_intra_op_thread_affinity(thread_options, c_str.as_ptr())
-		}); //1 for spin, 0 for non spin control
-
-		if !options.is_empty() {
-			warn!("Unknown options passed to create_global_thread_pool_env: {:?}", options);
-		}
-		let status =
-			unsafe { create_env_with_global_thread_pool(logging_function, logger_param, log_level.into(), cname.as_ptr(), thread_options, &mut env_ptr) };
-		unsafe {
-			release_thread_options(thread_options);
-		}
-		(status, env_ptr)
-	}
-
-	fn new(
-		name: String,
-		log_level: LoggingLevel,
-		execution_providers: Vec<ExecutionProvider>,
-		create_env_fn: CreateEnvFunction,
-		options: HashMap<String, String>
-	) -> OrtResult<Environment> {
-		// NOTE: Because 'G_ENV' is a lazy_static, locking it will, initially, create
-		//      a new Arc<Mutex<EnvironmentSingleton>> with a strong count of 1.
-		//      Cloning it to embed it inside the 'Environment' to return
-		//      will thus increase the strong count to 2.
-		let mut environment_guard = G_ENV.lock().expect("Failed to acquire lock: another thread panicked?");
-		let g_env_ptr = environment_guard.env_ptr.get_mut();
-		if g_env_ptr.is_null() {
-			debug!("Environment not yet initialized, creating a new one");
-			let (status, env_ptr) = create_env_fn(name.as_str(), log_level, options);
-			status_to_result(status).map_err(OrtError::CreateEnvironment)?;
-
-			debug!(env_ptr = format!("{:?}", env_ptr).as_str(), "Environment created");
-
-			*g_env_ptr = env_ptr;
-			environment_guard.name = name;
-
-			// NOTE: Cloning the lazy_static 'G_ENV' will increase its strong count by one.
-			//       If this 'Environment' is the only one in the process, the strong count
-			//       will be 2:
-			//          * one lazy_static 'G_ENV'
-			//          * one inside the 'Environment' returned
-			Ok(Environment {
-				env: G_ENV.clone(),
-				execution_providers
-			})
-		} else {
-			warn!(
-				name = environment_guard.name.as_str(),
-				env_ptr = format!("{:?}", environment_guard.env_ptr).as_str(),
-				"Environment already initialized for this thread, reusing it",
-			);
-
-			// NOTE: Cloning the lazy_static 'G_ENV' will increase its strong count by one.
-			//       If this 'Environment' is the only one in the process, the strong count
-			//       will be 2:
-			//          * one lazy_static 'G_ENV'
-			//          * one inside the 'Environment' returned
-			Ok(Environment {
-				env: G_ENV.clone(),
-				execution_providers
-			})
-		}
 	}
 }
 
 impl Default for Environment {
 	fn default() -> Self {
-		// NOTE: Because 'G_ENV' is a lazy_static, locking it will, initially, create
+		// NOTE: Because 'G_ENV' is `Lazy`, locking it will, initially, create
 		//      a new Arc<Mutex<EnvironmentSingleton>> with a strong count of 1.
 		//      Cloning it to embed it inside the 'Environment' to return
 		//      will thus increase the strong count to 2.
@@ -206,29 +107,31 @@ impl Default for Environment {
 
 			let cname = CString::new("default".to_string()).unwrap();
 
-			let create_env_with_custom_logger = ortsys![CreateEnvWithCustomLogger];
-			let status = unsafe { create_env_with_custom_logger(logging_function, logger_param, LoggingLevel::Warning.into(), cname.as_ptr(), &mut env_ptr) };
-			status_to_result(status).map_err(OrtError::CreateEnvironment).unwrap();
+			status_to_result(
+				ortsys![unsafe CreateEnvWithCustomLogger(logging_function, logger_param, LoggingLevel::Warning.into(), cname.as_ptr(), &mut env_ptr); nonNull(env_ptr)]
+			)
+			.map_err(OrtError::CreateEnvironment)
+			.unwrap();
 
 			debug!(env_ptr = format!("{:?}", env_ptr).as_str(), "Environment created");
 
 			*g_env_ptr = env_ptr;
 			environment_guard.name = "default".to_string();
 
-			// NOTE: Cloning the lazy_static 'G_ENV' will increase its strong count by one.
+			// NOTE: Cloning the `Lazy` 'G_ENV' will increase its strong count by one.
 			//       If this 'Environment' is the only one in the process, the strong count
 			//       will be 2:
-			//          * one lazy_static 'G_ENV'
+			//          * one `Lazy` 'G_ENV'
 			//          * one inside the 'Environment' returned
 			Environment {
 				env: G_ENV.clone(),
 				execution_providers: vec![]
 			}
 		} else {
-			// NOTE: Cloning the lazy_static 'G_ENV' will increase its strong count by one.
+			// NOTE: Cloning the `Lazy` 'G_ENV' will increase its strong count by one.
 			//       If this 'Environment' is the only one in the process, the strong count
 			//       will be 2:
-			//          * one lazy_static 'G_ENV'
+			//          * one `Lazy` 'G_ENV'
 			//          * one inside the 'Environment' returned
 			Environment {
 				env: G_ENV.clone(),
@@ -247,7 +150,7 @@ impl Drop for Environment {
 
 		// NOTE: If we drop an 'Environment' we (obviously) have _at least_
 		//       one 'G_ENV' strong count (the one in the 'env' member).
-		//       There is also the "original" 'G_ENV' which is a the lazy_static global.
+		//       There is also the "original" 'G_ENV' which is a the `Lazy` global.
 		//       If there is no other environment, the strong count should be two and we
 		//       can properly free the sys::OrtEnv pointer.
 		if Arc::strong_count(&G_ENV) == 2 {
@@ -272,27 +175,27 @@ impl Drop for Environment {
 /// Struct used to build an environment [`Environment`].
 ///
 /// This is ONNX Runtime's main entry point. An environment _must_ be created as the first step. An [`Environment`] can
-/// only be built using `EnvBuilder` to configure it.
+/// only be built using `EnvironmentBuilder` to configure it.
 ///
 /// Libraries using `ort` should **not** create an environment, as only one is allowed per process. Instead, allow the
 /// user to pass their own environment to the library.
 ///
-/// **NOTE**: If the same configuration method (for example [`EnvBuilder::with_name()`] is called multiple times, the
-/// last value will have precedence.
-pub struct EnvBuilder {
+/// **NOTE**: If the same configuration method (for example [`EnvironmentBuilder::with_name()`] is called multiple
+/// times, the last value will have precedence.
+pub struct EnvironmentBuilder {
 	name: String,
 	log_level: LoggingLevel,
 	execution_providers: Vec<ExecutionProvider>,
-	global_thread_pool_options: Vec<(String, String)>
+	global_thread_pool_options: Option<EnvironmentGlobalThreadPoolOptions>
 }
 
-impl EnvBuilder {
+impl EnvironmentBuilder {
 	/// Configure the environment with a given name
 	///
 	/// **NOTE**: Since ONNX can only define one environment per process, creating multiple environments using multiple
-	/// [`EnvBuilder`]s will end up re-using the same environment internally; a new one will _not_ be created. New
-	/// parameters will be ignored.
-	pub fn with_name<S>(mut self, name: S) -> EnvBuilder
+	/// [`EnvironmentBuilder`]s will end up re-using the same environment internally; a new one will _not_ be created.
+	/// New parameters will be ignored.
+	pub fn with_name<S>(mut self, name: S) -> EnvironmentBuilder
 	where
 		S: Into<String>
 	{
@@ -303,9 +206,9 @@ impl EnvBuilder {
 	/// Configure the environment with a given log level
 	///
 	/// **NOTE**: Since ONNX can only define one environment per process, creating multiple environments using multiple
-	/// [`EnvBuilder`]s will end up re-using the same environment internally; a new one will _not_ be created. New
-	/// parameters will be ignored.
-	pub fn with_log_level(mut self, log_level: LoggingLevel) -> EnvBuilder {
+	/// [`EnvironmentBuilder`]s will end up re-using the same environment internally; a new one will _not_ be created.
+	/// New parameters will be ignored.
+	pub fn with_log_level(mut self, log_level: LoggingLevel) -> EnvironmentBuilder {
 		self.log_level = log_level;
 		self
 	}
@@ -345,7 +248,7 @@ impl EnvBuilder {
 	///   it will hard crash the process with a "stack buffer overrun" error. This can occur when CUDA/TensorRT is
 	///   missing a DLL such as `zlibwapi.dll`. To prevent your app from crashing, you can check to see if you can load
 	///   `zlibwapi.dll` before enabling the CUDA/TensorRT execution providers.
-	pub fn with_execution_providers(mut self, execution_providers: impl AsRef<[ExecutionProvider]>) -> EnvBuilder {
+	pub fn with_execution_providers(mut self, execution_providers: impl AsRef<[ExecutionProvider]>) -> EnvironmentBuilder {
 		self.execution_providers = execution_providers.as_ref().to_vec();
 		self
 	}
@@ -354,23 +257,86 @@ impl EnvBuilder {
 	///
 	/// Sessions will only use the global thread pool if they are created with
 	/// [`SessionBuilder::with_disable_per_session_threads`](crate::SessionBuilder::with_disable_per_session_threads).
-	pub fn with_global_thread_pool(mut self, options: Vec<(String, String)>) -> EnvBuilder {
-		self.global_thread_pool_options = options;
+	pub fn with_global_thread_pool(mut self, options: EnvironmentGlobalThreadPoolOptions) -> EnvironmentBuilder {
+		self.global_thread_pool_options = Some(options);
 		self
 	}
 
 	/// Commit the configuration to a new [`Environment`].
 	pub fn build(self) -> OrtResult<Environment> {
-		if self.global_thread_pool_options.is_empty() {
-			Environment::new(self.name, self.log_level, self.execution_providers, Environment::create_custom_log_env, vec![].into_iter().collect())
+		// NOTE: Because 'G_ENV' is a `Lazy`, locking it will, initially, create
+		//      a new Arc<Mutex<EnvironmentSingleton>> with a strong count of 1.
+		//      Cloning it to embed it inside the 'Environment' to return
+		//      will thus increase the strong count to 2.
+		let mut environment_guard = G_ENV.lock().expect("Failed to acquire lock: another thread panicked?");
+		let g_env_ptr = environment_guard.env_ptr.get_mut();
+		if g_env_ptr.is_null() {
+			debug!("Environment not yet initialized, creating a new one");
+
+			let env_ptr = if let Some(global_thread_pool) = self.global_thread_pool_options {
+				let mut env_ptr: *mut sys::OrtEnv = std::ptr::null_mut();
+				let logging_function: sys::OrtLoggingFunction = Some(custom_logger);
+				let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
+				let cname = CString::new(self.name.clone()).unwrap();
+
+				let mut thread_options: *mut sys::OrtThreadingOptions = std::ptr::null_mut();
+				ortsys![unsafe CreateThreadingOptions(&mut thread_options) -> OrtError::CreateEnvironment; nonNull(thread_options)];
+				if let Some(inter_op_parallelism) = global_thread_pool.inter_op_parallelism {
+					ortsys![unsafe SetGlobalInterOpNumThreads(thread_options, inter_op_parallelism) -> OrtError::CreateEnvironment];
+				}
+				if let Some(intra_op_parallelism) = global_thread_pool.intra_op_parallelism {
+					ortsys![unsafe SetGlobalIntraOpNumThreads(thread_options, intra_op_parallelism) -> OrtError::CreateEnvironment];
+				}
+				if let Some(spin_control) = global_thread_pool.spin_control {
+					ortsys![unsafe SetGlobalSpinControl(thread_options, if spin_control { 1 } else { 0 }) -> OrtError::CreateEnvironment];
+				}
+				if let Some(intra_op_thread_affinity) = global_thread_pool.intra_op_thread_affinity {
+					let cstr = CString::new(intra_op_thread_affinity).unwrap();
+					ortsys![unsafe SetGlobalIntraOpThreadAffinity(thread_options, cstr.as_ptr()) -> OrtError::CreateEnvironment];
+				}
+
+				ortsys![unsafe CreateEnvWithCustomLoggerAndGlobalThreadPools(logging_function, logger_param, self.log_level.into(), cname.as_ptr(), thread_options, &mut env_ptr) -> OrtError::CreateEnvironment; nonNull(env_ptr)];
+				ortsys![unsafe ReleaseThreadingOptions(thread_options)];
+				env_ptr
+			} else {
+				let mut env_ptr: *mut sys::OrtEnv = std::ptr::null_mut();
+				let logging_function: sys::OrtLoggingFunction = Some(custom_logger);
+				// FIXME: What should go here?
+				let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
+				let cname = CString::new(self.name.clone()).unwrap();
+				ortsys![unsafe CreateEnvWithCustomLogger(logging_function, logger_param, self.log_level.into(), cname.as_ptr(), &mut env_ptr) -> OrtError::CreateEnvironment; nonNull(env_ptr)];
+				env_ptr
+			};
+			debug!(env_ptr = format!("{:?}", env_ptr).as_str(), "Environment created");
+
+			*g_env_ptr = env_ptr;
+			environment_guard.name = self.name;
+
+			// NOTE: Cloning the `Lazy` 'G_ENV' will increase its strong count by one.
+			//       If this 'Environment' is the only one in the process, the strong count
+			//       will be 2:
+			//          * one `Lazy` 'G_ENV'
+			//          * one inside the 'Environment' returned
+			Ok(Environment {
+				env: G_ENV.clone(),
+				execution_providers: self.execution_providers
+			})
 		} else {
-			Environment::new(
-				self.name,
-				self.log_level,
-				self.execution_providers,
-				Environment::create_global_thread_pool_env,
-				self.global_thread_pool_options.into_iter().collect()
-			)
+			warn!(
+				name = environment_guard.name.as_str(),
+				env_ptr = format!("{:?}", environment_guard.env_ptr).as_str(),
+				"Environment already initialized for this thread, reusing it",
+			);
+
+			// NOTE: Cloning the `Lazy` 'G_ENV' will increase its strong count by one.
+			//       If this 'Environment' is the only one in the process, the strong count
+			//       will be 2:
+			//          * one `Lazy` 'G_ENV'
+			//          * one inside the 'Environment' returned
+			Ok(Environment {
+				env: G_ENV.clone(),
+				execution_providers: self.execution_providers.clone()
+			})
 		}
 	}
 }
@@ -379,60 +345,55 @@ impl EnvBuilder {
 mod tests {
 	use std::sync::{RwLock, RwLockWriteGuard};
 
+	use once_cell::sync::Lazy;
 	use test_log::test;
 
 	use super::*;
 
-	impl G_ENV {
-		fn is_initialized(&self) -> bool {
-			Arc::strong_count(self) >= 2
-		}
+	fn is_env_initialized() -> bool {
+		Arc::strong_count(&G_ENV) >= 2
+	}
 
-		fn env_ptr(&self) -> *const sys::OrtEnv {
-			*self.lock().unwrap().env_ptr.get_mut()
-		}
+	fn env_ptr() -> *const sys::OrtEnv {
+		*G_ENV.lock().unwrap().env_ptr.get_mut()
 	}
 
 	struct ConcurrentTestRun {
 		lock: Arc<RwLock<()>>
 	}
 
-	lazy_static! {
-		static ref CONCURRENT_TEST_RUN: ConcurrentTestRun = ConcurrentTestRun { lock: Arc::new(RwLock::new(())) };
-	}
+	static CONCURRENT_TEST_RUN: Lazy<ConcurrentTestRun> = Lazy::new(|| ConcurrentTestRun { lock: Arc::new(RwLock::new(())) });
 
-	impl CONCURRENT_TEST_RUN {
-		fn single_test_run(&self) -> RwLockWriteGuard<()> {
-			self.lock.write().unwrap()
-		}
+	fn single_test_run() -> RwLockWriteGuard<'static, ()> {
+		CONCURRENT_TEST_RUN.lock.write().unwrap()
 	}
 
 	#[test]
 	fn env_is_initialized() {
-		let _run_lock = CONCURRENT_TEST_RUN.single_test_run();
+		let _run_lock = single_test_run();
 
-		assert!(!G_ENV.is_initialized());
-		assert_eq!(G_ENV.env_ptr(), std::ptr::null_mut());
+		assert!(!is_env_initialized());
+		assert_eq!(env_ptr(), std::ptr::null_mut());
 
 		let env = Environment::builder()
 			.with_name("env_is_initialized")
 			.with_log_level(LoggingLevel::Warning)
 			.build()
 			.unwrap();
-		assert!(G_ENV.is_initialized());
-		assert_ne!(G_ENV.env_ptr(), std::ptr::null_mut());
+		assert!(is_env_initialized());
+		assert_ne!(env_ptr(), std::ptr::null_mut());
 
 		std::mem::drop(env);
-		assert!(!G_ENV.is_initialized());
-		assert_eq!(G_ENV.env_ptr(), std::ptr::null_mut());
+		assert!(!is_env_initialized());
+		assert_eq!(env_ptr(), std::ptr::null_mut());
 	}
 
 	#[ignore]
 	#[test]
 	fn sequential_environment_creation() {
-		let _concurrent_run_lock_guard = CONCURRENT_TEST_RUN.single_test_run();
+		let _concurrent_run_lock_guard = single_test_run();
 
-		let mut prev_env_ptr = G_ENV.env_ptr();
+		let mut prev_env_ptr = env_ptr();
 
 		for i in 0..10 {
 			let name = format!("sequential_environment_creation: {}", i);
@@ -441,7 +402,7 @@ mod tests {
 				.with_log_level(LoggingLevel::Warning)
 				.build()
 				.unwrap();
-			let next_env_ptr = G_ENV.env_ptr();
+			let next_env_ptr = env_ptr();
 			assert_ne!(next_env_ptr, prev_env_ptr);
 			prev_env_ptr = next_env_ptr;
 
@@ -451,12 +412,14 @@ mod tests {
 
 	#[test]
 	fn concurrent_environment_creations() {
-		let _concurrent_run_lock_guard = CONCURRENT_TEST_RUN.single_test_run();
+		let _concurrent_run_lock_guard = single_test_run();
 
 		let initial_name = String::from("concurrent_environment_creation");
-		let main_env =
-			Environment::new(initial_name.clone(), LoggingLevel::Warning, Vec::new(), Environment::create_custom_log_env, vec![].into_iter().collect())
-				.unwrap();
+		let main_env = Environment::builder()
+			.with_name(&initial_name)
+			.with_log_level(LoggingLevel::Warning)
+			.build()
+			.unwrap();
 		let main_env_ptr = main_env.ptr() as usize;
 
 		assert_eq!(main_env.name(), initial_name);

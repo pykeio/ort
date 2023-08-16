@@ -4,6 +4,48 @@
 
 use crate::download::ModelUrl;
 
+/// Convolutional neural network for classification, which competed in the ImageNet Large Scale Visual Recognition
+/// Challenge in 2012.
+#[derive(Debug, Clone)]
+pub enum AlexNet {
+	/// AlexNet at full fp32 precision.
+	/// - **Size**: 233 MB
+	/// - **Top-1 accuracy**: 54.80%
+	/// - **Top-5 accuracy**: 78.23%
+	FullPrecision,
+	/// AlexNet at int8 precision.
+	/// - **Size**: 58 MB
+	/// - **Top-1 accuracy**: 54.68%
+	/// - **Top-5 accuracy**: 78.23%
+	Int8,
+	/// AlexNet with QDQ quantization.
+	/// - **Size**: 59 MB
+	/// - **Top-1 accuracy**: 54.71%
+	/// - **Top-5 accuracy**: 78.22%
+	QDQ
+}
+
+/// CaffeNet a variant of AlexNet. AlexNet is the name of a convolutional neural network for classification, which
+/// competed in the ImageNet Large Scale Visual Recognition Challenge in 2012.
+#[derive(Debug, Clone)]
+pub enum CaffeNet {
+	/// CaffeNet at full fp32 precision.
+	/// - **Size**: 233 MB
+	/// - **Top-1 accuracy**: 56.27%
+	/// - **Top-5 accuracy**: 79.52%
+	FullPrecision,
+	/// CaffeNet at int8 precision.
+	/// - **Size**: 58 MB
+	/// - **Top-1 accuracy**: 56.22%
+	/// - **Top-5 accuracy**: 79.52%
+	Int8,
+	/// CaffeNet with QDQ quantization.
+	/// - **Size**: 59 MB
+	/// - **Top-1 accuracy**: 56.26%
+	/// - **Top-5 accuracy**: 79.45%
+	QDQ
+}
+
 /// Models for image classification.
 #[derive(Debug, Clone)]
 pub enum ImageClassification {
@@ -14,11 +56,6 @@ pub enum ImageClassification {
 	/// > contains images from 1000 classes. MobileNet models are also very efficient in terms of speed and
 	/// > size and hence are ideal for embedded and mobile applications.
 	MobileNet,
-	/// Image classification, trained on ImageNet with 1000 classes.
-	///
-	/// > ResNet models provide very high accuracies with affordable model sizes. They are ideal for cases when
-	/// > high accuracy of classification is required.
-	ResNet(ResNet),
 	/// A small CNN with AlexNet level accuracy on ImageNet with 50x fewer parameters.
 	///
 	/// > SqueezeNet is a small CNN which achieves AlexNet level accuracy on ImageNet with 50x fewer parameters.
@@ -68,33 +105,73 @@ pub enum InceptionVersion {
 	V2
 }
 
-#[derive(Debug, Clone)]
-pub enum ResNet {
-	V1(ResNetV1),
-	V2(ResNetV2)
-}
-
+/// ResNet models perform image classification - they take images as input and classify the major object in the image
+/// into a set of pre-defined classes. They are trained on ImageNet dataset which contains images from 1000 classes.
+/// ResNet models provide very high accuracies with affordable model sizes. They are ideal for cases when high accuracy
+/// of classification is required.
 #[derive(Debug, Clone)]
 pub enum ResNetV1 {
 	/// ResNet v1 with 18 layers.
-	ResNet18,
+	/// - **Size**: 44.7 MB
+	/// - **Top-1 accuracy**: 69.93%
+	/// - **Top-5 accuracy**: 89.29%
+	L18,
 	/// ResNet v1 with 34 layers.
-	ResNet34,
+	/// - **Size**: 83.3 MB
+	/// - **Top-1 accuracy**: 73.73%
+	/// - **Top-5 accuracy**: 91.40%
+	L34,
 	/// ResNet v1 with 50 layers.
-	ResNet50,
+	/// - **Size**: 97.8 MB
+	/// - **Top-1 accuracy**: 74.93%
+	/// - **Top-5 accuracy**: 92.38%
+	L50,
 	/// ResNet v1 with 101 layers.
-	ResNet101,
+	/// - **Size**: 170.6 MB
+	/// - **Top-1 accuracy**: 76.48%
+	/// - **Top-5 accuracy**: 93.20%
+	L101,
 	/// ResNet v1 with 152 layers.
-	ResNet152
+	/// - **Size**: 230.6 MB
+	/// - **Top-1 accuracy**: 77.11%
+	/// - **Top-5 accuracy**: 93.61%
+	L152
 }
 
+/// ResNet models perform image classification - they take images as input and classify the major object in the image
+/// into a set of pre-defined classes. They are trained on ImageNet dataset which contains images from 1000 classes.
+/// ResNet models provide very high accuracies with affordable model sizes. They are ideal for cases when high accuracy
+/// of classification is required.
+///
+/// ResNet v2 uses pre-activation function, whereas [`ResNetV1`] uses post-activation for the residual blocks. ResNet v2
+/// models achieve slightly better top-5 accuracy than their ResNet v1 counterparts.
 #[derive(Debug, Clone)]
 pub enum ResNetV2 {
-	ResNet18,
-	ResNet34,
-	ResNet50,
-	ResNet101,
-	ResNet152
+	/// ResNet v2 with 18 layers.
+	/// - **Size**: 44.6 MB
+	/// - **Top-1 accuracy**: 69.70%
+	/// - **Top-5 accuracy**: 89.49%
+	L18,
+	/// ResNet v2 with 34 layers.
+	/// - **Size**: 83.2 MB
+	/// - **Top-1 accuracy**: 73.36%
+	/// - **Top-5 accuracy**: 91.43%
+	L34,
+	/// ResNet v2 with 50 layers.
+	/// - **Size**: 97.7 MB
+	/// - **Top-1 accuracy**: 75.81%
+	/// - **Top-5 accuracy**: 92.82%
+	L50,
+	/// ResNet v2 with 101 layers.
+	/// - **Size**: 170.4 MB
+	/// - **Top-1 accuracy**: 77.42%
+	/// - **Top-5 accuracy**: 93.61%
+	L101,
+	/// ResNet v2 with 152 layers.
+	/// - **Size**: 230.3 MB
+	/// - **Top-1 accuracy**: 78.20%
+	/// - **Top-5 accuracy**: 94.21%
+	L152
 }
 
 #[derive(Debug, Clone)]
@@ -124,13 +201,32 @@ pub enum ShuffleNetVersion {
 	V2
 }
 
+impl ModelUrl for AlexNet {
+	fn fetch_url(&self) -> &'static str {
+		match self {
+			AlexNet::FullPrecision => "https://github.com/onnx/models/raw/main/vision/classification/alexnet/model/bvlcalexnet-12.onnx",
+			AlexNet::Int8 => "https://github.com/onnx/models/raw/main/vision/classification/alexnet/model/bvlcalexnet-12-int8.onnx",
+			AlexNet::QDQ => "https://github.com/onnx/models/raw/main/vision/classification/alexnet/model/bvlcalexnet-12-qdq.onnx"
+		}
+	}
+}
+
+impl ModelUrl for CaffeNet {
+	fn fetch_url(&self) -> &'static str {
+		match self {
+			CaffeNet::FullPrecision => "https://github.com/onnx/models/raw/main/vision/classification/caffenet/model/caffenet-12.onnx",
+			CaffeNet::Int8 => "https://github.com/onnx/models/raw/main/vision/classification/caffenet/model/caffenet-12-int8.onnx",
+			CaffeNet::QDQ => "https://github.com/onnx/models/raw/main/vision/classification/caffenet/model/caffenet-12-qdq.onnx"
+		}
+	}
+}
+
 impl ModelUrl for ImageClassification {
 	fn fetch_url(&self) -> &'static str {
 		match self {
 			ImageClassification::MobileNet => "https://github.com/onnx/models/raw/main/vision/classification/mobilenet/model/mobilenetv2-7.onnx",
 			ImageClassification::SqueezeNet => "https://github.com/onnx/models/raw/main/vision/classification/squeezenet/model/squeezenet1.1-7.onnx",
 			ImageClassification::Inception(version) => version.fetch_url(),
-			ImageClassification::ResNet(version) => version.fetch_url(),
 			ImageClassification::Vgg(variant) => variant.fetch_url(),
 			ImageClassification::AlexNet => "https://github.com/onnx/models/raw/main/vision/classification/alexnet/model/bvlcalexnet-9.onnx",
 			ImageClassification::GoogleNet => {
@@ -161,23 +257,14 @@ impl ModelUrl for InceptionVersion {
 	}
 }
 
-impl ModelUrl for ResNet {
-	fn fetch_url(&self) -> &'static str {
-		match self {
-			ResNet::V1(variant) => variant.fetch_url(),
-			ResNet::V2(variant) => variant.fetch_url()
-		}
-	}
-}
-
 impl ModelUrl for ResNetV1 {
 	fn fetch_url(&self) -> &'static str {
 		match self {
-			ResNetV1::ResNet18 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet18-v1-7.onnx",
-			ResNetV1::ResNet34 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet34-v1-7.onnx",
-			ResNetV1::ResNet50 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet50-v1-7.onnx",
-			ResNetV1::ResNet101 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet101-v1-7.onnx",
-			ResNetV1::ResNet152 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet152-v1-7.onnx"
+			ResNetV1::L18 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet18-v1-7.onnx",
+			ResNetV1::L34 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet34-v1-7.onnx",
+			ResNetV1::L50 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet50-v1-7.onnx",
+			ResNetV1::L101 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet101-v1-7.onnx",
+			ResNetV1::L152 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet152-v1-7.onnx"
 		}
 	}
 }
@@ -185,11 +272,11 @@ impl ModelUrl for ResNetV1 {
 impl ModelUrl for ResNetV2 {
 	fn fetch_url(&self) -> &'static str {
 		match self {
-			ResNetV2::ResNet18 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet18-v2-7.onnx",
-			ResNetV2::ResNet34 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet34-v2-7.onnx",
-			ResNetV2::ResNet50 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet50-v2-7.onnx",
-			ResNetV2::ResNet101 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet101-v2-7.onnx",
-			ResNetV2::ResNet152 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet152-v2-7.onnx"
+			ResNetV2::L18 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet18-v2-7.onnx",
+			ResNetV2::L34 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet34-v2-7.onnx",
+			ResNetV2::L50 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet50-v2-7.onnx",
+			ResNetV2::L101 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet101-v2-7.onnx",
+			ResNetV2::L152 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet152-v2-7.onnx"
 		}
 	}
 }

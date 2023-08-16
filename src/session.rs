@@ -26,14 +26,20 @@ use super::{
 	error::{assert_non_null_pointer, assert_null_pointer, status_to_result, OrtApiError, OrtError, OrtResult},
 	execution_providers::{apply_execution_providers, ExecutionProvider},
 	extern_system_fn,
-	metadata::Metadata,
+	io_binding::IoBinding,
+	memory::Allocator,
+	metadata::ModelMetadata,
 	ort, ortsys, sys,
 	tensor::TensorElementDataType,
+	value::Value,
 	AllocatorType, GraphOptimizationLevel, MemType
 };
 #[cfg(feature = "fetch-models")]
 use super::{download::ModelUrl, error::OrtDownloadError};
-use crate::{io_binding::IoBinding, value::Value};
+
+pub(crate) mod input;
+pub(crate) mod output;
+pub use self::{input::SessionInputs, output::SessionOutputs};
 
 /// Type used to create a session using the _builder pattern_. Once created, you can use the different methods to
 /// configure the session.
@@ -59,6 +65,7 @@ use crate::{io_binding::IoBinding, value::Value};
 /// # Ok(())
 /// # }
 /// ```
+#[derive(Clone)]
 pub struct SessionBuilder {
 	env: Arc<Environment>,
 	session_options_ptr: *mut sys::OrtSessionOptions,
@@ -169,7 +176,8 @@ impl SessionBuilder {
 
 	/// Configure the session to disable per-session thread pool, instead using the environment's global thread pool.
 	/// This must be used with an environment created with
-	/// [`EnvBuilder::with_global_thread_pool`](crate::environment::EnvBuilder::with_global_thread_pool) enabled.
+	/// [`EnvironmentBuilder::with_global_thread_pool`](crate::environment::EnvironmentBuilder::with_global_thread_pool)
+	/// enabled.
 	pub fn with_disable_per_session_threads(self) -> OrtResult<Self> {
 		ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr) -> OrtError::CreateSessionOptions];
 		Ok(self)
@@ -222,6 +230,7 @@ impl SessionBuilder {
 		ortsys![unsafe EnableProfiling(self.session_options_ptr, profiling_file.as_ptr()) -> OrtError::CreateSessionOptions];
 		Ok(self)
 	}
+
 	/// Enables/disables memory pattern optimization. Disable it if the input size varies, i.e., dynamic batch
 	pub fn with_memory_pattern(self, enable: bool) -> OrtResult<Self> {
 		if enable {
@@ -245,8 +254,8 @@ impl SessionBuilder {
 	}
 
 	/// Registers a custom operator library with the given library path in the session.
-	pub fn with_custom_op_lib(mut self, lib_path: &str) -> OrtResult<Self> {
-		let path_cstr = CString::new(lib_path)?;
+	pub fn with_custom_op_lib(mut self, lib_path: impl AsRef<str>) -> OrtResult<Self> {
+		let path_cstr = CString::new(lib_path.as_ref())?;
 
 		let mut handle: *mut ::std::os::raw::c_void = std::ptr::null_mut();
 
@@ -254,16 +263,13 @@ impl SessionBuilder {
 
 		// per RegisterCustomOpsLibrary docs, release handle if there was an error and the handle
 		// is non-null
-		match status_to_result(status).map_err(OrtError::CreateSessionOptions) {
-			Ok(_) => {}
-			Err(e) => {
-				if !handle.is_null() {
-					// handle was written to, should release it
-					close_lib_handle(handle);
-				}
-
-				return Err(e);
+		if let Err(e) = status_to_result(status).map_err(OrtError::CreateSessionOptions) {
+			if !handle.is_null() {
+				// handle was written to, should release it
+				close_lib_handle(handle);
 			}
+
+			return Err(e);
 		}
 
 		self.custom_runtime_handles.push(handle);
@@ -373,23 +379,24 @@ impl SessionBuilder {
 		let mut session_ptr: *mut sys::OrtSession = std::ptr::null_mut();
 		ortsys![unsafe CreateSession(env_ptr, model_path.as_ptr(), self.session_options_ptr, &mut session_ptr) -> OrtError::CreateSession; nonNull(session_ptr)];
 
-		let mut allocator_ptr: *mut sys::OrtAllocator = std::ptr::null_mut();
-		ortsys![unsafe GetAllocatorWithDefaultOptions(&mut allocator_ptr) -> OrtError::CreateAllocator; nonNull(allocator_ptr)];
+		let allocator = Allocator::default();
 
 		// Extract input and output properties
 		let num_input_nodes = dangerous::extract_inputs_count(session_ptr)?;
 		let num_output_nodes = dangerous::extract_outputs_count(session_ptr)?;
 		let inputs = (0..num_input_nodes)
-			.map(|i| dangerous::extract_input(session_ptr, allocator_ptr, i))
+			.map(|i| dangerous::extract_input(session_ptr, allocator.ptr, i))
 			.collect::<OrtResult<Vec<Input>>>()?;
 		let outputs = (0..num_output_nodes)
-			.map(|i| dangerous::extract_output(session_ptr, allocator_ptr, i))
+			.map(|i| dangerous::extract_output(session_ptr, allocator.ptr, i))
 			.collect::<OrtResult<Vec<Output>>>()?;
 
 		Ok(Session {
-			env: Arc::clone(&self.env),
-			session_ptr: Arc::new(SessionPointerHolder { inner: session_ptr }),
-			allocator_ptr,
+			inner: Arc::new(SharedSessionInner {
+				env: Arc::clone(&self.env),
+				session_ptr,
+				allocator
+			}),
 			inputs,
 			outputs
 		})
@@ -439,8 +446,7 @@ impl SessionBuilder {
 
 		let env_ptr: *const sys::OrtEnv = self.env.ptr();
 
-		let mut allocator_ptr: *mut sys::OrtAllocator = std::ptr::null_mut();
-		ortsys![unsafe GetAllocatorWithDefaultOptions(&mut allocator_ptr) -> OrtError::CreateAllocator; nonNull(allocator_ptr)];
+		let allocator = Allocator::default();
 
 		let initializer_names: Vec<CString> = initializers
 			.iter()
@@ -465,23 +471,50 @@ impl SessionBuilder {
 		let num_input_nodes = dangerous::extract_inputs_count(session_ptr)?;
 		let num_output_nodes = dangerous::extract_outputs_count(session_ptr)?;
 		let inputs = (0..num_input_nodes)
-			.map(|i| dangerous::extract_input(session_ptr, allocator_ptr, i))
+			.map(|i| dangerous::extract_input(session_ptr, allocator.ptr, i))
 			.collect::<OrtResult<Vec<Input>>>()?;
 		let outputs = (0..num_output_nodes)
-			.map(|i| dangerous::extract_output(session_ptr, allocator_ptr, i))
+			.map(|i| dangerous::extract_output(session_ptr, allocator.ptr, i))
 			.collect::<OrtResult<Vec<Output>>>()?;
 
 		Ok(Session {
-			env: Arc::clone(&self.env),
-			session_ptr: Arc::new(SessionPointerHolder { inner: session_ptr }),
-			allocator_ptr,
+			inner: Arc::new(SharedSessionInner {
+				env: Arc::clone(&self.env),
+				session_ptr,
+				allocator
+			}),
 			inputs,
 			outputs
 		})
 	}
 
 	/// Load an ONNX graph from memory and commit the session.
-	pub fn with_model_from_memory(self, model_bytes: &[u8]) -> OrtResult<InMemorySession<'_>> {
+	///
+	/// For `.ort` models, we enable `session.use_ort_model_bytes_directly`. For more information, check
+	/// [Load ORT format model from an in-memory byte array][msdocs].
+	/// If you want to store the model file and the [`InMemorySession`] in same struct, please check crates for creating
+	/// self-referential structs, such as [`ouroboros`](https://github.com/joshua-maros/ouroboros).
+	///
+	/// [msdocs]: https://onnxruntime.ai/docs/performance/model-optimizations/ort-format-models.html#load-ort-format-model-from-an-in-memory-byte-array
+	pub fn with_model_from_memory_directly(self, model_bytes: &[u8]) -> OrtResult<InMemorySession<'_>> {
+		let str_to_char = |s: &str| {
+			s.as_bytes()
+				.iter()
+				.chain(std::iter::once(&b'\0')) // Make sure we have a null terminated string
+				.map(|b| *b as std::os::raw::c_char)
+				.collect::<Vec<std::os::raw::c_char>>()
+		};
+		// Enable zero-copy deserialization for models in `.ort` format.
+		ortsys![unsafe AddSessionConfigEntry(self.session_options_ptr, str_to_char("session.use_ort_model_bytes_directly").as_ptr(), str_to_char("1").as_ptr())];
+		ortsys![unsafe AddSessionConfigEntry(self.session_options_ptr, str_to_char("session.use_ort_model_bytes_for_initializers").as_ptr(), str_to_char("1").as_ptr())];
+
+		let session = self.with_model_from_memory(model_bytes)?;
+
+		Ok(InMemorySession { session, phantom: PhantomData })
+	}
+
+	/// Load an ONNX graph from memory and commit the session.
+	pub fn with_model_from_memory(self, model_bytes: &[u8]) -> OrtResult<Session> {
 		let mut session_ptr: *mut sys::OrtSession = std::ptr::null_mut();
 
 		let env_ptr: *const sys::OrtEnv = self.env.ptr();
@@ -513,52 +546,61 @@ impl SessionBuilder {
 			nonNull(session_ptr)
 		];
 
-		let mut allocator_ptr: *mut sys::OrtAllocator = std::ptr::null_mut();
-		ortsys![unsafe GetAllocatorWithDefaultOptions(&mut allocator_ptr) -> OrtError::CreateAllocator; nonNull(allocator_ptr)];
+		let allocator = Allocator::default();
 
 		// Extract input and output properties
 		let num_input_nodes = dangerous::extract_inputs_count(session_ptr)?;
 		let num_output_nodes = dangerous::extract_outputs_count(session_ptr)?;
 		let inputs = (0..num_input_nodes)
-			.map(|i| dangerous::extract_input(session_ptr, allocator_ptr, i))
+			.map(|i| dangerous::extract_input(session_ptr, allocator.ptr, i))
 			.collect::<OrtResult<Vec<Input>>>()?;
 		let outputs = (0..num_output_nodes)
-			.map(|i| dangerous::extract_output(session_ptr, allocator_ptr, i))
+			.map(|i| dangerous::extract_output(session_ptr, allocator.ptr, i))
 			.collect::<OrtResult<Vec<Output>>>()?;
 
 		let session = Session {
-			env: Arc::clone(&self.env),
-			session_ptr: Arc::new(SessionPointerHolder { inner: session_ptr }),
-			allocator_ptr,
+			inner: Arc::new(SharedSessionInner {
+				env: Arc::clone(&self.env),
+				session_ptr,
+				allocator
+			}),
 			inputs,
 			outputs
 		};
-		Ok(InMemorySession { session, phantom: PhantomData })
+		Ok(session)
 	}
 }
 
+/// Holds onto a C session and its allocator. This is wrapped in an [`Arc`] to ensure that [`Value`]s returned by the
+/// session keep their memory alive until all references to the session are dropped.
 #[derive(Debug)]
-pub struct SessionPointerHolder {
-	pub inner: *mut sys::OrtSession
+pub struct SharedSessionInner {
+	// hold onto an environment arc to ensure the environment also stays alive
+	#[allow(dead_code)]
+	env: Arc<Environment>,
+	pub(crate) session_ptr: *mut sys::OrtSession,
+	allocator: Allocator
 }
 
-unsafe impl Send for SessionPointerHolder {}
-unsafe impl Sync for SessionPointerHolder {}
+unsafe impl Send for SharedSessionInner {}
+unsafe impl Sync for SharedSessionInner {}
 
-impl Drop for SessionPointerHolder {
+impl Drop for SharedSessionInner {
+	#[tracing::instrument(skip_all)]
 	fn drop(&mut self) {
-		ortsys![unsafe ReleaseSession(self.inner)];
-		self.inner = std::ptr::null_mut();
+		tracing::warn!("dropping SharedSessionInner");
+		if !self.session_ptr.is_null() {
+			tracing::warn!("dropping session ptr");
+			ortsys![unsafe ReleaseSession(self.session_ptr)];
+		}
+		self.session_ptr = std::ptr::null_mut();
 	}
 }
 
 /// Type storing the session information, built from an [`Environment`](environment/struct.Environment.html)
 #[derive(Debug)]
 pub struct Session {
-	#[allow(dead_code)]
-	env: Arc<Environment>,
-	pub(crate) session_ptr: Arc<SessionPointerHolder>,
-	allocator_ptr: *mut sys::OrtAllocator,
+	pub(crate) inner: Arc<SharedSessionInner>,
 	/// Information about the ONNX's inputs as stored in loaded file
 	pub inputs: Vec<Input>,
 	/// Information about the ONNX's outputs as stored in loaded file
@@ -626,47 +668,58 @@ impl Output {
 	}
 }
 
-impl Drop for Session {
-	#[tracing::instrument]
-	fn drop(&mut self) {
-		self.allocator_ptr = std::ptr::null_mut();
-	}
-}
-
 impl Session {
-	pub fn allocator(&self) -> *mut sys::OrtAllocator {
-		self.allocator_ptr
+	/// Returns this session's [`Allocator`].
+	pub fn allocator(&self) -> &Allocator {
+		&self.inner.allocator
 	}
 
-	pub fn bind(&self) -> OrtResult<IoBinding> {
+	/// Creates a new [`IoBinding`] for this session.
+	pub fn create_binding(&self) -> OrtResult<IoBinding> {
 		IoBinding::new(self)
 	}
 
+	/// Get an [`Arc`] reference to the underlying [`SharedSessionInner`], containing the C session and allocator.
+	pub fn inner(&self) -> Arc<SharedSessionInner> {
+		Arc::clone(&self.inner)
+	}
+
 	/// Run the input data through the ONNX graph, performing inference.
-	///
-	/// Note that ONNX models can have multiple inputs; a `Vec<_>` is thus
-	/// used for the input data here.
-	pub fn run<'s, 'm, 'v, 'i>(&'s self, input_values: Vec<Value<'v>>) -> OrtResult<Vec<Value<'static>>>
+	pub fn run<'s, 'm, 'v, 'i>(&'s self, input_values: impl Into<SessionInputs<'s, 'v>>) -> OrtResult<SessionOutputs>
 	where
 		's: 'm, // 's outlives 'm (session outlives memory info)
 		'i: 'v
 	{
-		// Build arguments to Run()
+		let input_values = input_values.into();
+		if let SessionInputs::IoBinding(binding) = input_values {
+			return binding.run();
+		}
 
-		let input_names_ptr: Vec<*const c_char> = self
-			.inputs
-			.iter()
-			.map(|input| input.name.clone())
+		match input_values {
+			SessionInputs::ValueVec(input_values) => {
+				let outputs = self.run_inner(self.inputs.iter().map(|input| input.name.clone()).collect(), &input_values)?;
+				Ok(outputs)
+			}
+			SessionInputs::ValueMap(input_values) => {
+				let (input_names, values): (Vec<String>, Vec<Value<'_>>) = input_values.into_iter().unzip();
+				self.run_inner(input_names, &values)
+			}
+			_ => panic!()
+		}
+	}
+
+	fn run_inner<'s, 'm, 'v, 'i>(&'s self, input_names: Vec<String>, input_values: &[Value<'v>]) -> OrtResult<SessionOutputs>
+	where
+		's: 'm, // 's outlives 'm (session outlives memory info)
+		'i: 'v
+	{
+		let input_names_ptr: Vec<*const c_char> = input_names
+			.into_iter()
 			.map(|n| CString::new(n).unwrap())
 			.map(|n| n.into_raw() as *const c_char)
 			.collect();
-
-		let output_names_cstring: Vec<CString> = self
-			.outputs
-			.iter()
-			.map(|output| output.name.clone())
-			.map(|n| CString::new(n).unwrap())
-			.collect();
+		let output_names: Vec<String> = self.outputs.iter().map(|output| output.name.clone()).collect();
+		let output_names_cstring: Vec<CString> = output_names.iter().cloned().map(|n| CString::new(n).unwrap()).collect();
 		let output_names_ptr: Vec<*const c_char> = output_names_cstring.iter().map(|n| n.as_ptr() as *const c_char).collect();
 
 		let mut output_tensor_ptrs: Vec<*mut sys::OrtValue> = vec![std::ptr::null_mut(); self.outputs.len()];
@@ -678,7 +731,7 @@ impl Session {
 
 		ortsys![
 			unsafe Run(
-				self.session_ptr.inner,
+				self.inner.session_ptr,
 				run_options_ptr,
 				input_names_ptr.as_ptr(),
 				input_ort_values.as_ptr(),
@@ -693,7 +746,7 @@ impl Session {
 
 		let outputs: Vec<Value> = output_tensor_ptrs
 			.into_iter()
-			.map(|tensor_ptr| Value::from_raw(tensor_ptr, Arc::clone(&self.session_ptr)))
+			.map(|tensor_ptr| unsafe { Value::from_raw(tensor_ptr, Arc::clone(&self.inner)) })
 			.collect();
 
 		// Reconvert to CString so drop impl is called and memory is freed
@@ -706,20 +759,14 @@ impl Session {
 			.collect();
 		cstrings?;
 
-		Ok(outputs)
-	}
-
-	pub fn run_with_binding<'s, 'a: 's>(&'a self, binding: &IoBinding<'s>) -> OrtResult<()> {
-		let run_options_ptr: *const sys::OrtRunOptions = std::ptr::null();
-		ortsys![unsafe RunWithBinding(self.session_ptr.inner, run_options_ptr, binding.ptr) -> OrtError::SessionRun];
-		Ok(())
+		Ok(SessionOutputs::new(output_names, outputs))
 	}
 
 	/// Gets the session model metadata. See [`Metadata`] for more info.
-	pub fn metadata(&self) -> OrtResult<Metadata> {
+	pub fn metadata(&self) -> OrtResult<ModelMetadata> {
 		let mut metadata_ptr: *mut sys::OrtModelMetadata = std::ptr::null_mut();
-		ortsys![unsafe SessionGetModelMetadata(self.session_ptr.inner, &mut metadata_ptr) -> OrtError::GetModelMetadata; nonNull(metadata_ptr)];
-		Ok(Metadata::new(metadata_ptr, self.allocator_ptr))
+		ortsys![unsafe SessionGetModelMetadata(self.inner.session_ptr, &mut metadata_ptr) -> OrtError::GetModelMetadata; nonNull(metadata_ptr)];
+		Ok(ModelMetadata::new(metadata_ptr, self.inner.allocator.ptr))
 	}
 
 	/// Ends profiling for this session.
@@ -729,9 +776,9 @@ impl Session {
 	pub fn end_profiling(&self) -> OrtResult<String> {
 		let mut profiling_name: *mut c_char = std::ptr::null_mut();
 
-		ortsys![unsafe SessionEndProfiling(self.session_ptr.inner, self.allocator_ptr, &mut profiling_name)];
+		ortsys![unsafe SessionEndProfiling(self.inner.session_ptr, self.inner.allocator.ptr, &mut profiling_name)];
 		assert_non_null_pointer(profiling_name, "ProfilingName")?;
-		dangerous::raw_pointer_to_string(self.allocator_ptr, profiling_name)
+		dangerous::raw_pointer_to_string(self.inner.allocator.ptr, profiling_name)
 	}
 }
 

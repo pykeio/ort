@@ -4,14 +4,15 @@ use ndarray::{Array, ArrayView, CowArray, Dimension, IxDyn};
 
 use crate::{
 	error::assert_non_null_pointer,
-	memory::MemoryInfo,
+	memory::{Allocator, MemoryInfo},
 	ortsys,
-	session::SessionPointerHolder,
+	session::SharedSessionInner,
 	sys,
 	tensor::{IntoTensorElementDataType, OrtOwnedTensor, TensorDataToType, TensorElementDataType},
 	AllocatorType, MemType, OrtError, OrtResult
 };
 
+#[doc(hidden)]
 #[derive(Debug)]
 pub enum DynArrayRef<'v> {
 	Float(CowArray<'v, f32, IxDyn>),
@@ -93,31 +94,53 @@ impl_convert_trait!(bool, DynArrayRef::Bool);
 impl_convert_trait!(String, DynArrayRef::String);
 
 #[derive(Debug)]
-pub enum Value<'v> {
+pub(crate) enum ValueInner<'v> {
 	RustOwned {
 		ptr: *mut sys::OrtValue,
-		array: DynArrayRef<'v>,
-		memory_info: MemoryInfo
+		_array: DynArrayRef<'v>,
+		_memory_info: MemoryInfo
 	},
 	CppOwned {
 		ptr: *mut sys::OrtValue,
-		session: Arc<SessionPointerHolder>
+		/// Hold [`SharedSessionInner`] to ensure that the value can stay alive after the main session is dropped.
+		_session: Arc<SharedSessionInner>
 	}
+}
+
+/// A [`Value`] contains data for inputs/outputs in ONNX Runtime graphs. [`Value`]s can hold a tensor, sequence (array),
+/// or map.
+///
+/// Similar to [`std::borrow::Cow`], [`Value`] has two forms; a value containing data owned by Rust (`Value<'v>`), or a
+/// value containing data owned by ONNX Runtime in C++ (`Value<'static>`). Note that ORT-owned values will prevent the
+/// session from being dropped until all values are dropped; to prevent this behavior, extract the data with
+/// [`Value::extract_tensor`], clone the resulting ndarray, and drop the value.
+#[derive(Debug)]
+pub struct Value<'v> {
+	inner: ValueInner<'v>
 }
 
 unsafe impl<'v> Send for Value<'v> {}
 unsafe impl<'v> Sync for Value<'v> {}
 
 impl Value<'static> {
-	pub fn from_raw(ptr: *mut sys::OrtValue, session: Arc<SessionPointerHolder>) -> Value<'static> {
-		Value::CppOwned { ptr, session }
+	/// Construct a [`Value`] from a C++ [`sys::OrtValue`] pointer.
+	///
+	/// # Safety
+	///
+	/// - `ptr` must not be null.
+	pub unsafe fn from_raw(ptr: *mut sys::OrtValue, session: Arc<SharedSessionInner>) -> Value<'static> {
+		Value {
+			inner: ValueInner::CppOwned { ptr, _session: session }
+		}
 	}
 }
 
 impl<'v> Value<'v> {
-	#[allow(clippy::not_unsafe_ptr_arg_deref)]
+	/// Construct a [`Value`] from a Rust-owned [`CowArray`].
+	///
+	/// `allocator` is required to be `Some` when converting a String tensor. See [`crate::Session::allocator`].
 	pub fn from_array<'i, T: IntoTensorElementDataType + Debug + Clone>(
-		allocator_ptr: *mut sys::OrtAllocator,
+		allocator: Option<&Allocator>,
 		array: &'i CowArray<'v, T, IxDyn>
 	) -> OrtResult<Value<'v>>
 	where
@@ -193,9 +216,10 @@ impl<'v> Value<'v> {
 				assert_eq!(is_tensor, 1);
 			}
 			TensorElementDataType::String => {
+				let allocator = allocator.ok_or(OrtError::StringTensorRequiresAllocator)?;
 				// create tensor without data -- data is filled in later
 				ortsys![
-					unsafe CreateTensorAsOrtValue(allocator_ptr, shape_ptr, shape_len as _, T::tensor_element_data_type().into(), value_ptr_ptr)
+					unsafe CreateTensorAsOrtValue(allocator.ptr, shape_ptr, shape_len as _, T::tensor_element_data_type().into(), value_ptr_ptr)
 						-> OrtError::CreateTensor
 				];
 
@@ -217,27 +241,33 @@ impl<'v> Value<'v> {
 
 		assert_non_null_pointer(value_ptr, "Value")?;
 
-		Ok(Value::RustOwned {
-			ptr: value_ptr,
-			array: contiguous_array.into(),
-			memory_info
+		Ok(Value {
+			inner: ValueInner::RustOwned {
+				ptr: value_ptr,
+				_array: contiguous_array.into(),
+				_memory_info: memory_info
+			}
 		})
 	}
 
-	pub fn ptr(&self) -> *mut sys::OrtValue {
-		match self {
-			Self::CppOwned { ptr, .. } => *ptr,
-			Self::RustOwned { ptr, .. } => *ptr
+	pub(crate) fn ptr(&self) -> *mut sys::OrtValue {
+		match &self.inner {
+			ValueInner::CppOwned { ptr, .. } => *ptr,
+			ValueInner::RustOwned { ptr, .. } => *ptr
 		}
 	}
 
+	/// Returns `true` if this value is a tensor, or false if it is another type (sequence, map)
 	pub fn is_tensor(&self) -> OrtResult<bool> {
 		let mut result = 0;
 		ortsys![unsafe IsTensor(self.ptr(), &mut result) -> OrtError::GetTensorElementType];
 		Ok(result == 1)
 	}
 
-	pub fn try_extract<'t, T>(&self) -> OrtResult<OrtOwnedTensor<'t, T, IxDyn>>
+	/// Attempt to extract the underlying data into a Rust `ndarray`.
+	///
+	/// The resulting array will be wrapped within an [`OrtOwnedTensor`].
+	pub fn extract_tensor<'t, T>(&self) -> OrtResult<OrtOwnedTensor<'t, T, IxDyn>>
 	where
 		T: TensorDataToType + Clone + Debug,
 		'v: 't
@@ -283,12 +313,25 @@ impl<'v> Value<'v> {
 	}
 }
 
+impl<'i, 'v, T> TryFrom<&'i CowArray<'v, T, IxDyn>> for Value<'v>
+where
+	'i: 'v,
+	T: IntoTensorElementDataType + Debug + Clone,
+	DynArrayRef<'v>: From<CowArray<'v, T, IxDyn>>
+{
+	type Error = OrtError;
+
+	fn try_from(value: &'i CowArray<'v, T, IxDyn>) -> OrtResult<Self> {
+		Value::from_array(None, value)
+	}
+}
+
 impl<'v> Drop for Value<'v> {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleaseValue(self.ptr())];
-		match self {
-			Self::CppOwned { ptr, .. } => *ptr = ptr::null_mut(),
-			Self::RustOwned { ptr, .. } => *ptr = ptr::null_mut()
+		match &mut self.inner {
+			ValueInner::CppOwned { ptr, .. } => *ptr = ptr::null_mut(),
+			ValueInner::RustOwned { ptr, .. } => *ptr = ptr::null_mut()
 		}
 	}
 }

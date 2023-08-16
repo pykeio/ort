@@ -1,16 +1,16 @@
 #![doc = include_str!("../README.md")]
 
 pub mod download;
-pub mod environment;
-pub mod error;
-pub mod execution_providers;
-pub mod io_binding;
-pub mod memory;
-pub mod metadata;
+pub(crate) mod environment;
+pub(crate) mod error;
+pub(crate) mod execution_providers;
+pub(crate) mod io_binding;
+pub(crate) mod memory;
+pub(crate) mod metadata;
 pub mod session;
 pub mod sys;
-pub mod tensor;
-pub mod value;
+pub(crate) mod tensor;
+pub(crate) mod value;
 
 use std::{
 	ffi::{self, CStr},
@@ -19,16 +19,25 @@ use std::{
 	sync::{atomic::AtomicPtr, Arc, Mutex}
 };
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use tracing::warn;
 
-pub use self::environment::Environment;
+pub use self::environment::{Environment, EnvironmentBuilder};
+#[cfg(feature = "fetch-models")]
+pub use self::error::OrtDownloadError;
 pub use self::error::{OrtApiError, OrtError, OrtResult};
-pub use self::execution_providers::ExecutionProvider;
+pub use self::execution_providers::{
+	ACLExecutionProviderOptions, ArenaExtendStrategy, CPUExecutionProviderOptions, CUDAExecutionProviderCuDNNConvAlgoSearch, CUDAExecutionProviderOptions,
+	CoreMLExecutionProviderOptions, DirectMLExecutionProviderOptions, ExecutionProvider, NNAPIExecutionProviderOptions, OneDNNExecutionProviderOptions,
+	OpenVINOExecutionProviderOptions, ROCmExecutionProviderOptions, TensorRTExecutionProviderOptions
+};
 pub use self::io_binding::IoBinding;
 pub use self::memory::{AllocationDevice, MemoryInfo};
-pub use self::session::{InMemorySession, Session, SessionBuilder};
-pub use self::tensor::NdArrayExtensions;
+pub use self::metadata::ModelMetadata;
+pub use self::session::{InMemorySession, Session, SessionBuilder, SessionInputs, SessionOutputs, SharedSessionInner};
+pub use self::tensor::{
+	ort_owned_tensor::ViewHolder, IntoTensorElementDataType, NdArrayExtensions, OrtOwnedTensor, TensorData, TensorDataToType, TensorElementDataType
+};
 pub use self::value::Value;
 
 #[cfg(not(all(target_arch = "x86", target_os = "windows")))]
@@ -49,80 +58,77 @@ macro_rules! extern_system_fn {
 pub(crate) use extern_system_fn;
 
 #[cfg(feature = "load-dynamic")]
-lazy_static! {
-	pub(crate) static ref G_ORT_DYLIB_PATH: Arc<String> = {
-		let path = match std::env::var("ORT_DYLIB_PATH") {
-			Ok(s) if !s.is_empty() => s,
-			#[cfg(target_os = "windows")]
-			_ => "onnxruntime.dll".to_owned(),
-			#[cfg(any(target_os = "linux", target_os = "android"))]
-			_ => "libonnxruntime.so".to_owned(),
-			#[cfg(target_os = "macos")]
-			_ => "libonnxruntime.dylib".to_owned()
+pub(crate) static G_ORT_DYLIB_PATH: Lazy<Arc<String>> = Lazy::new(|| {
+	let path = match std::env::var("ORT_DYLIB_PATH") {
+		Ok(s) if !s.is_empty() => s,
+		#[cfg(target_os = "windows")]
+		_ => "onnxruntime.dll".to_owned(),
+		#[cfg(any(target_os = "linux", target_os = "android"))]
+		_ => "libonnxruntime.so".to_owned(),
+		#[cfg(target_os = "macos")]
+		_ => "libonnxruntime.dylib".to_owned()
+	};
+	Arc::new(path)
+});
+#[cfg(feature = "load-dynamic")]
+pub(crate) static G_ORT_LIB: Lazy<Arc<Mutex<AtomicPtr<libloading::Library>>>> = Lazy::new(|| {
+	unsafe {
+		// resolve path relative to executable
+		let path: std::path::PathBuf = (&**G_ORT_DYLIB_PATH).into();
+		let absolute_path = if path.is_absolute() {
+			path
+		} else {
+			let relative = std::env::current_exe()
+				.expect("could not get current executable path")
+				.parent()
+				.unwrap()
+				.join(&path);
+			if relative.exists() { relative } else { path }
 		};
-		Arc::new(path)
-	};
-	pub(crate) static ref G_ORT_LIB: Arc<Mutex<AtomicPtr<libloading::Library>>> = {
-		unsafe {
-			// resolve path relative to executable
-			let path: std::path::PathBuf = (&**G_ORT_DYLIB_PATH).into();
-			let absolute_path = if path.is_absolute() {
-				path
-			} else {
-				let relative = std::env::current_exe().expect("could not get current executable path").parent().unwrap().join(&path);
-				if relative.exists() {
-					relative
-				} else {
-					path
-				}
-			};
-			let lib = libloading::Library::new(&absolute_path).unwrap_or_else(|e| panic!("could not load the library at `{}`: {e:?}", absolute_path.display()));
-			Arc::new(Mutex::new(AtomicPtr::new(Box::leak(Box::new(lib)) as *mut _)))
-		}
-	};
-}
+		let lib = libloading::Library::new(&absolute_path).unwrap_or_else(|e| panic!("could not load the library at `{}`: {e:?}", absolute_path.display()));
+		Arc::new(Mutex::new(AtomicPtr::new(Box::leak(Box::new(lib)) as *mut _)))
+	}
+});
 
-lazy_static! {
-	pub(crate) static ref G_ORT_API: Arc<Mutex<AtomicPtr<sys::OrtApi>>> = {
-		#[cfg(feature = "load-dynamic")]
-		unsafe {
-			let dylib = *G_ORT_LIB
-				.lock()
-				.expect("failed to acquire ONNX Runtime dylib lock; another thread panicked?")
-				.get_mut();
-			let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const sys::OrtApiBase> = (*dylib).get(b"OrtGetApiBase").expect("");
-			let base: *const sys::OrtApiBase = base_getter();
-			assert_ne!(base, ptr::null());
+pub(crate) static G_ORT_API: Lazy<Arc<Mutex<AtomicPtr<sys::OrtApi>>>> = Lazy::new(|| {
+	#[cfg(feature = "load-dynamic")]
+	unsafe {
+		let dylib = *G_ORT_LIB
+			.lock()
+			.expect("failed to acquire ONNX Runtime dylib lock; another thread panicked?")
+			.get_mut();
+		let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const sys::OrtApiBase> = (*dylib).get(b"OrtGetApiBase").expect("");
+		let base: *const sys::OrtApiBase = base_getter();
+		assert_ne!(base, ptr::null());
 
-			let get_version_string: extern_system_fn! { unsafe fn () -> *const ffi::c_char } = (*base).GetVersionString.unwrap();
-			let version_string = get_version_string();
-			let version_string = CStr::from_ptr(version_string).to_string_lossy();
-			let lib_minor_version = version_string.split('.').nth(1).map(|x| x.parse::<u32>().unwrap_or(0)).unwrap_or(0);
-			match lib_minor_version.cmp(&14) {
-				std::cmp::Ordering::Less => panic!(
-					"ort 1.14 is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.14.x', but got '{version_string}'",
-					**G_ORT_DYLIB_PATH
-				),
-				std::cmp::Ordering::Greater => warn!(
-					"ort 1.14 may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.14.x', but got '{version_string}'",
-					**G_ORT_DYLIB_PATH
-				),
-				std::cmp::Ordering::Equal => {}
-			};
-			let get_api: extern_system_fn! { unsafe fn(u32) -> *const sys::OrtApi } = (*base).GetApi.unwrap();
-			let api: *const sys::OrtApi = get_api(sys::ORT_API_VERSION);
-			Arc::new(Mutex::new(AtomicPtr::new(api as *mut sys::OrtApi)))
-		}
-		#[cfg(not(feature = "load-dynamic"))]
-		{
-			let base: *const sys::OrtApiBase = unsafe { sys::OrtGetApiBase() };
-			assert_ne!(base, ptr::null());
-			let get_api: extern_system_fn! { unsafe fn(u32) -> *const sys::OrtApi } = unsafe { (*base).GetApi.unwrap() };
-			let api: *const sys::OrtApi = unsafe { get_api(sys::ORT_API_VERSION) };
-			Arc::new(Mutex::new(AtomicPtr::new(api as *mut sys::OrtApi)))
-		}
-	};
-}
+		let get_version_string: extern_system_fn! { unsafe fn () -> *const ffi::c_char } = (*base).GetVersionString.unwrap();
+		let version_string = get_version_string();
+		let version_string = CStr::from_ptr(version_string).to_string_lossy();
+		let lib_minor_version = version_string.split('.').nth(1).map(|x| x.parse::<u32>().unwrap_or(0)).unwrap_or(0);
+		match lib_minor_version.cmp(&15) {
+			std::cmp::Ordering::Less => panic!(
+				"ort 2.0 is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.15.x', but got '{version_string}'",
+				**G_ORT_DYLIB_PATH
+			),
+			std::cmp::Ordering::Greater => warn!(
+				"ort 2.0 may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.15.x', but got '{version_string}'",
+				**G_ORT_DYLIB_PATH
+			),
+			std::cmp::Ordering::Equal => {}
+		};
+		let get_api: extern_system_fn! { unsafe fn(u32) -> *const sys::OrtApi } = (*base).GetApi.unwrap();
+		let api: *const sys::OrtApi = get_api(sys::ORT_API_VERSION);
+		Arc::new(Mutex::new(AtomicPtr::new(api as *mut sys::OrtApi)))
+	}
+	#[cfg(not(feature = "load-dynamic"))]
+	{
+		let base: *const sys::OrtApiBase = unsafe { sys::OrtGetApiBase() };
+		assert_ne!(base, ptr::null());
+		let get_api: extern_system_fn! { unsafe fn(u32) -> *const sys::OrtApi } = unsafe { (*base).GetApi.unwrap() };
+		let api: *const sys::OrtApi = unsafe { get_api(sys::ORT_API_VERSION) };
+		Arc::new(Mutex::new(AtomicPtr::new(api as *mut sys::OrtApi)))
+	}
+});
 
 /// Attempts to acquire the global [`sys::OrtApi`] object.
 ///
@@ -156,10 +162,11 @@ macro_rules! ortsys {
 		$crate::ort().$method.unwrap()($($n),+);
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	};
-	(unsafe $method:tt($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {
-		unsafe { $crate::ort().$method.unwrap()($($n),+) };
-		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
-	};
+	(unsafe $method:tt($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {{
+		let _x = unsafe { $crate::ort().$method.unwrap()($($n),+) };
+		$($crate::error::assert_non_null_pointer($check, stringify!($method)).unwrap();)+
+		_x
+	}};
 	($method:tt($($n:expr),+ $(,)?) -> $err:expr$(;)?) => {
 		$crate::error::status_to_result($crate::ort().$method.unwrap()($($n),+)).map_err($err)?;
 	};
@@ -170,10 +177,10 @@ macro_rules! ortsys {
 		$crate::error::status_to_result($crate::ort().$method.unwrap()($($n),+)).map_err($err)?;
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	};
-	(unsafe $method:tt($($n:expr),+ $(,)?) -> $err:expr; nonNull($($check:expr),+ $(,)?)$(;)?) => {
+	(unsafe $method:tt($($n:expr),+ $(,)?) -> $err:expr; nonNull($($check:expr),+ $(,)?)$(;)?) => {{
 		$crate::error::status_to_result(unsafe { $crate::ort().$method.unwrap()($($n),+) }).map_err($err)?;
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
-	};
+	}};
 }
 
 macro_rules! ortfree {

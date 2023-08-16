@@ -57,7 +57,9 @@ impl FromStr for Architecture {
 			"x86_64" => Ok(Architecture::X86_64),
 			"arm" => Ok(Architecture::Arm),
 			"aarch64" => Ok(Architecture::Arm64),
-			_ => Err(format!("Unsupported architecture: {s}"))
+			_ => Err(format!(
+				"Unsupported architecture for binary download: {s}\nMicrosoft does not provide prebuilt binaries for this platform.\nYou'll need to build ONNX Runtime from source, disable the `download-binaries` feature, and link `ort` to your compiled libraries. See https://github.com/pykeio/ort#how-to-get-binaries"
+			))
 		}
 	}
 }
@@ -103,7 +105,9 @@ impl FromStr for Os {
 			"windows" => Ok(Os::Windows),
 			"linux" => Ok(Os::Linux),
 			"macos" => Ok(Os::MacOS),
-			_ => Err(format!("Unsupported OS: {s}"))
+			_ => Err(format!(
+				"Unsupported OS for binary download: {s}\nMicrosoft does not provide prebuilt binaries for this platform.\nYou'll need to build ONNX Runtime from source, disable the `download-binaries` feature, and link `ort` to your compiled libraries. See https://github.com/pykeio/ort#how-to-get-binaries"
+			))
 		}
 	}
 }
@@ -250,7 +254,7 @@ fn extract_archive(filename: &Path, output: &Path) {
 
 #[cfg(all(feature = "download-binaries", not(target_os = "windows")))]
 fn extract_tgz(filename: &Path, output: &Path) {
-	let file = fs::File::open(&filename).unwrap();
+	let file = fs::File::open(filename).unwrap();
 	let buf = io::BufReader::new(file);
 	let tar = flate2::read::GzDecoder::new(buf);
 	let mut archive = tar::Archive::new(tar);
@@ -321,7 +325,7 @@ fn system_strategy() -> (PathBuf, bool) {
 		if target_os.contains("windows") { format!("{}.lib", a) } else { format!("lib{}.a", a) }
 	};
 
-	let mut profile = String::new();
+	let mut profile = String::default();
 	for i in ["Release", "Debug", "MinSizeRel", "RelWithDebInfo"] {
 		if lib_dir.join(i).exists() && lib_dir.join(i).join(platform_format_lib("onnxruntime_common")).exists() {
 			profile = String::from(i);
@@ -472,7 +476,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 			}
 
 			println!("cargo:rustc-link-lib=add_ort_library_path_or_enable_feature_download-binaries_see_ort_docs");
-			(Default::default(), false)
+			(PathBuf::default(), false)
 		}
 		"system" => system_strategy(),
 		"compile" => {

@@ -94,7 +94,7 @@ pub struct CUDAExecutionProviderOptions {
 	pub device_id: u32,
 	/// The size limit of the device memory arena in bytes. This size limit is only for the execution provider’s arena.
 	/// The total device memory usage may be higher.
-	pub gpu_mem_limit: usize,
+	pub gpu_mem_limit: size_t,
 	/// The strategy for extending the device memory arena. See [`ArenaExtendStrategy`].
 	pub arena_extend_strategy: ArenaExtendStrategy,
 	/// ORT leverages cuDNN for convolution operations and the first step in this process is to determine an
@@ -155,7 +155,7 @@ impl Default for CUDAExecutionProviderOptions {
 	fn default() -> Self {
 		Self {
 			device_id: 0,
-			gpu_mem_limit: usize::MAX,
+			gpu_mem_limit: size_t::MAX,
 			arena_extend_strategy: ArenaExtendStrategy::NextPowerOfTwo,
 			cudnn_conv_algo_search: CUDAExecutionProviderCuDNNConvAlgoSearch::Exhaustive,
 			do_copy_in_default_stream: true,
@@ -208,12 +208,12 @@ impl Default for TensorRTExecutionProviderOptions {
 			min_subgraph_size: 1,
 			fp16_enable: false,
 			int8_enable: false,
-			int8_calibration_table_name: String::new(),
+			int8_calibration_table_name: String::default(),
 			int8_use_native_calibration_table: false,
 			dla_enable: false,
 			dla_core: 0,
 			engine_cache_enable: false,
-			engine_cache_path: String::new(),
+			engine_cache_path: String::default(),
 			dump_subgraphs: false,
 			force_sequential_engine_build: false,
 			enable_context_memory_sharing: false,
@@ -225,11 +225,11 @@ impl Default for TensorRTExecutionProviderOptions {
 			enable_sparsity: false,
 			builder_optimization_level: 3,
 			auxiliary_streams: -1,
-			tactic_sources: String::new(),
-			extra_plugin_lib_paths: String::new(),
-			profile_min_shapes: String::new(),
-			profile_max_shapes: String::new(),
-			profile_opt_shapes: String::new()
+			tactic_sources: String::default(),
+			extra_plugin_lib_paths: String::default(),
+			profile_min_shapes: String::default(),
+			profile_max_shapes: String::default(),
+			profile_opt_shapes: String::default()
 		}
 	}
 }
@@ -302,7 +302,7 @@ pub struct DirectMLExecutionProviderOptions {
 	pub device_id: u32
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ROCmExecutionProviderOptions {
 	pub device_id: i32,
 	pub miopen_conv_exhaustive_search: bool,
@@ -313,6 +313,22 @@ pub struct ROCmExecutionProviderOptions {
 	pub default_memory_arena_cfg: Option<*mut sys::OrtArenaCfg>,
 	pub tunable_op_enable: bool,
 	pub tunable_op_tuning_enable: bool
+}
+
+impl Default for ROCmExecutionProviderOptions {
+	fn default() -> Self {
+		Self {
+			device_id: 0,
+			miopen_conv_exhaustive_search: false,
+			gpu_mem_limit: size_t::MAX,
+			arena_extend_strategy: ArenaExtendStrategy::NextPowerOfTwo,
+			do_copy_in_default_stream: true,
+			user_compute_stream: None,
+			default_memory_arena_cfg: None,
+			tunable_op_enable: false,
+			tunable_op_tuning_enable: false
+		}
+	}
 }
 
 #[derive(Debug, Clone, Default)]
@@ -333,6 +349,67 @@ pub struct NNAPIExecutionProviderOptions {
 	/// loss, which is useful for validation. This option is only available for Android API level 29 and higher, and
 	/// will be ignored for Android API level 28 and lower.
 	pub cpu_only: bool
+}
+#[derive(Debug, Clone)]
+enum QNNExecutionHTPPerformanceMode {
+	/// Default mode.
+	Default,
+	Burst,
+	Balanced,
+	HighPerformance,
+	HighPowerSaver,
+	LowPowerSaver,
+	LowBalanced,
+	PowerSaver,
+	SustainedHighPerformance
+}
+
+impl QNNExecutionHTPPerformanceMode {
+	fn as_str(&self) -> &'static str {
+		match self {
+			QNNExecutionHTPPerformanceMode::Default => "default",
+			QNNExecutionHTPPerformanceMode::Burst => "burst",
+			QNNExecutionHTPPerformanceMode::Balanced => "balanced",
+			QNNExecutionHTPPerformanceMode::HighPerformance => "high_performance",
+			QNNExecutionHTPPerformanceMode::HighPowerSaver => "high_power_saver",
+			QNNExecutionHTPPerformanceMode::LowPowerSaver => "low_power_saver",
+			QNNExecutionHTPPerformanceMode::LowBalanced => "low_balanced",
+			QNNExecutionHTPPerformanceMode::PowerSaver => "power_saver",
+			QNNExecutionHTPPerformanceMode::SustainedHighPerformance => "sustained_high_performance"
+		}
+	}
+}
+#[derive(Debug, Clone)]
+pub struct QNNExecutionProviderOptions {
+	/// The file path to QNN backend library.On Linux/Android: libQnnCpu.so for CPU backend, libQnnHtp.so for GPU
+	/// backend.
+	backend_path: String,
+	/// true to enable QNN graph creation from cached QNN context file. If it's enabled: QNN EP will
+	/// load from cached QNN context binary if it exist. It will generate a context binary file if it's not exist
+	qnn_context_cache_enable: bool,
+	/// explicitly provide the QNN context cache file. Default to model_file.onnx.bin if not provided.
+	qnn_context_cache_path: Option<String>,
+	/// QNN profiling level, options: "off", "basic", "detailed". Default to off.
+	profiling_level: Option<String>,
+	/// Allows client to set up RPC control latency in microseconds.
+	rpc_control_latency: Option<u32>,
+	/// QNN performance mode, options: "burst", "balanced", "default", "high_performance",
+	/// "high_power_saver", "low_balanced", "low_power_saver", "power_saver", "sustained_high_performance". Default to
+	/// "default".
+	htp_performance_mode: Option<QNNExecutionHTPPerformanceMode>
+}
+
+impl Default for QNNExecutionProviderOptions {
+	fn default() -> Self {
+		Self {
+			backend_path: String::from("libQnnHtp.so"),
+			qnn_context_cache_enable: false,
+			qnn_context_cache_path: Some(String::from("model_file.onnx.bin")),
+			profiling_level: Some(String::from("off")),
+			rpc_control_latency: Some(10),
+			htp_performance_mode: Some(QNNExecutionHTPPerformanceMode::Default)
+		}
+	}
 }
 
 macro_rules! get_ep_register {
@@ -361,8 +438,10 @@ macro_rules! get_ep_register {
 
 /// Execution provider container. See [the ONNX Runtime docs](https://onnxruntime.ai/docs/execution-providers/) for more
 /// info on execution providers. Execution providers are actually registered via the functions [`crate::SessionBuilder`]
-/// (per-session) or [`EnvBuilder`](crate::environment::EnvBuilder) (default for all sessions in an environment).
+/// (per-session) or [`EnvironmentBuilder`](crate::environment::EnvironmentBuilder) (default for all sessions in an
+/// environment).
 #[derive(Debug, Clone)]
+#[allow(missing_docs)]
 pub enum ExecutionProvider {
 	CPU(CPUExecutionProviderOptions),
 	CUDA(CUDAExecutionProviderOptions),
@@ -373,7 +452,8 @@ pub enum ExecutionProvider {
 	CoreML(CoreMLExecutionProviderOptions),
 	DirectML(DirectMLExecutionProviderOptions),
 	ROCm(ROCmExecutionProviderOptions),
-	NNAPI(NNAPIExecutionProviderOptions)
+	NNAPI(NNAPIExecutionProviderOptions),
+	QNN(QNNExecutionProviderOptions)
 }
 
 macro_rules! map_keys {
@@ -393,15 +473,13 @@ macro_rules! map_keys {
 	};
 }
 
-#[inline]
+#[inline(always)]
 fn bool_as_int(x: bool) -> i32 {
-	match x {
-		true => 1,
-		false => 0
-	}
+	if x { 1 } else { 0 }
 }
 
 impl ExecutionProvider {
+	/// Returns the identifier of this execution provider used internally by ONNX Runtime.
 	pub fn as_str(&self) -> &'static str {
 		match self {
 			Self::CPU(_) => "CPUExecutionProvider",
@@ -413,7 +491,8 @@ impl ExecutionProvider {
 			Self::CoreML(_) => "CoreMLExecutionProvider",
 			Self::DirectML(_) => "DmlExecutionProvider",
 			Self::ROCm(_) => "ROCmExecutionProvider",
-			Self::NNAPI(_) => "NnapiExecutionProvider"
+			Self::NNAPI(_) => "NnapiExecutionProvider",
+			Self::QNN(_) => "QNNExecutionProvider"
 		}
 	}
 
@@ -422,7 +501,7 @@ impl ExecutionProvider {
 	pub fn is_available(&self) -> bool {
 		let mut providers: *mut *mut c_char = std::ptr::null_mut();
 		let mut num_providers = 0;
-		if status_to_result(ortsys![unsafe GetAvailableProviders(&mut providers, &mut num_providers)]).is_err() {
+		if status_to_result(ortsys![unsafe GetAvailableProviders(&mut providers, &mut num_providers)]).is_err() || providers.is_null() {
 			return false;
 		}
 
@@ -572,8 +651,8 @@ impl ExecutionProvider {
 					},
 					do_copy_in_default_stream: bool_as_int(options.do_copy_in_default_stream),
 					has_user_compute_stream: bool_as_int(options.user_compute_stream.is_some()),
-					user_compute_stream: options.user_compute_stream.unwrap_or(ptr::null_mut()),
-					default_memory_arena_cfg: options.default_memory_arena_cfg.unwrap_or(ptr::null_mut()),
+					user_compute_stream: options.user_compute_stream.unwrap_or_else(ptr::null_mut),
+					default_memory_arena_cfg: options.default_memory_arena_cfg.unwrap_or_else(ptr::null_mut),
 					tunable_op_enable: bool_as_int(options.tunable_op_enable),
 					tunable_op_tuning_enable: bool_as_int(options.tunable_op_tuning_enable)
 				};
@@ -624,6 +703,25 @@ impl ExecutionProvider {
 				};
 				status_to_result(ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO(session_options, &openvino_options as *const _)])
 					.map_err(OrtError::ExecutionProvider)?;
+			}
+			#[cfg(any(feature = "load-dynamic", feature = "qnn"))]
+			&Self::QNN(options) => {
+				let (key_ptrs, value_ptrs, len, keys, values) = map_keys! {
+					backend_path = options.backend_path,
+					profiling_level = options.profiling_level.clone().unwrap_or("off".to_string()),
+					qnn_context_cache_enable = bool_as_int(options.qnn_context_cache_enable),
+					qnn_context_cache_path = options.qnn_context_cache_path.clone().unwrap_or("model_file.onnx.bin".to_string()),
+					htp_performance_mode = options.htp_performance_mode.clone().unwrap_or(QNNExecutionHTPPerformanceMode::Default).as_str(),
+					rpc_control_latency = options.rpc_control_latency.unwrap_or(10)
+				};
+				status_to_result(ortsys![unsafe SessionOptionsAppendExecutionProvider(
+					session_options,
+					CString::new("QNN").unwrap().as_ptr(),
+					key_ptrs.as_ptr(),
+					value_ptrs.as_ptr(),
+					len as _,
+				)])
+				.map_err(OrtError::ExecutionProvider)?;
 			}
 			_ => return Err(OrtError::ExecutionProviderNotRegistered(self.as_str()))
 		}

@@ -1,10 +1,40 @@
 use std::ffi::{c_char, c_int, CStr, CString};
 
-use super::{error::OrtResult, ortsys, sys, AllocatorType, MemType};
-use crate::OrtError;
+use super::{
+	error::{OrtError, OrtResult},
+	ortsys, sys, AllocatorType, MemType
+};
+use crate::error::status_to_result;
 
+/// An ONNX Runtime allocator, used to manage the allocation of [`crate::Value`]s.
+#[derive(Debug)]
+pub struct Allocator {
+	pub(crate) ptr: *mut sys::OrtAllocator,
+	is_default: bool
+}
+
+impl Default for Allocator {
+	fn default() -> Self {
+		let mut allocator_ptr: *mut sys::OrtAllocator = std::ptr::null_mut();
+		status_to_result(ortsys![unsafe GetAllocatorWithDefaultOptions(&mut allocator_ptr); nonNull(allocator_ptr)]).unwrap();
+		Self { ptr: allocator_ptr, is_default: true }
+	}
+}
+
+impl Drop for Allocator {
+	fn drop(&mut self) {
+		// per GetAllocatorWithDefaultOptions docs: Returned value should NOT be freed
+		// https://onnxruntime.ai/docs/api/c/struct_ort_api.html#a8dec797ae52ee1a681e4f88be1fb4bb3
+		if !self.is_default {
+			ortsys![unsafe ReleaseAllocator(self.ptr)];
+		}
+	}
+}
+
+/// Represents possible devices that have their own device allocator.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AllocationDevice {
+	// https://github.com/microsoft/onnxruntime/blob/v1.15.1/include/onnxruntime/core/framework/allocator.h#L36-L45
 	CPU,
 	CUDA,
 	CUDAPinned,
@@ -81,10 +111,10 @@ impl MemoryInfo {
 		})
 	}
 
-	#[allow(clippy::not_unsafe_ptr_arg_deref)]
-	pub fn allocation_device(memory_info_ptr: *const sys::OrtMemoryInfo) -> OrtResult<AllocationDevice> {
+	/// Returns the [`AllocationDevice`] this memory info
+	pub fn allocation_device(&self) -> OrtResult<AllocationDevice> {
 		let mut name_ptr: *const c_char = std::ptr::null_mut();
-		ortsys![unsafe MemoryInfoGetName(memory_info_ptr, &mut name_ptr) -> OrtError::CreateCpuMemoryInfo; nonNull(name_ptr)];
+		ortsys![unsafe MemoryInfoGetName(self.ptr, &mut name_ptr) -> OrtError::CreateCpuMemoryInfo; nonNull(name_ptr)];
 		let name: String = unsafe { CStr::from_ptr(name_ptr) }.to_string_lossy().to_string();
 		Ok(AllocationDevice::from(name.as_str()))
 	}

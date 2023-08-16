@@ -1,3 +1,5 @@
+//! Helper traits to extend [`ndarray`] functionality.
+
 use ndarray::{Array, ArrayBase};
 
 /// Trait extending [`ndarray::ArrayBase`](https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html)

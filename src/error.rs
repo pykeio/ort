@@ -1,6 +1,6 @@
 //! Types and helpers for handling ORT errors.
 
-use std::{io, path::PathBuf, string};
+use std::{convert::Infallible, io, path::PathBuf, string};
 
 use thiserror::Error;
 
@@ -13,6 +13,11 @@ pub type OrtResult<T> = std::result::Result<T, OrtError>;
 #[non_exhaustive]
 #[derive(Error, Debug)]
 pub enum OrtError {
+	/// Workaround to get [`crate::inputs`] to accept `Value`s, since it will attempt to `Value::try_from` on provided
+	/// values, and the implementation `TryFrom<T> for T` uses `Infallible` as the error type.
+	#[error("unreachable")]
+	#[doc(hidden)]
+	Infallible,
 	/// An error occurred when converting an FFI C string to a Rust `String`.
 	#[error("Failed to construct Rust String")]
 	FfiStringConversion(OrtApiError),
@@ -143,7 +148,15 @@ pub enum OrtError {
 	#[error("Execution provider `{0}` was not registered because its corresponding Cargo feature is disabled.")]
 	ExecutionProviderNotRegistered(&'static str),
 	#[error("Expected tensor to be on CPU in order to get data, but had allocation device `{0}`.")]
-	TensorNotOnCpu(&'static str)
+	TensorNotOnCpu(&'static str),
+	#[error("String tensors require the session's allocator to be provided through `Value::from_array`.")]
+	StringTensorRequiresAllocator
+}
+
+impl From<Infallible> for OrtError {
+	fn from(_: Infallible) -> Self {
+		OrtError::Infallible
+	}
 }
 
 /// Error used when the input dimensions defined in the model and passed from an inference call do not match.

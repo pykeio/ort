@@ -66,6 +66,7 @@ To use other execution providers, you must explicitly enable them via their Carg
 - ✅ **`openvino`**: Enables the OpenVINO execution provider for 6th+ generation Intel Core CPUs.
 - ✅ **`onednn`**: Enables the Intel oneDNN execution provider for x86/x64 targets.
 - ✅ **`directml`**: Enables the DirectML execution provider for Windows x86/x64 targets with dedicated GPUs supporting DirectX 12.
+- ✅ **`qnn`**: Enables the Qualcomm AI Engine Direct SDK execution provider (thank you [@lx200916](https://github.com/lx200916)!)
 - ⚠️ **`snpe`**: Enables the SNPE execution provider for Qualcomm Snapdragon CPUs & Adreno GPUs.
 - ❓ **`nnapi`**: Enables the Android Neural Networks API (NNAPI) execution provider. (needs testing - [#45](https://github.com/pykeio/ort/issues/45))
 - ✅ **`coreml`**: Enables the CoreML execution provider for macOS/iOS targets.

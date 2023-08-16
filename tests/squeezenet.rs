@@ -8,8 +8,8 @@ use std::{
 use image::{imageops::FilterType, ImageBuffer, Pixel, Rgb};
 use ndarray::s;
 use ort::{
-	download::vision::ImageClassification, environment::Environment, error::OrtDownloadError, tensor::OrtOwnedTensor, value::Value, ExecutionProvider,
-	GraphOptimizationLevel, LoggingLevel, NdArrayExtensions, OrtResult, SessionBuilder
+	download::vision::ImageClassification, inputs, Environment, GraphOptimizationLevel, LoggingLevel, NdArrayExtensions, OrtDownloadError, OrtOwnedTensor,
+	OrtResult, SessionBuilder, Value
 };
 use test_log::test;
 
@@ -26,15 +26,6 @@ fn squeezenet_mushroom() -> OrtResult<()> {
 	let session = SessionBuilder::new(&environment)?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
-		.with_execution_providers([
-			// this is just to ensure that execution providers don't crash if init fails.
-			ExecutionProvider::CUDA(Default::default()),
-			ExecutionProvider::TensorRT(Default::default()),
-			ExecutionProvider::DirectML(Default::default()),
-			ExecutionProvider::OneDNN(Default::default()),
-			ExecutionProvider::CoreML(Default::default()),
-			ExecutionProvider::CPU(Default::default())
-		])?
 		.with_model_downloaded(ImageClassification::SqueezeNet)
 		.expect("Could not download model from file");
 
@@ -84,15 +75,12 @@ fn squeezenet_mushroom() -> OrtResult<()> {
 		channel_array /= std[c];
 	}
 
-	// Batch of 1
-	let input_tensor_values = vec![Value::from_array(session.allocator(), &array)?];
-
 	// Perform the inference
-	let outputs: Vec<Value> = session.run(input_tensor_values)?;
+	let outputs = session.run(inputs![&array])?;
 
 	// Downloaded model does not have a softmax as final layer; call softmax on second axis
 	// and iterate on resulting probabilities, creating an index to later access labels.
-	let output: OrtOwnedTensor<_, _> = outputs[0].try_extract()?;
+	let output: OrtOwnedTensor<_, _> = outputs[0].extract_tensor()?;
 	let mut probabilities: Vec<(usize, f32)> = output.view().softmax(ndarray::Axis(1)).iter().copied().enumerate().collect::<Vec<_>>();
 	// Sort probabilities so highest is at beginning of vector.
 	probabilities.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap());

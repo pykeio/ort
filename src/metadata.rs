@@ -5,14 +5,14 @@ use std::{ffi::CString, os::raw::c_char};
 use super::{char_p_to_string, error::OrtResult, ortfree, ortsys, sys, OrtError};
 
 /// Container for model metadata, including name & producer information.
-pub struct Metadata {
+pub struct ModelMetadata {
 	metadata_ptr: *mut sys::OrtModelMetadata,
 	allocator_ptr: *mut sys::OrtAllocator
 }
 
-impl Metadata {
+impl ModelMetadata {
 	pub(crate) fn new(metadata_ptr: *mut sys::OrtModelMetadata, allocator_ptr: *mut sys::OrtAllocator) -> Self {
-		Metadata { metadata_ptr, allocator_ptr }
+		ModelMetadata { metadata_ptr, allocator_ptr }
 	}
 
 	/// Gets the model description, returning an error if no description is present.
@@ -69,7 +69,7 @@ impl Metadata {
 	}
 }
 
-impl Drop for Metadata {
+impl Drop for ModelMetadata {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleaseModelMetadata(self.metadata_ptr)];
 	}

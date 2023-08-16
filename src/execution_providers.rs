@@ -345,27 +345,28 @@ enum QNNExecutionHTPPerformanceMode {
 	LowPowerSaver,
 	LowBalanced,
 	PowerSaver,
-	SustainedHighPerformance,
+	SustainedHighPerformance
 }
 
 impl QNNExecutionHTPPerformanceMode {
-	fn as_str(&self) ->&'static str{
-	match self {
-		QNNExecutionHTPPerformanceMode::Default => "default",
-		QNNExecutionHTPPerformanceMode::Burst => "burst",
-		QNNExecutionHTPPerformanceMode::Balanced => "balanced",
-		QNNExecutionHTPPerformanceMode::HighPerformance => "high_performance",
-		QNNExecutionHTPPerformanceMode::HighPowerSaver => "high_power_saver",
-		QNNExecutionHTPPerformanceMode::LowPowerSaver => "low_power_saver",
-		QNNExecutionHTPPerformanceMode::LowBalanced => "low_balanced",
-		QNNExecutionHTPPerformanceMode::PowerSaver => "power_saver",
-		QNNExecutionHTPPerformanceMode::SustainedHighPerformance => "sustained_high_performance",
+	fn as_str(&self) -> &'static str {
+		match self {
+			QNNExecutionHTPPerformanceMode::Default => "default",
+			QNNExecutionHTPPerformanceMode::Burst => "burst",
+			QNNExecutionHTPPerformanceMode::Balanced => "balanced",
+			QNNExecutionHTPPerformanceMode::HighPerformance => "high_performance",
+			QNNExecutionHTPPerformanceMode::HighPowerSaver => "high_power_saver",
+			QNNExecutionHTPPerformanceMode::LowPowerSaver => "low_power_saver",
+			QNNExecutionHTPPerformanceMode::LowBalanced => "low_balanced",
+			QNNExecutionHTPPerformanceMode::PowerSaver => "power_saver",
+			QNNExecutionHTPPerformanceMode::SustainedHighPerformance => "sustained_high_performance"
+		}
 	}
 }
-}
 #[derive(Debug, Clone)]
-pub struct QNNExecutionProviderOptions{
-	/// The file path to QNN backend library.On Linux/Android: libQnnCpu.so for CPU backend, libQnnHtp.so for GPU backend.
+pub struct QNNExecutionProviderOptions {
+	/// The file path to QNN backend library.On Linux/Android: libQnnCpu.so for CPU backend, libQnnHtp.so for GPU
+	/// backend.
 	backend_path: String,
 	/// true to enable QNN graph creation from cached QNN context file. If it's enabled: QNN EP will
 	/// load from cached QNN context binary if it exist. It will generate a context binary file if it's not exist
@@ -373,12 +374,13 @@ pub struct QNNExecutionProviderOptions{
 	/// explicitly provide the QNN context cache file. Default to model_file.onnx.bin if not provided.
 	qnn_context_cache_path: Option<String>,
 	/// QNN profiling level, options: "off", "basic", "detailed". Default to off.
-	profiling_level:Option<String>,
+	profiling_level: Option<String>,
 	/// Allows client to set up RPC control latency in microseconds.
 	rpc_control_latency: Option<u32>,
 	/// QNN performance mode, options: "burst", "balanced", "default", "high_performance",
-	/// "high_power_saver", "low_balanced", "low_power_saver", "power_saver", "sustained_high_performance". Default to "default".
-	htp_performance_mode: Option<QNNExecutionHTPPerformanceMode>,
+	/// "high_power_saver", "low_balanced", "low_power_saver", "power_saver", "sustained_high_performance". Default to
+	/// "default".
+	htp_performance_mode: Option<QNNExecutionHTPPerformanceMode>
 }
 
 impl Default for QNNExecutionProviderOptions {
@@ -389,11 +391,10 @@ impl Default for QNNExecutionProviderOptions {
 			qnn_context_cache_path: Some(String::from("model_file.onnx.bin")),
 			profiling_level: Some(String::from("off")),
 			rpc_control_latency: Some(10),
-			htp_performance_mode: Some(QNNExecutionHTPPerformanceMode::Default),
+			htp_performance_mode: Some(QNNExecutionHTPPerformanceMode::Default)
 		}
 	}
 }
-
 
 macro_rules! get_ep_register {
 	($symbol:ident($($id:ident: $type:ty),*) -> $rt:ty) => {
@@ -434,7 +435,7 @@ pub enum ExecutionProvider {
 	DirectML(DirectMLExecutionProviderOptions),
 	ROCm(ROCmExecutionProviderOptions),
 	NNAPI(NNAPIExecutionProviderOptions),
-	QNN(QNNExecutionProviderOptions),
+	QNN(QNNExecutionProviderOptions)
 }
 
 macro_rules! map_keys {
@@ -688,7 +689,7 @@ impl ExecutionProvider {
 					.map_err(OrtError::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "qnn"))]
-			&Self::QNN(options) =>{
+			&Self::QNN(options) => {
 				let (key_ptrs, value_ptrs, len, keys, values) = map_keys! {
 					backend_path = options.backend_path,
 					profiling_level = options.profiling_level.clone().unwrap_or("off".to_string()),
@@ -704,7 +705,7 @@ impl ExecutionProvider {
 					value_ptrs.as_ptr(),
 					len as _,
 				)])
-					.map_err(OrtError::ExecutionProvider)?;
+				.map_err(OrtError::ExecutionProvider)?;
 			}
 			_ => return Err(OrtError::ExecutionProviderNotRegistered(self.as_str()))
 		}

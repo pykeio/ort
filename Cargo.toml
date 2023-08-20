@@ -24,6 +24,10 @@ codegen-units = 1
 [package.metadata.docs.rs]
 features = [ "half", "fetch-models", "copy-dylibs" ]
 
+[[example]]
+name = "gpt"
+required-features = ["fetch-models"]
+
 [features]
 default = [ "half", "download-binaries", "copy-dylibs" ]
 

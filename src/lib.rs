@@ -29,7 +29,8 @@ pub use self::error::{OrtApiError, OrtError, OrtResult};
 pub use self::execution_providers::{
 	ACLExecutionProviderOptions, ArenaExtendStrategy, CPUExecutionProviderOptions, CUDAExecutionProviderCuDNNConvAlgoSearch, CUDAExecutionProviderOptions,
 	CoreMLExecutionProviderOptions, DirectMLExecutionProviderOptions, ExecutionProvider, NNAPIExecutionProviderOptions, OneDNNExecutionProviderOptions,
-	OpenVINOExecutionProviderOptions, ROCmExecutionProviderOptions, TensorRTExecutionProviderOptions
+	OpenVINOExecutionProviderOptions, QNNExecutionHTPPerformanceMode, QNNExecutionProviderOptions, ROCmExecutionProviderOptions,
+	TensorRTExecutionProviderOptions
 };
 pub use self::io_binding::IoBinding;
 pub use self::memory::{AllocationDevice, MemoryInfo};

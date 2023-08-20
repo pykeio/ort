@@ -715,6 +715,7 @@ impl ExecutionProvider {
 
 #[tracing::instrument(skip_all)]
 pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, execution_providers: impl AsRef<[ExecutionProvider]>) {
+	let mut fallback_to_cpu = true;
 	for ex in execution_providers.as_ref() {
 		if let Err(e) = ex.apply(options) {
 			if let &OrtError::ExecutionProviderNotRegistered(_) = &e {
@@ -724,8 +725,10 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 			}
 		} else {
 			tracing::info!("Successfully registered `{}`", ex.as_str());
-			return;
+			fallback_to_cpu = false;
 		}
 	}
-	tracing::warn!("No execution providers registered successfully. Falling back to CPU.");
+	if fallback_to_cpu {
+		tracing::warn!("No execution providers registered successfully. Falling back to CPU.");
+	}
 }

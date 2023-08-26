@@ -109,11 +109,6 @@ pub(crate) enum ValueInner<'v> {
 
 /// A [`Value`] contains data for inputs/outputs in ONNX Runtime graphs. [`Value`]s can hold a tensor, sequence (array),
 /// or map.
-///
-/// Similar to [`std::borrow::Cow`], [`Value`] has two forms; a value containing data owned by Rust (`Value<'v>`), or a
-/// value containing data owned by ONNX Runtime in C++ (`Value<'static>`). Note that ORT-owned values will prevent the
-/// session from being dropped until all values are dropped; to prevent this behavior, extract the data with
-/// [`Value::extract_tensor`], clone the resulting ndarray, and drop the value.
 #[derive(Debug)]
 pub struct Value<'v> {
 	inner: ValueInner<'v>
@@ -122,16 +117,63 @@ pub struct Value<'v> {
 unsafe impl<'v> Send for Value<'v> {}
 unsafe impl<'v> Sync for Value<'v> {}
 
-impl Value<'static> {
+impl<'s> Value<'s> {
 	/// Construct a [`Value`] from a C++ [`sys::OrtValue`] pointer.
 	///
 	/// # Safety
 	///
 	/// - `ptr` must not be null.
-	pub unsafe fn from_raw(ptr: *mut sys::OrtValue, session: Arc<SharedSessionInner>) -> Value<'static> {
+	pub unsafe fn from_raw(ptr: *mut sys::OrtValue, session: Arc<SharedSessionInner>) -> Value<'s> {
 		Value {
 			inner: ValueInner::CppOwned { ptr, _session: session }
 		}
+	}
+
+	/// Attempt to extract the underlying data into a Rust `ndarray`.
+	///
+	/// The resulting array will be wrapped within an [`OrtOwnedTensor`].
+	pub fn extract_tensor<T>(&self) -> OrtResult<OrtOwnedTensor<'s, T, IxDyn>>
+	where
+		T: TensorDataToType + Clone + Debug
+	{
+		let mut tensor_info_ptr: *mut sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> OrtError::GetTensorTypeAndShape];
+
+		let res = {
+			let mut num_dims = 0;
+			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> OrtError::GetDimensionsCount];
+
+			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
+			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> OrtError::GetDimensions];
+			let shape = IxDyn(&node_dims.iter().map(|&n| n as usize).collect::<Vec<_>>());
+
+			let mut type_sys = sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> OrtError::GetTensorElementType];
+			assert_ne!(type_sys, sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
+			let data_type: TensorElementDataType = type_sys.into();
+			if data_type != T::tensor_element_data_type() {
+				Err(OrtError::DataTypeMismatch {
+					actual: data_type,
+					requested: T::tensor_element_data_type()
+				})
+			} else {
+				// Note: Both tensor and array will point to the same data, nothing is copied.
+				// As such, there is no need to free the pointer used to create the ArrayView.
+				assert_ne!(self.ptr(), ptr::null_mut());
+
+				let mut is_tensor = 0;
+				ortsys![unsafe IsTensor(self.ptr(), &mut is_tensor) -> OrtError::FailedTensorCheck];
+				assert_eq!(is_tensor, 1);
+
+				let mut len = 0;
+				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> OrtError::GetTensorShapeElementCount];
+
+				let data = T::extract_data(shape, len, self.ptr())?;
+				Ok(OrtOwnedTensor { data })
+			}
+		};
+		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
+		res
 	}
 }
 
@@ -262,54 +304,6 @@ impl<'v> Value<'v> {
 		let mut result = 0;
 		ortsys![unsafe IsTensor(self.ptr(), &mut result) -> OrtError::GetTensorElementType];
 		Ok(result == 1)
-	}
-
-	/// Attempt to extract the underlying data into a Rust `ndarray`.
-	///
-	/// The resulting array will be wrapped within an [`OrtOwnedTensor`].
-	pub fn extract_tensor<'t, T>(&self) -> OrtResult<OrtOwnedTensor<'t, T, IxDyn>>
-	where
-		T: TensorDataToType + Clone + Debug,
-		'v: 't
-	{
-		let mut tensor_info_ptr: *mut sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> OrtError::GetTensorTypeAndShape];
-
-		let res = {
-			let mut num_dims = 0;
-			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> OrtError::GetDimensionsCount];
-
-			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> OrtError::GetDimensions];
-			let shape = IxDyn(&node_dims.iter().map(|&n| n as usize).collect::<Vec<_>>());
-
-			let mut type_sys = sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> OrtError::GetTensorElementType];
-			assert_ne!(type_sys, sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
-			let data_type: TensorElementDataType = type_sys.into();
-			if data_type != T::tensor_element_data_type() {
-				Err(OrtError::DataTypeMismatch {
-					actual: data_type,
-					requested: T::tensor_element_data_type()
-				})
-			} else {
-				// Note: Both tensor and array will point to the same data, nothing is copied.
-				// As such, there is no need to free the pointer used to create the ArrayView.
-				assert_ne!(self.ptr(), ptr::null_mut());
-
-				let mut is_tensor = 0;
-				ortsys![unsafe IsTensor(self.ptr(), &mut is_tensor) -> OrtError::FailedTensorCheck];
-				assert_eq!(is_tensor, 1);
-
-				let mut len = 0;
-				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> OrtError::GetTensorShapeElementCount];
-
-				let data = T::extract_data(shape, len, self.ptr())?;
-				Ok(OrtOwnedTensor { data })
-			}
-		};
-		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
-		res
 	}
 }
 

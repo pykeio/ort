@@ -685,7 +685,7 @@ impl Session {
 	}
 
 	/// Run the input data through the ONNX graph, performing inference.
-	pub fn run<'s, 'm, 'v, 'i>(&'s self, input_values: impl Into<SessionInputs<'s, 'v>>) -> OrtResult<SessionOutputs>
+	pub fn run<'s, 'm, 'v, 'i>(&'s self, input_values: impl Into<SessionInputs<'s, 'v>>) -> OrtResult<SessionOutputs<'s>>
 	where
 		's: 'm, // 's outlives 'm (session outlives memory info)
 		'i: 'v
@@ -697,25 +697,26 @@ impl Session {
 
 		match input_values {
 			SessionInputs::ValueVec(input_values) => {
-				let outputs = self.run_inner(self.inputs.iter().map(|input| input.name.clone()).collect(), &input_values)?;
+				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.clone()).collect::<Vec<_>>(), &input_values)?;
 				Ok(outputs)
 			}
 			SessionInputs::ValueMap(input_values) => {
-				let (input_names, values): (Vec<String>, Vec<Value<'_>>) = input_values.into_iter().unzip();
-				self.run_inner(input_names, &values)
+				let (input_names, values): (Vec<&'static str>, Vec<Value<'_>>) = input_values.into_iter().unzip();
+				self.run_inner(&input_names, &values)
 			}
 			_ => panic!()
 		}
 	}
 
-	fn run_inner<'s, 'm, 'v, 'i>(&'s self, input_names: Vec<String>, input_values: &[Value<'v>]) -> OrtResult<SessionOutputs>
+	fn run_inner<'s, 'm, 'v, 'i, I>(&'s self, input_names: &[I], input_values: &[Value<'v>]) -> OrtResult<SessionOutputs>
 	where
+		I: AsRef<str>,
 		's: 'm, // 's outlives 'm (session outlives memory info)
 		'i: 'v
 	{
 		let input_names_ptr: Vec<*const c_char> = input_names
-			.into_iter()
-			.map(|n| CString::new(n).unwrap())
+			.iter()
+			.map(|n| CString::new(n.as_ref()).unwrap())
 			.map(|n| n.into_raw() as *const c_char)
 			.collect();
 		let output_names: Vec<String> = self.outputs.iter().map(|output| output.name.clone()).collect();

@@ -20,6 +20,8 @@ use std::{
 };
 
 use once_cell::sync::Lazy;
+#[doc(hidden)]
+pub use smallvec;
 use tracing::warn;
 
 pub use self::environment::{Environment, EnvironmentBuilder};

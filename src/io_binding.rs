@@ -54,13 +54,13 @@ impl<'s> IoBinding<'s> {
 		Ok(())
 	}
 
-	pub fn run(&self) -> OrtResult<SessionOutputs> {
+	pub fn run(&self) -> OrtResult<SessionOutputs<'s>> {
 		let run_options_ptr: *const sys::OrtRunOptions = std::ptr::null();
 		ortsys![unsafe RunWithBinding(self.session.inner.session_ptr, run_options_ptr, self.ptr) -> OrtError::SessionRun];
 		self.outputs()
 	}
 
-	pub fn outputs(&self) -> OrtResult<SessionOutputs> {
+	pub fn outputs(&self) -> OrtResult<SessionOutputs<'s>> {
 		let mut names_ptr: *mut c_char = ptr::null_mut();
 		let mut lengths = Vec::new();
 		let mut lengths_ptr = lengths.as_mut_ptr();

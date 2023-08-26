@@ -1,3 +1,5 @@
+#![allow(clippy::manual_retain)]
+
 use std::{path::PathBuf, time::Duration};
 
 use image::{imageops::FilterType, GenericImageView};

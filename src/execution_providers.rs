@@ -672,9 +672,10 @@ impl ExecutionProvider {
 					htp_performance_mode = options.htp_performance_mode.as_ref().map(|v| v.as_str()),
 					rpc_control_latency = options.rpc_control_latency
 				};
+				let ep_name = CString::new("QNN").unwrap();
 				status_to_result(ortsys![unsafe SessionOptionsAppendExecutionProvider(
 					session_options,
-					CString::new("QNN").unwrap().as_ptr(),
+					ep_name.as_ptr(),
 					key_ptrs.as_ptr(),
 					value_ptrs.as_ptr(),
 					len as _,

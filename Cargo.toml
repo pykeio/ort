@@ -81,7 +81,7 @@ anyhow = "1.0"
 ureq = "2.1"
 image = "0.24"
 show-image = { version = "0.13", features = [ "image", "raqote" ] }
-raqote = "0.8"
+raqote = { version = "0.8", default-features = false }
 test-log = { version = "0.2", default-features = false, features = [ "trace" ] }
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
 tokenizers = { version = ">=0.13.4", default-features = false, features = [ "onig" ] }

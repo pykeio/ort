@@ -74,7 +74,7 @@ To use other execution providers, you must explicitly enable them via their Carg
 - ❓ **`rocm`**: Enables the ROCm execution provider for AMD ROCm-enabled GPUs. ([#16](https://github.com/pykeio/ort/issues/16))
 - ✅ **`acl`**: Enables the ARM Compute Library execution provider for multi-core ARM v8 processors.
 - ⚠️ **`armnn`**: Enables the ArmNN execution provider for ARM v8 targets.
-- ⚠️ **`tvm`**: Enables the **preview** Apache TVM execution provider.
+- ✅ **`tvm`**: Enables the **preview** Apache TVM execution provider.
 - ⚠️ **`rknpu`**: Enables the RKNPU execution provider for Rockchip NPUs.
 - ⚠️ **`vitis`**: Enables Xilinx's Vitis-AI execution provider for U200/U250 accelerators.
 - ⚠️ **`cann`**: Enables the Huawei Compute Architecture for Neural Networks (CANN) execution provider.

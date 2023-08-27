@@ -481,7 +481,29 @@ impl SessionBuilder {
 	}
 
 	/// Load an ONNX graph from memory and commit the session.
-	pub fn with_model_from_memory(self, model_bytes: &[u8]) -> OrtResult<InMemorySession<'_>> {
+	/// For `.ort` models, we enable `session.use_ort_model_bytes_directly`.
+	/// For more information, check [Load ORT format model from an in-memory byte array](https://onnxruntime.ai/docs/performance/model-optimizations/ort-format-models.html#load-ort-format-model-from-an-in-memory-byte-array).
+	/// If you want to store the model file and the [`InMemorySession`] in same struct,
+	/// please check crates for creating self-referential structs, such as [`ouroboros`](https://github.com/joshua-maros/ouroboros).
+	pub fn with_model_from_memory_directly(self, model_bytes: &[u8]) -> OrtResult<InMemorySession<'_>> {
+		let str_to_char = |s: &str| {
+			s.as_bytes()
+				.iter()
+				.chain(std::iter::once(&b'\0')) // Make sure we have a null terminated string
+				.map(|b| *b as std::os::raw::c_char)
+				.collect::<Vec<std::os::raw::c_char>>()
+		};
+		// Enable zero-copy deserialization for models in `.ort` format.
+		ortsys![unsafe AddSessionConfigEntry(self.session_options_ptr, str_to_char("session.use_ort_model_bytes_directly").as_ptr(), str_to_char("1").as_ptr())];
+		ortsys![unsafe AddSessionConfigEntry(self.session_options_ptr, str_to_char("session.use_ort_model_bytes_for_initializers").as_ptr(), str_to_char("1").as_ptr())];
+
+		let session = self.with_model_from_memory(model_bytes)?;
+
+		Ok(InMemorySession { session, phantom: PhantomData })
+	}
+
+	/// Load an ONNX graph from memory and commit the session.
+	pub fn with_model_from_memory(self, model_bytes: &[u8]) -> OrtResult<Session> {
 		let mut session_ptr: *mut sys::OrtSession = std::ptr::null_mut();
 
 		let env_ptr: *const sys::OrtEnv = self.env.ptr();
@@ -494,17 +516,6 @@ impl SessionBuilder {
 				.cloned()
 				.collect::<Vec<_>>()
 		);
-
-		let str_to_char = |s: &str| {
-			s.as_bytes()
-				.iter()
-				.chain(std::iter::once(&b'\0')) // Make sure we have a null terminated string
-				.map(|b| *b as std::os::raw::c_char)
-				.collect::<Vec<std::os::raw::c_char>>()
-		};
-		// Enable zero-copy deserialization for models in `.ort` format.
-		ortsys![unsafe AddSessionConfigEntry(self.session_options_ptr, str_to_char("session.use_ort_model_bytes_directly").as_ptr(), str_to_char("1").as_ptr())];
-		ortsys![unsafe AddSessionConfigEntry(self.session_options_ptr, str_to_char("session.use_ort_model_bytes_for_initializers").as_ptr(), str_to_char("1").as_ptr())];
 
 		let model_data = model_bytes.as_ptr() as *const std::ffi::c_void;
 		let model_data_length = model_bytes.len();
@@ -533,7 +544,7 @@ impl SessionBuilder {
 			inputs,
 			outputs
 		};
-		Ok(InMemorySession { session, phantom: PhantomData })
+		Ok(session)
 	}
 }
 

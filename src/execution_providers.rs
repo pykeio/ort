@@ -27,6 +27,9 @@ extern "C" {
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_DML(options: *mut sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> sys::OrtStatusPtr;
 	#[cfg(feature = "nnapi")]
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr;
+	#[cfg(feature = "tvm")]
+	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut sys::OrtSessionOptions, opt_str: *const std::os::raw::c_char)
+	-> sys::OrtStatusPtr;
 }
 #[cfg(all(not(feature = "load-dynamic"), target_arch = "x86"))]
 extern "stdcall" {
@@ -387,6 +390,45 @@ macro_rules! get_ep_register {
 	};
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TVMExecutorType {
+	GraphExecutor,
+	VirtualMachine
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TVMTuningType {
+	AutoTVM,
+	Ansor
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct TVMExecutionProviderOptions {
+	/// Executor type used by TVM. There is a choice between two types, `GraphExecutor` and `VirtualMachine`. Default is
+	/// [`TVMExecutorType::VirtualMachine`].
+	pub executor: Option<TVMExecutorType>,
+	/// Path to folder with set of files (`.ro-`, `.so`/`.dll`-files and weights) obtained after model tuning.
+	pub so_folder: Option<String>,
+	/// Whether or not to perform a hash check on the model obtained in the `so_folder`.
+	pub check_hash: Option<bool>,
+	/// A path to a file that contains the pre-computed hash for the ONNX model located in the `so_folder` for checking
+	/// when `check_hash` is `Some(true)`.
+	pub hash_file_path: Option<String>,
+	pub target: Option<String>,
+	pub target_host: Option<String>,
+	pub opt_level: Option<usize>,
+	/// Whether or not all model weights are kept on compilation stage, otherwise they are downloaded on each inference.
+	/// `true` is recommended for best performance and is the default.
+	pub freeze_weights: Option<bool>,
+	pub to_nhwc: Option<bool>,
+	pub tuning_type: Option<TVMTuningType>,
+	/// Path to AutoTVM or Ansor tuning file which gives specifications for given model and target for the best
+	/// performance.
+	pub tuning_file_path: Option<String>,
+	pub input_names: Option<String>,
+	pub input_shapes: Option<String>
+}
+
 /// Execution provider container. See [the ONNX Runtime docs](https://onnxruntime.ai/docs/execution-providers/) for more
 /// info on execution providers. Execution providers are actually registered via the functions [`crate::SessionBuilder`]
 /// (per-session) or [`EnvironmentBuilder`](crate::environment::EnvironmentBuilder) (default for all sessions in an
@@ -404,7 +446,8 @@ pub enum ExecutionProvider {
 	DirectML(DirectMLExecutionProviderOptions),
 	ROCm(ROCmExecutionProviderOptions),
 	NNAPI(NNAPIExecutionProviderOptions),
-	QNN(QNNExecutionProviderOptions)
+	QNN(QNNExecutionProviderOptions),
+	TVM(TVMExecutionProviderOptions)
 }
 
 macro_rules! map_keys {
@@ -450,7 +493,8 @@ impl ExecutionProvider {
 			Self::DirectML(_) => "DmlExecutionProvider",
 			Self::ROCm(_) => "ROCmExecutionProvider",
 			Self::NNAPI(_) => "NnapiExecutionProvider",
-			Self::QNN(_) => "QNNExecutionProvider"
+			Self::QNN(_) => "QNNExecutionProvider",
+			Self::TVM(_) => "TvmExecutionProvider"
 		}
 	}
 
@@ -682,6 +726,53 @@ impl ExecutionProvider {
 				)])
 				.map_err(OrtError::ExecutionProvider)?;
 			}
+			#[cfg(any(feature = "load-dynamic", feature = "tvm"))]
+			&Self::TVM(options) => {
+				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut sys::OrtSessionOptions, opt_str: *const std::os::raw::c_char) -> sys::OrtStatusPtr);
+				let mut option_string = Vec::new();
+				if let Some(check_hash) = options.check_hash {
+					option_string.push(format!("check_hash:{}", if check_hash { "True" } else { "False" }));
+				}
+				if let Some(executor) = options.executor {
+					option_string.push(format!(
+						"executor:{}",
+						match executor {
+							TVMExecutorType::GraphExecutor => "graph",
+							TVMExecutorType::VirtualMachine => "vm"
+						}
+					));
+				}
+				if let Some(freeze_weights) = options.freeze_weights {
+					option_string.push(format!("freeze_weights:{}", if freeze_weights { "True" } else { "False" }));
+				}
+				if let Some(hash_file_path) = options.hash_file_path.as_ref() {
+					option_string.push(format!("hash_file_path:{hash_file_path}"));
+				}
+				if let Some(input_names) = options.input_names.as_ref() {
+					option_string.push(format!("input_names:{input_names}"));
+				}
+				if let Some(input_shapes) = options.input_shapes.as_ref() {
+					option_string.push(format!("input_shapes:{input_shapes}"));
+				}
+				if let Some(opt_level) = options.opt_level {
+					option_string.push(format!("opt_level:{opt_level}"));
+				}
+				if let Some(so_folder) = options.so_folder.as_ref() {
+					option_string.push(format!("so_folder:{so_folder}"));
+				}
+				if let Some(target) = options.target.as_ref() {
+					option_string.push(format!("target:{target}"));
+				}
+				if let Some(target_host) = options.target_host.as_ref() {
+					option_string.push(format!("target_host:{target_host}"));
+				}
+				if let Some(to_nhwc) = options.to_nhwc {
+					option_string.push(format!("to_nhwc:{}", if to_nhwc { "True" } else { "False" }));
+				}
+				let options_string = CString::new(option_string.join(",")).unwrap();
+				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_Tvm(session_options, options_string.as_ptr()) })
+					.map_err(OrtError::ExecutionProvider)?;
+			}
 			_ => return Err(OrtError::ExecutionProviderNotRegistered(self.as_str()))
 		}
 		Ok(())
@@ -690,6 +781,7 @@ impl ExecutionProvider {
 
 #[tracing::instrument(skip_all)]
 pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, execution_providers: impl AsRef<[ExecutionProvider]>) {
+	let mut fallback_to_cpu = true;
 	for ex in execution_providers.as_ref() {
 		if let Err(e) = ex.apply(options) {
 			if let &OrtError::ExecutionProviderNotRegistered(_) = &e {
@@ -699,8 +791,10 @@ pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, ex
 			}
 		} else {
 			tracing::info!("Successfully registered `{}`", ex.as_str());
-			return;
+			fallback_to_cpu = false;
 		}
 	}
-	tracing::warn!("No execution providers registered successfully. Falling back to CPU.");
+	if fallback_to_cpu {
+		tracing::warn!("No execution providers registered successfully. Falling back to CPU.");
+	}
 }

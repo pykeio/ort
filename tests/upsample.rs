@@ -74,7 +74,7 @@ fn upsample() -> OrtResult<()> {
 	let input_tensor_values = inputs![&array];
 
 	// Perform the inference
-	let outputs: Vec<Value> = session.run(input_tensor_values)?;
+	let outputs = session.run(input_tensor_values)?;
 
 	assert_eq!(outputs.len(), 1);
 	let output: OrtOwnedTensor<'_, f32, IxDyn> = outputs[0].extract_tensor()?;
@@ -96,7 +96,6 @@ fn upsample_with_ort_model() -> OrtResult<()> {
 	let environment = Environment::builder()
 		.with_name("integration_test")
 		.with_log_level(LoggingLevel::Warning)
-		.with_execution_providers([ExecutionProvider::CPU(CPUExecutionProviderOptions { use_arena: true })])
 		.build()?
 		.into_arc();
 

@@ -1,6 +1,6 @@
 use std::{
 	collections::HashMap,
-	ops::{Deref, Index}
+	ops::{Deref, DerefMut, Index}
 };
 
 use crate::Value;
@@ -29,6 +29,12 @@ impl<'s> Deref for SessionOutputs<'s> {
 
 	fn deref(&self) -> &Self::Target {
 		&self.map
+	}
+}
+
+impl<'s> DerefMut for SessionOutputs<'s> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.map
 	}
 }
 

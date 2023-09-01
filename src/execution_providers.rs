@@ -487,8 +487,11 @@ macro_rules! map_keys {
 			let mut keys = Vec::<CString>::new();
 			let mut values = Vec::<CString>::new();
 			$(
-				keys.push(CString::new(stringify!($fn_name)).unwrap());
-				values.push(CString::new(($ex).to_string().as_str()).unwrap());
+				let str_value = CString::new(($ex).to_string().as_str()).unwrap();
+				if !str_value.is_empty() {
+					keys.push(CString::new(stringify!($fn_name)).unwrap());
+					values.push(str_value);
+				}
 			)*
 			assert_eq!(keys.len(), values.len()); // sanity check
 			let key_ptrs: Vec<*const c_char> = keys.iter().map(|k| k.as_ptr()).collect();

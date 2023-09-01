@@ -20,29 +20,32 @@ use crate::{memory::MemoryInfo, ortsys, session::output::SessionOutputs, sys, va
 #[derive(Debug)]
 pub struct IoBinding<'s> {
 	pub(crate) ptr: *mut sys::OrtIoBinding,
-	session: &'s Session
+	session: &'s Session,
+	values: Vec<Value>
 }
 
 impl<'s> IoBinding<'s> {
 	pub(crate) fn new(session: &'s Session) -> OrtResult<Self> {
 		let mut ptr: *mut sys::OrtIoBinding = ptr::null_mut();
 		ortsys![unsafe CreateIoBinding(session.inner.session_ptr, &mut ptr) -> OrtError::CreateIoBinding; nonNull(ptr)];
-		Ok(Self { ptr, session })
+		Ok(Self { ptr, session, values: Vec::new() })
 	}
 
 	/// Bind a [`Value`] to a session input.
-	pub fn bind_input<'a, 'b: 'a, S: AsRef<str> + Clone + Debug>(&'a mut self, name: S, ort_value: Value<'b>) -> OrtResult<()> {
+	pub fn bind_input<'a, 'b: 'a, S: AsRef<str> + Clone + Debug>(&'a mut self, name: S, ort_value: Value) -> OrtResult<()> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
 		ortsys![unsafe BindInput(self.ptr, cname.as_ptr(), ort_value.ptr()) -> OrtError::CreateIoBinding];
+		self.values.push(ort_value);
 		Ok(())
 	}
 
 	/// Bind a session output to a pre-allocated [`Value`].
-	pub fn bind_output<'a, 'b: 'a, S: AsRef<str> + Clone + Debug>(&'a mut self, name: S, ort_value: Value<'b>) -> OrtResult<()> {
+	pub fn bind_output<'a, 'b: 'a, S: AsRef<str> + Clone + Debug>(&'a mut self, name: S, ort_value: Value) -> OrtResult<()> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
 		ortsys![unsafe BindOutput(self.ptr, cname.as_ptr(), ort_value.ptr()) -> OrtError::CreateIoBinding];
+		self.values.push(ort_value);
 		Ok(())
 	}
 
@@ -54,13 +57,18 @@ impl<'s> IoBinding<'s> {
 		Ok(())
 	}
 
-	pub fn run(&self) -> OrtResult<SessionOutputs<'s>> {
+	pub fn run(&mut self) -> OrtResult<SessionOutputs> {
 		let run_options_ptr: *const sys::OrtRunOptions = std::ptr::null();
 		ortsys![unsafe RunWithBinding(self.session.inner.session_ptr, run_options_ptr, self.ptr) -> OrtError::SessionRun];
+		self.values.clear();
 		self.outputs()
 	}
 
-	pub fn outputs(&self) -> OrtResult<SessionOutputs<'s>> {
+	pub fn clean(&mut self) {
+		self.values.clear();
+	}
+
+	pub fn outputs(&self) -> OrtResult<SessionOutputs> {
 		let mut names_ptr: *mut c_char = ptr::null_mut();
 		let mut lengths = Vec::new();
 		let mut lengths_ptr = lengths.as_mut_ptr();

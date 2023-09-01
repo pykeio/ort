@@ -408,7 +408,7 @@ impl SessionBuilder {
 	/// the provided tensors. The replacement will occur before any optimizations take place, and the data will be
 	/// copied into the graph. Tensors replaced by this function must be using external data. (you cannot replace a
 	/// non-external tensor)
-	pub fn with_model_from_file_and_external_initializers<'v, 'i, P>(self, model_filepath_ref: P, initializers: &'i [(String, Value<'v>)]) -> OrtResult<Session>
+	pub fn with_model_from_file_and_external_initializers<'v, 'i, P>(self, model_filepath_ref: P, initializers: &'i [(String, Value)]) -> OrtResult<Session>
 	where
 		'i: 'v,
 		P: AsRef<Path>
@@ -671,13 +671,13 @@ impl Session {
 	}
 
 	/// Run the input data through the ONNX graph, performing inference.
-	pub fn run<'s, 'm, 'v, 'i>(&'s self, input_values: impl Into<SessionInputs<'s, 'v>>) -> OrtResult<SessionOutputs<'s>>
+	pub fn run<'s, 'm, 'v, 'i>(&'s self, input_values: impl Into<SessionInputs<'s>>) -> OrtResult<SessionOutputs>
 	where
 		's: 'm, // 's outlives 'm (session outlives memory info)
 		'i: 'v
 	{
 		let input_values = input_values.into();
-		if let SessionInputs::IoBinding(binding) = input_values {
+		if let SessionInputs::IoBinding(mut binding) = input_values {
 			return binding.run();
 		}
 
@@ -687,14 +687,14 @@ impl Session {
 				Ok(outputs)
 			}
 			SessionInputs::ValueMap(input_values) => {
-				let (input_names, values): (Vec<&'static str>, Vec<Value<'_>>) = input_values.into_iter().unzip();
+				let (input_names, values): (Vec<&'static str>, Vec<Value>) = input_values.into_iter().unzip();
 				self.run_inner(&input_names, &values)
 			}
 			_ => panic!()
 		}
 	}
 
-	fn run_inner<'s, 'm, 'v, 'i, I>(&'s self, input_names: &[I], input_values: &[Value<'v>]) -> OrtResult<SessionOutputs>
+	fn run_inner<'s, 'm, 'v, 'i, I>(&'s self, input_names: &[I], input_values: &[Value]) -> OrtResult<SessionOutputs>
 	where
 		I: AsRef<str>,
 		's: 'm, // 's outlives 'm (session outlives memory info)

@@ -4,32 +4,32 @@ use smallvec::SmallVec;
 
 use crate::{IoBinding, Value};
 
-pub enum SessionInputs<'s, 'v> {
+pub enum SessionInputs<'s> {
 	IoBinding(IoBinding<'s>),
-	ValueMap(HashMap<&'static str, Value<'v>>),
-	ValueVec(SmallVec<[Value<'v>; 4]>)
+	ValueMap(HashMap<&'static str, Value>),
+	ValueVec(SmallVec<[Value; 4]>)
 }
 
-impl<'s, 'v> From<IoBinding<'s>> for SessionInputs<'s, 'v> {
+impl<'s> From<IoBinding<'s>> for SessionInputs<'s> {
 	fn from(val: IoBinding<'s>) -> Self {
 		SessionInputs::IoBinding(val)
 	}
 }
 
-impl<'s, 'v> From<HashMap<&'static str, Value<'v>>> for SessionInputs<'s, 'v> {
-	fn from(val: HashMap<&'static str, Value<'v>>) -> Self {
+impl<'s> From<HashMap<&'static str, Value>> for SessionInputs<'s> {
+	fn from(val: HashMap<&'static str, Value>) -> Self {
 		SessionInputs::ValueMap(val)
 	}
 }
 
-impl<'s, 'v> From<Vec<Value<'v>>> for SessionInputs<'s, 'v> {
-	fn from(val: Vec<Value<'v>>) -> Self {
+impl<'s> From<Vec<Value>> for SessionInputs<'s> {
+	fn from(val: Vec<Value>) -> Self {
 		SessionInputs::ValueVec(val.into())
 	}
 }
 
-impl<'s, 'v> From<SmallVec<[Value<'v>; 4]>> for SessionInputs<'s, 'v> {
-	fn from(val: SmallVec<[Value<'v>; 4]>) -> Self {
+impl<'s> From<SmallVec<[Value; 4]>> for SessionInputs<'s> {
+	fn from(val: SmallVec<[Value; 4]>) -> Self {
 		SessionInputs::ValueVec(val)
 	}
 }

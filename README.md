@@ -66,7 +66,7 @@ To use other execution providers, you must explicitly enable them via their Carg
 - ✅ **`openvino`**: Enables the OpenVINO execution provider for 6th+ generation Intel Core CPUs.
 - ✅ **`onednn`**: Enables the Intel oneDNN execution provider for x86/x64 targets.
 - ✅ **`directml`**: Enables the DirectML execution provider for Windows x86/x64 targets with dedicated GPUs supporting DirectX 12.
-- ⚠️ **`snpe`**: Enables the SNPE execution provider for Qualcomm Snapdragon CPUs & Adreno GPUs.
+- ✅ **`qnn`**: Enables the Qualcomm AI Engine Direct SDK execution provider for Qualcomm chipsets.
 - ❓ **`nnapi`**: Enables the Android Neural Networks API (NNAPI) execution provider. (needs testing - [#45](https://github.com/pykeio/ort/issues/45))
 - ✅ **`coreml`**: Enables the CoreML execution provider for macOS/iOS targets.
 - ⚠️ **`xnnpack`**: Enables the [XNNPACK](https://github.com/google/XNNPACK) backend for WebAssembly and Android.
@@ -74,10 +74,10 @@ To use other execution providers, you must explicitly enable them via their Carg
 - ❓ **`rocm`**: Enables the ROCm execution provider for AMD ROCm-enabled GPUs. ([#16](https://github.com/pykeio/ort/issues/16))
 - ✅ **`acl`**: Enables the ARM Compute Library execution provider for multi-core ARM v8 processors.
 - ⚠️ **`armnn`**: Enables the ArmNN execution provider for ARM v8 targets.
-- ⚠️ **`tvm`**: Enables the **preview** Apache TVM execution provider.
+- ✅ **`tvm`**: Enables the **preview** Apache TVM execution provider.
 - ⚠️ **`rknpu`**: Enables the RKNPU execution provider for Rockchip NPUs.
 - ⚠️ **`vitis`**: Enables Xilinx's Vitis-AI execution provider for U200/U250 accelerators.
-- ⚠️ **`cann`**: Enables the Huawei Compute Architecture for Neural Networks (CANN) execution provider.
+- ✅ **`cann`**: Enables the Huawei Compute Architecture for Neural Networks (CANN) execution provider.
 
 Note that the `download` strategy only provides some execution providers, namely CUDA and TensorRT for Windows & Linux. You'll need to compile ONNX Runtime from source and use the `system` strategy to point to the compiled binaries to enable other execution providers.
 

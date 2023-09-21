@@ -27,6 +27,9 @@ extern "C" {
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_DML(options: *mut sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> sys::OrtStatusPtr;
 	#[cfg(feature = "nnapi")]
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr;
+	#[cfg(feature = "tvm")]
+	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut sys::OrtSessionOptions, opt_str: *const std::os::raw::c_char)
+	-> sys::OrtStatusPtr;
 }
 #[cfg(all(not(feature = "load-dynamic"), target_arch = "x86"))]
 extern "stdcall" {
@@ -335,6 +338,155 @@ pub struct NNAPIExecutionProviderOptions {
 	pub cpu_only: bool
 }
 
+#[derive(Debug, Clone)]
+pub enum QNNExecutionHTPPerformanceMode {
+	/// Default mode.
+	Default,
+	Burst,
+	Balanced,
+	HighPerformance,
+	HighPowerSaver,
+	LowPowerSaver,
+	LowBalanced,
+	PowerSaver,
+	SustainedHighPerformance
+}
+
+impl QNNExecutionHTPPerformanceMode {
+	fn as_str(&self) -> &'static str {
+		match self {
+			QNNExecutionHTPPerformanceMode::Default => "default",
+			QNNExecutionHTPPerformanceMode::Burst => "burst",
+			QNNExecutionHTPPerformanceMode::Balanced => "balanced",
+			QNNExecutionHTPPerformanceMode::HighPerformance => "high_performance",
+			QNNExecutionHTPPerformanceMode::HighPowerSaver => "high_power_saver",
+			QNNExecutionHTPPerformanceMode::LowPowerSaver => "low_power_saver",
+			QNNExecutionHTPPerformanceMode::LowBalanced => "low_balanced",
+			QNNExecutionHTPPerformanceMode::PowerSaver => "power_saver",
+			QNNExecutionHTPPerformanceMode::SustainedHighPerformance => "sustained_high_performance"
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct QNNExecutionProviderOptions {
+	/// The file path to QNN backend library.On Linux/Android: libQnnCpu.so for CPU backend, libQnnHtp.so for GPU
+	/// backend.
+	pub backend_path: String,
+	/// true to enable QNN graph creation from cached QNN context file. If it's enabled: QNN EP will
+	/// load from cached QNN context binary if it exist. It will generate a context binary file if it's not exist
+	pub qnn_context_cache_enable: bool,
+	/// explicitly provide the QNN context cache file. Default to model_file.onnx.bin if not provided.
+	pub qnn_context_cache_path: Option<String>,
+	/// QNN profiling level, options: "off", "basic", "detailed". Default to off.
+	pub profiling_level: Option<String>,
+	/// Allows client to set up RPC control latency in microseconds.
+	pub rpc_control_latency: Option<u32>,
+	/// QNN performance mode, options: "burst", "balanced", "default", "high_performance",
+	/// "high_power_saver", "low_balanced", "low_power_saver", "power_saver", "sustained_high_performance". Default to
+	/// "default".
+	pub htp_performance_mode: Option<QNNExecutionHTPPerformanceMode>
+}
+
+impl Default for QNNExecutionProviderOptions {
+	fn default() -> Self {
+		Self {
+			backend_path: String::from("libQnnHtp.so"),
+			qnn_context_cache_enable: false,
+			qnn_context_cache_path: Some(String::from("model_file.onnx.bin")),
+			profiling_level: Some(String::from("off")),
+			rpc_control_latency: Some(10),
+			htp_performance_mode: Some(QNNExecutionHTPPerformanceMode::Default)
+		}
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TVMExecutorType {
+	GraphExecutor,
+	VirtualMachine
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TVMTuningType {
+	AutoTVM,
+	Ansor
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct TVMExecutionProviderOptions {
+	/// Executor type used by TVM. There is a choice between two types, `GraphExecutor` and `VirtualMachine`. Default is
+	/// [`TVMExecutorType::VirtualMachine`].
+	pub executor: Option<TVMExecutorType>,
+	/// Path to folder with set of files (`.ro-`, `.so`/`.dll`-files and weights) obtained after model tuning.
+	pub so_folder: Option<String>,
+	/// Whether or not to perform a hash check on the model obtained in the `so_folder`.
+	pub check_hash: Option<bool>,
+	/// A path to a file that contains the pre-computed hash for the ONNX model located in the `so_folder` for checking
+	/// when `check_hash` is `Some(true)`.
+	pub hash_file_path: Option<String>,
+	pub target: Option<String>,
+	pub target_host: Option<String>,
+	pub opt_level: Option<usize>,
+	/// Whether or not all model weights are kept on compilation stage, otherwise they are downloaded on each inference.
+	/// `true` is recommended for best performance and is the default.
+	pub freeze_weights: Option<bool>,
+	pub to_nhwc: Option<bool>,
+	pub tuning_type: Option<TVMTuningType>,
+	/// Path to AutoTVM or Ansor tuning file which gives specifications for given model and target for the best
+	/// performance.
+	pub tuning_file_path: Option<String>,
+	pub input_names: Option<String>,
+	pub input_shapes: Option<String>
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CANNExecutionProviderPrecisionMode {
+	/// Convert to float32 first according to operator implementation
+	ForceFP32,
+	/// Convert to float16 when float16 and float32 are both supported
+	ForceFP16,
+	/// Convert to float16 when float32 is not supported
+	AllowFP32ToFP16,
+	/// Keep dtypes as is
+	MustKeepOrigin,
+	/// Allow mixed precision
+	AllowMixedPrecision
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CANNExecutionProviderImplementationMode {
+	HighPrecision,
+	HighPerformance
+}
+
+#[derive(Debug, Clone)]
+pub struct CANNExecutionProviderOptions {
+	pub device_id: u32,
+	pub npu_mem_limit: usize,
+	pub arena_extend_strategy: ArenaExtendStrategy,
+	pub enable_cann_graph: bool,
+	pub dump_graphs: bool,
+	pub precision_mode: CANNExecutionProviderPrecisionMode,
+	pub op_select_impl_mode: CANNExecutionProviderImplementationMode,
+	pub optypelist_for_impl_mode: String
+}
+
+impl Default for CANNExecutionProviderOptions {
+	fn default() -> Self {
+		Self {
+			device_id: 0,
+			npu_mem_limit: usize::MAX,
+			arena_extend_strategy: ArenaExtendStrategy::NextPowerOfTwo,
+			enable_cann_graph: true,
+			dump_graphs: false,
+			precision_mode: CANNExecutionProviderPrecisionMode::ForceFP16,
+			op_select_impl_mode: CANNExecutionProviderImplementationMode::HighPerformance,
+			optypelist_for_impl_mode: String::default()
+		}
+	}
+}
+
 macro_rules! get_ep_register {
 	($symbol:ident($($id:ident: $type:ty),*) -> $rt:ty) => {
 		#[cfg(feature = "load-dynamic")]
@@ -363,6 +515,7 @@ macro_rules! get_ep_register {
 /// info on execution providers. Execution providers are actually registered via the functions [`crate::SessionBuilder`]
 /// (per-session) or [`EnvBuilder`](crate::environment::EnvBuilder) (default for all sessions in an environment).
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum ExecutionProvider {
 	CPU(CPUExecutionProviderOptions),
 	CUDA(CUDAExecutionProviderOptions),
@@ -373,7 +526,10 @@ pub enum ExecutionProvider {
 	CoreML(CoreMLExecutionProviderOptions),
 	DirectML(DirectMLExecutionProviderOptions),
 	ROCm(ROCmExecutionProviderOptions),
-	NNAPI(NNAPIExecutionProviderOptions)
+	NNAPI(NNAPIExecutionProviderOptions),
+	QNN(QNNExecutionProviderOptions),
+	TVM(TVMExecutionProviderOptions),
+	CANN(CANNExecutionProviderOptions)
 }
 
 macro_rules! map_keys {
@@ -382,8 +538,11 @@ macro_rules! map_keys {
 			let mut keys = Vec::<CString>::new();
 			let mut values = Vec::<CString>::new();
 			$(
-				keys.push(CString::new(stringify!($fn_name)).unwrap());
-				values.push(CString::new(($ex).to_string().as_str()).unwrap());
+				let str_value = CString::new(($ex).to_string().as_str()).unwrap();
+				if !str_value.is_empty() {
+					keys.push(CString::new(stringify!($fn_name)).unwrap());
+					values.push(str_value);
+				}
 			)*
 			assert_eq!(keys.len(), values.len()); // sanity check
 			let key_ptrs: Vec<*const c_char> = keys.iter().map(|k| k.as_ptr()).collect();
@@ -413,7 +572,10 @@ impl ExecutionProvider {
 			Self::CoreML(_) => "CoreMLExecutionProvider",
 			Self::DirectML(_) => "DmlExecutionProvider",
 			Self::ROCm(_) => "ROCmExecutionProvider",
-			Self::NNAPI(_) => "NnapiExecutionProvider"
+			Self::NNAPI(_) => "NnapiExecutionProvider",
+			Self::QNN(_) => "QNNExecutionProvider",
+			Self::TVM(_) => "TvmExecutionProvider",
+			Self::CANN(_) => "CANNExecutionProvider"
 		}
 	}
 
@@ -624,6 +786,112 @@ impl ExecutionProvider {
 				};
 				status_to_result(ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO(session_options, &openvino_options as *const _)])
 					.map_err(OrtError::ExecutionProvider)?;
+			}
+			#[cfg(any(feature = "load-dynamic", feature = "qnn"))]
+			&Self::QNN(options) => {
+				let (key_ptrs, value_ptrs, len, keys, values) = map_keys! {
+					backend_path = options.backend_path,
+					profiling_level = options.profiling_level.clone().unwrap_or("off".to_string()),
+					qnn_context_cache_enable = bool_as_int(options.qnn_context_cache_enable),
+					qnn_context_cache_path = options.qnn_context_cache_path.clone().unwrap_or("model_file.onnx.bin".to_string()),
+					htp_performance_mode = options.htp_performance_mode.clone().unwrap_or(QNNExecutionHTPPerformanceMode::Default).as_str(),
+					rpc_control_latency = options.rpc_control_latency.unwrap_or(10)
+				};
+				let name = CString::new("QNN").unwrap();
+				status_to_result(ortsys![unsafe SessionOptionsAppendExecutionProvider(
+					session_options,
+					name.as_ptr(),
+					key_ptrs.as_ptr(),
+					value_ptrs.as_ptr(),
+					len as _,
+				)])
+				.map_err(OrtError::ExecutionProvider)?;
+			}
+			#[cfg(any(feature = "load-dynamic", feature = "tvm"))]
+			&Self::TVM(options) => {
+				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut sys::OrtSessionOptions, opt_str: *const std::os::raw::c_char) -> sys::OrtStatusPtr);
+				let mut option_string = Vec::new();
+				if let Some(check_hash) = options.check_hash {
+					option_string.push(format!("check_hash:{}", if check_hash { "True" } else { "False" }));
+				}
+				if let Some(executor) = options.executor {
+					option_string.push(format!(
+						"executor:{}",
+						match executor {
+							TVMExecutorType::GraphExecutor => "graph",
+							TVMExecutorType::VirtualMachine => "vm"
+						}
+					));
+				}
+				if let Some(freeze_weights) = options.freeze_weights {
+					option_string.push(format!("freeze_weights:{}", if freeze_weights { "True" } else { "False" }));
+				}
+				if let Some(hash_file_path) = options.hash_file_path.as_ref() {
+					option_string.push(format!("hash_file_path:{hash_file_path}"));
+				}
+				if let Some(input_names) = options.input_names.as_ref() {
+					option_string.push(format!("input_names:{input_names}"));
+				}
+				if let Some(input_shapes) = options.input_shapes.as_ref() {
+					option_string.push(format!("input_shapes:{input_shapes}"));
+				}
+				if let Some(opt_level) = options.opt_level {
+					option_string.push(format!("opt_level:{opt_level}"));
+				}
+				if let Some(so_folder) = options.so_folder.as_ref() {
+					option_string.push(format!("so_folder:{so_folder}"));
+				}
+				if let Some(target) = options.target.as_ref() {
+					option_string.push(format!("target:{target}"));
+				}
+				if let Some(target_host) = options.target_host.as_ref() {
+					option_string.push(format!("target_host:{target_host}"));
+				}
+				if let Some(to_nhwc) = options.to_nhwc {
+					option_string.push(format!("to_nhwc:{}", if to_nhwc { "True" } else { "False" }));
+				}
+				let options_string = CString::new(option_string.join(",")).unwrap();
+				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_Tvm(session_options, options_string.as_ptr()) })
+					.map_err(OrtError::ExecutionProvider)?;
+			}
+			#[cfg(any(feature = "load-dynamic", feature = "cann"))]
+			&Self::CANN(options) => {
+				let mut cann_options: *mut sys::OrtCANNProviderOptions = std::ptr::null_mut();
+				status_to_result(ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)]).map_err(OrtError::ExecutionProvider)?;
+				let (key_ptrs, value_ptrs, len, keys, values) = map_keys! {
+					device_id = options.device_id,
+					npu_mem_limit = options.npu_mem_limit,
+					arena_extend_strategy = match options.arena_extend_strategy {
+						ArenaExtendStrategy::NextPowerOfTwo => "kNextPowerOfTwo",
+						ArenaExtendStrategy::SameAsRequested => "kSameAsRequested"
+					},
+					enable_cann_graph = bool_as_int(options.enable_cann_graph),
+					dump_graphs = bool_as_int(options.dump_graphs),
+					precision_mode = match options.precision_mode {
+						CANNExecutionProviderPrecisionMode::ForceFP32 => "force_fp32",
+						CANNExecutionProviderPrecisionMode::ForceFP16 => "force_fp16",
+						CANNExecutionProviderPrecisionMode::AllowFP32ToFP16 => "allow_fp32_to_fp16",
+						CANNExecutionProviderPrecisionMode::MustKeepOrigin => "must_keep_origin_dtype",
+						CANNExecutionProviderPrecisionMode::AllowMixedPrecision => "allow_mix_precision"
+					},
+					op_select_impl_mode = match options.op_select_impl_mode {
+						CANNExecutionProviderImplementationMode::HighPrecision => "high_precision",
+						CANNExecutionProviderImplementationMode::HighPerformance => "high_performance"
+					},
+					optypelist_for_impl_mode = options.optypelist_for_impl_mode
+				};
+				if let Err(e) = status_to_result(ortsys![unsafe UpdateCANNProviderOptions(cann_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), len as _)])
+					.map_err(OrtError::ExecutionProvider)
+				{
+					ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
+					std::mem::drop((keys, values));
+					return Err(e);
+				}
+
+				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_CANN(session_options, cann_options)];
+				ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
+				std::mem::drop((keys, values));
+				status_to_result(status).map_err(OrtError::ExecutionProvider)?;
 			}
 			_ => return Err(OrtError::ExecutionProviderNotRegistered(self.as_str()))
 		}

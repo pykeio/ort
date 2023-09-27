@@ -563,7 +563,7 @@ impl Drop for SessionPointerHolder {
 	}
 }
 
-/// Type storing the session information, built from an [`Environment`](environment/struct.Environment.html)
+/// Type storing the session information, built from an [`Environment`](crate::environment::Environment)
 #[derive(Debug)]
 pub struct Session {
 	#[allow(dead_code)]

@@ -316,6 +316,7 @@ fn add_search_dir<P: AsRef<Path>>(base: P) {
 fn system_strategy() -> (PathBuf, bool) {
 	let lib_dir = PathBuf::from(env::var(ORT_ENV_SYSTEM_LIB_LOCATION).expect("[ort] system strategy requires ORT_LIB_LOCATION env var to be set"));
 
+	let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap().to_lowercase();
 	let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap().to_lowercase();
 	let platform_format_lib = |a: &str| {
 		if target_os.contains("windows") { format!("{}.lib", a) } else { format!("lib{}.a", a) }
@@ -362,6 +363,15 @@ fn system_strategy() -> (PathBuf, bool) {
 					}
 				}
 
+				if target_arch == "wasm32" {
+					for lib in &["webassembly", "providers_js"] {
+						let lib_path = lib_dir.join(platform_format_lib(&format!("onnxruntime_{lib}")));
+						if lib_path.exists() {
+							println!("cargo:rustc-link-lib=static=onnxruntime_{lib}");
+						}
+					}
+				}
+
 				let protobuf_build = transform_dep(external_lib_dir.join("protobuf-build"), &profile);
 				add_search_dir(&protobuf_build);
 				for lib in ["protobuf-lited", "protobuf-lite", "protobuf"] {
@@ -379,10 +389,12 @@ fn system_strategy() -> (PathBuf, bool) {
 				add_search_dir(transform_dep(external_lib_dir.join("google_nsync-build"), &profile));
 				println!("cargo:rustc-link-lib=static=nsync_cpp");
 
-				add_search_dir(transform_dep(external_lib_dir.join("pytorch_cpuinfo-build"), &profile));
-				add_search_dir(transform_dep(external_lib_dir.join("pytorch_cpuinfo-build").join("deps").join("clog"), &profile));
-				println!("cargo:rustc-link-lib=static=cpuinfo");
-				println!("cargo:rustc-link-lib=static=clog");
+				if target_arch != "wasm32" {
+					add_search_dir(transform_dep(external_lib_dir.join("pytorch_cpuinfo-build"), &profile));
+					add_search_dir(transform_dep(external_lib_dir.join("pytorch_cpuinfo-build").join("deps").join("clog"), &profile));
+					println!("cargo:rustc-link-lib=static=cpuinfo");
+					println!("cargo:rustc-link-lib=static=clog");
+				}
 
 				add_search_dir(transform_dep(external_lib_dir.join("re2-build"), &profile));
 				println!("cargo:rustc-link-lib=static=re2");

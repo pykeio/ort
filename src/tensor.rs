@@ -19,6 +19,8 @@ pub mod ort_owned_tensor;
 
 use std::{ffi, fmt, ptr, result, string};
 
+use ndarray::IxDyn;
+
 pub use self::ndarray_tensor::NdArrayExtensions;
 pub use self::ort_owned_tensor::OrtOwnedTensor;
 use super::{ortsys, sys, OrtError, OrtResult};
@@ -193,7 +195,7 @@ pub trait TensorDataToType: Sized + fmt::Debug + Clone {
 	fn tensor_element_data_type() -> TensorElementDataType;
 
 	/// Extract an `ArrayView` from the ORT-owned tensor.
-	fn extract_data<'t, D>(shape: D, tensor_element_len: usize, tensor_ptr: *mut sys::OrtValue) -> OrtResult<TensorData<'t, Self, D>>
+	fn extract_data<'t, D>(shape: D, tensor_element_len: usize, tensor_ptr: *mut sys::OrtValue) -> OrtResult<TensorData<'t, Self>>
 	where
 		D: ndarray::Dimension;
 }
@@ -202,10 +204,7 @@ pub trait TensorDataToType: Sized + fmt::Debug + Clone {
 ///
 /// This should only be used internally.
 #[derive(Debug)]
-pub enum TensorData<'t, T, D>
-where
-	D: ndarray::Dimension
-{
+pub enum TensorData<'t, T> {
 	/// Data residing in ONNX Runtime's tensor, in which case the `'t` lifetime is what makes this valid.
 	/// This is used for data types whose in-memory form from ONNX Runtime is compatible with Rust's, like
 	/// primitive numeric types.
@@ -213,14 +212,14 @@ where
 		/// The pointer ONNX Runtime produced. Kept alive so that `array_view` is valid.
 		ptr: *mut sys::OrtValue,
 		/// A view into `ptr`.
-		array_view: ndarray::ArrayView<'t, T, D>
+		array_view: ndarray::ArrayView<'t, T, IxDyn>
 	},
 	/// String data is output differently by ONNX, and is of course also variable size, so it cannot
 	/// use the same simple pointer representation.
 	// Since `'t` outlives this struct, the 't lifetime is more than we need, but no harm done.
 	Strings {
 		/// Owned Strings copied out of ONNX Runtime's output.
-		strings: ndarray::Array<T, D>
+		strings: ndarray::Array<T, IxDyn>
 	}
 }
 
@@ -232,7 +231,7 @@ macro_rules! impl_prim_type_from_ort_trait {
 				TensorElementDataType::$variant
 			}
 
-			fn extract_data<'t, D>(shape: D, _tensor_element_len: usize, tensor_ptr: *mut sys::OrtValue) -> OrtResult<TensorData<'t, Self, D>>
+			fn extract_data<'t, D>(shape: D, _tensor_element_len: usize, tensor_ptr: *mut sys::OrtValue) -> OrtResult<TensorData<'t, Self>>
 			where
 				D: ndarray::Dimension
 			{
@@ -246,7 +245,7 @@ macro_rules! impl_prim_type_from_ort_trait {
 ///
 /// Only to be used on types whose Rust in-memory representation matches ONNX Runtime's (e.g. primitive numeric types
 /// like u32)
-fn extract_primitive_array<'t, D, T: TensorDataToType>(shape: D, tensor: *mut sys::OrtValue) -> OrtResult<ndarray::ArrayView<'t, T, D>>
+fn extract_primitive_array<'t, D, T: TensorDataToType>(shape: D, tensor: *mut sys::OrtValue) -> OrtResult<ndarray::ArrayView<'t, T, IxDyn>>
 where
 	D: ndarray::Dimension
 {
@@ -256,7 +255,7 @@ where
 	let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr as *mut *mut std::ffi::c_void;
 	ortsys![unsafe GetTensorMutableData(tensor, output_array_ptr_ptr_void) -> OrtError::GetTensorMutableData; nonNull(output_array_ptr)];
 
-	let array_view = unsafe { ndarray::ArrayView::from_shape_ptr(shape, output_array_ptr) };
+	let array_view = unsafe { ndarray::ArrayView::from_shape_ptr(shape, output_array_ptr) }.into_dyn();
 	Ok(array_view)
 }
 
@@ -282,7 +281,7 @@ impl TensorDataToType for String {
 	}
 
 	#[allow(clippy::not_unsafe_ptr_arg_deref)]
-	fn extract_data<'t, D: ndarray::Dimension>(shape: D, tensor_element_len: usize, tensor_ptr: *mut sys::OrtValue) -> OrtResult<TensorData<'t, Self, D>> {
+	fn extract_data<'t, D: ndarray::Dimension>(shape: D, tensor_element_len: usize, tensor_ptr: *mut sys::OrtValue) -> OrtResult<TensorData<'t, Self>> {
 		// Total length of string data, not including \0 suffix
 		let mut total_length = 0;
 		ortsys![unsafe GetStringTensorDataLength(tensor_ptr, &mut total_length) -> OrtError::GetStringTensorDataLength];
@@ -313,7 +312,9 @@ impl TensorDataToType for String {
             .collect::<result::Result<Vec<String>, string::FromUtf8Error>>()
             .map_err(OrtError::StringFromUtf8Error)?;
 
-		let array = ndarray::Array::from_shape_vec(shape, strings).expect("Shape extracted from tensor didn't match tensor contents");
+		let array = ndarray::Array::from_shape_vec(shape, strings)
+			.expect("Shape extracted from tensor didn't match tensor contents")
+			.into_dyn();
 
 		Ok(TensorData::Strings { strings: array })
 	}

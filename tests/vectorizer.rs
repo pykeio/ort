@@ -23,7 +23,7 @@ fn vectorizer() -> OrtResult<()> {
 	let array = ndarray::CowArray::from(ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap().into_dyn());
 
 	// Just one input
-	let input_tensor_values = inputs![Value::from_array(Some(session.allocator()), &array)?];
+	let input_tensor_values = inputs![Value::from_array(Some(session.allocator()), &array)?]?;
 
 	// Perform the inference
 	let outputs = session.run(input_tensor_values)?;

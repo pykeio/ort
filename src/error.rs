@@ -33,9 +33,6 @@ pub enum OrtError {
 	/// Error occurred when creating an IO binding.
 	#[error("Failed to create IO binding: {0}")]
 	CreateIoBinding(OrtApiError),
-	/// Error occurred when creating an ONNX allocator.
-	#[error("Failed to create ONNX allocator: {0}")]
-	CreateAllocator(OrtApiError),
 	/// Error occurred when counting ONNX session input/output count.
 	#[error("Failed to get input or output count: {0}")]
 	GetInOutCount(OrtApiError),
@@ -63,9 +60,6 @@ pub enum OrtError {
 	/// Error occurred when getting tensor element count
 	#[error("Failed to get tensor element count: {0}")]
 	GetTensorShapeElementCount(OrtApiError),
-	/// Error occurred when creating CPU memory information
-	#[error("Failed to create CPU memory info: {0}")]
-	CreateCpuMemoryInfo(OrtApiError),
 	/// Error occurred when creating ONNX tensor
 	#[error("Failed to create tensor: {0}")]
 	CreateTensor(OrtApiError),
@@ -84,6 +78,9 @@ pub enum OrtError {
 	/// Error occurred when ONNX inference operation was called
 	#[error("Failed to run inference on model: {0}")]
 	SessionRun(OrtApiError),
+	/// Error occurred when ONNX inference operation was called using `IoBinding`.
+	#[error("Failed to run inference on model with IoBinding: {0}")]
+	SessionRunWithIoBinding(OrtApiError),
 	/// Error occurred when extracting data from an ONNX tensor into an C array to be used as an `ndarray::ArrayView`.
 	#[error("Failed to get tensor data: {0}")]
 	GetTensorMutableData(OrtApiError),
@@ -121,11 +118,11 @@ pub enum OrtError {
 	#[cfg(all(windows, feature = "profiling"))]
 	#[error("Failed to build CString when original contains null: {0}")]
 	WideFfiStringNull(#[from] widestring::error::ContainsNul<u16>),
-	#[error("{0} pointer should be null")]
+	#[error("`{0}` should be a null pointer")]
 	/// ORT pointer should have been null
 	PointerShouldBeNull(String),
 	/// ORT pointer should not have been null
-	#[error("{0} pointer should not be null")]
+	#[error("`{0}` should not be a null pointer")]
 	PointerShouldNotBeNull(String),
 	/// The runtime type was undefined.
 	#[error("Undefined tensor element type")]
@@ -150,7 +147,21 @@ pub enum OrtError {
 	#[error("Expected tensor to be on CPU in order to get data, but had allocation device `{0}`.")]
 	TensorNotOnCpu(&'static str),
 	#[error("String tensors require the session's allocator to be provided through `Value::from_array`.")]
-	StringTensorRequiresAllocator
+	StringTensorRequiresAllocator,
+	#[error("Failed to create memory info: {0}")]
+	CreateMemoryInfo(OrtApiError),
+	#[error("Could not get allocation device from `MemoryInfo`: {0}")]
+	GetAllocationDevice(OrtApiError),
+	#[error("Failed to get available execution providers: {0}")]
+	GetAvailableProviders(OrtApiError),
+	#[error("Unknown allocation device `{0}`")]
+	UnknownAllocationDevice(String),
+	#[error("Error when binding input: {0}")]
+	BindInput(OrtApiError),
+	#[error("Error when binding output: {0}")]
+	BindOutput(OrtApiError),
+	#[error("Error when retrieving session outputs from `IoBinding`: {0}")]
+	GetBoundOutputs(OrtApiError)
 }
 
 impl From<Infallible> for OrtError {

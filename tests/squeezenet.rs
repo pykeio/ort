@@ -9,7 +9,7 @@ use image::{imageops::FilterType, ImageBuffer, Pixel, Rgb};
 use ndarray::s;
 use ort::{
 	download::vision::ImageClassification, inputs, Environment, GraphOptimizationLevel, LoggingLevel, NdArrayExtensions, OrtDownloadError, OrtOwnedTensor,
-	OrtResult, SessionBuilder, Value
+	OrtResult, SessionBuilder
 };
 use test_log::test;
 
@@ -76,11 +76,11 @@ fn squeezenet_mushroom() -> OrtResult<()> {
 	}
 
 	// Perform the inference
-	let outputs = session.run(inputs![&array])?;
+	let outputs = session.run(inputs![&array]?)?;
 
 	// Downloaded model does not have a softmax as final layer; call softmax on second axis
 	// and iterate on resulting probabilities, creating an index to later access labels.
-	let output: OrtOwnedTensor<_, _> = outputs[0].extract_tensor()?;
+	let output: OrtOwnedTensor<_> = outputs[0].extract_tensor()?;
 	let mut probabilities: Vec<(usize, f32)> = output.view().softmax(ndarray::Axis(1)).iter().copied().enumerate().collect::<Vec<_>>();
 	// Sort probabilities so highest is at beginning of vector.
 	probabilities.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap());

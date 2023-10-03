@@ -41,20 +41,20 @@ impl DerefMut for SessionOutputs {
 impl Index<&str> for SessionOutputs {
 	type Output = Value;
 	fn index(&self, index: &str) -> &Self::Output {
-		self.map.get(index).unwrap()
+		self.map.get(index).expect("no entry found for key")
 	}
 }
 
 impl Index<String> for SessionOutputs {
 	type Output = Value;
 	fn index(&self, index: String) -> &Self::Output {
-		self.map.get(index.as_str()).unwrap()
+		self.map.get(index.as_str()).expect("no entry found for key")
 	}
 }
 
 impl Index<usize> for SessionOutputs {
 	type Output = Value;
 	fn index(&self, index: usize) -> &Self::Output {
-		self.map.get(&self.idxs[index]).unwrap()
+		self.map.get(&self.idxs[index]).expect("no entry found for key")
 	}
 }

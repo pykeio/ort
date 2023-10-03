@@ -2,7 +2,7 @@ use std::path::Path;
 
 use image::RgbImage;
 use ndarray::{Array, CowArray, IxDyn};
-use ort::{inputs, Environment, GraphOptimizationLevel, LoggingLevel, OrtOwnedTensor, OrtResult, SessionBuilder, Value};
+use ort::{inputs, Environment, GraphOptimizationLevel, LoggingLevel, OrtOwnedTensor, OrtResult, SessionBuilder};
 use test_log::test;
 
 fn load_input_image<P: AsRef<Path>>(name: P) -> RgbImage {
@@ -71,13 +71,13 @@ fn upsample() -> OrtResult<()> {
 	let array = convert_image_to_cow_array(&image_buffer);
 
 	// Just one input
-	let input_tensor_values = inputs![&array];
+	let input_tensor_values = inputs![&array]?;
 
 	// Perform the inference
 	let outputs = session.run(input_tensor_values)?;
 
 	assert_eq!(outputs.len(), 1);
-	let output: OrtOwnedTensor<'_, f32, IxDyn> = outputs[0].extract_tensor()?;
+	let output: OrtOwnedTensor<f32> = outputs[0].extract_tensor()?;
 
 	// The image should have doubled in size
 	assert_eq!(output.view().shape(), [1, 448, 448, 3]);
@@ -115,10 +115,10 @@ fn upsample_with_ort_model() -> OrtResult<()> {
 	let array = convert_image_to_cow_array(&image_buffer);
 
 	// Perform the inference
-	let outputs = session.run(inputs![&array])?;
+	let outputs = session.run(inputs![&array]?)?;
 
 	assert_eq!(outputs.len(), 1);
-	let output: OrtOwnedTensor<'_, f32, IxDyn> = outputs[0].extract_tensor()?;
+	let output: OrtOwnedTensor<f32> = outputs[0].extract_tensor()?;
 
 	// The image should have doubled in size
 	assert_eq!(output.view().shape(), [1, 448, 448, 3]);

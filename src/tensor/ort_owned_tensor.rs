@@ -2,7 +2,7 @@
 
 use std::{fmt::Debug, ops::Deref, ptr};
 
-use ndarray::ArrayView;
+use ndarray::{ArrayView, IxDyn};
 
 use super::{TensorData, TensorDataToType};
 use crate::{ortsys, sys};
@@ -18,21 +18,19 @@ use crate::{ortsys, sys};
 /// `OrtOwnedTensor` implements the [`std::deref::Deref`](#impl-Deref) trait for ergonomic access to
 /// the underlying [`ndarray::ArrayView`](https://docs.rs/ndarray/latest/ndarray/type.ArrayView.html).
 #[derive(Debug)]
-pub struct OrtOwnedTensor<'t, T, D>
+pub struct OrtOwnedTensor<'t, T>
 where
-	T: TensorDataToType,
-	D: ndarray::Dimension
+	T: TensorDataToType
 {
-	pub(crate) data: TensorData<'t, T, D>
+	pub(crate) data: TensorData<'t, T>
 }
 
-impl<'t, T, D> OrtOwnedTensor<'t, T, D>
+impl<'t, T> OrtOwnedTensor<'t, T>
 where
-	T: TensorDataToType,
-	D: ndarray::Dimension + 't
+	T: TensorDataToType
 {
 	/// Produce a [`ViewHolder`] for the underlying data.
-	pub fn view<'s>(&'s self) -> ViewHolder<'s, T, D>
+	pub fn view<'s>(&'s self) -> ViewHolder<'s, T>
 	where
 		't: 's // tensor ptr can outlive the TensorData
 	{
@@ -45,20 +43,18 @@ where
 // be a field in a struct. This struct exists only to hold that field.
 // Its lifetime 's is bound to the TensorData its view was created around, not the underlying tensor
 // pointer, since in the case of strings the data is the Array in the TensorData, not the pointer.
-pub struct ViewHolder<'s, T, D>
+pub struct ViewHolder<'s, T>
 where
-	T: TensorDataToType,
-	D: ndarray::Dimension
+	T: TensorDataToType
 {
-	array_view: ndarray::ArrayView<'s, T, D>
+	array_view: ndarray::ArrayView<'s, T, IxDyn>
 }
 
-impl<'s, T, D> ViewHolder<'s, T, D>
+impl<'s, T> ViewHolder<'s, T>
 where
-	T: TensorDataToType,
-	D: ndarray::Dimension
+	T: TensorDataToType
 {
-	fn new<'t>(data: &'s TensorData<'t, T, D>) -> ViewHolder<'s, T, D>
+	fn new<'t>(data: &'s TensorData<'t, T>) -> ViewHolder<'s, T>
 	where
 		't: 's // underlying tensor ptr lives at least as long as TensorData
 	{
@@ -77,12 +73,11 @@ where
 	}
 }
 
-impl<'t, T, D> Deref for ViewHolder<'t, T, D>
+impl<'t, T> Deref for ViewHolder<'t, T>
 where
-	T: TensorDataToType,
-	D: ndarray::Dimension
+	T: TensorDataToType
 {
-	type Target = ArrayView<'t, T, D>;
+	type Target = ArrayView<'t, T, IxDyn>;
 
 	fn deref(&self) -> &Self::Target {
 		&self.array_view

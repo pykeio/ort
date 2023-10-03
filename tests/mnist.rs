@@ -3,7 +3,7 @@ use std::path::Path;
 use image::{imageops::FilterType, ImageBuffer, Luma, Pixel};
 use ort::{
 	download::vision::DomainBasedImageClassification, inputs, Environment, GraphOptimizationLevel, LoggingLevel, NdArrayExtensions, OrtOwnedTensor, OrtResult,
-	SessionBuilder, Value
+	SessionBuilder
 };
 use test_log::test;
 
@@ -51,9 +51,9 @@ fn mnist_5() -> OrtResult<()> {
 	);
 
 	// Perform the inference
-	let outputs = session.run(inputs![&array])?;
+	let outputs = session.run(inputs![&array]?)?;
 
-	let output: OrtOwnedTensor<_, _> = outputs[0].extract_tensor()?;
+	let output: OrtOwnedTensor<_> = outputs[0].extract_tensor()?;
 	let mut probabilities: Vec<(usize, f32)> = output.view().softmax(ndarray::Axis(1)).iter().copied().enumerate().collect::<Vec<_>>();
 
 	// Sort probabilities so highest is at beginning of vector.

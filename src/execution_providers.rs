@@ -8,6 +8,7 @@ use std::{
 };
 
 use crate::{
+	char_p_to_string,
 	error::status_to_result,
 	ortsys,
 	sys::{self, size_t, OrtArenaCfg},
@@ -429,6 +430,38 @@ pub struct TVMExecutionProviderOptions {
 	pub input_shapes: Option<String>
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CANNExecutionProviderPrecisionMode {
+	/// Convert to float32 first according to operator implementation
+	ForceFP32,
+	/// Convert to float16 when float16 and float32 are both supported
+	ForceFP16,
+	/// Convert to float16 when float32 is not supported
+	AllowFP32ToFP16,
+	/// Keep dtypes as is
+	MustKeepOrigin,
+	/// Allow mixed precision
+	AllowMixedPrecision
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CANNExecutionProviderImplementationMode {
+	HighPrecision,
+	HighPerformance
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct CANNExecutionProviderOptions {
+	pub device_id: Option<u32>,
+	pub npu_mem_limit: Option<usize>,
+	pub arena_extend_strategy: Option<ArenaExtendStrategy>,
+	pub enable_cann_graph: Option<bool>,
+	pub dump_graphs: Option<bool>,
+	pub precision_mode: Option<CANNExecutionProviderPrecisionMode>,
+	pub op_select_impl_mode: Option<CANNExecutionProviderImplementationMode>,
+	pub optypelist_for_impl_mode: Option<String>
+}
+
 /// Execution provider container. See [the ONNX Runtime docs](https://onnxruntime.ai/docs/execution-providers/) for more
 /// info on execution providers. Execution providers are actually registered via the functions [`crate::SessionBuilder`]
 /// (per-session) or [`EnvironmentBuilder`](crate::environment::EnvironmentBuilder) (default for all sessions in an
@@ -447,7 +480,8 @@ pub enum ExecutionProvider {
 	ROCm(ROCmExecutionProviderOptions),
 	NNAPI(NNAPIExecutionProviderOptions),
 	QNN(QNNExecutionProviderOptions),
-	TVM(TVMExecutionProviderOptions)
+	TVM(TVMExecutionProviderOptions),
+	CANN(CANNExecutionProviderOptions)
 }
 
 macro_rules! map_keys {
@@ -456,10 +490,9 @@ macro_rules! map_keys {
 			let mut keys = Vec::<CString>::new();
 			let mut values = Vec::<CString>::new();
 			$(
-				let str_value = CString::new(($ex).to_string().as_str()).unwrap();
-				if !str_value.is_empty() {
+				if let Some(v) = $ex {
 					keys.push(CString::new(stringify!($fn_name)).unwrap());
-					values.push(str_value);
+					values.push(CString::new(v.to_string().as_str()).unwrap());
 				}
 			)*
 			assert_eq!(keys.len(), values.len()); // sanity check
@@ -495,31 +528,31 @@ impl ExecutionProvider {
 			Self::ROCm(_) => "ROCmExecutionProvider",
 			Self::NNAPI(_) => "NnapiExecutionProvider",
 			Self::QNN(_) => "QNNExecutionProvider",
-			Self::TVM(_) => "TvmExecutionProvider"
+			Self::TVM(_) => "TvmExecutionProvider",
+			Self::CANN(_) => "CANNExecutionProvider"
 		}
 	}
 
 	/// Returns `true` if this execution provider is available, `false` otherwise.
 	/// The CPU execution provider will always be available.
-	pub fn is_available(&self) -> bool {
+	pub fn is_available(&self) -> OrtResult<bool> {
 		let mut providers: *mut *mut c_char = std::ptr::null_mut();
 		let mut num_providers = 0;
-		if status_to_result(ortsys![unsafe GetAvailableProviders(&mut providers, &mut num_providers)]).is_err() || providers.is_null() {
-			return false;
+		ortsys![unsafe GetAvailableProviders(&mut providers, &mut num_providers) -> OrtError::GetAvailableProviders];
+		if providers.is_null() {
+			return Ok(false);
 		}
 
 		for i in 0..num_providers {
-			let avail = unsafe { std::ffi::CStr::from_ptr(*providers.offset(i as isize)) }
-				.to_string_lossy()
-				.into_owned();
+			let avail = char_p_to_string(unsafe { *providers.offset(i as isize) })?;
 			if self.as_str() == avail {
 				let _ = ortsys![unsafe ReleaseAvailableProviders(providers, num_providers)];
-				return true;
+				return Ok(true);
 			}
 		}
 
 		let _ = ortsys![unsafe ReleaseAvailableProviders(providers, num_providers)];
-		false
+		Ok(false)
 	}
 
 	pub(crate) fn apply(&self, session_options: *mut sys::OrtSessionOptions) -> OrtResult<()> {
@@ -773,6 +806,45 @@ impl ExecutionProvider {
 				let options_string = CString::new(option_string.join(",")).unwrap();
 				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_Tvm(session_options, options_string.as_ptr()) })
 					.map_err(OrtError::ExecutionProvider)?;
+			}
+			#[cfg(any(feature = "load-dynamic", feature = "cann"))]
+			&Self::CANN(options) => {
+				let mut cann_options: *mut sys::OrtCANNProviderOptions = std::ptr::null_mut();
+				status_to_result(ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)]).map_err(OrtError::ExecutionProvider)?;
+				let (key_ptrs, value_ptrs, len, keys, values) = map_keys! {
+					device_id = options.device_id,
+					npu_mem_limit = options.npu_mem_limit,
+					arena_extend_strategy = options.arena_extend_strategy.as_ref().map(|v| match v {
+						ArenaExtendStrategy::NextPowerOfTwo => "kNextPowerOfTwo",
+						ArenaExtendStrategy::SameAsRequested => "kSameAsRequested"
+					}),
+					enable_cann_graph = bool_as_int(options.enable_cann_graph),
+					dump_graphs = bool_as_int(options.dump_graphs),
+					precision_mode = options.precision_mode.as_ref().map(|v| match v {
+						CANNExecutionProviderPrecisionMode::ForceFP32 => "force_fp32",
+						CANNExecutionProviderPrecisionMode::ForceFP16 => "force_fp16",
+						CANNExecutionProviderPrecisionMode::AllowFP32ToFP16 => "allow_fp32_to_fp16",
+						CANNExecutionProviderPrecisionMode::MustKeepOrigin => "must_keep_origin_dtype",
+						CANNExecutionProviderPrecisionMode::AllowMixedPrecision => "allow_mix_precision"
+					}),
+					op_select_impl_mode = options.op_select_impl_mode.as_ref().map(|v| match v {
+						CANNExecutionProviderImplementationMode::HighPrecision => "high_precision",
+						CANNExecutionProviderImplementationMode::HighPerformance => "high_performance"
+					}),
+					optypelist_for_impl_mode = options.optypelist_for_impl_mode.clone()
+				};
+				if let Err(e) = status_to_result(ortsys![unsafe UpdateCANNProviderOptions(cann_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), len as _)])
+					.map_err(OrtError::ExecutionProvider)
+				{
+					ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
+					std::mem::drop((keys, values));
+					return Err(e);
+				}
+
+				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_CANN(session_options, cann_options)];
+				ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
+				std::mem::drop((keys, values));
+				status_to_result(status).map_err(OrtError::ExecutionProvider)?;
 			}
 			_ => return Err(OrtError::ExecutionProviderNotRegistered(self.as_str()))
 		}

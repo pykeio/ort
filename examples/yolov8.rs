@@ -4,7 +4,7 @@ use std::{path::PathBuf, time::Duration};
 
 use image::{imageops::FilterType, GenericImageView};
 use ndarray::{s, Array, Axis};
-use ort::{inputs, Environment, OrtResult, SessionBuilder, Value};
+use ort::{inputs, Environment, OrtResult, SessionBuilder};
 use raqote::{DrawOptions, DrawTarget, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle};
 use show_image::{event, AsImageView, WindowOptions};
 

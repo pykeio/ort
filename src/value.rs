@@ -132,7 +132,7 @@ impl Value {
 	/// Attempt to extract the underlying data into a Rust `ndarray`.
 	///
 	/// The resulting array will be wrapped within an [`OrtOwnedTensor`].
-	pub fn extract_tensor<'s, T>(&self) -> OrtResult<OrtOwnedTensor<'s, T, IxDyn>>
+	pub fn extract_tensor<T>(&self) -> OrtResult<OrtOwnedTensor<'_, T>>
 	where
 		T: TensorDataToType + Clone + Debug
 	{
@@ -341,7 +341,7 @@ where
 
 	fn get(&self) -> (Vec<i64>, &[Self::Item]) {
 		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
-		let data = self.as_slice().unwrap();
+		let data = self.as_slice().expect("tensor should be contiguous");
 		(shape, data)
 	}
 
@@ -361,7 +361,7 @@ impl<T: Clone + 'static> OrtInput for &mut ArcArray<T, IxDyn> {
 
 	fn get(&self) -> (Vec<i64>, &[Self::Item]) {
 		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
-		let data = self.as_slice().unwrap();
+		let data = self.as_slice().expect("tensor should be contiguous");
 		(shape, data)
 	}
 

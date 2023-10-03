@@ -1,10 +1,10 @@
-use std::ffi::{c_char, c_int, CStr, CString};
+use std::ffi::{c_char, c_int, CString};
 
 use super::{
 	error::{OrtError, OrtResult},
 	ortsys, sys, AllocatorType, MemType
 };
-use crate::error::status_to_result;
+use crate::{char_p_to_string, error::status_to_result};
 
 /// An ONNX Runtime allocator, used to manage the allocation of [`crate::Value`]s.
 #[derive(Debug)]
@@ -60,19 +60,21 @@ impl AllocationDevice {
 	}
 }
 
-impl From<&str> for AllocationDevice {
-	fn from(value: &str) -> Self {
+impl TryFrom<&str> for AllocationDevice {
+	type Error = String;
+
+	fn try_from(value: &str) -> Result<Self, String> {
 		match value {
-			"Cpu" => AllocationDevice::CPU,
-			"CUDA_CPU" => AllocationDevice::CPU,
-			"Cuda" => AllocationDevice::CUDA,
-			"CudaPinned" => AllocationDevice::CUDAPinned,
-			"Cann" => AllocationDevice::CANN,
-			"CannPinned" => AllocationDevice::CANNPinned,
-			"Dml" => AllocationDevice::DirectML,
-			"OpenVINO_CPU" => AllocationDevice::OpenVINOCPU,
-			"OpenVINO_GPU" => AllocationDevice::OpenVINOGPU,
-			other => unimplemented!("not implemented `{other}`")
+			"Cpu" => Ok(AllocationDevice::CPU),
+			"CUDA_CPU" => Ok(AllocationDevice::CPU),
+			"Cuda" => Ok(AllocationDevice::CUDA),
+			"CudaPinned" => Ok(AllocationDevice::CUDAPinned),
+			"Cann" => Ok(AllocationDevice::CANN),
+			"CannPinned" => Ok(AllocationDevice::CANNPinned),
+			"Dml" => Ok(AllocationDevice::DirectML),
+			"OpenVINO_CPU" => Ok(AllocationDevice::OpenVINOCPU),
+			"OpenVINO_GPU" => Ok(AllocationDevice::OpenVINOGPU),
+			other => Err(other.to_string())
 		}
 	}
 }
@@ -88,7 +90,7 @@ impl MemoryInfo {
 	pub fn new_cpu(allocator: AllocatorType, memory_type: MemType) -> OrtResult<Self> {
 		let mut memory_info_ptr: *mut sys::OrtMemoryInfo = std::ptr::null_mut();
 		ortsys![
-			unsafe CreateCpuMemoryInfo(allocator.into(), memory_type.into(), &mut memory_info_ptr);
+			unsafe CreateCpuMemoryInfo(allocator.into(), memory_type.into(), &mut memory_info_ptr) -> OrtError::CreateMemoryInfo;
 			nonNull(memory_info_ptr)
 		];
 		Ok(Self {
@@ -102,7 +104,8 @@ impl MemoryInfo {
 		let mut memory_info_ptr: *mut sys::OrtMemoryInfo = std::ptr::null_mut();
 		let allocator_name = CString::new(allocation_device.as_str()).unwrap();
 		ortsys![
-			unsafe CreateMemoryInfo(allocator_name.as_ptr(), allocator_type.into(), device_id, memory_type.into(), &mut memory_info_ptr);
+			unsafe CreateMemoryInfo(allocator_name.as_ptr(), allocator_type.into(), device_id, memory_type.into(), &mut memory_info_ptr)
+				-> OrtError::CreateMemoryInfo;
 			nonNull(memory_info_ptr)
 		];
 		Ok(Self {
@@ -114,9 +117,11 @@ impl MemoryInfo {
 	/// Returns the [`AllocationDevice`] this memory info
 	pub fn allocation_device(&self) -> OrtResult<AllocationDevice> {
 		let mut name_ptr: *const c_char = std::ptr::null_mut();
-		ortsys![unsafe MemoryInfoGetName(self.ptr, &mut name_ptr) -> OrtError::CreateCpuMemoryInfo; nonNull(name_ptr)];
-		let name: String = unsafe { CStr::from_ptr(name_ptr) }.to_string_lossy().to_string();
-		Ok(AllocationDevice::from(name.as_str()))
+		ortsys![unsafe MemoryInfoGetName(self.ptr, &mut name_ptr) -> OrtError::GetAllocationDevice; nonNull(name_ptr)];
+		// no need to free: "Do NOT free the returned pointer. It is valid for the lifetime of the OrtMemoryInfo"
+
+		let name: String = char_p_to_string(name_ptr)?;
+		AllocationDevice::try_from(name.as_str()).map_err(OrtError::UnknownAllocationDevice)
 	}
 }
 

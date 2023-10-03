@@ -15,10 +15,9 @@ use std::{
 	ops::Deref,
 	os::raw::c_char,
 	path::Path,
+	ptr,
 	sync::Arc
 };
-
-use tracing::error;
 
 use super::{
 	char_p_to_string,
@@ -65,7 +64,6 @@ pub use self::{input::SessionInputs, output::SessionOutputs};
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Clone)]
 pub struct SessionBuilder {
 	env: Arc<Environment>,
 	session_options_ptr: *mut sys::OrtSessionOptions,
@@ -86,6 +84,22 @@ impl Debug for SessionBuilder {
 	}
 }
 
+impl Clone for SessionBuilder {
+	fn clone(&self) -> Self {
+		let mut session_options_ptr = ptr::null_mut();
+		status_to_result(ortsys![unsafe CloneSessionOptions(self.session_options_ptr, &mut session_options_ptr as *mut _)])
+			.expect("error cloning session options");
+		Self {
+			env: Arc::clone(&self.env),
+			session_options_ptr,
+			allocator: self.allocator,
+			memory_type: self.memory_type,
+			custom_runtime_handles: self.custom_runtime_handles.clone(),
+			execution_providers: self.execution_providers.clone()
+		}
+	}
+}
+
 impl Drop for SessionBuilder {
 	#[tracing::instrument]
 	fn drop(&mut self) {
@@ -93,9 +107,7 @@ impl Drop for SessionBuilder {
 			close_lib_handle(handle);
 		}
 
-		if self.session_options_ptr.is_null() {
-			error!("Session options pointer is null, not dropping");
-		} else {
+		if !self.session_options_ptr.is_null() {
 			ortsys![unsafe ReleaseSessionOptions(self.session_options_ptr)];
 		}
 	}

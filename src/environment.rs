@@ -94,7 +94,7 @@ impl Default for Environment {
 		//      a new Arc<Mutex<EnvironmentSingleton>> with a strong count of 1.
 		//      Cloning it to embed it inside the 'Environment' to return
 		//      will thus increase the strong count to 2.
-		let mut environment_guard = G_ENV.lock().expect("Failed to acquire lock: another thread panicked?");
+		let mut environment_guard = G_ENV.lock().expect("Failed to acquire global environment lock: another thread panicked?");
 		let g_env_ptr = environment_guard.env_ptr.get_mut();
 		if g_env_ptr.is_null() {
 			debug!("Environment not yet initialized, creating a new one");
@@ -268,7 +268,7 @@ impl EnvironmentBuilder {
 		//      a new Arc<Mutex<EnvironmentSingleton>> with a strong count of 1.
 		//      Cloning it to embed it inside the 'Environment' to return
 		//      will thus increase the strong count to 2.
-		let mut environment_guard = G_ENV.lock().expect("Failed to acquire lock: another thread panicked?");
+		let mut environment_guard = G_ENV.lock().expect("Failed to acquire global environment lock: another thread panicked?");
 		let g_env_ptr = environment_guard.env_ptr.get_mut();
 		if g_env_ptr.is_null() {
 			debug!("Environment not yet initialized, creating a new one");

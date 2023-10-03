@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use ndarray::{array, concatenate, s, Array1, Axis, CowArray};
 use ort::{
 	download::language::machine_comprehension::GPT2, inputs, CUDAExecutionProviderOptions, Environment, ExecutionProvider, GraphOptimizationLevel,
-	OrtOwnedTensor, OrtResult, SessionBuilder, Value
+	OrtOwnedTensor, OrtResult, SessionBuilder
 };
 use rand::Rng;
 use tokenizers::Tokenizer;
@@ -41,8 +41,8 @@ fn main() -> OrtResult<()> {
 	for _ in 0..GEN_TOKENS {
 		let n_tokens = tokens.shape()[0];
 		let array = tokens.clone().insert_axis(Axis(0)).into_shape((1, 1, n_tokens)).unwrap().into_dyn();
-		let outputs = session.run(inputs![&array])?;
-		let generated_tokens: OrtOwnedTensor<f32, _> = outputs["output1"].extract_tensor()?;
+		let outputs = session.run(inputs![&array]?)?;
+		let generated_tokens: OrtOwnedTensor<f32> = outputs["output1"].extract_tensor()?;
 		let generated_tokens = generated_tokens.view();
 
 		let probabilities = &mut generated_tokens

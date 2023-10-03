@@ -37,11 +37,11 @@ impl<'s> From<SmallVec<[Value; 4]>> for SessionInputs<'s> {
 #[macro_export]
 macro_rules! inputs {
 	(bind = $($v:expr),+) => ($v);
-	($($v:expr),+ $(,)?) => ($crate::smallvec::smallvec![$(std::convert::TryInto::<Value<'_>>::try_into($v)?,)+]);
+	($($v:expr),+ $(,)?) => ([$(std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::OrtError::from),)+].into_iter().collect::<$crate::OrtResult<$crate::smallvec::SmallVec<_>>>());
 	($($n:expr => $v:expr),+ $(,)?) => {{
-		let mut inputs = std::collections::HashMap::<_, Value<'_>>::new();
+		let mut inputs = std::collections::HashMap::<_, $crate::Value>::new();
 		$(
-			inputs.insert($n, std::convert::TryInto::<Value<'_>>::try_into($v)?);
+			inputs.insert($n, std::convert::TryInto::<$crate::Value>::try_into($v)?);
 		)+
 		inputs
 	}};

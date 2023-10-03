@@ -315,7 +315,8 @@ pub struct ROCmExecutionProviderOptions {
 	pub user_compute_stream: Option<*mut c_void>,
 	pub default_memory_arena_cfg: Option<*mut sys::OrtArenaCfg>,
 	pub tunable_op_enable: bool,
-	pub tunable_op_tuning_enable: bool
+	pub tunable_op_tuning_enable: bool,
+	pub tunable_op_max_tuning_duration_ms: i32
 }
 
 #[derive(Debug, Clone, Default)]
@@ -737,7 +738,8 @@ impl ExecutionProvider {
 					user_compute_stream: options.user_compute_stream.unwrap_or(ptr::null_mut()),
 					default_memory_arena_cfg: options.default_memory_arena_cfg.unwrap_or(ptr::null_mut()),
 					tunable_op_enable: bool_as_int(options.tunable_op_enable),
-					tunable_op_tuning_enable: bool_as_int(options.tunable_op_tuning_enable)
+					tunable_op_tuning_enable: bool_as_int(options.tunable_op_tuning_enable),
+					tunable_op_max_tuning_duration_ms: options.tunable_op_max_tuning_duration_ms
 				};
 				status_to_result(ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(session_options, &rocm_options as *const _)])
 					.map_err(OrtError::ExecutionProvider)?;

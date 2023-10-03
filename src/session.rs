@@ -583,7 +583,7 @@ impl Drop for SharedSessionInner {
 	}
 }
 
-/// Type storing the session information, built from an [`Environment`](environment/struct.Environment.html)
+/// Type storing the session information, built from an [`Environment`](crate::environment::Environment)
 #[derive(Debug)]
 pub struct Session {
 	pub(crate) inner: Arc<SharedSessionInner>,

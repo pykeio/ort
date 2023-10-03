@@ -456,9 +456,10 @@ macro_rules! map_keys {
 			let mut keys = Vec::<CString>::new();
 			let mut values = Vec::<CString>::new();
 			$(
-				if let Some(v) = $ex {
+				let str_value = CString::new(($ex).to_string().as_str()).unwrap();
+				if !str_value.is_empty() {
 					keys.push(CString::new(stringify!($fn_name)).unwrap());
-					values.push(CString::new(v.to_string().as_str()).unwrap());
+					values.push(str_value);
 				}
 			)*
 			assert_eq!(keys.len(), values.len()); // sanity check

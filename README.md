@@ -3,10 +3,10 @@
 	<h1>Rust bindings for ONNX Runtime</h1>
     <a href="https://app.codecov.io/gh/pykeio/ort" target="_blank"><img alt="Coverage Results" src="https://img.shields.io/codecov/c/gh/pykeio/ort?style=for-the-badge"></a> <a href="https://github.com/pykeio/ort/actions/workflows/test.yml"><img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/pykeio/ort/test.yml?branch=main&style=for-the-badge"></a> <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/d/ort?style=for-the-badge"></a>
     <br />
-    <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/v/ort?style=for-the-badge&label=ort&logo=rust"></a> <img alt="ONNX Runtime" src="https://img.shields.io/badge/onnxruntime-v1.15.1-blue?style=for-the-badge&logo=cplusplus">
+    <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/v/ort?style=for-the-badge&label=ort&logo=rust"></a> <img alt="ONNX Runtime" src="https://img.shields.io/badge/onnxruntime-v1.16.0-blue?style=for-the-badge&logo=cplusplus">
 </div>
 
-`ort` is an (unofficial) [ONNX Runtime](https://onnxruntime.ai/) 1.15 wrapper for Rust based on the now inactive [`onnxruntime-rs`](https://github.com/nbigaouette/onnxruntime-rs). ONNX Runtime accelerates ML inference on both CPU & GPU.
+`ort` is an (unofficial) [ONNX Runtime](https://onnxruntime.ai/) 1.16 wrapper for Rust based on the now inactive [`onnxruntime-rs`](https://github.com/nbigaouette/onnxruntime-rs). ONNX Runtime accelerates ML inference on both CPU & GPU.
 
 See [the docs](https://docs.rs/ort) for more detailed information and the [`examples`](https://github.com/pykeio/ort/tree/main/examples). If you have any questions, feel free to ask in the [`#💬｜ort-discussions` and related channels in the pyke Discord server](https://discord.gg/uQtsNu2xMa) or in [GitHub Discussions](https://github.com/pykeio/ort/discussions).
 
@@ -25,7 +25,7 @@ See [the docs](https://docs.rs/ort) for more detailed information and the [`exam
 ## Feature comparison
 | Feature comparison     | **📕 ort** | **📗 [ors](https://github.com/HaoboGu/ors)** | **🪟 [onnxruntime-rs](https://github.com/microsoft/onnxruntime/tree/main/rust)** |
 |------------------------|-----------|-----------|----------------------|
-| Upstream version       | **v1.15.1** | v1.12.0 | v1.8               |
+| Upstream version       | **v1.16.0** | v1.12.0 | v1.8               |
 | `dlopen()`?            | ✅         | ✅         | ❌                    |
 | Execution providers?   | ✅         | ❌         | ❌                    |
 | IOBinding?             | ✅         | ❌         | ❌                    |
@@ -33,6 +33,7 @@ See [the docs](https://docs.rs/ort) for more detailed information and the [`exam
 | Multiple output types? | ✅         | ✅         | ❌                    |
 | Multiple input types?  | ✅         | ✅         | ❌                    |
 | In-memory session?     | ✅         | ✅         | ✅                    |
+| WebAssembly?           | ✅         | ❌         | ❌                    |
 
 ## Cargo features
 > **Note:**

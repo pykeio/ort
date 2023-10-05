@@ -274,7 +274,7 @@ impl<'v> Value<'v> {
 				let mut len = 0;
 				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> OrtError::GetTensorShapeElementCount];
 
-				let data = T::extract_data(shape, len, self.ptr())?;
+				let data = T::extract_data(shape, len as _, self.ptr())?;
 				Ok(OrtOwnedTensor { data })
 			}
 		};

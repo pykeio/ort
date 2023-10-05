@@ -784,7 +784,7 @@ mod dangerous {
 	}
 
 	fn extract_io_count(
-		f: extern_system_fn! { unsafe fn(*const sys::OrtSession, *mut usize) -> *mut sys::OrtStatus },
+		f: extern_system_fn! { unsafe fn(*const sys::OrtSession, *mut size_t) -> *mut sys::OrtStatus },
 		session_ptr: *mut sys::OrtSession
 	) -> OrtResult<usize> {
 		let mut num_nodes = 0;
@@ -794,7 +794,7 @@ mod dangerous {
 		(num_nodes != 0)
 			.then_some(())
 			.ok_or_else(|| OrtError::GetInOutCount(OrtApiError::Msg("No nodes in model".to_owned())))?;
-		Ok(num_nodes)
+		Ok(num_nodes as _)
 	}
 
 	fn extract_input_name(session_ptr: *mut sys::OrtSession, allocator_ptr: *mut sys::OrtAllocator, i: size_t) -> OrtResult<String> {

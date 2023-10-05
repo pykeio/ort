@@ -7,7 +7,13 @@ use std::{
 	sync::Arc
 };
 
-use crate::{memory::MemoryInfo, ortsys, sys, value::Value, OrtError, OrtResult, Session};
+use crate::{
+	memory::MemoryInfo,
+	ortsys,
+	sys::{self, size_t},
+	value::Value,
+	OrtError, OrtResult, Session
+};
 
 #[derive(Debug)]
 pub struct IoBinding<'s> {
@@ -53,21 +59,23 @@ impl<'s> IoBinding<'s> {
 			nonNull(names_ptr)
 		];
 		if count > 0 {
-			let lengths = unsafe { std::slice::from_raw_parts(lengths_ptr, count).to_vec() };
-			let output_names = unsafe { ManuallyDrop::new(String::from_raw_parts(names_ptr as *mut u8, lengths.iter().sum(), lengths.iter().sum())) };
+			let lengths = unsafe { std::slice::from_raw_parts(lengths_ptr, count as _).to_vec() };
+			let output_names = unsafe {
+				ManuallyDrop::new(String::from_raw_parts(names_ptr as *mut u8, lengths.iter().sum::<size_t>() as _, lengths.iter().sum::<size_t>() as _))
+			};
 			let mut output_names_chars = output_names.chars();
 
 			let output_names = lengths
 				.into_iter()
-				.map(|length| output_names_chars.by_ref().take(length).collect::<String>())
+				.map(|length| output_names_chars.by_ref().take(length as _).collect::<String>())
 				.collect::<Vec<_>>();
 
 			ortsys![unsafe AllocatorFree(self.session.allocator(), names_ptr as *mut c_void) -> OrtError::CreateIoBinding];
 
-			let mut output_values_ptr: *mut *mut sys::OrtValue = vec![ptr::null_mut(); count].as_mut_ptr();
+			let mut output_values_ptr: *mut *mut sys::OrtValue = vec![ptr::null_mut(); count as _].as_mut_ptr();
 			ortsys![unsafe GetBoundOutputValues(self.ptr, self.session.allocator(), &mut output_values_ptr, &mut count) -> OrtError::CreateIoBinding; nonNull(output_values_ptr)];
 
-			let output_values_ptr = unsafe { std::slice::from_raw_parts(output_values_ptr, count).to_vec() }
+			let output_values_ptr = unsafe { std::slice::from_raw_parts(output_values_ptr, count as _).to_vec() }
 				.into_iter()
 				.map(|v| Value::from_raw(v, Arc::clone(&self.session.session_ptr)));
 

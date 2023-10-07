@@ -665,7 +665,7 @@ impl ExecutionProvider {
 					trt_context_memory_sharing_enable = bool_as_int(options.enable_context_memory_sharing),
 					trt_layer_norm_fp32_fallback = bool_as_int(options.layer_norm_fp32_fallback),
 					trt_timing_cache_enable = bool_as_int(options.timing_cache_enable),
-					trt_force_timing_cache = bool_as_int(options.force_timing_cache),
+					trt_force_timing_cache_match = bool_as_int(options.force_timing_cache),
 					trt_detailed_build_log = bool_as_int(options.detailed_build_log),
 					trt_build_heuristics_enable = bool_as_int(options.enable_build_heuristics),
 					trt_sparsity_enable = bool_as_int(options.enable_sparsity),

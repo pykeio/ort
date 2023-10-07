@@ -1,7 +1,7 @@
 [package]
 name = "ort"
 description = "A Rust wrapper for ONNX Runtime 1.16 - Optimize and Accelerate Machine Learning Inferencing"
-version = "1.16.1"
+version = "1.16.2"
 edition = "2021"
 rust-version = "1.70"
 license = "MIT/Apache-2.0"

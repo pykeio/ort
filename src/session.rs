@@ -29,7 +29,7 @@ use super::{
 	memory::Allocator,
 	metadata::ModelMetadata,
 	ort, ortsys, sys,
-	tensor::TensorElementDataType,
+	tensor::DataType,
 	value::Value,
 	AllocatorType, GraphOptimizationLevel, MemType
 };
@@ -624,11 +624,7 @@ pub struct Input {
 	/// Name of the input layer
 	pub name: String,
 	/// Type of the input layer's elements
-	pub input_type: TensorElementDataType,
-	/// Shape of the input layer
-	///
-	/// C API uses a i64 for the dimensions. We use an unsigned of the same range of the positive values.
-	pub dimensions: Vec<Option<u32>>
+	pub input_type: DataType
 }
 
 /// Information about an ONNX's output as stored in loaded file
@@ -637,33 +633,7 @@ pub struct Output {
 	/// Name of the output layer
 	pub name: String,
 	/// Type of the output layer's elements
-	pub output_type: TensorElementDataType,
-	/// Shape of the output layer
-	///
-	/// C API uses a i64 for the dimensions. We use an unsigned of the same range of the positive values.
-	pub dimensions: Vec<Option<u32>>
-}
-
-impl Input {
-	/// Return an iterator over the shape elements of the input layer
-	///
-	/// Note: The member [`Input::dimensions`](struct.Input.html#structfield.dimensions)
-	/// stores `u32` (since ONNX uses `i64` but which cannot be negative) so the
-	/// iterator converts to `usize`.
-	pub fn dimensions(&self) -> impl Iterator<Item = Option<usize>> + '_ {
-		self.dimensions.iter().map(|d| d.map(|d2| d2 as usize))
-	}
-}
-
-impl Output {
-	/// Return an iterator over the shape elements of the output layer
-	///
-	/// Note: The member [`Output::dimensions`](struct.Output.html#structfield.dimensions)
-	/// stores `u32` (since ONNX uses `i64` but which cannot be negative) so the
-	/// iterator converts to `usize`.
-	pub fn dimensions(&self) -> impl Iterator<Item = Option<usize>> + '_ {
-		self.dimensions.iter().map(|d| d.map(|d2| d2 as usize))
-	}
+	pub output_type: DataType
 }
 
 impl Session {
@@ -785,23 +755,6 @@ impl Session {
 unsafe impl Send for Session {}
 unsafe impl Sync for Session {}
 
-unsafe fn get_tensor_dimensions(tensor_info_ptr: *const sys::OrtTensorTypeAndShapeInfo) -> OrtResult<Vec<i64>> {
-	let mut num_dims = 0;
-	ortsys![GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> OrtError::GetDimensionsCount];
-
-	let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-	ortsys![GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> OrtError::GetDimensions];
-	Ok(node_dims)
-}
-
-unsafe fn extract_data_type(tensor_info_ptr: *const sys::OrtTensorTypeAndShapeInfo) -> OrtResult<TensorElementDataType> {
-	let mut type_sys = sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-	ortsys![GetTensorElementType(tensor_info_ptr, &mut type_sys) -> OrtError::GetTensorElementType];
-	assert_ne!(type_sys, sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
-	// This transmute should be safe since its value is read from GetTensorElementType, which we must trust
-	Ok(type_sys.into())
-}
-
 #[cfg(unix)]
 fn close_lib_handle(handle: *mut std::os::raw::c_void) {
 	unsafe { libc::dlclose(handle) };
@@ -817,7 +770,68 @@ fn close_lib_handle(handle: *mut std::os::raw::c_void) {
 /// `SessionBuilder::with_model_from_file()` method.
 mod dangerous {
 	use super::*;
-	use crate::{ortfree, sys::size_t, tensor::TensorElementDataType};
+	use crate::{ortfree, sys::size_t};
+
+	unsafe fn extract_data_type_from_tensor_info(info_ptr: *const sys::OrtTensorTypeAndShapeInfo) -> OrtResult<DataType> {
+		let mut type_sys = sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+		ortsys![GetTensorElementType(info_ptr, &mut type_sys) -> OrtError::GetTensorElementType];
+		assert_ne!(type_sys, sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
+		// This transmute should be safe since its value is read from GetTensorElementType, which we must trust
+		let mut num_dims = 0;
+		ortsys![GetDimensionsCount(info_ptr, &mut num_dims) -> OrtError::GetDimensionsCount];
+
+		let mut node_dims: Vec<i64> = vec![0; num_dims as _];
+		ortsys![GetDimensions(info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> OrtError::GetDimensions];
+
+		Ok(DataType::Tensor {
+			ty: type_sys.into(),
+			dimensions: node_dims
+		})
+	}
+
+	unsafe fn extract_data_type_from_sequence_info(info_ptr: *const sys::OrtSequenceTypeInfo) -> OrtResult<DataType> {
+		let mut element_type_info: *mut sys::OrtTypeInfo = std::ptr::null_mut();
+		ortsys![GetSequenceElementType(info_ptr, &mut element_type_info) -> OrtError::GetSequenceElementType];
+
+		let mut ty: sys::ONNXType = sys::ONNXType::ONNX_TYPE_UNKNOWN;
+		let status = ortsys![unsafe GetOnnxTypeFromTypeInfo(element_type_info, &mut ty)];
+		status_to_result(status).map_err(OrtError::GetOnnxTypeFromTypeInfo)?;
+
+		match ty {
+			sys::ONNXType::ONNX_TYPE_TENSOR => {
+				let mut info_ptr: *const sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+				ortsys![unsafe CastTypeInfoToTensorInfo(element_type_info, &mut info_ptr) -> OrtError::CastTypeInfoToTensorInfo; nonNull(info_ptr)];
+				let ty = unsafe { extract_data_type_from_tensor_info(info_ptr)? };
+				Ok(DataType::Sequence(Box::new(ty)))
+			}
+			sys::ONNXType::ONNX_TYPE_MAP => {
+				let mut info_ptr: *const sys::OrtMapTypeInfo = std::ptr::null_mut();
+				ortsys![unsafe CastTypeInfoToMapTypeInfo(element_type_info, &mut info_ptr) -> OrtError::CastTypeInfoToMapTypeInfo; nonNull(info_ptr)];
+				let ty = unsafe { extract_data_type_from_map_info(info_ptr)? };
+				Ok(DataType::Sequence(Box::new(ty)))
+			}
+			_ => unreachable!()
+		}
+	}
+
+	unsafe fn extract_data_type_from_map_info(info_ptr: *const sys::OrtMapTypeInfo) -> OrtResult<DataType> {
+		let mut key_type_sys = sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+		ortsys![GetMapKeyType(info_ptr, &mut key_type_sys) -> OrtError::GetMapKeyType];
+		assert_ne!(key_type_sys, sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
+
+		let mut value_type_info: *mut sys::OrtTypeInfo = std::ptr::null_mut();
+		ortsys![GetMapValueType(info_ptr, &mut value_type_info) -> OrtError::GetMapValueType];
+		let mut value_info_ptr: *const sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+		ortsys![unsafe CastTypeInfoToTensorInfo(value_type_info, &mut value_info_ptr) -> OrtError::CastTypeInfoToTensorInfo; nonNull(value_info_ptr)];
+		let mut value_type_sys = sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+		ortsys![GetTensorElementType(value_info_ptr, &mut value_type_sys) -> OrtError::GetTensorElementType];
+		assert_ne!(value_type_sys, sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
+
+		Ok(DataType::Map {
+			key: key_type_sys.into(),
+			value: value_type_sys.into()
+		})
+	}
 
 	pub(super) fn extract_inputs_count(session_ptr: *mut sys::OrtSession) -> OrtResult<usize> {
 		let f = ort().SessionGetInputCount.unwrap();
@@ -882,23 +896,15 @@ mod dangerous {
 	pub(super) fn extract_input(session_ptr: *mut sys::OrtSession, allocator_ptr: *mut sys::OrtAllocator, i: usize) -> OrtResult<Input> {
 		let input_name = extract_input_name(session_ptr, allocator_ptr, i as _)?;
 		let f = ort().SessionGetInputTypeInfo.unwrap();
-		let (input_type, dimensions) = extract_io(f, session_ptr, i as _)?;
-		Ok(Input {
-			name: input_name,
-			input_type,
-			dimensions
-		})
+		let input_type = extract_io(f, session_ptr, i as _)?;
+		Ok(Input { name: input_name, input_type })
 	}
 
 	pub(super) fn extract_output(session_ptr: *mut sys::OrtSession, allocator_ptr: *mut sys::OrtAllocator, i: usize) -> OrtResult<Output> {
 		let output_name = extract_output_name(session_ptr, allocator_ptr, i as _)?;
 		let f = ort().SessionGetOutputTypeInfo.unwrap();
-		let (output_type, dimensions) = extract_io(f, session_ptr, i as _)?;
-		Ok(Output {
-			name: output_name,
-			output_type,
-			dimensions
-		})
+		let output_type = extract_io(f, session_ptr, i as _)?;
+		Ok(Output { name: output_name, output_type })
 	}
 
 	fn extract_io(
@@ -909,21 +915,36 @@ mod dangerous {
 		) -> *mut sys::OrtStatus },
 		session_ptr: *mut sys::OrtSession,
 		i: size_t
-	) -> OrtResult<(TensorElementDataType, Vec<Option<u32>>)> {
+	) -> OrtResult<DataType> {
 		let mut typeinfo_ptr: *mut sys::OrtTypeInfo = std::ptr::null_mut();
 
 		let status = unsafe { f(session_ptr, i, &mut typeinfo_ptr) };
 		status_to_result(status).map_err(OrtError::GetTypeInfo)?;
 		assert_non_null_pointer(typeinfo_ptr, "TypeInfo")?;
 
-		let mut tensor_info_ptr: *const sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-		ortsys![unsafe CastTypeInfoToTensorInfo(typeinfo_ptr, &mut tensor_info_ptr) -> OrtError::CastTypeInfoToTensorInfo; nonNull(tensor_info_ptr)];
-
-		let io_type: TensorElementDataType = unsafe { extract_data_type(tensor_info_ptr)? };
-		let node_dims = unsafe { get_tensor_dimensions(tensor_info_ptr)? };
+		let mut ty: sys::ONNXType = sys::ONNXType::ONNX_TYPE_UNKNOWN;
+		let status = ortsys![unsafe GetOnnxTypeFromTypeInfo(typeinfo_ptr, &mut ty)];
+		status_to_result(status).map_err(OrtError::GetOnnxTypeFromTypeInfo)?;
+		let io_type = match ty {
+			sys::ONNXType::ONNX_TYPE_TENSOR | sys::ONNXType::ONNX_TYPE_SPARSETENSOR => {
+				let mut info_ptr: *const sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+				ortsys![unsafe CastTypeInfoToTensorInfo(typeinfo_ptr, &mut info_ptr) -> OrtError::CastTypeInfoToTensorInfo; nonNull(info_ptr)];
+				unsafe { extract_data_type_from_tensor_info(info_ptr)? }
+			}
+			sys::ONNXType::ONNX_TYPE_SEQUENCE => {
+				let mut info_ptr: *const sys::OrtSequenceTypeInfo = std::ptr::null_mut();
+				ortsys![unsafe CastTypeInfoToSequenceTypeInfo(typeinfo_ptr, &mut info_ptr) -> OrtError::CastTypeInfoToSequenceTypeInfo; nonNull(info_ptr)];
+				unsafe { extract_data_type_from_sequence_info(info_ptr)? }
+			}
+			sys::ONNXType::ONNX_TYPE_MAP => {
+				let mut info_ptr: *const sys::OrtMapTypeInfo = std::ptr::null_mut();
+				ortsys![unsafe CastTypeInfoToMapTypeInfo(typeinfo_ptr, &mut info_ptr) -> OrtError::CastTypeInfoToMapTypeInfo; nonNull(info_ptr)];
+				unsafe { extract_data_type_from_map_info(info_ptr)? }
+			}
+			_ => unreachable!()
+		};
 
 		ortsys![unsafe ReleaseTypeInfo(typeinfo_ptr)];
-
-		Ok((io_type, node_dims.into_iter().map(|d| if d == -1 { None } else { Some(d as u32) }).collect()))
+		Ok(io_type)
 	}
 }

@@ -319,3 +319,10 @@ impl TensorDataToType for String {
 		Ok(TensorData::Strings { strings: array })
 	}
 }
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum DataType {
+	Tensor { ty: TensorElementDataType, dimensions: Vec<i64> },
+	Sequence(Box<DataType>),
+	Map { key: TensorElementDataType, value: TensorElementDataType }
+}

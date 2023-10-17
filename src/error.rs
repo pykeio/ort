@@ -42,9 +42,27 @@ pub enum OrtError {
 	/// Error occurred when getting ONNX type information
 	#[error("Failed to get type info: {0}")]
 	GetTypeInfo(OrtApiError),
+	/// Error occurred when getting ONNX type information
+	#[error("Failed to get onnx type from type info: {0}")]
+	GetOnnxTypeFromTypeInfo(OrtApiError),
 	/// Error occurred when casting ONNX type information to tensor information
 	#[error("Failed to cast type info to tensor info: {0}")]
 	CastTypeInfoToTensorInfo(OrtApiError),
+	/// Error occurred when casting ONNX type information to sequence information
+	#[error("Failed to cast type info to sequence info: {0}")]
+	CastTypeInfoToSequenceTypeInfo(OrtApiError),
+	/// Error occurred when casting ONNX type information to map information
+	#[error("Failed to cast type info to map info: {0}")]
+	CastTypeInfoToMapTypeInfo(OrtApiError),
+	/// Error occurred when casting ONNX type information to map information
+	#[error("Failed to cast type info to map info: {0}")]
+	GetMapKeyType(OrtApiError),
+	/// Error occurred when casting ONNX type information to map information
+	#[error("Failed to cast type info to map info: {0}")]
+	GetMapValueType(OrtApiError),
+	/// Error occurred when casting ONNX type information to map information
+	#[error("Failed to cast type info to map info: {0}")]
+	GetSequenceElementType(OrtApiError),
 	/// Error occurred when getting tensor elements type
 	#[error("Failed to get tensor element type: {0}")]
 	GetTensorElementType(OrtApiError),

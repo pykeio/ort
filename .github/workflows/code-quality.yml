@@ -32,37 +32,24 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@nightly
         with:
-          profile: minimal
-          toolchain: nightly # required for some rustfmt/clippy features
-          override: true
           components: rustfmt, clippy
       - name: Check fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+        run: cargo fmt --all -- --check
       - name: Run clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all-targets --features fetch-models
+        run: cargo clippy --all-targets --features fetch-models
   coverage:
     name: Code coverage
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
+        uses: dtolnay/rust-toolchain@stable
       - name: Get Rust version
         id: rust-version
         run: echo "::set-output name=version::$(cargo --version | cut -d ' ' -f 2)"

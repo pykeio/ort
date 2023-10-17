@@ -10,7 +10,7 @@ use std::os::windows::ffi::OsStrExt;
 use std::{env, path::PathBuf, time::Duration};
 use std::{
 	ffi::CString,
-	fmt::{self, Debug},
+	fmt,
 	marker::PhantomData,
 	ops::Deref,
 	os::raw::c_char,
@@ -74,7 +74,7 @@ pub struct SessionBuilder {
 	execution_providers: Vec<ExecutionProvider>
 }
 
-impl Debug for SessionBuilder {
+impl fmt::Debug for SessionBuilder {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
 		f.debug_struct("SessionBuilder")
 			.field("env", &self.env.name())
@@ -309,7 +309,7 @@ impl SessionBuilder {
 	#[tracing::instrument]
 	fn download_to<P>(&self, url: &str, download_dir: P) -> OrtResult<PathBuf>
 	where
-		P: AsRef<Path> + std::fmt::Debug
+		P: AsRef<Path> + fmt::Debug
 	{
 		let model_filename = PathBuf::from(url.split('/').last().unwrap());
 		let model_filepath = download_dir.as_ref().join(model_filename);

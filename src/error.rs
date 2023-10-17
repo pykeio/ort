@@ -48,20 +48,20 @@ pub enum OrtError {
 	/// Error occurred when casting ONNX type information to tensor information
 	#[error("Failed to cast type info to tensor info: {0}")]
 	CastTypeInfoToTensorInfo(OrtApiError),
-	/// Error occurred when casting ONNX type information to sequence information
-	#[error("Failed to cast type info to sequence info: {0}")]
+	/// Error occurred when casting ONNX type information to sequence type info
+	#[error("Failed to cast type info to sequence type info: {0}")]
 	CastTypeInfoToSequenceTypeInfo(OrtApiError),
-	/// Error occurred when casting ONNX type information to map information
-	#[error("Failed to cast type info to map info: {0}")]
+	/// Error occurred when casting ONNX type information to map type info
+	#[error("Failed to cast type info to map typ info: {0}")]
 	CastTypeInfoToMapTypeInfo(OrtApiError),
-	/// Error occurred when casting ONNX type information to map information
-	#[error("Failed to cast type info to map info: {0}")]
+	/// Error occurred when getting map key type
+	#[error("Failed to get map key type: {0}")]
 	GetMapKeyType(OrtApiError),
-	/// Error occurred when casting ONNX type information to map information
-	#[error("Failed to cast type info to map info: {0}")]
+	/// Error occurred when getting map value type
+	#[error("Failed to get map value type: {0}")]
 	GetMapValueType(OrtApiError),
-	/// Error occurred when casting ONNX type information to map information
-	#[error("Failed to cast type info to map info: {0}")]
+	/// Error occurred when getting sequence element type
+	#[error("Failed to get sequence element type: {0}")]
 	GetSequenceElementType(OrtApiError),
 	/// Error occurred when getting tensor elements type
 	#[error("Failed to get tensor element type: {0}")]

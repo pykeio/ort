@@ -188,3 +188,6 @@ WixTools/
 **/*.ort
 !tests/data/*.onnx
 !tests/data/*.ort
+
+# IDEA 
+.idea

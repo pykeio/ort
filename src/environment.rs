@@ -9,7 +9,7 @@ use tracing::{debug, error, warn};
 use super::{
 	custom_logger,
 	error::{status_to_result, OrtError, OrtResult},
-	ort, ortsys, sys, ExecutionProvider, LoggingLevel
+	ort, ortsys, ExecutionProvider, LoggingLevel
 };
 
 static G_ENV: Lazy<Arc<Mutex<EnvironmentSingleton>>> = Lazy::new(|| {
@@ -22,7 +22,7 @@ static G_ENV: Lazy<Arc<Mutex<EnvironmentSingleton>>> = Lazy::new(|| {
 #[derive(Debug)]
 struct EnvironmentSingleton {
 	name: String,
-	env_ptr: AtomicPtr<sys::OrtEnv>
+	env_ptr: AtomicPtr<ort_sys::OrtEnv>
 }
 
 #[derive(Debug, Default, Clone)]
@@ -83,7 +83,7 @@ impl Environment {
 		Arc::new(self)
 	}
 
-	pub(crate) fn ptr(&self) -> *const sys::OrtEnv {
+	pub(crate) fn ptr(&self) -> *const ort_sys::OrtEnv {
 		*self.env.lock().unwrap().env_ptr.get_mut()
 	}
 }
@@ -99,9 +99,9 @@ impl Default for Environment {
 		if g_env_ptr.is_null() {
 			debug!("Environment not yet initialized, creating a new one");
 
-			let mut env_ptr: *mut sys::OrtEnv = std::ptr::null_mut();
+			let mut env_ptr: *mut ort_sys::OrtEnv = std::ptr::null_mut();
 
-			let logging_function: sys::OrtLoggingFunction = Some(custom_logger);
+			let logging_function: ort_sys::OrtLoggingFunction = Some(custom_logger);
 			// FIXME: What should go here?
 			let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
 
@@ -155,7 +155,7 @@ impl Drop for Environment {
 		//       can properly free the sys::OrtEnv pointer.
 		if Arc::strong_count(&G_ENV) == 2 {
 			let release_env = ort().ReleaseEnv.unwrap();
-			let env_ptr: *mut sys::OrtEnv = *environment_guard.env_ptr.get_mut();
+			let env_ptr: *mut ort_sys::OrtEnv = *environment_guard.env_ptr.get_mut();
 
 			debug!(global_arc_count = Arc::strong_count(&G_ENV), "Releasing environment");
 
@@ -274,12 +274,12 @@ impl EnvironmentBuilder {
 			debug!("Environment not yet initialized, creating a new one");
 
 			let env_ptr = if let Some(global_thread_pool) = self.global_thread_pool_options {
-				let mut env_ptr: *mut sys::OrtEnv = std::ptr::null_mut();
-				let logging_function: sys::OrtLoggingFunction = Some(custom_logger);
+				let mut env_ptr: *mut ort_sys::OrtEnv = std::ptr::null_mut();
+				let logging_function: ort_sys::OrtLoggingFunction = Some(custom_logger);
 				let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
 				let cname = CString::new(self.name.clone()).unwrap();
 
-				let mut thread_options: *mut sys::OrtThreadingOptions = std::ptr::null_mut();
+				let mut thread_options: *mut ort_sys::OrtThreadingOptions = std::ptr::null_mut();
 				ortsys![unsafe CreateThreadingOptions(&mut thread_options) -> OrtError::CreateEnvironment; nonNull(thread_options)];
 				if let Some(inter_op_parallelism) = global_thread_pool.inter_op_parallelism {
 					ortsys![unsafe SetGlobalInterOpNumThreads(thread_options, inter_op_parallelism) -> OrtError::CreateEnvironment];
@@ -299,8 +299,8 @@ impl EnvironmentBuilder {
 				ortsys![unsafe ReleaseThreadingOptions(thread_options)];
 				env_ptr
 			} else {
-				let mut env_ptr: *mut sys::OrtEnv = std::ptr::null_mut();
-				let logging_function: sys::OrtLoggingFunction = Some(custom_logger);
+				let mut env_ptr: *mut ort_sys::OrtEnv = std::ptr::null_mut();
+				let logging_function: ort_sys::OrtLoggingFunction = Some(custom_logger);
 				// FIXME: What should go here?
 				let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
 				let cname = CString::new(self.name.clone()).unwrap();
@@ -354,7 +354,7 @@ mod tests {
 		Arc::strong_count(&G_ENV) >= 2
 	}
 
-	fn env_ptr() -> *const sys::OrtEnv {
+	fn env_ptr() -> *const ort_sys::OrtEnv {
 		*G_ENV.lock().unwrap().env_ptr.get_mut()
 	}
 
@@ -383,7 +383,7 @@ mod tests {
 		assert!(is_env_initialized());
 		assert_ne!(env_ptr(), std::ptr::null_mut());
 
-		std::mem::drop(env);
+		drop(env);
 		assert!(!is_env_initialized());
 		assert_eq!(env_ptr(), std::ptr::null_mut());
 	}
@@ -442,7 +442,7 @@ mod tests {
 					})
 				})
 				.map(|child| child.join())
-				.all(|r| std::result::Result::is_ok(&r))
+				.all(|r| Result::is_ok(&r))
 		);
 	}
 }

@@ -7,34 +7,45 @@ use std::{
 	ptr
 };
 
-use crate::{
-	char_p_to_string,
-	error::status_to_result,
-	ortsys,
-	sys::{self, size_t, OrtArenaCfg},
-	OrtApiError, OrtError, OrtResult
-};
+use crate::{char_p_to_string, error::status_to_result, ortsys, OrtApiError, OrtError, OrtResult};
 
 #[cfg(all(not(feature = "load-dynamic"), not(target_arch = "x86")))]
 extern "C" {
-	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CPU(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr;
+	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CPU(
+		options: *mut ort_sys::OrtSessionOptions,
+		use_arena: std::os::raw::c_int
+	) -> ort_sys::OrtStatusPtr;
 	#[cfg(feature = "acl")]
-	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr;
+	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_ACL(
+		options: *mut ort_sys::OrtSessionOptions,
+		use_arena: std::os::raw::c_int
+	) -> ort_sys::OrtStatusPtr;
 	#[cfg(feature = "onednn")]
-	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_Dnnl(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr;
+	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_Dnnl(
+		options: *mut ort_sys::OrtSessionOptions,
+		use_arena: std::os::raw::c_int
+	) -> ort_sys::OrtStatusPtr;
 	#[cfg(feature = "coreml")]
-	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CoreML(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr;
+	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CoreML(options: *mut ort_sys::OrtSessionOptions, flags: u32) -> ort_sys::OrtStatusPtr;
 	#[cfg(feature = "directml")]
-	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_DML(options: *mut sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> sys::OrtStatusPtr;
+	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_DML(
+		options: *mut ort_sys::OrtSessionOptions,
+		device_id: std::os::raw::c_int
+	) -> ort_sys::OrtStatusPtr;
 	#[cfg(feature = "nnapi")]
-	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr;
+	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut ort_sys::OrtSessionOptions, flags: u32) -> ort_sys::OrtStatusPtr;
 	#[cfg(feature = "tvm")]
-	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut sys::OrtSessionOptions, opt_str: *const std::os::raw::c_char)
-	-> sys::OrtStatusPtr;
+	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_Tvm(
+		options: *mut ort_sys::OrtSessionOptions,
+		opt_str: *const std::os::raw::c_char
+	) -> ort_sys::OrtStatusPtr;
 }
 #[cfg(all(not(feature = "load-dynamic"), target_arch = "x86"))]
 extern "stdcall" {
-	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CPU(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr;
+	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CPU(
+		options: *mut ort_sys::OrtSessionOptions,
+		use_arena: std::os::raw::c_int
+	) -> ort_sys::OrtStatusPtr;
 }
 
 #[derive(Debug, Clone, Default)]
@@ -98,7 +109,7 @@ pub struct CUDAExecutionProviderOptions {
 	pub device_id: Option<u32>,
 	/// The size limit of the device memory arena in bytes. This size limit is only for the execution provider’s arena.
 	/// The total device memory usage may be higher.
-	pub gpu_mem_limit: Option<size_t>,
+	pub gpu_mem_limit: Option<ort_sys::size_t>,
 	/// The strategy for extending the device memory arena. See [`ArenaExtendStrategy`].
 	pub arena_extend_strategy: Option<ArenaExtendStrategy>,
 	/// ORT leverages cuDNN for convolution operations and the first step in this process is to determine an
@@ -197,7 +208,7 @@ pub struct OpenVINOExecutionProviderOptions {
 	pub device_id: Option<String>,
 	/// Overrides the accelerator default value of number of threads with this value at runtime. If this option is not
 	/// explicitly set, default value of 8 is used during build time.
-	pub num_threads: size_t,
+	pub num_threads: ort_sys::size_t,
 	/// Explicitly specify the path to save and load the blobs enabling model caching feature.
 	pub cache_dir: Option<String>,
 	/// This option is only alvailable when OpenVINO EP is built with OpenCL flags enabled. It takes in the remote
@@ -259,11 +270,11 @@ pub struct DirectMLExecutionProviderOptions {
 pub struct ROCmExecutionProviderOptions {
 	pub device_id: i32,
 	pub miopen_conv_exhaustive_search: bool,
-	pub gpu_mem_limit: size_t,
+	pub gpu_mem_limit: ort_sys::size_t,
 	pub arena_extend_strategy: ArenaExtendStrategy,
 	pub do_copy_in_default_stream: bool,
 	pub user_compute_stream: Option<*mut c_void>,
-	pub default_memory_arena_cfg: Option<*mut sys::OrtArenaCfg>,
+	pub default_memory_arena_cfg: Option<*mut ort_sys::OrtArenaCfg>,
 	pub tunable_op_enable: bool,
 	pub tunable_op_tuning_enable: bool
 }
@@ -273,7 +284,7 @@ impl Default for ROCmExecutionProviderOptions {
 		Self {
 			device_id: 0,
 			miopen_conv_exhaustive_search: false,
-			gpu_mem_limit: size_t::MAX,
+			gpu_mem_limit: ort_sys::size_t::MAX,
 			arena_extend_strategy: ArenaExtendStrategy::NextPowerOfTwo,
 			do_copy_in_default_stream: true,
 			user_compute_stream: None,
@@ -555,16 +566,16 @@ impl ExecutionProvider {
 		Ok(false)
 	}
 
-	pub(crate) fn apply(&self, session_options: *mut sys::OrtSessionOptions) -> OrtResult<()> {
+	pub(crate) fn apply(&self, session_options: *mut ort_sys::OrtSessionOptions) -> OrtResult<()> {
 		match &self {
 			&Self::CPU(options) => {
-				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_CPU(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr);
+				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_CPU(options: *mut ort_sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> ort_sys::OrtStatusPtr);
 				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_CPU(session_options, options.use_arena.into()) })
 					.map_err(OrtError::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "cuda"))]
 			&Self::CUDA(options) => {
-				let mut cuda_options: *mut sys::OrtCUDAProviderOptionsV2 = std::ptr::null_mut();
+				let mut cuda_options: *mut ort_sys::OrtCUDAProviderOptionsV2 = std::ptr::null_mut();
 				status_to_result(ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)]).map_err(OrtError::ExecutionProvider)?;
 				let (key_ptrs, value_ptrs, len, keys, values) = map_keys! {
 					device_id = options.device_id,
@@ -598,7 +609,7 @@ impl ExecutionProvider {
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "tensorrt"))]
 			&Self::TensorRT(options) => {
-				let mut trt_options: *mut sys::OrtTensorRTProviderOptionsV2 = std::ptr::null_mut();
+				let mut trt_options: *mut ort_sys::OrtTensorRTProviderOptionsV2 = std::ptr::null_mut();
 				status_to_result(ortsys![unsafe CreateTensorRTProviderOptions(&mut trt_options)]).map_err(OrtError::ExecutionProvider)?;
 				let (key_ptrs, value_ptrs, len, keys, values) = map_keys! {
 					device_id = options.device_id,
@@ -644,19 +655,19 @@ impl ExecutionProvider {
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "acl"))]
 			&Self::ACL(options) => {
-				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr);
+				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut ort_sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> ort_sys::OrtStatusPtr);
 				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_ACL(session_options, options.use_arena.into()) })
 					.map_err(OrtError::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "onednn"))]
 			&Self::OneDNN(options) => {
-				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Dnnl(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr);
+				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Dnnl(options: *mut ort_sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> ort_sys::OrtStatusPtr);
 				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_Dnnl(session_options, options.use_arena.into()) })
 					.map_err(OrtError::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "coreml"))]
 			&Self::CoreML(options) => {
-				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_CoreML(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr);
+				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_CoreML(options: *mut ort_sys::OrtSessionOptions, flags: u32) -> ort_sys::OrtStatusPtr);
 				let mut flags = 0;
 				if options.use_cpu_only {
 					flags |= 0x001;
@@ -671,13 +682,13 @@ impl ExecutionProvider {
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "directml"))]
 			&Self::DirectML(options) => {
-				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_DML(options: *mut sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> sys::OrtStatusPtr);
+				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_DML(options: *mut ort_sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> ort_sys::OrtStatusPtr);
 				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_DML(session_options, options.device_id as _) })
 					.map_err(OrtError::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "rocm"))]
 			&Self::ROCm(options) => {
-				let rocm_options = sys::OrtROCMProviderOptions {
+				let rocm_options = ort_sys::OrtROCMProviderOptions {
 					device_id: options.device_id,
 					miopen_conv_exhaustive_search: bool_as_int_req(options.miopen_conv_exhaustive_search),
 					gpu_mem_limit: options.gpu_mem_limit as _,
@@ -697,7 +708,7 @@ impl ExecutionProvider {
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "nnapi"))]
 			&Self::NNAPI(options) => {
-				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut sys::OrtSessionOptions, flags: u32) -> sys::OrtStatusPtr);
+				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut ort_sys::OrtSessionOptions, flags: u32) -> ort_sys::OrtStatusPtr);
 				let mut flags = 0;
 				if options.use_fp16 {
 					flags |= 0x001;
@@ -715,7 +726,7 @@ impl ExecutionProvider {
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "openvino"))]
 			&Self::OpenVINO(options) => {
-				let openvino_options = sys::OrtOpenVINOProviderOptions {
+				let openvino_options = ort_sys::OrtOpenVINOProviderOptions {
 					device_type: options
 						.device_type
 						.clone()
@@ -762,7 +773,7 @@ impl ExecutionProvider {
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "tvm"))]
 			&Self::TVM(options) => {
-				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut sys::OrtSessionOptions, opt_str: *const std::os::raw::c_char) -> sys::OrtStatusPtr);
+				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut ort_sys::OrtSessionOptions, opt_str: *const std::os::raw::c_char) -> ort_sys::OrtStatusPtr);
 				let mut option_string = Vec::new();
 				if let Some(check_hash) = options.check_hash {
 					option_string.push(format!("check_hash:{}", if check_hash { "True" } else { "False" }));
@@ -809,7 +820,7 @@ impl ExecutionProvider {
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "cann"))]
 			&Self::CANN(options) => {
-				let mut cann_options: *mut sys::OrtCANNProviderOptions = std::ptr::null_mut();
+				let mut cann_options: *mut ort_sys::OrtCANNProviderOptions = std::ptr::null_mut();
 				status_to_result(ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)]).map_err(OrtError::ExecutionProvider)?;
 				let (key_ptrs, value_ptrs, len, keys, values) = map_keys! {
 					device_id = options.device_id,
@@ -853,7 +864,7 @@ impl ExecutionProvider {
 }
 
 #[tracing::instrument(skip_all)]
-pub(crate) fn apply_execution_providers(options: *mut sys::OrtSessionOptions, execution_providers: impl AsRef<[ExecutionProvider]>) {
+pub(crate) fn apply_execution_providers(options: *mut ort_sys::OrtSessionOptions, execution_providers: impl AsRef<[ExecutionProvider]>) {
 	let mut fallback_to_cpu = true;
 	for ex in execution_providers.as_ref() {
 		if let Err(e) = ex.apply(options) {

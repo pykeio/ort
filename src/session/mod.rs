@@ -8,16 +8,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::os::windows::ffi::OsStrExt;
 #[cfg(feature = "fetch-models")]
 use std::{env, path::PathBuf, time::Duration};
-use std::{
-	ffi::CString,
-	fmt,
-	marker::PhantomData,
-	ops::Deref,
-	os::raw::c_char,
-	path::Path,
-	ptr,
-	sync::Arc
-};
+use std::{ffi::CString, fmt, marker::PhantomData, ops::Deref, os::raw::c_char, path::Path, ptr, sync::Arc};
 
 use super::{
 	char_p_to_string,
@@ -28,7 +19,7 @@ use super::{
 	io_binding::IoBinding,
 	memory::Allocator,
 	metadata::ModelMetadata,
-	ort, ortsys, sys,
+	ort, ortsys,
 	tensor::DataType,
 	value::Value,
 	AllocatorType, GraphOptimizationLevel, MemType
@@ -66,7 +57,7 @@ pub use self::{input::SessionInputs, output::SessionOutputs};
 /// ```
 pub struct SessionBuilder {
 	env: Arc<Environment>,
-	session_options_ptr: *mut sys::OrtSessionOptions,
+	session_options_ptr: *mut ort_sys::OrtSessionOptions,
 
 	allocator: AllocatorType,
 	memory_type: MemType,
@@ -116,7 +107,7 @@ impl Drop for SessionBuilder {
 impl SessionBuilder {
 	/// Creates a new session builder in the given environment.
 	pub fn new(env: &Arc<Environment>) -> OrtResult<Self> {
-		let mut session_options_ptr: *mut sys::OrtSessionOptions = std::ptr::null_mut();
+		let mut session_options_ptr: *mut ort_sys::OrtSessionOptions = std::ptr::null_mut();
 		ortsys![unsafe CreateSessionOptions(&mut session_options_ptr) -> OrtError::CreateSessionOptions; nonNull(session_options_ptr)];
 
 		Ok(Self {
@@ -216,9 +207,9 @@ impl SessionBuilder {
 	/// [`SessionBuilder::with_inter_threads()`].
 	pub fn with_parallel_execution(self, parallel_execution: bool) -> OrtResult<Self> {
 		let execution_mode = if parallel_execution {
-			sys::ExecutionMode::ORT_PARALLEL
+			ort_sys::ExecutionMode::ORT_PARALLEL
 		} else {
-			sys::ExecutionMode::ORT_SEQUENTIAL
+			ort_sys::ExecutionMode::ORT_SEQUENTIAL
 		};
 		ortsys![unsafe SetSessionExecutionMode(self.session_options_ptr, execution_mode) -> OrtError::CreateSessionOptions];
 		Ok(self)
@@ -393,9 +384,9 @@ impl SessionBuilder {
 				.collect::<Vec<_>>()
 		);
 
-		let env_ptr: *const sys::OrtEnv = self.env.ptr();
+		let env_ptr: *const ort_sys::OrtEnv = self.env.ptr();
 
-		let mut session_ptr: *mut sys::OrtSession = std::ptr::null_mut();
+		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
 		ortsys![unsafe CreateSession(env_ptr, model_path.as_ptr(), self.session_options_ptr, &mut session_ptr) -> OrtError::CreateSession; nonNull(session_ptr)];
 
 		let allocator = Allocator::default();
@@ -463,7 +454,7 @@ impl SessionBuilder {
 				.collect::<Vec<_>>()
 		);
 
-		let env_ptr: *const sys::OrtEnv = self.env.ptr();
+		let env_ptr: *const ort_sys::OrtEnv = self.env.ptr();
 
 		let allocator = Allocator::default();
 
@@ -474,13 +465,13 @@ impl SessionBuilder {
 			.collect();
 		let initializer_names_ptr: Vec<*const c_char> = initializer_names.iter().map(|n| n.as_ptr() as *const c_char).collect();
 
-		let initializers: Vec<*const sys::OrtValue> = initializers.iter().map(|input_array_ort| input_array_ort.1.ptr() as *const _).collect();
+		let initializers: Vec<*const ort_sys::OrtValue> = initializers.iter().map(|input_array_ort| input_array_ort.1.ptr() as *const _).collect();
 		if !initializers.is_empty() {
 			assert_eq!(initializer_names.len(), initializers.len());
 			ortsys![unsafe AddExternalInitializers(self.session_options_ptr, initializer_names_ptr.as_ptr(), initializers.as_ptr(), initializers.len() as _) -> OrtError::CreateSession];
 		}
 
-		let mut session_ptr: *mut sys::OrtSession = std::ptr::null_mut();
+		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
 		ortsys![unsafe CreateSession(env_ptr, model_path.as_ptr(), self.session_options_ptr, &mut session_ptr) -> OrtError::CreateSession; nonNull(session_ptr)];
 
 		std::mem::drop(initializer_names);
@@ -531,9 +522,9 @@ impl SessionBuilder {
 
 	/// Load an ONNX graph from memory and commit the session.
 	pub fn with_model_from_memory(self, model_bytes: &[u8]) -> OrtResult<Session> {
-		let mut session_ptr: *mut sys::OrtSession = std::ptr::null_mut();
+		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
 
-		let env_ptr: *const sys::OrtEnv = self.env.ptr();
+		let env_ptr: *const ort_sys::OrtEnv = self.env.ptr();
 
 		apply_execution_providers(
 			self.session_options_ptr,
@@ -583,7 +574,7 @@ pub struct SharedSessionInner {
 	// hold onto an environment arc to ensure the environment also stays alive
 	#[allow(dead_code)]
 	env: Arc<Environment>,
-	pub(crate) session_ptr: *mut sys::OrtSession,
+	pub(crate) session_ptr: *mut ort_sys::OrtSession,
 	allocator: Allocator
 }
 
@@ -698,12 +689,12 @@ impl Session {
 		let output_names_cstring: Vec<CString> = output_names.iter().cloned().map(|n| CString::new(n).unwrap()).collect();
 		let output_names_ptr: Vec<*const c_char> = output_names_cstring.iter().map(|n| n.as_ptr() as *const c_char).collect();
 
-		let mut output_tensor_ptrs: Vec<*mut sys::OrtValue> = vec![std::ptr::null_mut(); self.outputs.len()];
+		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![std::ptr::null_mut(); self.outputs.len()];
 
 		// The C API expects pointers for the arrays (pointers to C-arrays)
-		let input_ort_values: Vec<*const sys::OrtValue> = input_values.iter().map(|input_array_ort| input_array_ort.ptr() as *const _).collect();
+		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.iter().map(|input_array_ort| input_array_ort.ptr() as *const _).collect();
 
-		let run_options_ptr: *const sys::OrtRunOptions = std::ptr::null();
+		let run_options_ptr: *const ort_sys::OrtRunOptions = std::ptr::null();
 
 		ortsys![
 			unsafe Run(
@@ -740,7 +731,7 @@ impl Session {
 
 	/// Gets the session model metadata. See [`Metadata`] for more info.
 	pub fn metadata(&self) -> OrtResult<ModelMetadata> {
-		let mut metadata_ptr: *mut sys::OrtModelMetadata = std::ptr::null_mut();
+		let mut metadata_ptr: *mut ort_sys::OrtModelMetadata = std::ptr::null_mut();
 		ortsys![unsafe SessionGetModelMetadata(self.inner.session_ptr, &mut metadata_ptr) -> OrtError::GetModelMetadata; nonNull(metadata_ptr)];
 		Ok(ModelMetadata::new(metadata_ptr, self.inner.allocator.ptr))
 	}
@@ -777,12 +768,12 @@ fn close_lib_handle(handle: *mut std::os::raw::c_void) {
 /// `SessionBuilder::with_model_from_file()` method.
 mod dangerous {
 	use super::*;
-	use crate::{ortfree, sys::size_t};
+	use crate::ortfree;
 
-	unsafe fn extract_data_type_from_tensor_info(info_ptr: *const sys::OrtTensorTypeAndShapeInfo) -> OrtResult<DataType> {
-		let mut type_sys = sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+	unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo) -> OrtResult<DataType> {
+		let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
 		ortsys![GetTensorElementType(info_ptr, &mut type_sys) -> OrtError::GetTensorElementType];
-		assert_ne!(type_sys, sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
+		assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 		// This transmute should be safe since its value is read from GetTensorElementType, which we must trust
 		let mut num_dims = 0;
 		ortsys![GetDimensionsCount(info_ptr, &mut num_dims) -> OrtError::GetDimensionsCount];
@@ -796,23 +787,23 @@ mod dangerous {
 		})
 	}
 
-	unsafe fn extract_data_type_from_sequence_info(info_ptr: *const sys::OrtSequenceTypeInfo) -> OrtResult<DataType> {
-		let mut element_type_info: *mut sys::OrtTypeInfo = std::ptr::null_mut();
+	unsafe fn extract_data_type_from_sequence_info(info_ptr: *const ort_sys::OrtSequenceTypeInfo) -> OrtResult<DataType> {
+		let mut element_type_info: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
 		ortsys![GetSequenceElementType(info_ptr, &mut element_type_info) -> OrtError::GetSequenceElementType];
 
-		let mut ty: sys::ONNXType = sys::ONNXType::ONNX_TYPE_UNKNOWN;
+		let mut ty: ort_sys::ONNXType = ort_sys::ONNXType::ONNX_TYPE_UNKNOWN;
 		let status = ortsys![unsafe GetOnnxTypeFromTypeInfo(element_type_info, &mut ty)];
 		status_to_result(status).map_err(OrtError::GetOnnxTypeFromTypeInfo)?;
 
 		match ty {
-			sys::ONNXType::ONNX_TYPE_TENSOR => {
-				let mut info_ptr: *const sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+			ort_sys::ONNXType::ONNX_TYPE_TENSOR => {
+				let mut info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
 				ortsys![unsafe CastTypeInfoToTensorInfo(element_type_info, &mut info_ptr) -> OrtError::CastTypeInfoToTensorInfo; nonNull(info_ptr)];
 				let ty = unsafe { extract_data_type_from_tensor_info(info_ptr)? };
 				Ok(DataType::Sequence(Box::new(ty)))
 			}
-			sys::ONNXType::ONNX_TYPE_MAP => {
-				let mut info_ptr: *const sys::OrtMapTypeInfo = std::ptr::null_mut();
+			ort_sys::ONNXType::ONNX_TYPE_MAP => {
+				let mut info_ptr: *const ort_sys::OrtMapTypeInfo = std::ptr::null_mut();
 				ortsys![unsafe CastTypeInfoToMapTypeInfo(element_type_info, &mut info_ptr) -> OrtError::CastTypeInfoToMapTypeInfo; nonNull(info_ptr)];
 				let ty = unsafe { extract_data_type_from_map_info(info_ptr)? };
 				Ok(DataType::Sequence(Box::new(ty)))
@@ -821,18 +812,18 @@ mod dangerous {
 		}
 	}
 
-	unsafe fn extract_data_type_from_map_info(info_ptr: *const sys::OrtMapTypeInfo) -> OrtResult<DataType> {
-		let mut key_type_sys = sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+	unsafe fn extract_data_type_from_map_info(info_ptr: *const ort_sys::OrtMapTypeInfo) -> OrtResult<DataType> {
+		let mut key_type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
 		ortsys![GetMapKeyType(info_ptr, &mut key_type_sys) -> OrtError::GetMapKeyType];
-		assert_ne!(key_type_sys, sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
+		assert_ne!(key_type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 
-		let mut value_type_info: *mut sys::OrtTypeInfo = std::ptr::null_mut();
+		let mut value_type_info: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
 		ortsys![GetMapValueType(info_ptr, &mut value_type_info) -> OrtError::GetMapValueType];
-		let mut value_info_ptr: *const sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+		let mut value_info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
 		ortsys![unsafe CastTypeInfoToTensorInfo(value_type_info, &mut value_info_ptr) -> OrtError::CastTypeInfoToTensorInfo; nonNull(value_info_ptr)];
-		let mut value_type_sys = sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+		let mut value_type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
 		ortsys![GetTensorElementType(value_info_ptr, &mut value_type_sys) -> OrtError::GetTensorElementType];
-		assert_ne!(value_type_sys, sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
+		assert_ne!(value_type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 
 		Ok(DataType::Map {
 			key: key_type_sys.into(),
@@ -840,19 +831,19 @@ mod dangerous {
 		})
 	}
 
-	pub(super) fn extract_inputs_count(session_ptr: *mut sys::OrtSession) -> OrtResult<usize> {
+	pub(super) fn extract_inputs_count(session_ptr: *mut ort_sys::OrtSession) -> OrtResult<usize> {
 		let f = ort().SessionGetInputCount.unwrap();
 		extract_io_count(f, session_ptr)
 	}
 
-	pub(super) fn extract_outputs_count(session_ptr: *mut sys::OrtSession) -> OrtResult<usize> {
+	pub(super) fn extract_outputs_count(session_ptr: *mut ort_sys::OrtSession) -> OrtResult<usize> {
 		let f = ort().SessionGetOutputCount.unwrap();
 		extract_io_count(f, session_ptr)
 	}
 
 	fn extract_io_count(
-		f: extern_system_fn! { unsafe fn(*const sys::OrtSession, *mut usize) -> *mut sys::OrtStatus },
-		session_ptr: *mut sys::OrtSession
+		f: extern_system_fn! { unsafe fn(*const ort_sys::OrtSession, *mut usize) -> *mut ort_sys::OrtStatus },
+		session_ptr: *mut ort_sys::OrtSession
 	) -> OrtResult<usize> {
 		let mut num_nodes = 0;
 		let status = unsafe { f(session_ptr, &mut num_nodes) };
@@ -864,17 +855,17 @@ mod dangerous {
 		Ok(num_nodes)
 	}
 
-	fn extract_input_name(session_ptr: *mut sys::OrtSession, allocator_ptr: *mut sys::OrtAllocator, i: size_t) -> OrtResult<String> {
+	fn extract_input_name(session_ptr: *mut ort_sys::OrtSession, allocator_ptr: *mut ort_sys::OrtAllocator, i: ort_sys::size_t) -> OrtResult<String> {
 		let f = ort().SessionGetInputName.unwrap();
 		extract_io_name(f, session_ptr, allocator_ptr, i)
 	}
 
-	fn extract_output_name(session_ptr: *mut sys::OrtSession, allocator_ptr: *mut sys::OrtAllocator, i: size_t) -> OrtResult<String> {
+	fn extract_output_name(session_ptr: *mut ort_sys::OrtSession, allocator_ptr: *mut ort_sys::OrtAllocator, i: ort_sys::size_t) -> OrtResult<String> {
 		let f = ort().SessionGetOutputName.unwrap();
 		extract_io_name(f, session_ptr, allocator_ptr, i)
 	}
 
-	pub(crate) fn raw_pointer_to_string(allocator_ptr: *mut sys::OrtAllocator, c_str: *mut c_char) -> OrtResult<String> {
+	pub(crate) fn raw_pointer_to_string(allocator_ptr: *mut ort_sys::OrtAllocator, c_str: *mut c_char) -> OrtResult<String> {
 		let name = char_p_to_string(c_str)?;
 		ortfree!(unsafe allocator_ptr, c_str);
 		Ok(name)
@@ -882,14 +873,14 @@ mod dangerous {
 
 	fn extract_io_name(
 		f: extern_system_fn! { unsafe fn(
-			*const sys::OrtSession,
-			size_t,
-			*mut sys::OrtAllocator,
+			*const ort_sys::OrtSession,
+			ort_sys::size_t,
+			*mut ort_sys::OrtAllocator,
 			*mut *mut c_char,
-		) -> *mut sys::OrtStatus },
-		session_ptr: *mut sys::OrtSession,
-		allocator_ptr: *mut sys::OrtAllocator,
-		i: size_t
+		) -> *mut ort_sys::OrtStatus },
+		session_ptr: *mut ort_sys::OrtSession,
+		allocator_ptr: *mut ort_sys::OrtAllocator,
+		i: ort_sys::size_t
 	) -> OrtResult<String> {
 		let mut name_bytes: *mut c_char = std::ptr::null_mut();
 
@@ -900,14 +891,14 @@ mod dangerous {
 		raw_pointer_to_string(allocator_ptr, name_bytes)
 	}
 
-	pub(super) fn extract_input(session_ptr: *mut sys::OrtSession, allocator_ptr: *mut sys::OrtAllocator, i: usize) -> OrtResult<Input> {
+	pub(super) fn extract_input(session_ptr: *mut ort_sys::OrtSession, allocator_ptr: *mut ort_sys::OrtAllocator, i: usize) -> OrtResult<Input> {
 		let input_name = extract_input_name(session_ptr, allocator_ptr, i as _)?;
 		let f = ort().SessionGetInputTypeInfo.unwrap();
 		let input_type = extract_io(f, session_ptr, i as _)?;
 		Ok(Input { name: input_name, input_type })
 	}
 
-	pub(super) fn extract_output(session_ptr: *mut sys::OrtSession, allocator_ptr: *mut sys::OrtAllocator, i: usize) -> OrtResult<Output> {
+	pub(super) fn extract_output(session_ptr: *mut ort_sys::OrtSession, allocator_ptr: *mut ort_sys::OrtAllocator, i: usize) -> OrtResult<Output> {
 		let output_name = extract_output_name(session_ptr, allocator_ptr, i as _)?;
 		let f = ort().SessionGetOutputTypeInfo.unwrap();
 		let output_type = extract_io(f, session_ptr, i as _)?;
@@ -916,35 +907,35 @@ mod dangerous {
 
 	fn extract_io(
 		f: extern_system_fn! { unsafe fn(
-			*const sys::OrtSession,
-			size_t,
-			*mut *mut sys::OrtTypeInfo,
-		) -> *mut sys::OrtStatus },
-		session_ptr: *mut sys::OrtSession,
-		i: size_t
+			*const ort_sys::OrtSession,
+			ort_sys::size_t,
+			*mut *mut ort_sys::OrtTypeInfo,
+		) -> *mut ort_sys::OrtStatus },
+		session_ptr: *mut ort_sys::OrtSession,
+		i: ort_sys::size_t
 	) -> OrtResult<DataType> {
-		let mut typeinfo_ptr: *mut sys::OrtTypeInfo = std::ptr::null_mut();
+		let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
 
 		let status = unsafe { f(session_ptr, i, &mut typeinfo_ptr) };
 		status_to_result(status).map_err(OrtError::GetTypeInfo)?;
 		assert_non_null_pointer(typeinfo_ptr, "TypeInfo")?;
 
-		let mut ty: sys::ONNXType = sys::ONNXType::ONNX_TYPE_UNKNOWN;
+		let mut ty: ort_sys::ONNXType = ort_sys::ONNXType::ONNX_TYPE_UNKNOWN;
 		let status = ortsys![unsafe GetOnnxTypeFromTypeInfo(typeinfo_ptr, &mut ty)];
 		status_to_result(status).map_err(OrtError::GetOnnxTypeFromTypeInfo)?;
 		let io_type = match ty {
-			sys::ONNXType::ONNX_TYPE_TENSOR | sys::ONNXType::ONNX_TYPE_SPARSETENSOR => {
-				let mut info_ptr: *const sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+			ort_sys::ONNXType::ONNX_TYPE_TENSOR | ort_sys::ONNXType::ONNX_TYPE_SPARSETENSOR => {
+				let mut info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
 				ortsys![unsafe CastTypeInfoToTensorInfo(typeinfo_ptr, &mut info_ptr) -> OrtError::CastTypeInfoToTensorInfo; nonNull(info_ptr)];
 				unsafe { extract_data_type_from_tensor_info(info_ptr)? }
 			}
-			sys::ONNXType::ONNX_TYPE_SEQUENCE => {
-				let mut info_ptr: *const sys::OrtSequenceTypeInfo = std::ptr::null_mut();
+			ort_sys::ONNXType::ONNX_TYPE_SEQUENCE => {
+				let mut info_ptr: *const ort_sys::OrtSequenceTypeInfo = std::ptr::null_mut();
 				ortsys![unsafe CastTypeInfoToSequenceTypeInfo(typeinfo_ptr, &mut info_ptr) -> OrtError::CastTypeInfoToSequenceTypeInfo; nonNull(info_ptr)];
 				unsafe { extract_data_type_from_sequence_info(info_ptr)? }
 			}
-			sys::ONNXType::ONNX_TYPE_MAP => {
-				let mut info_ptr: *const sys::OrtMapTypeInfo = std::ptr::null_mut();
+			ort_sys::ONNXType::ONNX_TYPE_MAP => {
+				let mut info_ptr: *const ort_sys::OrtMapTypeInfo = std::ptr::null_mut();
 				ortsys![unsafe CastTypeInfoToMapTypeInfo(typeinfo_ptr, &mut info_ptr) -> OrtError::CastTypeInfoToMapTypeInfo; nonNull(info_ptr)];
 				unsafe { extract_data_type_from_map_info(info_ptr)? }
 			}

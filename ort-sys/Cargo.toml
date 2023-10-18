@@ -1,0 +1,38 @@
+[package]
+name = "ort-sys"
+description = "A Rust wrapper for ONNX Runtime 1.15 - Optimize and Accelerate Machine Learning Inferencing"
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.70"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/pykeio/ort"
+readme = "README.md"
+keywords = [ "machine-learning", "ai", "ml" , "sys"]
+categories = [ "algorithms", "mathematics", "science" ]
+authors = [
+	"pyke.io <contact@pyke.io>",
+	"Nicolas Bigaouette <nbigaouette@gmail.com>"
+]
+include = [ "src/", "build.rs", "LICENSE" ]
+
+[features]
+default = [ "download-binaries", "copy-dylibs" ]
+download-binaries = [ "ureq", "zip" ]
+load-dynamic = []
+copy-dylibs = []
+minimal-build = []
+compile-static = []
+cuda = []
+tensorrt = []
+rocm = []
+
+[build-dependencies]
+ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }
+zip = { version = "0.6", optional = true, default-features = false, features = [ "deflate" ] }
+
+[target.'cfg(not(target_os = "windows"))'.build-dependencies]
+flate2 = "1.0"
+tar = "0.4"
+
+[target.'cfg(target_os = "windows")'.build-dependencies]
+vswhom = "0.1"

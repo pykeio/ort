@@ -8,7 +8,6 @@ pub(crate) mod io_binding;
 pub(crate) mod memory;
 pub(crate) mod metadata;
 pub(crate) mod session;
-pub mod sys;
 pub(crate) mod tensor;
 pub(crate) mod value;
 
@@ -93,17 +92,17 @@ pub(crate) static G_ORT_LIB: Lazy<Arc<Mutex<AtomicPtr<libloading::Library>>>> = 
 	}
 });
 
-pub(crate) static G_ORT_API: Lazy<Arc<Mutex<AtomicPtr<sys::OrtApi>>>> = Lazy::new(|| {
+pub(crate) static G_ORT_API: Lazy<Arc<Mutex<AtomicPtr<ort_sys::OrtApi>>>> = Lazy::new(|| {
 	#[cfg(feature = "load-dynamic")]
 	unsafe {
 		let dylib = *G_ORT_LIB
 			.lock()
 			.expect("failed to acquire ONNX Runtime dylib lock; another thread panicked?")
 			.get_mut();
-		let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const sys::OrtApiBase> = (*dylib)
+		let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const ort_sys::OrtApiBase> = (*dylib)
 			.get(b"OrtGetApiBase")
 			.expect("`OrtGetApiBase` must be present in ONNX Runtime dylib");
-		let base: *const sys::OrtApiBase = base_getter();
+		let base: *const ort_sys::OrtApiBase = base_getter();
 		assert_ne!(base, ptr::null());
 
 		let get_version_string: extern_system_fn! { unsafe fn () -> *const ffi::c_char } =
@@ -122,29 +121,29 @@ pub(crate) static G_ORT_API: Lazy<Arc<Mutex<AtomicPtr<sys::OrtApi>>>> = Lazy::ne
 			),
 			std::cmp::Ordering::Equal => {}
 		};
-		let get_api: extern_system_fn! { unsafe fn(u32) -> *const sys::OrtApi } = (*base).GetApi.expect("`GetApi` must be present in `OrtApiBase`");
-		let api: *const sys::OrtApi = get_api(sys::ORT_API_VERSION);
-		Arc::new(Mutex::new(AtomicPtr::new(api as *mut sys::OrtApi)))
+		let get_api: extern_system_fn! { unsafe fn(u32) -> *const ort_sys::OrtApi } = (*base).GetApi.expect("`GetApi` must be present in `OrtApiBase`");
+		let api: *const ort_sys::OrtApi = get_api(ort_sys::ORT_API_VERSION);
+		Arc::new(Mutex::new(AtomicPtr::new(api as *mut ort_sys::OrtApi)))
 	}
 	#[cfg(not(feature = "load-dynamic"))]
 	{
-		let base: *const sys::OrtApiBase = unsafe { sys::OrtGetApiBase() };
+		let base: *const ort_sys::OrtApiBase = unsafe { ort_sys::OrtGetApiBase() };
 		assert_ne!(base, ptr::null());
-		let get_api: extern_system_fn! { unsafe fn(u32) -> *const sys::OrtApi } = unsafe { (*base).GetApi.unwrap() };
-		let api: *const sys::OrtApi = unsafe { get_api(sys::ORT_API_VERSION) };
-		Arc::new(Mutex::new(AtomicPtr::new(api as *mut sys::OrtApi)))
+		let get_api: extern_system_fn! { unsafe fn(u32) -> *const ort_sys::OrtApi } = unsafe { (*base).GetApi.unwrap() };
+		let api: *const ort_sys::OrtApi = unsafe { get_api(ort_sys::ORT_API_VERSION) };
+		Arc::new(Mutex::new(AtomicPtr::new(api as *mut ort_sys::OrtApi)))
 	}
 });
 
-/// Attempts to acquire the global [`sys::OrtApi`] object.
+/// Attempts to acquire the global [`ort_sys::OrtApi`] object.
 ///
 /// # Panics
 ///
 /// Panics if another thread panicked while holding the API lock, or if the ONNX Runtime API could not be initialized.
-pub fn ort() -> sys::OrtApi {
+pub fn ort() -> ort_sys::OrtApi {
 	let mut api_ref = G_ORT_API.lock().expect("failed to acquire OrtApi lock; another thread panicked?");
-	let api_ref_mut: &mut *mut sys::OrtApi = api_ref.get_mut();
-	let api_ptr_mut: *mut sys::OrtApi = *api_ref_mut;
+	let api_ref_mut: &mut *mut ort_sys::OrtApi = api_ref.get_mut();
+	let api_ptr_mut: *mut ort_sys::OrtApi = *api_ref_mut;
 
 	assert_ne!(api_ptr_mut, ptr::null_mut());
 
@@ -233,15 +232,15 @@ impl<'a> From<&'a str> for CodeLocation<'a> {
 
 extern_system_fn! {
 	/// Callback from C that will handle ONNX logging, forwarding ONNX's logs to the `tracing` crate.
-	pub(crate) fn custom_logger(_params: *mut ffi::c_void, severity: sys::OrtLoggingLevel, category: *const c_char, log_id: *const c_char, code_location: *const c_char, message: *const c_char) {
+	pub(crate) fn custom_logger(_params: *mut ffi::c_void, severity: ort_sys::OrtLoggingLevel, category: *const c_char, log_id: *const c_char, code_location: *const c_char, message: *const c_char) {
 		use tracing::{span, Level, trace, debug, warn, info, error};
 
 		let log_level = match severity {
-			sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE => Level::TRACE,
-			sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_INFO => Level::DEBUG,
-			sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING => Level::INFO,
-			sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_ERROR => Level::WARN,
-			sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_FATAL => Level::ERROR
+			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE => Level::TRACE,
+			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_INFO => Level::DEBUG,
+			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING => Level::INFO,
+			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_ERROR => Level::WARN,
+			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_FATAL => Level::ERROR
 		};
 
 		assert_ne!(category, ptr::null());
@@ -290,14 +289,14 @@ pub enum LoggingLevel {
 	Fatal
 }
 
-impl From<LoggingLevel> for sys::OrtLoggingLevel {
+impl From<LoggingLevel> for ort_sys::OrtLoggingLevel {
 	fn from(logging_level: LoggingLevel) -> Self {
 		match logging_level {
-			LoggingLevel::Verbose => sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
-			LoggingLevel::Info => sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_INFO,
-			LoggingLevel::Warning => sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING,
-			LoggingLevel::Error => sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_ERROR,
-			LoggingLevel::Fatal => sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_FATAL
+			LoggingLevel::Verbose => ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
+			LoggingLevel::Info => ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_INFO,
+			LoggingLevel::Warning => ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING,
+			LoggingLevel::Error => ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_ERROR,
+			LoggingLevel::Fatal => ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_FATAL
 		}
 	}
 }
@@ -382,13 +381,13 @@ pub enum GraphOptimizationLevel {
 	Level3
 }
 
-impl From<GraphOptimizationLevel> for sys::GraphOptimizationLevel {
+impl From<GraphOptimizationLevel> for ort_sys::GraphOptimizationLevel {
 	fn from(val: GraphOptimizationLevel) -> Self {
 		match val {
-			GraphOptimizationLevel::Disable => sys::GraphOptimizationLevel::ORT_DISABLE_ALL,
-			GraphOptimizationLevel::Level1 => sys::GraphOptimizationLevel::ORT_ENABLE_BASIC,
-			GraphOptimizationLevel::Level2 => sys::GraphOptimizationLevel::ORT_ENABLE_EXTENDED,
-			GraphOptimizationLevel::Level3 => sys::GraphOptimizationLevel::ORT_ENABLE_ALL
+			GraphOptimizationLevel::Disable => ort_sys::GraphOptimizationLevel::ORT_DISABLE_ALL,
+			GraphOptimizationLevel::Level1 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_BASIC,
+			GraphOptimizationLevel::Level2 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_EXTENDED,
+			GraphOptimizationLevel::Level3 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_ALL
 		}
 	}
 }
@@ -402,11 +401,11 @@ pub enum AllocatorType {
 	Arena
 }
 
-impl From<AllocatorType> for sys::OrtAllocatorType {
+impl From<AllocatorType> for ort_sys::OrtAllocatorType {
 	fn from(val: AllocatorType) -> Self {
 		match val {
-			AllocatorType::Device => sys::OrtAllocatorType::OrtDeviceAllocator,
-			AllocatorType::Arena => sys::OrtAllocatorType::OrtArenaAllocator
+			AllocatorType::Device => ort_sys::OrtAllocatorType::OrtDeviceAllocator,
+			AllocatorType::Arena => ort_sys::OrtAllocatorType::OrtArenaAllocator
 		}
 	}
 }
@@ -427,12 +426,12 @@ impl MemType {
 	pub const CPU: MemType = MemType::CPUOutput;
 }
 
-impl From<MemType> for sys::OrtMemType {
+impl From<MemType> for ort_sys::OrtMemType {
 	fn from(val: MemType) -> Self {
 		match val {
-			MemType::CPUInput => sys::OrtMemType::OrtMemTypeCPUInput,
-			MemType::CPUOutput => sys::OrtMemType::OrtMemTypeCPUOutput,
-			MemType::Default => sys::OrtMemType::OrtMemTypeDefault
+			MemType::CPUInput => ort_sys::OrtMemType::OrtMemTypeCPUInput,
+			MemType::CPUOutput => ort_sys::OrtMemType::OrtMemTypeCPUOutput,
+			MemType::Default => ort_sys::OrtMemType::OrtMemTypeDefault
 		}
 	}
 }

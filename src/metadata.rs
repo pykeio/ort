@@ -2,16 +2,16 @@
 
 use std::{ffi::CString, os::raw::c_char};
 
-use super::{char_p_to_string, error::OrtResult, ortfree, ortsys, sys, OrtError};
+use super::{char_p_to_string, error::OrtResult, ortfree, ortsys, OrtError};
 
 /// Container for model metadata, including name & producer information.
 pub struct ModelMetadata {
-	metadata_ptr: *mut sys::OrtModelMetadata,
-	allocator_ptr: *mut sys::OrtAllocator
+	metadata_ptr: *mut ort_sys::OrtModelMetadata,
+	allocator_ptr: *mut ort_sys::OrtAllocator
 }
 
 impl ModelMetadata {
-	pub(crate) fn new(metadata_ptr: *mut sys::OrtModelMetadata, allocator_ptr: *mut sys::OrtAllocator) -> Self {
+	pub(crate) fn new(metadata_ptr: *mut ort_sys::OrtModelMetadata, allocator_ptr: *mut ort_sys::OrtAllocator) -> Self {
 		ModelMetadata { metadata_ptr, allocator_ptr }
 	}
 

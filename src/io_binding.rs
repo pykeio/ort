@@ -6,7 +6,7 @@ use std::{
 	sync::Arc
 };
 
-use crate::{memory::MemoryInfo, ortfree, ortsys, session::output::SessionOutputs, sys, value::Value, OrtError, OrtResult, Session};
+use crate::{memory::MemoryInfo, ortfree, ortsys, session::output::SessionOutputs, value::Value, OrtError, OrtResult, Session};
 
 /// Enables binding of session inputs and/or outputs to pre-allocated memory.
 ///
@@ -19,14 +19,14 @@ use crate::{memory::MemoryInfo, ortfree, ortsys, session::output::SessionOutputs
 /// The fact that data copy is not made during runtime may also have performance implications.
 #[derive(Debug)]
 pub struct IoBinding<'s> {
-	pub(crate) ptr: *mut sys::OrtIoBinding,
+	pub(crate) ptr: *mut ort_sys::OrtIoBinding,
 	session: &'s Session,
 	values: Vec<Value>
 }
 
 impl<'s> IoBinding<'s> {
 	pub(crate) fn new(session: &'s Session) -> OrtResult<Self> {
-		let mut ptr: *mut sys::OrtIoBinding = ptr::null_mut();
+		let mut ptr: *mut ort_sys::OrtIoBinding = ptr::null_mut();
 		ortsys![unsafe CreateIoBinding(session.inner.session_ptr, &mut ptr) -> OrtError::CreateIoBinding; nonNull(ptr)];
 		Ok(Self { ptr, session, values: Vec::new() })
 	}
@@ -58,7 +58,7 @@ impl<'s> IoBinding<'s> {
 	}
 
 	pub fn run(&mut self) -> OrtResult<SessionOutputs> {
-		let run_options_ptr: *const sys::OrtRunOptions = std::ptr::null();
+		let run_options_ptr: *const ort_sys::OrtRunOptions = std::ptr::null();
 		ortsys![unsafe RunWithBinding(self.session.inner.session_ptr, run_options_ptr, self.ptr) -> OrtError::SessionRunWithIoBinding];
 		self.values.clear();
 		self.outputs()
@@ -96,7 +96,7 @@ impl<'s> IoBinding<'s> {
 			ortfree![unsafe self.session.allocator().ptr, names_ptr as *mut c_void];
 			ortfree![unsafe self.session.allocator().ptr, lengths_ptr as *mut c_void];
 
-			let mut output_values_ptr: *mut *mut sys::OrtValue = ptr::null_mut();
+			let mut output_values_ptr: *mut *mut ort_sys::OrtValue = ptr::null_mut();
 			ortsys![unsafe GetBoundOutputValues(self.ptr, self.session.allocator().ptr, &mut output_values_ptr, &mut count) -> OrtError::GetBoundOutputs; nonNull(output_values_ptr)];
 
 			let output_values_ptr = unsafe { std::slice::from_raw_parts(output_values_ptr, count).to_vec() }

@@ -7,7 +7,6 @@ use crate::{
 	memory::{Allocator, MemoryInfo},
 	ortsys,
 	session::SharedSessionInner,
-	sys,
 	tensor::{IntoTensorElementDataType, OrtOwnedTensor, TensorDataToType, TensorElementDataType},
 	AllocatorType, MemType, OrtError, OrtResult
 };
@@ -96,12 +95,12 @@ impl_convert_trait!(String, DynArrayRef::String);
 #[derive(Debug)]
 pub(crate) enum ValueInner {
 	RustOwned {
-		ptr: *mut sys::OrtValue,
+		ptr: *mut ort_sys::OrtValue,
 		_array: Box<dyn Any>,
 		_memory_info: MemoryInfo
 	},
 	CppOwned {
-		ptr: *mut sys::OrtValue,
+		ptr: *mut ort_sys::OrtValue,
 		/// Hold [`SharedSessionInner`] to ensure that the value can stay alive after the main session is dropped.
 		_session: Arc<SharedSessionInner>
 	}
@@ -118,12 +117,12 @@ unsafe impl Send for Value {}
 unsafe impl Sync for Value {}
 
 impl Value {
-	/// Construct a [`Value`] from a C++ [`sys::OrtValue`] pointer.
+	/// Construct a [`Value`] from a C++ [`ort_sys::OrtValue`] pointer.
 	///
 	/// # Safety
 	///
 	/// - `ptr` must not be null.
-	pub unsafe fn from_raw(ptr: *mut sys::OrtValue, session: Arc<SharedSessionInner>) -> Value {
+	pub unsafe fn from_raw(ptr: *mut ort_sys::OrtValue, session: Arc<SharedSessionInner>) -> Value {
 		Value {
 			inner: ValueInner::CppOwned { ptr, _session: session }
 		}
@@ -136,7 +135,7 @@ impl Value {
 	where
 		T: TensorDataToType + Clone + Debug
 	{
-		let mut tensor_info_ptr: *mut sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
 		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> OrtError::GetTensorTypeAndShape];
 
 		let res = {
@@ -147,9 +146,9 @@ impl Value {
 			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> OrtError::GetDimensions];
 			let shape = IxDyn(&node_dims.iter().map(|&n| n as usize).collect::<Vec<_>>());
 
-			let mut type_sys = sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
 			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> OrtError::GetTensorElementType];
-			assert_ne!(type_sys, sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
+			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 			let data_type: TensorElementDataType = type_sys.into();
 			if data_type != T::tensor_element_data_type() {
 				Err(OrtError::DataTypeMismatch {
@@ -194,8 +193,8 @@ impl Value {
 	) -> OrtResult<Value> {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemType::Default)?;
 
-		let mut value_ptr: *mut sys::OrtValue = ptr::null_mut();
-		let value_ptr_ptr: *mut *mut sys::OrtValue = &mut value_ptr;
+		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
+		let value_ptr_ptr: *mut *mut ort_sys::OrtValue = &mut value_ptr;
 
 		let guard = match T::tensor_element_data_type() {
 			TensorElementDataType::Float32
@@ -284,7 +283,7 @@ impl Value {
 						let slice = elt.try_utf8_bytes().expect("String data type must provide utf8 bytes");
 						ffi::CString::new(slice)
 					})
-					.collect::<std::result::Result<Vec<_>, _>>()
+					.collect::<Result<Vec<_>, _>>()
 					.map_err(OrtError::FfiStringNull)?;
 
 				let string_pointers = null_terminated_copies.iter().map(|cstring| cstring.as_ptr()).collect::<Vec<_>>();
@@ -305,7 +304,7 @@ impl Value {
 		})
 	}
 
-	pub(crate) fn ptr(&self) -> *mut sys::OrtValue {
+	pub(crate) fn ptr(&self) -> *mut ort_sys::OrtValue {
 		match &self.inner {
 			ValueInner::CppOwned { ptr, .. } => *ptr,
 			ValueInner::RustOwned { ptr, .. } => *ptr

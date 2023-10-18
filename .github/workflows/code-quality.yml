@@ -12,15 +12,22 @@ on:
       - '.cargo/**/*'
       - 'tests/**/*'
       - 'codecov.yml'
+      - 'ort-sys/build.rs'
+      - 'ort-sys/src/**/*.rs'
+      - 'ort-sys/wrapper.h'
+      - 'ort-sys/Cargo.toml'
   pull_request:
     paths:
       - '.github/workflows/code-quality.yml'
       - 'src/**/*.rs'
-      - 'build.rs'
       - 'Cargo.toml'
       - '.cargo/**/*'
       - 'tests/**/*'
       - 'codecov.yml'
+      - 'ort-sys/build.rs'
+      - 'ort-sys/src/**/*.rs'
+      - 'ort-sys/wrapper.h'
+      - 'ort-sys/Cargo.toml'
 env:
   RUST_BACKTRACE: 1
   CARGO_INCREMENTAL: 0
@@ -40,7 +47,7 @@ jobs:
       - name: Check fmt
         run: cargo fmt --all -- --check
       - name: Run clippy
-        run: cargo clippy --all-targets --features fetch-models
+        run: cargo clippy --all-targets --workspace --features fetch-models
   coverage:
     name: Code coverage
     runs-on: ubuntu-latest

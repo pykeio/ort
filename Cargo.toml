@@ -1,3 +1,6 @@
+[workspace]
+members = ['ort-sys']
+
 [package]
 name = "ort"
 description = "A Rust wrapper for ONNX Runtime 1.15 - Optimize and Accelerate Machine Learning Inferencing"
@@ -13,7 +16,7 @@ authors = [
 	"pyke.io <contact@pyke.io>",
 	"Nicolas Bigaouette <nbigaouette@gmail.com>"
 ]
-include = [ "src/", "examples/", "tests/", "toolchains/", "build.rs", "LICENSE", "README.md" ]
+include = [ "src/", "examples/", "tests/", "toolchains/", "LICENSE", "README.md" ]
 
 [profile.release]
 opt-level = 3
@@ -34,24 +37,24 @@ default = [ "half", "download-binaries", "copy-dylibs" ]
 profiling = [ "widestring" ]
 
 fetch-models = [ "ureq" ]
-download-binaries = [ "ureq", "zip" ]
-load-dynamic = [ "libloading" ]
-copy-dylibs = []
+download-binaries = [ "ort-sys/download-binaries" ]
+load-dynamic = [ "libloading", "ort-sys/load-dynamic" ]
+copy-dylibs = [ "ort-sys/copy-dylibs" ]
 
-minimal-build = []
+minimal-build = [ "ort-sys/minimal-build" ]
 experimental = []
 mimalloc = []
-compile-static = []
+compile-static = [ "ort-sys/compile-static" ]
 
-cuda = []
-tensorrt = []
+cuda = [ "ort-sys/cuda" ]
+tensorrt = [ "ort-sys/tensorrt" ]
 openvino = []
 onednn = []
 directml = []
 nnapi = []
 coreml = []
 xnnpack = []
-rocm = []
+rocm = [ "ort-sys/rocm" ]
 acl = []
 armnn = []
 tvm = []
@@ -64,6 +67,7 @@ qnn = []
 [dependencies]
 ndarray = "0.15"
 thiserror = "1.0"
+ort-sys = { path = "ort-sys" }
 libloading = { version = "0.8", optional = true }
 smallvec = "1.11"
 
@@ -71,6 +75,7 @@ ureq = { version = "2.1", optional = true, default-features = false, features = 
 once_cell = "1.18"
 tracing = "0.1"
 half = { version = "2.1", optional = true }
+
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -89,14 +94,3 @@ test-log = { version = "0.2", default-features = false, features = [ "trace" ] }
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
 tokenizers = { version = ">=0.13.4", default-features = false, features = [ "onig" ] }
 rand = "0.8"
-
-[build-dependencies]
-ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }
-zip = { version = "0.6", optional = true, default-features = false, features = [ "deflate" ] }
-
-[target.'cfg(not(target_os = "windows"))'.build-dependencies]
-flate2 = "1.0"
-tar = "0.4"
-
-[target.'cfg(target_os = "windows")'.build-dependencies]
-vswhom = "0.1"

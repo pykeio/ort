@@ -2,20 +2,20 @@ use std::ffi::{c_char, c_int, CString};
 
 use super::{
 	error::{OrtError, OrtResult},
-	ortsys, sys, AllocatorType, MemType
+	ortsys, AllocatorType, MemType
 };
 use crate::{char_p_to_string, error::status_to_result};
 
 /// An ONNX Runtime allocator, used to manage the allocation of [`crate::Value`]s.
 #[derive(Debug)]
 pub struct Allocator {
-	pub(crate) ptr: *mut sys::OrtAllocator,
+	pub(crate) ptr: *mut ort_sys::OrtAllocator,
 	is_default: bool
 }
 
 impl Default for Allocator {
 	fn default() -> Self {
-		let mut allocator_ptr: *mut sys::OrtAllocator = std::ptr::null_mut();
+		let mut allocator_ptr: *mut ort_sys::OrtAllocator = std::ptr::null_mut();
 		status_to_result(ortsys![unsafe GetAllocatorWithDefaultOptions(&mut allocator_ptr); nonNull(allocator_ptr)]).unwrap();
 		Self { ptr: allocator_ptr, is_default: true }
 	}
@@ -81,14 +81,14 @@ impl TryFrom<&str> for AllocationDevice {
 
 #[derive(Debug)]
 pub struct MemoryInfo {
-	pub(crate) ptr: *mut sys::OrtMemoryInfo,
+	pub(crate) ptr: *mut ort_sys::OrtMemoryInfo,
 	pub(crate) should_release: bool
 }
 
 impl MemoryInfo {
 	#[tracing::instrument]
 	pub fn new_cpu(allocator: AllocatorType, memory_type: MemType) -> OrtResult<Self> {
-		let mut memory_info_ptr: *mut sys::OrtMemoryInfo = std::ptr::null_mut();
+		let mut memory_info_ptr: *mut ort_sys::OrtMemoryInfo = std::ptr::null_mut();
 		ortsys![
 			unsafe CreateCpuMemoryInfo(allocator.into(), memory_type.into(), &mut memory_info_ptr) -> OrtError::CreateMemoryInfo;
 			nonNull(memory_info_ptr)
@@ -101,7 +101,7 @@ impl MemoryInfo {
 
 	#[tracing::instrument]
 	pub fn new(allocation_device: AllocationDevice, device_id: c_int, allocator_type: AllocatorType, memory_type: MemType) -> OrtResult<Self> {
-		let mut memory_info_ptr: *mut sys::OrtMemoryInfo = std::ptr::null_mut();
+		let mut memory_info_ptr: *mut ort_sys::OrtMemoryInfo = std::ptr::null_mut();
 		let allocator_name = CString::new(allocation_device.as_str()).unwrap();
 		ortsys![
 			unsafe CreateMemoryInfo(allocator_name.as_ptr(), allocator_type.into(), device_id, memory_type.into(), &mut memory_info_ptr)

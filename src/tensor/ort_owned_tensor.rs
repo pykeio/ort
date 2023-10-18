@@ -5,7 +5,7 @@ use std::{fmt::Debug, ops::Deref, ptr};
 use ndarray::{ArrayView, IxDyn};
 
 use super::{TensorData, TensorDataToType};
-use crate::{ortsys, sys};
+use crate::ortsys;
 
 /// Tensor containing data owned by the ONNX Runtime C library, used to return values from inference.
 ///
@@ -91,7 +91,7 @@ where
 /// to keep a reference to `DynOrtTensor`, which would be inconvenient.
 #[derive(Debug)]
 pub struct TensorPointerHolder {
-	pub(crate) tensor_ptr: *mut sys::OrtValue
+	pub(crate) tensor_ptr: *mut ort_sys::OrtValue
 }
 
 impl Drop for TensorPointerHolder {

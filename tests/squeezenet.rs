@@ -7,7 +7,10 @@ use std::{
 
 use image::{imageops::FilterType, ImageBuffer, Pixel, Rgb};
 use ndarray::s;
-use ort::{download::vision::ImageClassification, inputs, Environment, GraphOptimizationLevel, LoggingLevel, OrtDownloadError, OrtOwnedTensor, OrtResult, SessionBuilder, NdArrayExtensions};
+use ort::{
+	download::vision::ImageClassification, inputs, Environment, GraphOptimizationLevel, LoggingLevel, NdArrayExtensions, OrtDownloadError, OrtOwnedTensor,
+	OrtResult, SessionBuilder
+};
 use test_log::test;
 
 #[test]

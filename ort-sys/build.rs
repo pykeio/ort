@@ -702,7 +702,7 @@ fn real_main(link: bool) {
 }
 
 fn main() {
-	if std::env::var("DOCS_RS").is_err() {
+	if env::var("DOCS_RS").is_err() {
 		if cfg!(feature = "load-dynamic") {
 			// we only need to execute the real main step if we are using the download strategy...
 			if cfg!(feature = "download-binaries") && std::env::var(ORT_ENV_STRATEGY).as_ref().map_or("download", String::as_str) == "download" {

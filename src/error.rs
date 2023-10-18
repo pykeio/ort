@@ -4,10 +4,10 @@ use std::{convert::Infallible, io, path::PathBuf, string};
 
 use thiserror::Error;
 
-use super::{char_p_to_string, ort, sys, tensor::TensorElementDataType};
+use super::{char_p_to_string, ort, tensor::TensorElementDataType};
 
 /// Type alias for the Result type returned by ORT functions.
-pub type OrtResult<T> = std::result::Result<T, OrtError>;
+pub type OrtResult<T> = Result<T, OrtError>;
 
 /// An enum of all errors returned by ORT functions.
 #[non_exhaustive]
@@ -255,10 +255,10 @@ pub enum OrtDownloadError {
 /// Wrapper type around ONNX's `OrtStatus` pointer.
 ///
 /// This wrapper exists to facilitate conversion from C raw pointers to Rust error types.
-pub struct OrtStatusWrapper(*mut sys::OrtStatus);
+pub struct OrtStatusWrapper(*mut ort_sys::OrtStatus);
 
-impl From<*mut sys::OrtStatus> for OrtStatusWrapper {
-	fn from(status: *mut sys::OrtStatus) -> Self {
+impl From<*mut ort_sys::OrtStatus> for OrtStatusWrapper {
+	fn from(status: *mut ort_sys::OrtStatus) -> Self {
 		OrtStatusWrapper(status)
 	}
 }
@@ -273,7 +273,7 @@ pub(crate) fn assert_non_null_pointer<T>(ptr: *const T, name: &str) -> OrtResult
 		.ok_or_else(|| OrtError::PointerShouldNotBeNull(name.to_owned()))
 }
 
-impl From<OrtStatusWrapper> for std::result::Result<(), OrtApiError> {
+impl From<OrtStatusWrapper> for Result<(), OrtApiError> {
 	fn from(status: OrtStatusWrapper) -> Self {
 		if status.0.is_null() {
 			Ok(())
@@ -296,7 +296,7 @@ impl Drop for OrtStatusWrapper {
 	}
 }
 
-pub(crate) fn status_to_result(status: *mut sys::OrtStatus) -> std::result::Result<(), OrtApiError> {
+pub(crate) fn status_to_result(status: *mut ort_sys::OrtStatus) -> Result<(), OrtApiError> {
 	let status_wrapper: OrtStatusWrapper = status.into();
 	status_wrapper.into()
 }

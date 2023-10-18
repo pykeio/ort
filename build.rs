@@ -355,12 +355,12 @@ fn system_strategy() -> (PathBuf, bool) {
 		needs_link = false;
 	} else {
 		#[allow(clippy::type_complexity)]
-		let static_configs: Vec<(PathBuf, PathBuf, Box<dyn Fn(PathBuf, &String) -> PathBuf>)> = vec![
-			(lib_dir.join(&profile), lib_dir.join("_deps"), Box::new(|p: PathBuf, profile| p.join(profile))),
-			(lib_dir.clone(), lib_dir.parent().unwrap().join("_deps"), Box::new(|p: PathBuf, _| p)),
-			(lib_dir.join("onnxruntime"), lib_dir.join("_deps"), Box::new(|p: PathBuf, _| p)),
+		let static_configs: Vec<(PathBuf, PathBuf, PathBuf, Box<dyn Fn(PathBuf, &String) -> PathBuf>)> = vec![
+			(lib_dir.join(&profile), lib_dir.join("lib"), lib_dir.join("_deps"), Box::new(|p: PathBuf, profile| p.join(profile))),
+			(lib_dir.clone(), lib_dir.join("lib"), lib_dir.parent().unwrap().join("_deps"), Box::new(|p: PathBuf, _| p)),
+			(lib_dir.join("onnxruntime"), lib_dir.join("onnxruntime").join("lib"), lib_dir.join("_deps"), Box::new(|p: PathBuf, _| p)),
 		];
-		for (lib_dir, external_lib_dir, transform_dep) in static_configs {
+		for (lib_dir, extension_lib_dir, external_lib_dir, transform_dep) in static_configs {
 			if lib_dir.join(platform_format_lib("onnxruntime_common")).exists() {
 				add_search_dir(&lib_dir);
 
@@ -372,6 +372,13 @@ fn system_strategy() -> (PathBuf, bool) {
 					} else {
 						panic!("[ort] unable to find ONNX Runtime library: {}", lib_path.display());
 					}
+				}
+
+				if extension_lib_dir.exists() {
+					add_search_dir(&extension_lib_dir);
+					println!("cargo:rustc-link-lib=static=ortcustomops");
+					println!("cargo:rustc-link-lib=static=ocos_operators");
+					println!("cargo:rustc-link-lib=static=noexcep_operators");
 				}
 
 				if target_arch == "wasm32" {

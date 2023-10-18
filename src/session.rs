@@ -289,6 +289,13 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
+	/// Enable custom operators. See onnxruntime-extensions: https://github.com/microsoft/onnxruntime-extensions
+	pub fn with_enable_ort_custom_ops(self) -> OrtResult<Self> {
+		let status = ortsys![unsafe EnableOrtCustomOps(self.session_options_ptr)];
+		status_to_result(status).map_err(OrtError::CreateSessionOptions)?;
+		Ok(self)
+	}
+
 	/// Downloads a pre-trained ONNX model from the [ONNX Model Zoo](https://github.com/onnx/models) and builds the session.
 	#[cfg(feature = "fetch-models")]
 	pub fn with_model_downloaded<M>(self, model: M) -> OrtResult<Session>

@@ -27,8 +27,8 @@ fn mnist_5() -> OrtResult<()> {
 	assert_eq!(metadata.name()?, "CNTKGraph");
 	assert_eq!(metadata.producer()?, "CNTK");
 
-	let input0_shape: Vec<usize> = session.inputs[0].dimensions().map(|d| d.unwrap()).collect();
-	let output0_shape: Vec<usize> = session.outputs[0].dimensions().map(|d| d.unwrap()).collect();
+	let input0_shape: Vec<usize> = session.inputs[0].map(|d| d.unwrap()).collect();
+	let output0_shape: Vec<usize> = session.outputs[0].map(|d| d.unwrap()).collect();
 
 	assert_eq!(input0_shape, [1, 1, 28, 28]);
 	assert_eq!(output0_shape, [1, 10]);

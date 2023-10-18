@@ -63,8 +63,8 @@ fn upsample() -> OrtResult<()> {
 	assert_eq!(metadata.name()?, "tf2onnx");
 	assert_eq!(metadata.producer()?, "tf2onnx");
 
-	assert_eq!(session.inputs[0].dimensions().collect::<Vec<_>>(), [None, None, None, Some(3)]);
-	assert_eq!(session.outputs[0].dimensions().collect::<Vec<_>>(), [None, None, None, Some(3)]);
+	assert_eq!(session.inputs[0].collect::<Vec<_>>(), [None, None, None, Some(3)]);
+	assert_eq!(session.outputs[0].collect::<Vec<_>>(), [None, None, None, Some(3)]);
 
 	// Load image, converting to RGB format
 	let image_buffer = load_input_image(IMAGE_TO_LOAD);
@@ -107,8 +107,8 @@ fn upsample_with_ort_model() -> OrtResult<()> {
 		.with_model_from_memory_directly(&session_data) // Zero-copy.
 		.expect("Could not read model from memory");
 
-	assert_eq!(session.inputs[0].dimensions().collect::<Vec<_>>(), [None, None, None, Some(3)]);
-	assert_eq!(session.outputs[0].dimensions().collect::<Vec<_>>(), [None, None, None, Some(3)]);
+	assert_eq!(session.inputs[0].collect::<Vec<_>>(), [None, None, None, Some(3)]);
+	assert_eq!(session.outputs[0].collect::<Vec<_>>(), [None, None, None, Some(3)]);
 
 	// Load image, converting to RGB format
 	let image_buffer = load_input_image(IMAGE_TO_LOAD);

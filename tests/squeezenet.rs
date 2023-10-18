@@ -7,10 +7,7 @@ use std::{
 
 use image::{imageops::FilterType, ImageBuffer, Pixel, Rgb};
 use ndarray::s;
-use ort::{
-	download::vision::ImageClassification, inputs, Environment, GraphOptimizationLevel, LoggingLevel, NdArrayExtensions, OrtDownloadError, OrtOwnedTensor,
-	OrtResult, SessionBuilder
-};
+use ort::{download::vision::ImageClassification, inputs, Environment, GraphOptimizationLevel, LoggingLevel, OrtDownloadError, OrtOwnedTensor, OrtResult, SessionBuilder, NdArrayExtensions};
 use test_log::test;
 
 #[test]
@@ -35,8 +32,8 @@ fn squeezenet_mushroom() -> OrtResult<()> {
 
 	let class_labels = get_imagenet_labels()?;
 
-	let input0_shape: Vec<usize> = session.inputs[0].dimensions().map(|d| d.unwrap()).collect();
-	let output0_shape: Vec<usize> = session.outputs[0].dimensions().map(|d| d.unwrap()).collect();
+	let input0_shape: Vec<usize> = session.inputs[0].map(|d| d.unwrap()).collect();
+	let output0_shape: Vec<usize> = session.outputs[0].map(|d| d.unwrap()).collect();
 
 	assert_eq!(input0_shape, [1, 3, 224, 224]);
 	assert_eq!(output0_shape, [1, 1000]);

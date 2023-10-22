@@ -1,5 +1,14 @@
 [workspace]
-members = ['ort-sys']
+members = [
+	'ort-sys',
+	'examples/gpt2',
+	'examples/yolov8'
+]
+default-members = [
+	'.',
+	'examples/gpt2',
+	'examples/yolov8'
+]
 
 [package]
 name = "ort"
@@ -26,10 +35,6 @@ codegen-units = 1
 
 [package.metadata.docs.rs]
 features = [ "half", "fetch-models", "copy-dylibs" ]
-
-[[example]]
-name = "gpt"
-required-features = ["fetch-models"]
 
 [features]
 default = [ "half", "download-binaries", "copy-dylibs" ]
@@ -87,9 +92,5 @@ widestring = { version = "1.0", optional = true }
 anyhow = "1.0"
 ureq = "2.1"
 image = "0.24"
-show-image = { version = "0.13", features = [ "image", "raqote" ] }
-raqote = { version = "0.8", default-features = false }
 test-log = { version = "0.2", default-features = false, features = [ "trace" ] }
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
-tokenizers = { version = ">=0.13.4", default-features = false, features = [ "onig" ] }
-rand = "0.8"

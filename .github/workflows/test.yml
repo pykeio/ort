@@ -37,7 +37,7 @@ jobs:
       - name: Run tests
         # do not run doctests until rust-lang/cargo#10469 is merged
         run: |
-          cargo test --verbose --lib --features fetch-models
+          cargo test -p ort --verbose --lib --features fetch-models
   cross-compile:
     name: Cross-platform compile
     runs-on: ${{ matrix.platform.os }}
@@ -68,16 +68,9 @@ jobs:
           $VCINSTALLDIR = Join-Path $VSINSTALLDIR "VC"
           $LLVM_ROOT = Join-Path $VCINSTALLDIR "Tools\Llvm\x64"
           echo "PATH=$Env:PATH;${LLVM_ROOT}\bin" >> $Env:GITHUB_ENV
-      - name: Install native dependencies for Linux
-        if: matrix.platform.os == 'ubuntu-latest'
-        shell: bash
-        run: |
-          sudo apt-get install pkg-config libfreetype6-dev libexpat1-dev libxcb-composite0-dev libssl-dev libx11-dev libfontconfig1-dev
       - name: Build/test
         uses: houseabsolute/actions-rust-cross@v0
         with:
           command: ${{ matrix.platform.command }}
           target: ${{ matrix.platform.target }}
-          args: "--features fetch-models"
-        env:
-          LC_ALL: C
+          args: "-p ort --features fetch-models"

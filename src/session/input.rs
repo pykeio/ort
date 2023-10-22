@@ -34,15 +34,71 @@ impl<'s> From<SmallVec<[Value; 4]>> for SessionInputs<'s> {
 	}
 }
 
+/// Construct the inputs to a session from an array, a map, or an IO binding.
+///
+/// The result of this macro is an `Result<SessionInputs, OrtError>`, so make sure you `?` on the result.
+///
+/// For tensors, note that using certain array structures can have performance implications.
+/// - `&CowArray`, `ArrayView` will **always** be copied.
+/// - `Array`, `&mut ArcArray` will only be copied **if the tensor is not contiguous** (i.e. has been reshaped).
+///
+/// # Example
+///
+/// ## Array of tensors
+///
+/// ```no_run
+/// # use std::{error::Error, sync::Arc};
+/// # use ndarray::Array1;
+/// # use ort::{Environment, LoggingLevel, GraphOptimizationLevel, SessionBuilder};
+/// # fn main() -> Result<(), Box<dyn Error>> {
+/// # let environment = Environment::default().into_arc();
+/// let mut session = SessionBuilder::new(&environment)?.with_model_from_file("model.onnx")?;
+/// let _ = session.run(ort::inputs![Array1::from_vec(vec![1, 2, 3, 4, 5])]?);
+/// # Ok(())
+/// # }
+/// ```
+///
+/// ## Map of named tensors
+///
+/// ```no_run
+/// # use std::{error::Error, sync::Arc};
+/// # use ndarray::Array1;
+/// # use ort::{Environment, LoggingLevel, GraphOptimizationLevel, SessionBuilder};
+/// # fn main() -> Result<(), Box<dyn Error>> {
+/// # let environment = Environment::default().into_arc();
+/// let mut session = SessionBuilder::new(&environment)?.with_model_from_file("model.onnx")?;
+/// let _ = session.run(ort::inputs! {
+/// 	"tokens" => Array1::from_vec(vec![1, 2, 3, 4, 5])
+/// }?);
+/// # Ok(())
+/// # }
+/// ```
+///
+/// ## IOBinding
+///
+/// ```no_run
+/// # use std::{error::Error, sync::Arc};
+/// # use ndarray::Array1;
+/// # use ort::{Environment, LoggingLevel, GraphOptimizationLevel, SessionBuilder};
+/// # fn main() -> Result<(), Box<dyn Error>> {
+/// # let environment = Environment::default().into_arc();
+/// let mut session = SessionBuilder::new(&environment)?.with_model_from_file("model.onnx")?;
+/// let mut binding = session.create_binding()?;
+/// let _ = session.run(ort::inputs!(bind = binding)?);
+/// # Ok(())
+/// # }
+/// ```
 #[macro_export]
 macro_rules! inputs {
-	(bind = $($v:expr),+) => ($v);
-	($($v:expr),+ $(,)?) => ([$(std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::OrtError::from),)+].into_iter().collect::<$crate::OrtResult<$crate::smallvec::SmallVec<_>>>());
+	(bind = $v:expr) => ($crate::OrtResult::Ok($v));
+	($($v:expr),+ $(,)?) => (
+		[$(std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::OrtError::from),)+]
+			.into_iter()
+			.collect::<$crate::OrtResult<$crate::smallvec::SmallVec<_>>>()
+	);
 	($($n:expr => $v:expr),+ $(,)?) => {{
-		let mut inputs = std::collections::HashMap::<_, $crate::Value>::new();
-		$(
-			inputs.insert($n, std::convert::TryInto::<$crate::Value>::try_into($v)?);
-		)+
-		inputs
+		[$(std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::OrtError::from).map(|v| ($n, v)),)+]
+			.into_iter()
+			.collect::<$crate::OrtResult<std::collections::HashMap::<_, $crate::Value>>>()
 	}};
 }

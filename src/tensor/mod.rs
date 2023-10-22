@@ -179,16 +179,6 @@ impl<'a> Utf8Data for &'a str {
 	}
 }
 
-impl<T: Utf8Data> IntoTensorElementDataType for T {
-	fn tensor_element_data_type() -> TensorElementDataType {
-		TensorElementDataType::String
-	}
-
-	fn try_utf8_bytes(&self) -> Option<&[u8]> {
-		Some(self.utf8_bytes())
-	}
-}
-
 /// Trait used to map ONNX Runtime types to Rust types.
 pub trait TensorDataToType: Sized + fmt::Debug + Clone {
 	/// The tensor element type that this type can extract from.
@@ -325,4 +315,14 @@ pub enum DataType {
 	Tensor { ty: TensorElementDataType, dimensions: Vec<i64> },
 	Sequence(Box<DataType>),
 	Map { key: TensorElementDataType, value: TensorElementDataType }
+}
+
+impl DataType {
+	/// Returns the dimensions of this data type if it is a tensor, or `None` if it is a sequence or map.
+	pub fn tensor_dimensions(&self) -> Option<&Vec<i64>> {
+		match self {
+			DataType::Tensor { dimensions, .. } => Some(dimensions),
+			_ => None
+		}
+	}
 }

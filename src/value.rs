@@ -7,7 +7,7 @@ use crate::{
 	memory::{Allocator, MemoryInfo},
 	ortsys,
 	session::SharedSessionInner,
-	tensor::{IntoTensorElementDataType, OrtOwnedTensor, TensorDataToType, TensorElementDataType},
+	tensor::{IntoTensorElementDataType, OrtOwnedTensor, TensorDataToType, TensorElementDataType, Utf8Data},
 	AllocatorType, MemType, OrtError, OrtResult
 };
 
@@ -30,29 +30,6 @@ pub enum DynArrayRef<'v> {
 	Uint32(CowArray<'v, u32, IxDyn>),
 	Uint64(CowArray<'v, u64, IxDyn>),
 	String(CowArray<'v, String, IxDyn>)
-}
-
-impl<'v> DynArrayRef<'v> {
-	pub fn shape(&self) -> &[usize] {
-		match self {
-			DynArrayRef::Float(x) => x.shape(),
-			#[cfg(feature = "half")]
-			DynArrayRef::Float16(x) => x.shape(),
-			#[cfg(feature = "half")]
-			DynArrayRef::Bfloat16(x) => x.shape(),
-			DynArrayRef::Uint8(x) => x.shape(),
-			DynArrayRef::Int8(x) => x.shape(),
-			DynArrayRef::Uint16(x) => x.shape(),
-			DynArrayRef::Int16(x) => x.shape(),
-			DynArrayRef::Int32(x) => x.shape(),
-			DynArrayRef::Int64(x) => x.shape(),
-			DynArrayRef::Bool(x) => x.shape(),
-			DynArrayRef::Double(x) => x.shape(),
-			DynArrayRef::Uint32(x) => x.shape(),
-			DynArrayRef::Uint64(x) => x.shape(),
-			DynArrayRef::String(x) => x.shape()
-		}
-	}
 }
 
 macro_rules! impl_convert_trait {
@@ -179,18 +156,15 @@ impl Value {
 pub trait OrtInput {
 	type Item;
 
-	fn get(&self) -> (Vec<i64>, &[Self::Item]);
-	fn get_mut(&mut self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>);
+	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]);
+	fn into_parts(self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>);
 }
 
 impl Value {
-	/// Construct a [`Value`] from a Rust-owned [`CowArray`].
+	/// Construct a [`Value`] from a Rust-owned array.
 	///
 	/// `allocator` is required to be `Some` when converting a String tensor. See [`crate::Session::allocator`].
-	pub fn from_array<T: IntoTensorElementDataType + Debug + Clone + 'static>(
-		allocator: Option<&Allocator>,
-		mut input: impl OrtInput<Item = T>
-	) -> OrtResult<Value> {
+	pub fn from_array<T: IntoTensorElementDataType + Debug + Clone + 'static>(input: impl OrtInput<Item = T>) -> OrtResult<Value> {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemType::Default)?;
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
@@ -210,7 +184,7 @@ impl Value {
 			| TensorElementDataType::Bool => {
 				// primitive data is already suitably laid out in memory; provide it to
 				// onnxruntime as is
-				let (shape, ptr, ptr_len, guard) = input.get_mut();
+				let (shape, ptr, ptr_len, guard) = input.into_parts();
 				let shape_ptr: *const i64 = shape.as_ptr();
 				let shape_len = shape.len();
 
@@ -238,7 +212,7 @@ impl Value {
 			#[cfg(feature = "half")]
 			TensorElementDataType::Bfloat16 | TensorElementDataType::Float16 => {
 				// f16 and bf16 are repr(transparent) to u16, so memory layout should be identical to onnxruntime
-				let (shape, ptr, ptr_len, guard) = input.get_mut();
+				let (shape, ptr, ptr_len, guard) = input.into_parts();
 				let shape_ptr: *const i64 = shape.as_ptr();
 				let shape_len = shape.len();
 
@@ -263,34 +237,7 @@ impl Value {
 				assert_eq!(is_tensor, 1);
 				guard
 			}
-			TensorElementDataType::String => {
-				let allocator = allocator.ok_or(OrtError::StringTensorRequiresAllocator)?;
-
-				let (shape, data) = input.get();
-				let shape_ptr: *const i64 = shape.as_ptr();
-				let shape_len = shape.len();
-
-				// create tensor without data -- data is filled in later
-				ortsys![
-					unsafe CreateTensorAsOrtValue(allocator.ptr, shape_ptr, shape_len as _, T::tensor_element_data_type().into(), value_ptr_ptr)
-						-> OrtError::CreateTensor
-				];
-
-				// create null-terminated copies of each string, as per `FillStringTensor` docs
-				let null_terminated_copies: Vec<ffi::CString> = data
-					.iter()
-					.map(|elt| {
-						let slice = elt.try_utf8_bytes().expect("String data type must provide utf8 bytes");
-						ffi::CString::new(slice)
-					})
-					.collect::<Result<Vec<_>, _>>()
-					.map_err(OrtError::FfiStringNull)?;
-
-				let string_pointers = null_terminated_copies.iter().map(|cstring| cstring.as_ptr()).collect::<Vec<_>>();
-
-				ortsys![unsafe FillStringTensor(value_ptr, string_pointers.as_ptr(), string_pointers.len() as _) -> OrtError::FillStringTensor];
-				Box::new(())
-			}
+			TensorElementDataType::String => unreachable!()
 		};
 
 		assert_non_null_pointer(value_ptr, "Value")?;
@@ -299,6 +246,50 @@ impl Value {
 			inner: ValueInner::RustOwned {
 				ptr: value_ptr,
 				_array: guard,
+				_memory_info: memory_info
+			}
+		})
+	}
+
+	/// Construct a [`Value`] from a Rust-owned [`CowArray`].
+	///
+	/// `allocator` is required to be `Some` when converting a String tensor. See [`crate::Session::allocator`].
+	pub fn from_string_array<T: Utf8Data + Debug + Clone + 'static>(allocator: &Allocator, input: impl OrtInput<Item = T>) -> OrtResult<Value> {
+		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemType::Default)?;
+
+		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
+		let value_ptr_ptr: *mut *mut ort_sys::OrtValue = &mut value_ptr;
+
+		let (shape, data) = input.ref_parts();
+		let shape_ptr: *const i64 = shape.as_ptr();
+		let shape_len = shape.len();
+
+		// create tensor without data -- data is filled in later
+		ortsys![
+			unsafe CreateTensorAsOrtValue(allocator.ptr, shape_ptr, shape_len as _, TensorElementDataType::String.into(), value_ptr_ptr)
+				-> OrtError::CreateTensor
+		];
+
+		// create null-terminated copies of each string, as per `FillStringTensor` docs
+		let null_terminated_copies: Vec<ffi::CString> = data
+			.iter()
+			.map(|elt| {
+				let slice = elt.utf8_bytes();
+				ffi::CString::new(slice)
+			})
+			.collect::<Result<Vec<_>, _>>()
+			.map_err(OrtError::FfiStringNull)?;
+
+		let string_pointers = null_terminated_copies.iter().map(|cstring| cstring.as_ptr()).collect::<Vec<_>>();
+
+		ortsys![unsafe FillStringTensor(value_ptr, string_pointers.as_ptr(), string_pointers.len() as _) -> OrtError::FillStringTensor];
+
+		assert_non_null_pointer(value_ptr, "Value")?;
+
+		Ok(Value {
+			inner: ValueInner::RustOwned {
+				ptr: value_ptr,
+				_array: Box::new(()),
 				_memory_info: memory_info
 			}
 		})
@@ -319,32 +310,19 @@ impl Value {
 	}
 }
 
-impl<'i, 'v, T> TryFrom<&'i CowArray<'v, T, IxDyn>> for Value
-where
-	'i: 'v,
-	T: IntoTensorElementDataType + Debug + Clone + 'static,
-	DynArrayRef<'v>: From<CowArray<'v, T, IxDyn>>
-{
-	type Error = OrtError;
-
-	fn try_from(value: &'i CowArray<'v, T, IxDyn>) -> OrtResult<Self> {
-		Value::from_array(None, value)
-	}
-}
-
-impl<'i, 'v, T: Clone + 'static> OrtInput for &'i CowArray<'v, T, IxDyn>
+impl<'i, 'v, T: Clone + 'static, D: Dimension + 'static> OrtInput for &'i CowArray<'v, T, D>
 where
 	'i: 'v
 {
 	type Item = T;
 
-	fn get(&self) -> (Vec<i64>, &[Self::Item]) {
+	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
 		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
 		let data = self.as_slice().expect("tensor should be contiguous");
 		(shape, data)
 	}
 
-	fn get_mut(&mut self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
+	fn into_parts(self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
 		// This will result in a copy in either form of the CowArray
 		let mut contiguous_array = self.as_standard_layout().into_owned();
 		let shape: Vec<i64> = contiguous_array.shape().iter().map(|d| *d as i64).collect();
@@ -355,16 +333,16 @@ where
 	}
 }
 
-impl<T: Clone + 'static> OrtInput for &mut ArcArray<T, IxDyn> {
+impl<T: Clone + 'static, D: Dimension + 'static> OrtInput for &mut ArcArray<T, D> {
 	type Item = T;
 
-	fn get(&self) -> (Vec<i64>, &[Self::Item]) {
+	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
 		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
 		let data = self.as_slice().expect("tensor should be contiguous");
 		(shape, data)
 	}
 
-	fn get_mut(&mut self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
+	fn into_parts(self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
 		if self.is_standard_layout() {
 			// We can avoid the copy here and use the data as is
 			let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
@@ -384,21 +362,101 @@ impl<T: Clone + 'static> OrtInput for &mut ArcArray<T, IxDyn> {
 	}
 }
 
+impl<T: Clone + 'static, D: Dimension + 'static> OrtInput for Array<T, D> {
+	type Item = T;
+
+	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
+		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
+		let data = self.as_slice().expect("tensor should be contiguous");
+		(shape, data)
+	}
+
+	fn into_parts(self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
+		if self.is_standard_layout() {
+			// We can avoid the copy here and use the data as is
+			let mut guard = Box::new(self);
+			let shape: Vec<i64> = guard.shape().iter().map(|d| *d as i64).collect();
+			let ptr = guard.as_mut_ptr();
+			let ptr_len = guard.len();
+			(shape, ptr, ptr_len, guard)
+		} else {
+			// Need to do a copy here to get data in to standard layout
+			let mut contiguous_array = self.as_standard_layout().into_owned();
+			let shape: Vec<i64> = contiguous_array.shape().iter().map(|d| *d as i64).collect();
+			let ptr = contiguous_array.as_mut_ptr();
+			let ptr_len: usize = contiguous_array.len();
+			let guard = Box::new(contiguous_array);
+			(shape, ptr, ptr_len, guard)
+		}
+	}
+}
+
+impl<'v, T: Clone + 'static, D: Dimension + 'static> OrtInput for ArrayView<'v, T, D> {
+	type Item = T;
+
+	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
+		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
+		let data = self.as_slice().expect("tensor should be contiguous");
+		(shape, data)
+	}
+
+	fn into_parts(self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
+		// This will result in a copy in either form of the ArrayView
+		let mut contiguous_array = self.as_standard_layout().into_owned();
+		let shape: Vec<i64> = contiguous_array.shape().iter().map(|d| *d as i64).collect();
+		let ptr = contiguous_array.as_mut_ptr();
+		let ptr_len = contiguous_array.len();
+		let guard = Box::new(contiguous_array);
+		(shape, ptr, ptr_len, guard)
+	}
+}
+
 impl<T: Clone + 'static> OrtInput for (Vec<i64>, Arc<Box<[T]>>) {
 	type Item = T;
 
-	fn get(&self) -> (Vec<i64>, &[Self::Item]) {
+	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
 		let shape = self.0.clone();
 		let data = self.1.deref();
 		(shape, data)
 	}
 
-	fn get_mut(&mut self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
+	fn into_parts(mut self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
 		let shape = self.0.clone();
 		let ptr = std::sync::Arc::<std::boxed::Box<[T]>>::make_mut(&mut self.1).as_mut_ptr();
 		let ptr_len: usize = self.1.len();
-		let guard = Box::new(self.clone());
+		let guard = Box::new(Arc::clone(&self.1));
 		(shape, ptr, ptr_len, guard)
+	}
+}
+
+impl<'i, 'v, T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for Value
+where
+	'i: 'v
+{
+	type Error = OrtError;
+	fn try_from(arr: &'i CowArray<'v, T, D>) -> Result<Self, Self::Error> {
+		Value::from_array(arr)
+	}
+}
+
+impl<T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&mut ArcArray<T, D>> for Value {
+	type Error = OrtError;
+	fn try_from(arr: &mut ArcArray<T, D>) -> Result<Self, Self::Error> {
+		Value::from_array(arr)
+	}
+}
+
+impl<T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<Array<T, D>> for Value {
+	type Error = OrtError;
+	fn try_from(arr: Array<T, D>) -> Result<Self, Self::Error> {
+		Value::from_array(arr)
+	}
+}
+
+impl<'v, T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for Value {
+	type Error = OrtError;
+	fn try_from(arr: ArrayView<'v, T, D>) -> Result<Self, Self::Error> {
+		Value::from_array(arr)
 	}
 }
 

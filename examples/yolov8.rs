@@ -74,7 +74,7 @@ fn main() -> OrtResult<()> {
 	let original_img = image::open("tests/data/baseball.jpg").unwrap();
 	let (img_width, img_height) = (original_img.width(), original_img.height());
 	let img = original_img.resize_exact(640, 640, FilterType::CatmullRom);
-	let mut input = Array::zeros((1, 3, 640, 640)).into_dyn();
+	let mut input = Array::zeros((1, 3, 640, 640));
 	for pixel in img.pixels() {
 		let x = pixel.0 as _;
 		let y = pixel.1 as _;
@@ -89,8 +89,7 @@ fn main() -> OrtResult<()> {
 	let model = SessionBuilder::new(&env).unwrap().with_model_from_file(path).unwrap();
 
 	// Run YOLOv8 inference
-	let input_as_values = &input.as_standard_layout();
-	let outputs = model.run(inputs!["images" => input_as_values]).unwrap();
+	let outputs = model.run(inputs!["images" => input]?).unwrap();
 	let output = outputs["output0"].extract_tensor::<f32>().unwrap().view().t().into_owned();
 
 	let mut boxes = Vec::new();

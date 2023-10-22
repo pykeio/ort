@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use ndarray::{array, concatenate, s, Array1, Axis, CowArray};
+use ndarray::{array, concatenate, s, Array1, Axis};
 use ort::{
 	download::language::machine_comprehension::GPT2, inputs, CUDAExecutionProviderOptions, Environment, ExecutionProvider, GraphOptimizationLevel,
 	OrtOwnedTensor, OrtResult, SessionBuilder
@@ -33,15 +33,14 @@ fn main() -> OrtResult<()> {
 	let tokens = tokenizer.encode(PROMPT, false).unwrap();
 	let tokens = tokens.get_ids().iter().map(|i| *i as i64).collect::<Vec<_>>();
 
-	let mut tokens = CowArray::from(Array1::from_iter(tokens.iter().cloned()));
+	let mut tokens = Array1::from_iter(tokens.iter().cloned());
 
 	print!("{PROMPT}");
 	stdout.flush().unwrap();
 
 	for _ in 0..GEN_TOKENS {
-		let n_tokens = tokens.shape()[0];
-		let array = tokens.clone().insert_axis(Axis(0)).into_shape((1, 1, n_tokens)).unwrap().into_dyn();
-		let outputs = session.run(inputs![&array]?)?;
+		let array = tokens.view().insert_axis(Axis(0)).insert_axis(Axis(1));
+		let outputs = session.run(inputs![array]?)?;
 		let generated_tokens: OrtOwnedTensor<f32> = outputs["output1"].extract_tensor()?;
 		let generated_tokens = generated_tokens.view();
 
@@ -56,7 +55,7 @@ fn main() -> OrtResult<()> {
 		probabilities.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Less));
 
 		let token = probabilities[rng.gen_range(0..=TOP_K)].0;
-		tokens = CowArray::from(concatenate![Axis(0), tokens, array![token.try_into().unwrap()]]);
+		tokens = concatenate![Axis(0), tokens, array![token.try_into().unwrap()]];
 
 		let token_str = tokenizer.decode(&[token as _], true).unwrap();
 		print!("{}", token_str);

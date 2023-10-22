@@ -35,11 +35,11 @@ fn squeezenet_mushroom() -> OrtResult<()> {
 
 	let class_labels = get_imagenet_labels()?;
 
-	let input0_shape: Vec<usize> = session.inputs[0].map(|d| d.unwrap()).collect();
-	let output0_shape: Vec<usize> = session.outputs[0].map(|d| d.unwrap()).collect();
+	let input0_shape: &Vec<i64> = session.inputs[0].input_type.tensor_dimensions().expect("input0 to be a tensor type");
+	let output0_shape: &Vec<i64> = session.outputs[0].output_type.tensor_dimensions().expect("output0 to be a tensor type");
 
-	assert_eq!(input0_shape, [1, 3, 224, 224]);
-	assert_eq!(output0_shape, [1, 1000]);
+	assert_eq!(input0_shape, &[1, 3, 224, 224]);
+	assert_eq!(output0_shape, &[1, 1000]);
 
 	// Load image and resize to model's shape, converting to RGB format
 	let image_buffer: ImageBuffer<Rgb<u8>, Vec<u8>> = image::open(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join(IMAGE_TO_LOAD))
@@ -55,16 +55,13 @@ fn squeezenet_mushroom() -> OrtResult<()> {
 	// See https://github.com/onnx/models/blob/master/vision/classification/imagenet_inference.ipynb
 	// for pre-processing image.
 	// WARNING: Note order of declaration of arguments: (_,c,j,i)
-	let mut array = ndarray::CowArray::from(
-		ndarray::Array::from_shape_fn((1, 3, 224, 224), |(_, c, j, i)| {
-			let pixel = image_buffer.get_pixel(i as u32, j as u32);
-			let channels = pixel.channels();
+	let mut array = ndarray::Array::from_shape_fn((1, 3, 224, 224), |(_, c, j, i)| {
+		let pixel = image_buffer.get_pixel(i as u32, j as u32);
+		let channels = pixel.channels();
 
-			// range [0, 255] -> range [0, 1]
-			(channels[c] as f32) / 255.0
-		})
-		.into_dyn()
-	);
+		// range [0, 255] -> range [0, 1]
+		(channels[c] as f32) / 255.0
+	});
 
 	// Normalize channels to mean=[0.485, 0.456, 0.406] and std=[0.229, 0.224, 0.225]
 	let mean = [0.485, 0.456, 0.406];
@@ -76,7 +73,7 @@ fn squeezenet_mushroom() -> OrtResult<()> {
 	}
 
 	// Perform the inference
-	let outputs = session.run(inputs![&array]?)?;
+	let outputs = session.run(inputs![array]?)?;
 
 	// Downloaded model does not have a softmax as final layer; call softmax on second axis
 	// and iterate on resulting probabilities, creating an index to later access labels.

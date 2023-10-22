@@ -72,7 +72,7 @@ jobs:
         if: matrix.platform.os == 'ubuntu-latest'
         shell: bash
         run: |
-          apt install pkg-config libfreetype6-dev libexpat1-dev libxcb-composite0-dev libssl-dev libx11-dev libfontconfig1-dev
+          sudo apt-get install pkg-config libfreetype6-dev libexpat1-dev libxcb-composite0-dev libssl-dev libx11-dev libfontconfig1-dev
       - name: Build/test
         uses: houseabsolute/actions-rust-cross@v0
         with:

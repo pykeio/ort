@@ -56,13 +56,15 @@ pub use self::{input::SessionInputs, output::SessionOutputs};
 /// # }
 /// ```
 pub struct SessionBuilder {
-	env: Arc<Environment>,
 	session_options_ptr: *mut ort_sys::OrtSessionOptions,
 
 	allocator: AllocatorType,
 	memory_type: MemType,
 	custom_runtime_handles: Vec<*mut std::os::raw::c_void>,
-	execution_providers: Vec<ExecutionProvider>
+	execution_providers: Vec<ExecutionProvider>,
+
+	// env must be last to drop it after everything else
+	env: Arc<Environment>
 }
 
 impl fmt::Debug for SessionBuilder {
@@ -571,11 +573,12 @@ impl SessionBuilder {
 /// session keep their memory alive until all references to the session are dropped.
 #[derive(Debug)]
 pub struct SharedSessionInner {
-	// hold onto an environment arc to ensure the environment also stays alive
-	#[allow(dead_code)]
-	env: Arc<Environment>,
 	pub(crate) session_ptr: *mut ort_sys::OrtSession,
-	allocator: Allocator
+	allocator: Allocator,
+	// hold onto an environment arc to ensure the environment also stays alive
+	// env must be last to drop it after everything else
+	#[allow(dead_code)]
+	env: Arc<Environment>
 }
 
 unsafe impl Send for SharedSessionInner {}

@@ -60,13 +60,15 @@ use crate::{io_binding::IoBinding, value::Value};
 /// # }
 /// ```
 pub struct SessionBuilder {
-	env: Arc<Environment>,
 	session_options_ptr: *mut sys::OrtSessionOptions,
 
 	allocator: AllocatorType,
 	memory_type: MemType,
 	custom_runtime_handles: Vec<*mut std::os::raw::c_void>,
-	execution_providers: Vec<ExecutionProvider>
+	execution_providers: Vec<ExecutionProvider>,
+
+	// env must be last to drop it after everything else
+	env: Arc<Environment>
 }
 
 impl Debug for SessionBuilder {
@@ -566,14 +568,16 @@ impl Drop for SessionPointerHolder {
 /// Type storing the session information, built from an [`Environment`](crate::environment::Environment)
 #[derive(Debug)]
 pub struct Session {
-	#[allow(dead_code)]
-	env: Arc<Environment>,
 	pub(crate) session_ptr: Arc<SessionPointerHolder>,
 	allocator_ptr: *mut sys::OrtAllocator,
 	/// Information about the ONNX's inputs as stored in loaded file
 	pub inputs: Vec<Input>,
 	/// Information about the ONNX's outputs as stored in loaded file
-	pub outputs: Vec<Output>
+	pub outputs: Vec<Output>,
+
+	// env must be last to drop it after everything else
+	#[allow(dead_code)]
+	env: Arc<Environment>
 }
 
 /// A [`Session`] with data stored in-memory.

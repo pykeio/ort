@@ -84,13 +84,19 @@ impl<'s> IoBinding<'s> {
 			nonNull(names_ptr)
 		];
 		if count > 0 {
-			let lengths = unsafe { std::slice::from_raw_parts(lengths_ptr, count).to_vec() };
-			let output_names = unsafe { ManuallyDrop::new(String::from_raw_parts(names_ptr as *mut u8, lengths.iter().sum(), lengths.iter().sum())) };
+			let lengths = unsafe { std::slice::from_raw_parts(lengths_ptr, count as _).to_vec() };
+			let output_names = unsafe {
+				ManuallyDrop::new(String::from_raw_parts(
+					names_ptr as *mut u8,
+					lengths.iter().sum::<ort_sys::size_t>(),
+					lengths.iter().sum::<ort_sys::size_t>()
+				))
+			};
 			let mut output_names_chars = output_names.chars();
 
 			let output_names = lengths
 				.into_iter()
-				.map(|length| output_names_chars.by_ref().take(length).collect::<String>())
+				.map(|length| output_names_chars.by_ref().take(length as _).collect::<String>())
 				.collect::<Vec<_>>();
 
 			ortfree![unsafe self.session.allocator().ptr, names_ptr as *mut c_void];
@@ -99,7 +105,7 @@ impl<'s> IoBinding<'s> {
 			let mut output_values_ptr: *mut *mut ort_sys::OrtValue = ptr::null_mut();
 			ortsys![unsafe GetBoundOutputValues(self.ptr, self.session.allocator().ptr, &mut output_values_ptr, &mut count) -> OrtError::GetBoundOutputs; nonNull(output_values_ptr)];
 
-			let output_values_ptr = unsafe { std::slice::from_raw_parts(output_values_ptr, count).to_vec() }
+			let output_values_ptr = unsafe { std::slice::from_raw_parts(output_values_ptr, count as _).to_vec() }
 				.into_iter()
 				.map(|v| unsafe { Value::from_raw(v, Arc::clone(&self.session.inner)) });
 

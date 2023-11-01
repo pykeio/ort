@@ -276,7 +276,8 @@ pub struct ROCmExecutionProviderOptions {
 	pub user_compute_stream: Option<*mut c_void>,
 	pub default_memory_arena_cfg: Option<*mut ort_sys::OrtArenaCfg>,
 	pub tunable_op_enable: bool,
-	pub tunable_op_tuning_enable: bool
+	pub tunable_op_tuning_enable: bool,
+	pub tunable_op_max_tuning_duration_ms: i32
 }
 
 impl Default for ROCmExecutionProviderOptions {
@@ -290,7 +291,8 @@ impl Default for ROCmExecutionProviderOptions {
 			user_compute_stream: None,
 			default_memory_arena_cfg: None,
 			tunable_op_enable: false,
-			tunable_op_tuning_enable: false
+			tunable_op_tuning_enable: false,
+			tunable_op_max_tuning_duration_ms: 0
 		}
 	}
 }
@@ -628,6 +630,7 @@ impl ExecutionProvider {
 					trt_context_memory_sharing_enable = bool_as_int(options.enable_context_memory_sharing),
 					trt_layer_norm_fp32_fallback = bool_as_int(options.layer_norm_fp32_fallback),
 					trt_timing_cache_enable = bool_as_int(options.timing_cache_enable),
+					// https://github.com/microsoft/onnxruntime/pull/17956
 					trt_force_timing_cache = bool_as_int(options.force_timing_cache),
 					trt_detailed_build_log = bool_as_int(options.detailed_build_log),
 					trt_build_heuristics_enable = bool_as_int(options.enable_build_heuristics),
@@ -701,7 +704,8 @@ impl ExecutionProvider {
 					user_compute_stream: options.user_compute_stream.unwrap_or_else(ptr::null_mut),
 					default_memory_arena_cfg: options.default_memory_arena_cfg.unwrap_or_else(ptr::null_mut),
 					tunable_op_enable: bool_as_int_req(options.tunable_op_enable),
-					tunable_op_tuning_enable: bool_as_int_req(options.tunable_op_tuning_enable)
+					tunable_op_tuning_enable: bool_as_int_req(options.tunable_op_tuning_enable),
+					tunable_op_max_tuning_duration_ms: options.tunable_op_max_tuning_duration_ms
 				};
 				status_to_result(ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(session_options, &rocm_options as *const _)])
 					.map_err(OrtError::ExecutionProvider)?;

@@ -16,7 +16,7 @@ authors = [
 include = [ "src/", "build.rs", "LICENSE" ]
 
 [features]
-default = [ "download-binaries", "copy-dylibs" ]
+default = []
 download-binaries = [ "ureq", "zip" ]
 load-dynamic = []
 copy-dylibs = []

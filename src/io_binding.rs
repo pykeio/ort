@@ -70,7 +70,7 @@ impl<'s> IoBinding<'s> {
 
 	pub fn outputs(&self) -> Result<SessionOutputs> {
 		let mut names_ptr: *mut c_char = ptr::null_mut();
-		let mut lengths_ptr: *mut usize = ptr::null_mut();
+		let mut lengths_ptr: *mut ort_sys::size_t = ptr::null_mut();
 		let mut count = 0;
 
 		ortsys![
@@ -88,8 +88,8 @@ impl<'s> IoBinding<'s> {
 			let output_names = unsafe {
 				ManuallyDrop::new(String::from_raw_parts(
 					names_ptr as *mut u8,
-					lengths.iter().sum::<ort_sys::size_t>(),
-					lengths.iter().sum::<ort_sys::size_t>()
+					lengths.iter().sum::<ort_sys::size_t>() as _,
+					lengths.iter().sum::<ort_sys::size_t>() as _
 				))
 			};
 			let mut output_names_chars = output_names.chars();

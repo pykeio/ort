@@ -13,15 +13,7 @@ const ORT_VERSION: &str = "1.16.0";
 const ORT_RELEASE_BASE_URL: &str = "https://github.com/microsoft/onnxruntime/releases/download";
 const ORT_ENV_STRATEGY: &str = "ORT_STRATEGY";
 const ORT_ENV_SYSTEM_LIB_LOCATION: &str = "ORT_LIB_LOCATION";
-const ORT_ENV_CMAKE_TOOLCHAIN: &str = "ORT_CMAKE_TOOLCHAIN";
-const ORT_ENV_CMAKE_PROGRAM: &str = "ORT_CMAKE_PROGRAM";
-const ORT_ENV_PYTHON_PROGRAM: &str = "ORT_PYTHON_PROGRAM";
 const ORT_EXTRACT_DIR: &str = "onnxruntime";
-const ORT_GIT_DIR: &str = "onnxruntime";
-const ORT_GIT_REPO: &str = "https://github.com/microsoft/onnxruntime";
-const PROTOBUF_EXTRACT_DIR: &str = "protobuf";
-const PROTOBUF_VERSION: &str = "3.18.1";
-const PROTOBUF_RELEASE_BASE_URL: &str = "https://github.com/protocolbuffers/protobuf/releases/download";
 
 macro_rules! incompatible_providers {
 	($($provider:ident),*) => {
@@ -197,30 +189,6 @@ fn prebuilt_onnx_url() -> (PathBuf, String) {
 
 	let prebuilt_archive = format!("onnxruntime-{}-{}.{}", triplet.as_onnx_str(), ORT_VERSION, triplet.os.archive_extension());
 	let prebuilt_url = format!("{ORT_RELEASE_BASE_URL}/v{ORT_VERSION}/{prebuilt_archive}");
-
-	(PathBuf::from(prebuilt_archive), prebuilt_url)
-}
-
-fn prebuilt_protoc_url() -> (PathBuf, String) {
-	let host_platform = if cfg!(target_os = "windows") {
-		std::string::String::from("win32")
-	} else if cfg!(target_os = "macos") {
-		format!(
-			"osx-{}",
-			if cfg!(target_arch = "x86_64") {
-				"x86_64"
-			} else if cfg!(target_arch = "x86") {
-				"x86"
-			} else {
-				panic!("protoc does not have prebuilt binaries for darwin arm64 yet")
-			}
-		)
-	} else {
-		format!("linux-{}", if cfg!(target_arch = "x86_64") { "x86_64" } else { "x86_32" })
-	};
-
-	let prebuilt_archive = format!("protoc-{PROTOBUF_VERSION}-{host_platform}.zip");
-	let prebuilt_url = format!("{PROTOBUF_RELEASE_BASE_URL}/v{PROTOBUF_VERSION}/{prebuilt_archive}");
 
 	(PathBuf::from(prebuilt_archive), prebuilt_url)
 }
@@ -516,166 +484,6 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 			(PathBuf::default(), false)
 		}
 		"system" => system_strategy(),
-		"compile" => {
-			use std::process::Command;
-
-			let target = env::var("TARGET").unwrap();
-			let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-
-			let python = env::var("PYTHON").unwrap_or_else(|_| "python".to_string());
-
-			Command::new("git")
-				.args([
-					"clone",
-					"--depth",
-					"1",
-					"--single-branch",
-					"--branch",
-					&format!("v{ORT_VERSION}"),
-					"--shallow-submodules",
-					"--recursive",
-					ORT_GIT_REPO,
-					ORT_GIT_DIR
-				])
-				.current_dir(&out_dir)
-				.stdout(Stdio::null())
-				.stderr(Stdio::null())
-				.status()
-				.expect("failed to clone ORT repo");
-
-			let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-			let _cmake_toolchain = env::var(ORT_ENV_CMAKE_TOOLCHAIN).map_or_else(
-				|_| {
-					if cfg!(target_os = "linux") && target.contains("aarch64") && target.contains("linux") {
-						root.join("toolchains").join("default-aarch64-linux-gnu.cmake")
-					} else if cfg!(target_os = "linux") && target.contains("aarch64") && target.contains("windows") {
-						root.join("toolchains").join("default-aarch64-w64-mingw32.cmake")
-					} else if cfg!(target_os = "linux") && target.contains("x86_64") && target.contains("windows") {
-						root.join("toolchains").join("default-x86_64-w64-mingw32.cmake")
-					} else {
-						PathBuf::default()
-					}
-				},
-				PathBuf::from
-			);
-
-			let mut command = Command::new(python);
-			command
-				.current_dir(&out_dir.join(ORT_GIT_DIR))
-				.stdout(Stdio::null())
-				.stderr(Stdio::inherit());
-
-			// note: --parallel will probably break something... parallel build *while* doing another parallel build (cargo)?
-			let mut build_args = vec!["tools/ci_build/build.py", "--build", "--update", "--parallel", "--skip_tests", "--skip_submodule_sync"];
-			let config = if cfg!(debug_assertions) {
-				"Debug"
-			} else if cfg!(feature = "minimal-build") {
-				"MinSizeRel"
-			} else {
-				"Release"
-			};
-			build_args.push("--config");
-			build_args.push(config);
-
-			if cfg!(feature = "minimal-build") {
-				build_args.push("--disable_exceptions");
-			}
-
-			build_args.push("--disable_rtti");
-
-			if target.contains("windows") {
-				build_args.push("--disable_memleak_checker");
-			}
-
-			if !cfg!(feature = "compile-static") {
-				build_args.push("--build_shared_lib");
-			} else {
-				build_args.push("--enable_msvc_static_runtime");
-			}
-
-			// onnxruntime will still build tests when --skip_tests is enabled, this filters out most of them
-			// this "fixes" compilation on alpine: https://github.com/microsoft/onnxruntime/issues/9155
-			// but causes other compilation errors: https://github.com/microsoft/onnxruntime/issues/7571
-			// build_args.push("--cmake_extra_defines");
-			// build_args.push("onnxruntime_BUILD_UNIT_TESTS=0");
-
-			#[cfg(windows)]
-			{
-				use vswhom::VsFindResult;
-				let vs_find_result = VsFindResult::search();
-				match vs_find_result {
-					Some(VsFindResult { vs_exe_path: Some(vs_exe_path), .. }) => {
-						let vs_exe_path = vs_exe_path.to_string_lossy();
-						// the one sane thing about visual studio is that the version numbers are somewhat predictable...
-						if vs_exe_path.contains("14.1") {
-							build_args.push("--cmake_generator=Visual Studio 15 2017");
-						} else if vs_exe_path.contains("14.2") {
-							build_args.push("--cmake_generator=Visual Studio 16 2019");
-						} else if vs_exe_path.contains("14.3") {
-							build_args.push("--cmake_generator=Visual Studio 17 2022");
-						}
-					}
-					Some(VsFindResult { vs_exe_path: None, .. }) | None => panic!("[ort] unable to find Visual Studio installation")
-				};
-			}
-
-			build_args.push("--build_dir=build");
-			command.args(build_args);
-
-			let code = command.status().expect("failed to run build script");
-			assert!(code.success(), "failed to build ONNX Runtime");
-
-			let lib_dir = out_dir.join(ORT_GIT_DIR).join("build").join(config);
-			let lib_dir = if cfg!(target_os = "windows") { lib_dir.join(config) } else { lib_dir };
-			for lib in &["common", "flatbuffers", "framework", "graph", "mlas", "optimizer", "providers", "session", "util"] {
-				let lib_path = lib_dir.join(if cfg!(target_os = "windows") {
-					format!("onnxruntime_{lib}.lib")
-				} else {
-					format!("libonnxruntime_{lib}.a")
-				});
-				// sanity check, just make sure the library exists before we try to link to it
-				if lib_path.exists() {
-					println!("cargo:rustc-link-lib=static=onnxruntime_{lib}");
-				} else {
-					panic!("[ort] unable to find ONNX Runtime library: {}", lib_path.display());
-				}
-			}
-
-			println!("cargo:rustc-link-search=native={}", lib_dir.display());
-
-			let external_lib_dir = lib_dir.join("external");
-			println!("cargo:rustc-link-search=native={}", external_lib_dir.join("protobuf").join("cmake").display());
-			println!("cargo:rustc-link-lib=static=protobuf-lited");
-
-			println!("cargo:rustc-link-search=native={}", external_lib_dir.join("onnx").display());
-			println!("cargo:rustc-link-lib=static=onnx");
-			println!("cargo:rustc-link-lib=static=onnx_proto");
-
-			println!("cargo:rustc-link-search=native={}", external_lib_dir.join("nsync").display());
-			println!("cargo:rustc-link-lib=static=nsync_cpp");
-
-			println!("cargo:rustc-link-search=native={}", external_lib_dir.join("re2").display());
-			println!("cargo:rustc-link-lib=static=re2");
-
-			println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil-cpp").join("absl").join("base").display());
-			println!("cargo:rustc-link-lib=static=absl_base");
-			println!("cargo:rustc-link-lib=static=absl_throw_delegate");
-			println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil-cpp").join("absl").join("hash").display());
-			println!("cargo:rustc-link-lib=static=absl_hash");
-			println!("cargo:rustc-link-lib=static=absl_low_level_hash");
-			println!("cargo:rustc-link-search=native={}", external_lib_dir.join("abseil-cpp").join("absl").join("container").display());
-			println!("cargo:rustc-link-lib=static=absl_raw_hash_set");
-
-			if cfg!(target_os = "macos") {
-				println!("cargo:rustc-link-lib=framework=Foundation");
-			}
-
-			println!("cargo:rustc-link-lib=onnxruntime_providers_shared");
-			#[cfg(feature = "rocm")]
-			println!("cargo:rustc-link-lib=onnxruntime_providers_rocm");
-
-			(out_dir, false)
-		}
 		_ => panic!("[ort] unknown strategy: {} (valid options are `download` or `system`)", strategy.unwrap_or_else(|_| "unknown".to_string()))
 	}
 }

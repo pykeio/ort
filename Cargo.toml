@@ -47,11 +47,6 @@ download-binaries = [ "ort-sys/download-binaries" ]
 load-dynamic = [ "libloading", "ort-sys/load-dynamic" ]
 copy-dylibs = [ "ort-sys/copy-dylibs" ]
 
-minimal-build = [ "ort-sys/minimal-build" ]
-experimental = []
-mimalloc = []
-compile-static = [ "ort-sys/compile-static" ]
-
 cuda = [ "ort-sys/cuda" ]
 tensorrt = [ "ort-sys/tensorrt" ]
 openvino = []

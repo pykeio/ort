@@ -1,7 +1,7 @@
 use std::ffi::{c_char, c_int, CString};
 
 use super::{
-	error::{OrtError, OrtResult},
+	error::{Error, Result},
 	ortsys, AllocatorType, MemType
 };
 use crate::{char_p_to_string, error::status_to_result};
@@ -87,10 +87,10 @@ pub struct MemoryInfo {
 
 impl MemoryInfo {
 	#[tracing::instrument]
-	pub fn new_cpu(allocator: AllocatorType, memory_type: MemType) -> OrtResult<Self> {
+	pub fn new_cpu(allocator: AllocatorType, memory_type: MemType) -> Result<Self> {
 		let mut memory_info_ptr: *mut ort_sys::OrtMemoryInfo = std::ptr::null_mut();
 		ortsys![
-			unsafe CreateCpuMemoryInfo(allocator.into(), memory_type.into(), &mut memory_info_ptr) -> OrtError::CreateMemoryInfo;
+			unsafe CreateCpuMemoryInfo(allocator.into(), memory_type.into(), &mut memory_info_ptr) -> Error::CreateMemoryInfo;
 			nonNull(memory_info_ptr)
 		];
 		Ok(Self {
@@ -100,12 +100,12 @@ impl MemoryInfo {
 	}
 
 	#[tracing::instrument]
-	pub fn new(allocation_device: AllocationDevice, device_id: c_int, allocator_type: AllocatorType, memory_type: MemType) -> OrtResult<Self> {
+	pub fn new(allocation_device: AllocationDevice, device_id: c_int, allocator_type: AllocatorType, memory_type: MemType) -> Result<Self> {
 		let mut memory_info_ptr: *mut ort_sys::OrtMemoryInfo = std::ptr::null_mut();
 		let allocator_name = CString::new(allocation_device.as_str()).unwrap();
 		ortsys![
 			unsafe CreateMemoryInfo(allocator_name.as_ptr(), allocator_type.into(), device_id, memory_type.into(), &mut memory_info_ptr)
-				-> OrtError::CreateMemoryInfo;
+				-> Error::CreateMemoryInfo;
 			nonNull(memory_info_ptr)
 		];
 		Ok(Self {
@@ -115,13 +115,13 @@ impl MemoryInfo {
 	}
 
 	/// Returns the [`AllocationDevice`] this memory info
-	pub fn allocation_device(&self) -> OrtResult<AllocationDevice> {
+	pub fn allocation_device(&self) -> Result<AllocationDevice> {
 		let mut name_ptr: *const c_char = std::ptr::null_mut();
-		ortsys![unsafe MemoryInfoGetName(self.ptr, &mut name_ptr) -> OrtError::GetAllocationDevice; nonNull(name_ptr)];
+		ortsys![unsafe MemoryInfoGetName(self.ptr, &mut name_ptr) -> Error::GetAllocationDevice; nonNull(name_ptr)];
 		// no need to free: "Do NOT free the returned pointer. It is valid for the lifetime of the OrtMemoryInfo"
 
 		let name: String = char_p_to_string(name_ptr)?;
-		AllocationDevice::try_from(name.as_str()).map_err(OrtError::UnknownAllocationDevice)
+		AllocationDevice::try_from(name.as_str()).map_err(Error::UnknownAllocationDevice)
 	}
 }
 

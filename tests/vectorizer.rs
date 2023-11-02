@@ -1,12 +1,12 @@
 use std::path::Path;
 
 use ndarray::{ArrayD, IxDyn};
-use ort::{inputs, Environment, GraphOptimizationLevel, OrtResult, SessionBuilder, Value};
+use ort::{inputs, Environment, GraphOptimizationLevel, SessionBuilder, Value};
 use test_log::test;
 
 #[test]
 #[cfg(not(target_arch = "aarch64"))]
-fn vectorizer() -> OrtResult<()> {
+fn vectorizer() -> ort::Result<()> {
 	let environment = Environment::default().into_arc();
 
 	let session = SessionBuilder::new(&environment)?

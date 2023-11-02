@@ -38,7 +38,7 @@ The `ort::inputs!` macro will painlessly convert compatible data types (see abov
 +let chunk_embeddings = text_encoder.run(ort::inputs![text_input_chunk]?)?;
 ```
 
-Note the `?` after the macro call - `ort::inputs!` returns an `OrtResult<SessionInputs>`, so you'll need to handle any errors accordingly.
+Note the `?` after the macro call - `ort::inputs!` returns an `ort::Result<SessionInputs>`, so you'll need to handle any errors accordingly.
 
 As mentioned, you can now also specify inputs by name using a map-like syntax. This is especially useful for graphs with optional inputs.
 ```rust
@@ -96,3 +96,10 @@ Just like how inputs can now be specified by name, you can now retrieve session 
 ```rust
 let l = outputs["latents"].extract_tensor::<f32>()?;
 ```
+
+## Renamed types
+The following types have been renamed with no other changes.
+- `NdArrayExtensions` -> `ArrayExtensions`
+- `OrtOwnedTensor` -> `Tensor`
+- `OrtResult`, `OrtError` -> `ort::Result`, `ort::Error`
+- `TensorDataToType` -> `ExtractTensorData`

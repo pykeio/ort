@@ -8,7 +8,7 @@ use tracing::{debug, error, warn};
 
 use super::{
 	custom_logger,
-	error::{status_to_result, OrtError, OrtResult},
+	error::{status_to_result, Error, Result},
 	ort, ortsys, ExecutionProvider, LoggingLevel
 };
 
@@ -110,7 +110,7 @@ impl Default for Environment {
 			status_to_result(
 				ortsys![unsafe CreateEnvWithCustomLogger(logging_function, logger_param, LoggingLevel::Warning.into(), cname.as_ptr(), &mut env_ptr); nonNull(env_ptr)]
 			)
-			.map_err(OrtError::CreateEnvironment)
+			.map_err(Error::CreateEnvironment)
 			.unwrap();
 
 			debug!(env_ptr = format!("{:?}", env_ptr).as_str(), "Environment created");
@@ -263,7 +263,7 @@ impl EnvironmentBuilder {
 	}
 
 	/// Commit the configuration to a new [`Environment`].
-	pub fn build(self) -> OrtResult<Environment> {
+	pub fn build(self) -> Result<Environment> {
 		// NOTE: Because 'G_ENV' is a `Lazy`, locking it will, initially, create
 		//      a new Arc<Mutex<EnvironmentSingleton>> with a strong count of 1.
 		//      Cloning it to embed it inside the 'Environment' to return
@@ -280,22 +280,22 @@ impl EnvironmentBuilder {
 				let cname = CString::new(self.name.clone()).unwrap();
 
 				let mut thread_options: *mut ort_sys::OrtThreadingOptions = std::ptr::null_mut();
-				ortsys![unsafe CreateThreadingOptions(&mut thread_options) -> OrtError::CreateEnvironment; nonNull(thread_options)];
+				ortsys![unsafe CreateThreadingOptions(&mut thread_options) -> Error::CreateEnvironment; nonNull(thread_options)];
 				if let Some(inter_op_parallelism) = global_thread_pool.inter_op_parallelism {
-					ortsys![unsafe SetGlobalInterOpNumThreads(thread_options, inter_op_parallelism) -> OrtError::CreateEnvironment];
+					ortsys![unsafe SetGlobalInterOpNumThreads(thread_options, inter_op_parallelism) -> Error::CreateEnvironment];
 				}
 				if let Some(intra_op_parallelism) = global_thread_pool.intra_op_parallelism {
-					ortsys![unsafe SetGlobalIntraOpNumThreads(thread_options, intra_op_parallelism) -> OrtError::CreateEnvironment];
+					ortsys![unsafe SetGlobalIntraOpNumThreads(thread_options, intra_op_parallelism) -> Error::CreateEnvironment];
 				}
 				if let Some(spin_control) = global_thread_pool.spin_control {
-					ortsys![unsafe SetGlobalSpinControl(thread_options, if spin_control { 1 } else { 0 }) -> OrtError::CreateEnvironment];
+					ortsys![unsafe SetGlobalSpinControl(thread_options, if spin_control { 1 } else { 0 }) -> Error::CreateEnvironment];
 				}
 				if let Some(intra_op_thread_affinity) = global_thread_pool.intra_op_thread_affinity {
 					let cstr = CString::new(intra_op_thread_affinity).unwrap();
-					ortsys![unsafe SetGlobalIntraOpThreadAffinity(thread_options, cstr.as_ptr()) -> OrtError::CreateEnvironment];
+					ortsys![unsafe SetGlobalIntraOpThreadAffinity(thread_options, cstr.as_ptr()) -> Error::CreateEnvironment];
 				}
 
-				ortsys![unsafe CreateEnvWithCustomLoggerAndGlobalThreadPools(logging_function, logger_param, self.log_level.into(), cname.as_ptr(), thread_options, &mut env_ptr) -> OrtError::CreateEnvironment; nonNull(env_ptr)];
+				ortsys![unsafe CreateEnvWithCustomLoggerAndGlobalThreadPools(logging_function, logger_param, self.log_level.into(), cname.as_ptr(), thread_options, &mut env_ptr) -> Error::CreateEnvironment; nonNull(env_ptr)];
 				ortsys![unsafe ReleaseThreadingOptions(thread_options)];
 				env_ptr
 			} else {
@@ -304,7 +304,7 @@ impl EnvironmentBuilder {
 				// FIXME: What should go here?
 				let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
 				let cname = CString::new(self.name.clone()).unwrap();
-				ortsys![unsafe CreateEnvWithCustomLogger(logging_function, logger_param, self.log_level.into(), cname.as_ptr(), &mut env_ptr) -> OrtError::CreateEnvironment; nonNull(env_ptr)];
+				ortsys![unsafe CreateEnvWithCustomLogger(logging_function, logger_param, self.log_level.into(), cname.as_ptr(), &mut env_ptr) -> Error::CreateEnvironment; nonNull(env_ptr)];
 				env_ptr
 			};
 			debug!(env_ptr = format!("{:?}", env_ptr).as_str(), "Environment created");

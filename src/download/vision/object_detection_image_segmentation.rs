@@ -51,7 +51,7 @@ pub enum ObjectDetectionImageSegmentation {
 }
 
 impl ModelUrl for ObjectDetectionImageSegmentation {
-	fn fetch_url(&self) -> &'static str {
+	fn model_url(&self) -> &'static str {
 		match self {
 			ObjectDetectionImageSegmentation::TinyYoloV2 => {
 				"https://github.com/onnx/models/raw/main/vision/object_detection_segmentation/tiny-yolov2/model/tinyyolov2-8.onnx"

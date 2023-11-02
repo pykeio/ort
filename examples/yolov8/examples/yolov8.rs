@@ -4,7 +4,7 @@ use std::{path::PathBuf, time::Duration};
 
 use image::{imageops::FilterType, GenericImageView};
 use ndarray::{s, Array, Axis};
-use ort::{inputs, Environment, OrtResult, SessionBuilder};
+use ort::{inputs, Environment, SessionBuilder};
 use raqote::{DrawOptions, DrawTarget, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle};
 use show_image::{event, AsImageView, WindowOptions};
 
@@ -68,7 +68,7 @@ fn download_model(download_dir: PathBuf) -> PathBuf {
 }
 
 #[show_image::main]
-fn main() -> OrtResult<()> {
+fn main() -> ort::Result<()> {
 	tracing_subscriber::fmt::init();
 
 	let original_img = image::open("tests/data/baseball.jpg").unwrap();

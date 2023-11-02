@@ -7,9 +7,26 @@ use crate::{
 	memory::{Allocator, MemoryInfo},
 	ortsys,
 	session::SharedSessionInner,
-	tensor::{IntoTensorElementDataType, OrtOwnedTensor, TensorDataToType, TensorElementDataType, Utf8Data},
-	AllocatorType, MemType, OrtError, OrtResult
+	tensor::{ExtractTensorData, IntoTensorElementDataType, Tensor, TensorElementDataType, Utf8Data},
+	AllocatorType, Error, MemType, Result
 };
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum ValueType {
+	Tensor { ty: TensorElementDataType, dimensions: Vec<i64> },
+	Sequence(Box<ValueType>),
+	Map { key: TensorElementDataType, value: TensorElementDataType }
+}
+
+impl ValueType {
+	/// Returns the dimensions of this data type if it is a tensor, or `None` if it is a sequence or map.
+	pub fn tensor_dimensions(&self) -> Option<&Vec<i64>> {
+		match self {
+			ValueType::Tensor { dimensions, .. } => Some(dimensions),
+			_ => None
+		}
+	}
+}
 
 #[doc(hidden)]
 #[derive(Debug)]
@@ -91,7 +108,6 @@ pub struct Value {
 }
 
 unsafe impl Send for Value {}
-unsafe impl Sync for Value {}
 
 impl Value {
 	/// Construct a [`Value`] from a C++ [`ort_sys::OrtValue`] pointer.
@@ -108,27 +124,27 @@ impl Value {
 	/// Attempt to extract the underlying data into a Rust `ndarray`.
 	///
 	/// The resulting array will be wrapped within an [`OrtOwnedTensor`].
-	pub fn extract_tensor<T>(&self) -> OrtResult<OrtOwnedTensor<'_, T>>
+	pub fn extract_tensor<T>(&self) -> Result<Tensor<'_, T>>
 	where
-		T: TensorDataToType + Clone + Debug
+		T: ExtractTensorData + Clone + Debug
 	{
 		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> OrtError::GetTensorTypeAndShape];
+		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
 
 		let res = {
 			let mut num_dims = 0;
-			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> OrtError::GetDimensionsCount];
+			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
 
 			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> OrtError::GetDimensions];
+			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
 			let shape = IxDyn(&node_dims.iter().map(|&n| n as usize).collect::<Vec<_>>());
 
 			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> OrtError::GetTensorElementType];
+			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
 			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 			let data_type: TensorElementDataType = type_sys.into();
 			if data_type != T::tensor_element_data_type() {
-				Err(OrtError::DataTypeMismatch {
+				Err(Error::DataTypeMismatch {
 					actual: data_type,
 					requested: T::tensor_element_data_type()
 				})
@@ -138,14 +154,14 @@ impl Value {
 				assert_ne!(self.ptr(), ptr::null_mut());
 
 				let mut is_tensor = 0;
-				ortsys![unsafe IsTensor(self.ptr(), &mut is_tensor) -> OrtError::FailedTensorCheck];
+				ortsys![unsafe IsTensor(self.ptr(), &mut is_tensor) -> Error::FailedTensorCheck];
 				assert_eq!(is_tensor, 1);
 
 				let mut len = 0;
-				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> OrtError::GetTensorShapeElementCount];
+				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
 
-				let data = T::extract_data(shape, len as _, self.ptr())?;
-				Ok(OrtOwnedTensor { data })
+				let data = T::extract_tensor_array(shape, len as _, self.ptr())?;
+				Ok(Tensor { data })
 			}
 		};
 		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
@@ -164,13 +180,13 @@ impl Value {
 	/// Construct a [`Value`] from a Rust-owned array.
 	///
 	/// `allocator` is required to be `Some` when converting a String tensor. See [`crate::Session::allocator`].
-	pub fn from_array<T: IntoTensorElementDataType + Debug + Clone + 'static>(input: impl OrtInput<Item = T>) -> OrtResult<Value> {
+	pub fn from_array<T: IntoTensorElementDataType + Debug + Clone + 'static>(input: impl OrtInput<Item = T>) -> Result<Value> {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemType::Default)?;
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 		let value_ptr_ptr: *mut *mut ort_sys::OrtValue = &mut value_ptr;
 
-		let guard = match T::tensor_element_data_type() {
+		let guard = match T::into_tensor_element_data_type() {
 			TensorElementDataType::Float32
 			| TensorElementDataType::Uint8
 			| TensorElementDataType::Int8
@@ -198,14 +214,14 @@ impl Value {
 						(ptr_len * std::mem::size_of::<T>()) as _,
 						shape_ptr,
 						shape_len as _,
-						T::tensor_element_data_type().into(),
+						T::into_tensor_element_data_type().into(),
 						value_ptr_ptr
-					) -> OrtError::CreateTensorWithData;
+					) -> Error::CreateTensorWithData;
 					nonNull(value_ptr)
 				];
 
 				let mut is_tensor = 0;
-				ortsys![unsafe IsTensor(value_ptr, &mut is_tensor) -> OrtError::FailedTensorCheck];
+				ortsys![unsafe IsTensor(value_ptr, &mut is_tensor) -> Error::FailedTensorCheck];
 				assert_eq!(is_tensor, 1);
 				guard
 			}
@@ -226,14 +242,14 @@ impl Value {
 						(ptr_len * std::mem::size_of::<T>()) as _,
 						shape_ptr,
 						shape_len as _,
-						T::tensor_element_data_type().into(),
+						T::into_tensor_element_data_type().into(),
 						value_ptr_ptr
-					) -> OrtError::CreateTensorWithData;
+					) -> Error::CreateTensorWithData;
 					nonNull(value_ptr)
 				];
 
 				let mut is_tensor = 0;
-				ortsys![unsafe IsTensor(value_ptr, &mut is_tensor) -> OrtError::FailedTensorCheck];
+				ortsys![unsafe IsTensor(value_ptr, &mut is_tensor) -> Error::FailedTensorCheck];
 				assert_eq!(is_tensor, 1);
 				guard
 			}
@@ -254,7 +270,7 @@ impl Value {
 	/// Construct a [`Value`] from a Rust-owned [`CowArray`].
 	///
 	/// `allocator` is required to be `Some` when converting a String tensor. See [`crate::Session::allocator`].
-	pub fn from_string_array<T: Utf8Data + Debug + Clone + 'static>(allocator: &Allocator, input: impl OrtInput<Item = T>) -> OrtResult<Value> {
+	pub fn from_string_array<T: Utf8Data + Debug + Clone + 'static>(allocator: &Allocator, input: impl OrtInput<Item = T>) -> Result<Value> {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemType::Default)?;
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
@@ -267,22 +283,22 @@ impl Value {
 		// create tensor without data -- data is filled in later
 		ortsys![
 			unsafe CreateTensorAsOrtValue(allocator.ptr, shape_ptr, shape_len as _, TensorElementDataType::String.into(), value_ptr_ptr)
-				-> OrtError::CreateTensor
+				-> Error::CreateTensor
 		];
 
 		// create null-terminated copies of each string, as per `FillStringTensor` docs
 		let null_terminated_copies: Vec<ffi::CString> = data
 			.iter()
 			.map(|elt| {
-				let slice = elt.utf8_bytes();
+				let slice = elt.as_utf8_bytes();
 				ffi::CString::new(slice)
 			})
 			.collect::<Result<Vec<_>, _>>()
-			.map_err(OrtError::FfiStringNull)?;
+			.map_err(Error::FfiStringNull)?;
 
 		let string_pointers = null_terminated_copies.iter().map(|cstring| cstring.as_ptr()).collect::<Vec<_>>();
 
-		ortsys![unsafe FillStringTensor(value_ptr, string_pointers.as_ptr(), string_pointers.len() as _) -> OrtError::FillStringTensor];
+		ortsys![unsafe FillStringTensor(value_ptr, string_pointers.as_ptr(), string_pointers.len() as _) -> Error::FillStringTensor];
 
 		assert_non_null_pointer(value_ptr, "Value")?;
 
@@ -303,9 +319,9 @@ impl Value {
 	}
 
 	/// Returns `true` if this value is a tensor, or false if it is another type (sequence, map)
-	pub fn is_tensor(&self) -> OrtResult<bool> {
+	pub fn is_tensor(&self) -> Result<bool> {
 		let mut result = 0;
-		ortsys![unsafe IsTensor(self.ptr(), &mut result) -> OrtError::GetTensorElementType];
+		ortsys![unsafe IsTensor(self.ptr(), &mut result) -> Error::GetTensorElementType];
 		Ok(result == 1)
 	}
 }
@@ -433,28 +449,28 @@ impl<'i, 'v, T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimensio
 where
 	'i: 'v
 {
-	type Error = OrtError;
+	type Error = Error;
 	fn try_from(arr: &'i CowArray<'v, T, D>) -> Result<Self, Self::Error> {
 		Value::from_array(arr)
 	}
 }
 
 impl<T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&mut ArcArray<T, D>> for Value {
-	type Error = OrtError;
+	type Error = Error;
 	fn try_from(arr: &mut ArcArray<T, D>) -> Result<Self, Self::Error> {
 		Value::from_array(arr)
 	}
 }
 
 impl<T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<Array<T, D>> for Value {
-	type Error = OrtError;
+	type Error = Error;
 	fn try_from(arr: Array<T, D>) -> Result<Self, Self::Error> {
 		Value::from_array(arr)
 	}
 }
 
 impl<'v, T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for Value {
-	type Error = OrtError;
+	type Error = Error;
 	fn try_from(arr: ArrayView<'v, T, D>) -> Result<Self, Self::Error> {
 		Value::from_array(arr)
 	}

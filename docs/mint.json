@@ -34,7 +34,7 @@
 		{
 			"name": "Crates.io",
 			"icon": "rust",
-			"url": "https://crates.io/ort"
+			"url": "https://crates.io/crates/ort"
 		},
 		{
 			"name": "GitHub",

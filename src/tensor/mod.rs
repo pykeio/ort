@@ -14,315 +14,109 @@
 //! convert it internally to an [`OrtTensor`]. After inference, a [`OrtOwnedTensor`] will be returned by the method
 //! which can be derefed into its internal [`ndarray::ArrayView`].
 
-pub mod ndarray_tensor;
-pub mod ort_owned_tensor;
+mod ndarray;
+mod types;
 
-use std::{ffi, fmt, ptr, result, string};
+use std::{fmt::Debug, ops::Deref, ptr};
 
-use ndarray::IxDyn;
+use ::ndarray::{ArrayView, IxDyn};
 
-pub use self::ndarray_tensor::NdArrayExtensions;
-pub use self::ort_owned_tensor::OrtOwnedTensor;
-use super::{ortsys, OrtError, OrtResult};
+pub use self::ndarray::ArrayExtensions;
+pub use self::types::{ExtractTensorData, IntoTensorElementDataType, TensorData, TensorElementDataType, Utf8Data};
+use super::{ortsys, Error, Result};
 
-/// Enum mapping ONNX Runtime's supported tensor data types.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum TensorElementDataType {
-	/// 32-bit floating point number, equivalent to Rust's `f32`.
-	Float32,
-	/// Unsigned 8-bit integer, equivalent to Rust's `u8`.
-	Uint8,
-	/// Signed 8-bit integer, equivalent to Rust's `i8`.
-	Int8,
-	/// Unsigned 16-bit integer, equivalent to Rust's `u16`.
-	Uint16,
-	/// Signed 16-bit integer, equivalent to Rust's `i16`.
-	Int16,
-	/// Signed 32-bit integer, equivalent to Rust's `i32`.
-	Int32,
-	/// Signed 64-bit integer, equivalent to Rust's `i64`.
-	Int64,
-	/// String, equivalent to Rust's `String`.
-	String,
-	/// Boolean, equivalent to Rust's `bool`.
-	Bool,
-	/// 16-bit floating point number, equivalent to `half::f16` (requires the `half` crate).
-	#[cfg(feature = "half")]
-	Float16,
-	/// 64-bit floating point number, equivalent to Rust's `f64`. Also known as `double`.
-	Float64,
-	/// Unsigned 32-bit integer, equivalent to Rust's `u32`.
-	Uint32,
-	/// Unsigned 64-bit integer, equivalent to Rust's `u64`.
-	Uint64,
-	// /// Complex 64-bit floating point number, equivalent to Rust's `num_complex::Complex<f64>`.
-	// Complex64,
-	// TODO: `num_complex` crate doesn't support i128 provided by the `decimal` crate.
-	// /// Complex 128-bit floating point number, equivalent to Rust's `num_complex::Complex<f128>`.
-	// Complex128,
-	/// Brain 16-bit floating point number, equivalent to `half::bf16` (requires the `half` crate).
-	#[cfg(feature = "half")]
-	Bfloat16
-}
-
-impl From<TensorElementDataType> for ort_sys::ONNXTensorElementDataType {
-	fn from(val: TensorElementDataType) -> Self {
-		match val {
-			TensorElementDataType::Float32 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
-			TensorElementDataType::Uint8 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8,
-			TensorElementDataType::Int8 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8,
-			TensorElementDataType::Uint16 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16,
-			TensorElementDataType::Int16 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16,
-			TensorElementDataType::Int32 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32,
-			TensorElementDataType::Int64 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
-			TensorElementDataType::String => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING,
-			TensorElementDataType::Bool => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL,
-			#[cfg(feature = "half")]
-			TensorElementDataType::Float16 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16,
-			TensorElementDataType::Float64 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE,
-			TensorElementDataType::Uint32 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32,
-			TensorElementDataType::Uint64 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64,
-			// TensorElementDataType::Complex64 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX64,
-			// TensorElementDataType::Complex128 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX128,
-			#[cfg(feature = "half")]
-			TensorElementDataType::Bfloat16 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16
-		}
-	}
-}
-impl From<ort_sys::ONNXTensorElementDataType> for TensorElementDataType {
-	fn from(val: ort_sys::ONNXTensorElementDataType) -> Self {
-		match val {
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT => TensorElementDataType::Float32,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8 => TensorElementDataType::Uint8,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8 => TensorElementDataType::Int8,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16 => TensorElementDataType::Uint16,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16 => TensorElementDataType::Int16,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32 => TensorElementDataType::Int32,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64 => TensorElementDataType::Int64,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING => TensorElementDataType::String,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL => TensorElementDataType::Bool,
-			#[cfg(feature = "half")]
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16 => TensorElementDataType::Float16,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE => TensorElementDataType::Float64,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32 => TensorElementDataType::Uint32,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64 => TensorElementDataType::Uint64,
-			// ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX64 => TensorElementDataType::Complex64,
-			// ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX128 => TensorElementDataType::Complex128,
-			#[cfg(feature = "half")]
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16 => TensorElementDataType::Bfloat16,
-			_ => panic!("Invalid ONNXTensorElementDataType value")
-		}
-	}
-}
-
-/// Trait used to map Rust types (for example `f32`) to ONNX tensor element data types (for example `Float`).
-pub trait IntoTensorElementDataType {
-	/// Returns the ONNX tensor element data type corresponding to the given Rust type.
-	fn tensor_element_data_type() -> TensorElementDataType;
-
-	/// If the type is `String`, returns `Some` with UTF-8 contents, else `None`.
-	fn try_utf8_bytes(&self) -> Option<&[u8]>;
-}
-
-macro_rules! impl_type_trait {
-	($type_:ty, $variant:ident) => {
-		impl IntoTensorElementDataType for $type_ {
-			fn tensor_element_data_type() -> TensorElementDataType {
-				TensorElementDataType::$variant
-			}
-
-			fn try_utf8_bytes(&self) -> Option<&[u8]> {
-				None
-			}
-		}
-	};
-}
-
-impl_type_trait!(f32, Float32);
-impl_type_trait!(u8, Uint8);
-impl_type_trait!(i8, Int8);
-impl_type_trait!(u16, Uint16);
-impl_type_trait!(i16, Int16);
-impl_type_trait!(i32, Int32);
-impl_type_trait!(i64, Int64);
-impl_type_trait!(bool, Bool);
-#[cfg(feature = "half")]
-impl_type_trait!(half::f16, Float16);
-impl_type_trait!(f64, Float64);
-impl_type_trait!(u32, Uint32);
-impl_type_trait!(u64, Uint64);
-// impl_type_trait!(num_complex::Complex<f64>, Complex64);
-// impl_type_trait!(num_complex::Complex<f128>, Complex128);
-#[cfg(feature = "half")]
-impl_type_trait!(half::bf16, Bfloat16);
-
-/// Adapter for common Rust string types to ONNX strings.
+/// Tensor containing data owned by the ONNX Runtime C library, used to return values from inference.
 ///
-/// It should be easy to use both [`String`] and `&str` as [`TensorElementDataType::String`] data, but
-/// we can't define an automatic implementation for anything that implements [`AsRef<str>`] as it
-/// would conflict with the implementations of [`IntoTensorElementDataType`] for primitive numeric
-/// types (which might implement [`AsRef<str>`] at some point in the future).
-pub trait Utf8Data {
-	/// Returns the contents of this value as a slice of UTF-8 bytes.
-	fn utf8_bytes(&self) -> &[u8];
-}
-
-impl Utf8Data for String {
-	fn utf8_bytes(&self) -> &[u8] {
-		self.as_bytes()
-	}
-}
-
-impl<'a> Utf8Data for &'a str {
-	fn utf8_bytes(&self) -> &[u8] {
-		self.as_bytes()
-	}
-}
-
-/// Trait used to map ONNX Runtime types to Rust types.
-pub trait TensorDataToType: Sized + fmt::Debug + Clone {
-	/// The tensor element type that this type can extract from.
-	fn tensor_element_data_type() -> TensorElementDataType;
-
-	/// Extract an `ArrayView` from the ORT-owned tensor.
-	fn extract_data<'t, D>(shape: D, tensor_element_len: usize, tensor_ptr: *mut ort_sys::OrtValue) -> OrtResult<TensorData<'t, Self>>
-	where
-		D: ndarray::Dimension;
-}
-
-/// Represents the possible ways tensor data can be accessed.
+/// This tensor type is returned by the [`Session::run()`](../session/struct.Session.html#method.run) method.
+/// It is not meant to be created directly.
 ///
-/// This should only be used internally.
+/// The tensor hosts an [`ndarray::ArrayView`](https://docs.rs/ndarray/latest/ndarray/type.ArrayView.html)
+/// of the data on the C side. This allows manipulation on the Rust side using `ndarray` without copying the data.
+///
+/// `OrtOwnedTensor` implements the [`std::deref::Deref`](#impl-Deref) trait for ergonomic access to
+/// the underlying [`ndarray::ArrayView`](https://docs.rs/ndarray/latest/ndarray/type.ArrayView.html).
 #[derive(Debug)]
-pub enum TensorData<'t, T> {
-	/// Data residing in ONNX Runtime's tensor, in which case the `'t` lifetime is what makes this valid.
-	/// This is used for data types whose in-memory form from ONNX Runtime is compatible with Rust's, like
-	/// primitive numeric types.
-	TensorPtr {
-		/// The pointer ONNX Runtime produced. Kept alive so that `array_view` is valid.
-		ptr: *mut ort_sys::OrtValue,
-		/// A view into `ptr`.
-		array_view: ndarray::ArrayView<'t, T, IxDyn>
-	},
-	/// String data is output differently by ONNX, and is of course also variable size, so it cannot
-	/// use the same simple pointer representation.
-	// Since `'t` outlives this struct, the 't lifetime is more than we need, but no harm done.
-	Strings {
-		/// Owned Strings copied out of ONNX Runtime's output.
-		strings: ndarray::Array<T, IxDyn>
-	}
-}
-
-/// Implements [`TensorDataToType`] for primitives which can use `GetTensorMutableData`.
-macro_rules! impl_prim_type_from_ort_trait {
-	($type_: ty, $variant: ident) => {
-		impl TensorDataToType for $type_ {
-			fn tensor_element_data_type() -> TensorElementDataType {
-				TensorElementDataType::$variant
-			}
-
-			fn extract_data<'t, D>(shape: D, _tensor_element_len: usize, tensor_ptr: *mut ort_sys::OrtValue) -> OrtResult<TensorData<'t, Self>>
-			where
-				D: ndarray::Dimension
-			{
-				extract_primitive_array(shape, tensor_ptr).map(|v| TensorData::TensorPtr { ptr: tensor_ptr, array_view: v })
-			}
-		}
-	};
-}
-
-/// Construct an [`ndarray::ArrayView`] for an ORT tensor.
-///
-/// Only to be used on types whose Rust in-memory representation matches ONNX Runtime's (e.g. primitive numeric types
-/// like u32)
-fn extract_primitive_array<'t, D, T: TensorDataToType>(shape: D, tensor: *mut ort_sys::OrtValue) -> OrtResult<ndarray::ArrayView<'t, T, IxDyn>>
+pub struct Tensor<'t, T>
 where
-	D: ndarray::Dimension
+	T: ExtractTensorData
 {
-	// Get pointer to output tensor values
-	let mut output_array_ptr: *mut T = ptr::null_mut();
-	let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
-	let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr as *mut *mut std::ffi::c_void;
-	ortsys![unsafe GetTensorMutableData(tensor, output_array_ptr_ptr_void) -> OrtError::GetTensorMutableData; nonNull(output_array_ptr)];
-
-	let array_view = unsafe { ndarray::ArrayView::from_shape_ptr(shape, output_array_ptr) }.into_dyn();
-	Ok(array_view)
+	pub(crate) data: TensorData<'t, T>
 }
 
-#[cfg(feature = "half")]
-impl_prim_type_from_ort_trait!(half::f16, Float16);
-#[cfg(feature = "half")]
-impl_prim_type_from_ort_trait!(half::bf16, Bfloat16);
-impl_prim_type_from_ort_trait!(f32, Float32);
-impl_prim_type_from_ort_trait!(f64, Float64);
-impl_prim_type_from_ort_trait!(u8, Uint8);
-impl_prim_type_from_ort_trait!(u16, Uint16);
-impl_prim_type_from_ort_trait!(u32, Uint32);
-impl_prim_type_from_ort_trait!(u64, Uint64);
-impl_prim_type_from_ort_trait!(i8, Int8);
-impl_prim_type_from_ort_trait!(i16, Int16);
-impl_prim_type_from_ort_trait!(i32, Int32);
-impl_prim_type_from_ort_trait!(i64, Int64);
-impl_prim_type_from_ort_trait!(bool, Bool);
-
-impl TensorDataToType for String {
-	fn tensor_element_data_type() -> TensorElementDataType {
-		TensorElementDataType::String
-	}
-
-	#[allow(clippy::not_unsafe_ptr_arg_deref)]
-	fn extract_data<'t, D: ndarray::Dimension>(shape: D, tensor_element_len: usize, tensor_ptr: *mut ort_sys::OrtValue) -> OrtResult<TensorData<'t, Self>> {
-		// Total length of string data, not including \0 suffix
-		let mut total_length = 0;
-		ortsys![unsafe GetStringTensorDataLength(tensor_ptr, &mut total_length) -> OrtError::GetStringTensorDataLength];
-
-		// In the JNI impl of this, tensor_element_len was included in addition to total_length,
-		// but that seems contrary to the docs of GetStringTensorDataLength, and those extra bytes
-		// don't seem to be written to in practice either.
-		// If the string data actually did go farther, it would panic below when using the offset
-		// data to get slices for each string.
-		let mut string_contents = vec![0u8; total_length as _];
-		// one extra slot so that the total length can go in the last one, making all per-string
-		// length calculations easy
-		let mut offsets = vec![0; tensor_element_len + 1];
-
-		ortsys![unsafe GetStringTensorContent(tensor_ptr, string_contents.as_mut_ptr() as *mut ffi::c_void, total_length as _, offsets.as_mut_ptr(), tensor_element_len as _) -> OrtError::GetStringTensorContent];
-
-		// final offset = overall length so that per-string length calculations work for the last string
-		debug_assert_eq!(0, offsets[tensor_element_len]);
-		offsets[tensor_element_len] = total_length;
-
-		let strings = offsets
-            // offsets has 1 extra offset past the end so that all windows work
-            .windows(2)
-            .map(|w| {
-                let slice = &string_contents[w[0] as _..w[1] as _];
-                String::from_utf8(slice.into())
-            })
-            .collect::<result::Result<Vec<String>, string::FromUtf8Error>>()
-            .map_err(OrtError::StringFromUtf8Error)?;
-
-		let array = ndarray::Array::from_shape_vec(shape, strings)
-			.expect("Shape extracted from tensor didn't match tensor contents")
-			.into_dyn();
-
-		Ok(TensorData::Strings { strings: array })
+impl<'t, T> Tensor<'t, T>
+where
+	T: ExtractTensorData
+{
+	/// Produce an [`ArrayViewHolder`] for the underlying data.
+	pub fn view<'s>(&'s self) -> ArrayViewHolder<'s, T>
+	where
+		't: 's // tensor ptr can outlive the TensorData
+	{
+		ArrayViewHolder::new(&self.data)
 	}
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum DataType {
-	Tensor { ty: TensorElementDataType, dimensions: Vec<i64> },
-	Sequence(Box<DataType>),
-	Map { key: TensorElementDataType, value: TensorElementDataType }
+/// An intermediate step on the way to an [`ArrayView`].
+// Since Deref has to produce a reference, and the referent can't be a local in deref(), it must
+// be a field in a struct. This struct exists only to hold that field.
+// Its lifetime 's is bound to the TensorData its view was created around, not the underlying tensor
+// pointer, since in the case of strings the data is the Array in the TensorData, not the pointer.
+pub struct ArrayViewHolder<'s, T>
+where
+	T: ExtractTensorData
+{
+	array_view: ArrayView<'s, T, IxDyn>
 }
 
-impl DataType {
-	/// Returns the dimensions of this data type if it is a tensor, or `None` if it is a sequence or map.
-	pub fn tensor_dimensions(&self) -> Option<&Vec<i64>> {
-		match self {
-			DataType::Tensor { dimensions, .. } => Some(dimensions),
-			_ => None
+impl<'s, T> ArrayViewHolder<'s, T>
+where
+	T: ExtractTensorData
+{
+	fn new<'t>(data: &'s TensorData<'t, T>) -> ArrayViewHolder<'s, T>
+	where
+		't: 's // underlying tensor ptr lives at least as long as TensorData
+	{
+		match data {
+			TensorData::PrimitiveView { array_view, .. } => ArrayViewHolder {
+				// we already have a view, but creating a view from a view is cheap
+				array_view: array_view.view()
+			},
+			TensorData::Strings { strings } => ArrayViewHolder {
+				// This view creation has to happen here, not at new()'s callsite, because
+				// a field can't be a reference to another field in the same struct. Thus, we have
+				// this separate struct to hold the view that refers to the `Array`.
+				array_view: strings.view()
+			}
 		}
+	}
+}
+
+impl<'t, T> Deref for ArrayViewHolder<'t, T>
+where
+	T: ExtractTensorData
+{
+	type Target = ArrayView<'t, T, IxDyn>;
+
+	fn deref(&self) -> &Self::Target {
+		&self.array_view
+	}
+}
+
+/// Holds on to a tensor pointer until dropped.
+///
+/// This allows for creating an [`OrtOwnedTensor`] from a [`DynOrtTensor`] without consuming `self`, which would prevent
+/// retrying extraction and avoids awkward interaction with the outputs `Vec`. It also avoids requiring `OrtOwnedTensor`
+/// to keep a reference to `DynOrtTensor`, which would be inconvenient.
+#[derive(Debug)]
+pub struct TensorPointerHolder {
+	pub(crate) tensor_ptr: *mut ort_sys::OrtValue
+}
+
+impl Drop for TensorPointerHolder {
+	#[tracing::instrument]
+	fn drop(&mut self) {
+		ortsys![unsafe ReleaseValue(self.tensor_ptr)];
+
+		self.tensor_ptr = ptr::null_mut();
 	}
 }

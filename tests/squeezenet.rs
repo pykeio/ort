@@ -8,13 +8,12 @@ use std::{
 use image::{imageops::FilterType, ImageBuffer, Pixel, Rgb};
 use ndarray::s;
 use ort::{
-	download::vision::ImageClassification, inputs, Environment, GraphOptimizationLevel, LoggingLevel, NdArrayExtensions, OrtDownloadError, OrtOwnedTensor,
-	OrtResult, SessionBuilder
+	download::vision::ImageClassification, inputs, ArrayExtensions, Environment, FetchModelError, GraphOptimizationLevel, LoggingLevel, SessionBuilder, Tensor
 };
 use test_log::test;
 
 #[test]
-fn squeezenet_mushroom() -> OrtResult<()> {
+fn squeezenet_mushroom() -> ort::Result<()> {
 	const IMAGE_TO_LOAD: &str = "mushroom.png";
 
 	let environment = Environment::builder()
@@ -77,7 +76,7 @@ fn squeezenet_mushroom() -> OrtResult<()> {
 
 	// Downloaded model does not have a softmax as final layer; call softmax on second axis
 	// and iterate on resulting probabilities, creating an index to later access labels.
-	let output: OrtOwnedTensor<_> = outputs[0].extract_tensor()?;
+	let output: Tensor<_> = outputs[0].extract_tensor()?;
 	let mut probabilities: Vec<(usize, f32)> = output.view().softmax(ndarray::Axis(1)).iter().copied().enumerate().collect::<Vec<_>>();
 	// Sort probabilities so highest is at beginning of vector.
 	probabilities.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
@@ -88,7 +87,7 @@ fn squeezenet_mushroom() -> OrtResult<()> {
 	Ok(())
 }
 
-fn get_imagenet_labels() -> Result<Vec<String>, OrtDownloadError> {
+fn get_imagenet_labels() -> Result<Vec<String>, FetchModelError> {
 	// Download the ImageNet class labels, matching SqueezeNet's classes.
 	let labels_path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("synset.txt");
 	if !labels_path.exists() {
@@ -98,7 +97,7 @@ fn get_imagenet_labels() -> Result<Vec<String>, OrtDownloadError> {
             .timeout(Duration::from_secs(180)) // 3 minutes
             .call()
             .map_err(Box::new)
-            .map_err(OrtDownloadError::FetchError)?;
+            .map_err(FetchModelError::FetchError)?;
 
 		assert!(resp.has("Content-Length"));
 		let len = resp.header("Content-Length").and_then(|s| s.parse::<usize>().ok()).unwrap();
@@ -113,5 +112,5 @@ fn get_imagenet_labels() -> Result<Vec<String>, OrtDownloadError> {
 	}
 
 	let file = BufReader::new(fs::File::open(labels_path).unwrap());
-	file.lines().map(|line| line.map_err(OrtDownloadError::IoError)).collect()
+	file.lines().map(|line| line.map_err(FetchModelError::IoError)).collect()
 }

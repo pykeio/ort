@@ -74,7 +74,7 @@ impl<'s> From<SmallVec<[Value; 4]>> for SessionInputs<'s> {
 /// # }
 /// ```
 ///
-/// ## IOBinding
+/// ## I/O Binding
 ///
 /// ```no_run
 /// # use std::{error::Error, sync::Arc};
@@ -90,15 +90,15 @@ impl<'s> From<SmallVec<[Value; 4]>> for SessionInputs<'s> {
 /// ```
 #[macro_export]
 macro_rules! inputs {
-	(bind = $v:expr) => ($crate::OrtResult::Ok($v));
+	(bind = $v:expr) => ($crate::Result::<_, $crate::Error>::Ok($v));
 	($($v:expr),+ $(,)?) => (
-		[$(std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::OrtError::from),)+]
+		[$(std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::Error::from),)+]
 			.into_iter()
-			.collect::<$crate::OrtResult<$crate::smallvec::SmallVec<_>>>()
+			.collect::<$crate::Result<$crate::smallvec::SmallVec<_>>>()
 	);
 	($($n:expr => $v:expr),+ $(,)?) => {{
-		[$(std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::OrtError::from).map(|v| ($n, v)),)+]
+		[$(std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::Error::from).map(|v| ($n, v)),)+]
 			.into_iter()
-			.collect::<$crate::OrtResult<std::collections::HashMap::<_, $crate::Value>>>()
+			.collect::<$crate::Result<std::collections::HashMap::<_, $crate::Value>>>()
 	}};
 }

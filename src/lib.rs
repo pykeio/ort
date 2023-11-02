@@ -25,8 +25,8 @@ use tracing::warn;
 
 pub use self::environment::{Environment, EnvironmentBuilder};
 #[cfg(feature = "fetch-models")]
-pub use self::error::OrtDownloadError;
-pub use self::error::{OrtApiError, OrtError, OrtResult};
+pub use self::error::FetchModelError;
+pub use self::error::{Error, ErrorInternal, Result};
 pub use self::execution_providers::{
 	ACLExecutionProviderOptions, ArenaExtendStrategy, CPUExecutionProviderOptions, CUDAExecutionProviderCuDNNConvAlgoSearch, CUDAExecutionProviderOptions,
 	CoreMLExecutionProviderOptions, DirectMLExecutionProviderOptions, ExecutionProvider, NNAPIExecutionProviderOptions, OneDNNExecutionProviderOptions,
@@ -37,9 +37,7 @@ pub use self::io_binding::IoBinding;
 pub use self::memory::{AllocationDevice, MemoryInfo};
 pub use self::metadata::ModelMetadata;
 pub use self::session::{InMemorySession, Session, SessionBuilder, SessionInputs, SessionOutputs, SharedSessionInner};
-pub use self::tensor::{
-	ort_owned_tensor::ViewHolder, IntoTensorElementDataType, NdArrayExtensions, OrtOwnedTensor, TensorData, TensorDataToType, TensorElementDataType
-};
+pub use self::tensor::{ArrayExtensions, ArrayViewHolder, ExtractTensorData, IntoTensorElementDataType, Tensor, TensorData, TensorElementDataType};
 pub use self::value::Value;
 
 #[cfg(not(all(target_arch = "x86", target_os = "windows")))]
@@ -200,13 +198,13 @@ macro_rules! ortfree {
 pub(crate) use ortfree;
 pub(crate) use ortsys;
 
-pub(crate) fn char_p_to_string(raw: *const c_char) -> OrtResult<String> {
+pub(crate) fn char_p_to_string(raw: *const c_char) -> Result<String> {
 	let c_string = unsafe { CStr::from_ptr(raw as *mut c_char).to_owned() };
 	match c_string.into_string() {
 		Ok(string) => Ok(string),
-		Err(e) => Err(OrtApiError::IntoStringError(e))
+		Err(e) => Err(ErrorInternal::IntoStringError(e))
 	}
-	.map_err(OrtError::FfiStringConversion)
+	.map_err(Error::FfiStringConversion)
 }
 
 /// ONNX's logger sends the code location where the log occurred, which will be parsed into this struct.

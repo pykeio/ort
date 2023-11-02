@@ -7,7 +7,7 @@ use std::{
 	ptr
 };
 
-use crate::{char_p_to_string, error::status_to_result, ortsys, OrtApiError, OrtError, OrtResult};
+use crate::{char_p_to_string, error::status_to_result, ortsys, Error, ErrorInternal, Result};
 
 #[cfg(all(not(feature = "load-dynamic"), not(target_arch = "x86")))]
 extern "C" {
@@ -397,7 +397,7 @@ macro_rules! get_ep_register {
 			match symbol {
 				Ok(symbol) => symbol,
 				Err(e) => {
-					return Err(OrtError::DlLoad { symbol: stringify!($symbol), error: e.to_string() });
+					return Err(Error::DlLoad { symbol: stringify!($symbol), error: e.to_string() });
 				}
 			}
 		};
@@ -548,10 +548,10 @@ impl ExecutionProvider {
 
 	/// Returns `true` if this execution provider is available, `false` otherwise.
 	/// The CPU execution provider will always be available.
-	pub fn is_available(&self) -> OrtResult<bool> {
+	pub fn is_available(&self) -> Result<bool> {
 		let mut providers: *mut *mut c_char = std::ptr::null_mut();
 		let mut num_providers = 0;
-		ortsys![unsafe GetAvailableProviders(&mut providers, &mut num_providers) -> OrtError::GetAvailableProviders];
+		ortsys![unsafe GetAvailableProviders(&mut providers, &mut num_providers) -> Error::GetAvailableProviders];
 		if providers.is_null() {
 			return Ok(false);
 		}
@@ -568,17 +568,17 @@ impl ExecutionProvider {
 		Ok(false)
 	}
 
-	pub(crate) fn apply(&self, session_options: *mut ort_sys::OrtSessionOptions) -> OrtResult<()> {
+	pub(crate) fn apply(&self, session_options: *mut ort_sys::OrtSessionOptions) -> Result<()> {
 		match &self {
 			&Self::CPU(options) => {
 				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_CPU(options: *mut ort_sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> ort_sys::OrtStatusPtr);
 				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_CPU(session_options, options.use_arena.into()) })
-					.map_err(OrtError::ExecutionProvider)?;
+					.map_err(Error::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "cuda"))]
 			&Self::CUDA(options) => {
 				let mut cuda_options: *mut ort_sys::OrtCUDAProviderOptionsV2 = std::ptr::null_mut();
-				status_to_result(ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)]).map_err(OrtError::ExecutionProvider)?;
+				status_to_result(ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)]).map_err(Error::ExecutionProvider)?;
 				let (key_ptrs, value_ptrs, len, keys, values) = map_keys! {
 					device_id = options.device_id,
 					arena_extend_strategy = options.arena_extend_strategy.as_ref().map(|v| match v {
@@ -597,7 +597,7 @@ impl ExecutionProvider {
 					enable_skip_layer_norm_strict_mode = bool_as_int(options.enable_skip_layer_norm_strict_mode)
 				};
 				if let Err(e) = status_to_result(ortsys![unsafe UpdateCUDAProviderOptions(cuda_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), len as _)])
-					.map_err(OrtError::ExecutionProvider)
+					.map_err(Error::ExecutionProvider)
 				{
 					ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
 					std::mem::drop((keys, values));
@@ -607,12 +607,12 @@ impl ExecutionProvider {
 				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(session_options, cuda_options)];
 				ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
 				std::mem::drop((keys, values));
-				status_to_result(status).map_err(OrtError::ExecutionProvider)?;
+				status_to_result(status).map_err(Error::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "tensorrt"))]
 			&Self::TensorRT(options) => {
 				let mut trt_options: *mut ort_sys::OrtTensorRTProviderOptionsV2 = std::ptr::null_mut();
-				status_to_result(ortsys![unsafe CreateTensorRTProviderOptions(&mut trt_options)]).map_err(OrtError::ExecutionProvider)?;
+				status_to_result(ortsys![unsafe CreateTensorRTProviderOptions(&mut trt_options)]).map_err(Error::ExecutionProvider)?;
 				let (key_ptrs, value_ptrs, len, keys, values) = map_keys! {
 					device_id = options.device_id,
 					trt_max_workspace_size = options.max_workspace_size,
@@ -644,7 +644,7 @@ impl ExecutionProvider {
 					trt_profile_opt_shapes = options.profile_opt_shapes.clone()
 				};
 				if let Err(e) = status_to_result(ortsys![unsafe UpdateTensorRTProviderOptions(trt_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), len as _)])
-					.map_err(OrtError::ExecutionProvider)
+					.map_err(Error::ExecutionProvider)
 				{
 					ortsys![unsafe ReleaseTensorRTProviderOptions(trt_options)];
 					std::mem::drop((keys, values));
@@ -654,19 +654,19 @@ impl ExecutionProvider {
 				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_TensorRT_V2(session_options, trt_options)];
 				ortsys![unsafe ReleaseTensorRTProviderOptions(trt_options)];
 				std::mem::drop((keys, values));
-				status_to_result(status).map_err(OrtError::ExecutionProvider)?;
+				status_to_result(status).map_err(Error::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "acl"))]
 			&Self::ACL(options) => {
 				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut ort_sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> ort_sys::OrtStatusPtr);
 				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_ACL(session_options, options.use_arena.into()) })
-					.map_err(OrtError::ExecutionProvider)?;
+					.map_err(Error::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "onednn"))]
 			&Self::OneDNN(options) => {
 				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Dnnl(options: *mut ort_sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> ort_sys::OrtStatusPtr);
 				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_Dnnl(session_options, options.use_arena.into()) })
-					.map_err(OrtError::ExecutionProvider)?;
+					.map_err(Error::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "coreml"))]
 			&Self::CoreML(options) => {
@@ -681,13 +681,13 @@ impl ExecutionProvider {
 				if options.only_enable_device_with_ane {
 					flags |= 0x004;
 				}
-				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_CoreML(session_options, flags) }).map_err(OrtError::ExecutionProvider)?;
+				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_CoreML(session_options, flags) }).map_err(Error::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "directml"))]
 			&Self::DirectML(options) => {
 				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_DML(options: *mut ort_sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> ort_sys::OrtStatusPtr);
 				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_DML(session_options, options.device_id as _) })
-					.map_err(OrtError::ExecutionProvider)?;
+					.map_err(Error::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "rocm"))]
 			&Self::ROCm(options) => {
@@ -708,7 +708,7 @@ impl ExecutionProvider {
 					tunable_op_max_tuning_duration_ms: options.tunable_op_max_tuning_duration_ms
 				};
 				status_to_result(ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(session_options, &rocm_options as *const _)])
-					.map_err(OrtError::ExecutionProvider)?;
+					.map_err(Error::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "nnapi"))]
 			&Self::NNAPI(options) => {
@@ -726,7 +726,7 @@ impl ExecutionProvider {
 				if options.cpu_only {
 					flags |= 0x008;
 				}
-				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_Nnapi(session_options, flags) }).map_err(OrtError::ExecutionProvider)?;
+				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_Nnapi(session_options, flags) }).map_err(Error::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "openvino"))]
 			&Self::OpenVINO(options) => {
@@ -753,7 +753,7 @@ impl ExecutionProvider {
 					enable_vpu_fast_compile: bool_as_int_req(options.enable_vpu_fast_compile) as _
 				};
 				status_to_result(ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO(session_options, &openvino_options as *const _)])
-					.map_err(OrtError::ExecutionProvider)?;
+					.map_err(Error::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "qnn"))]
 			&Self::QNN(options) => {
@@ -773,7 +773,7 @@ impl ExecutionProvider {
 					value_ptrs.as_ptr(),
 					len as _,
 				)])
-				.map_err(OrtError::ExecutionProvider)?;
+				.map_err(Error::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "tvm"))]
 			&Self::TVM(options) => {
@@ -820,12 +820,12 @@ impl ExecutionProvider {
 				}
 				let options_string = CString::new(option_string.join(",")).unwrap();
 				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_Tvm(session_options, options_string.as_ptr()) })
-					.map_err(OrtError::ExecutionProvider)?;
+					.map_err(Error::ExecutionProvider)?;
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "cann"))]
 			&Self::CANN(options) => {
 				let mut cann_options: *mut ort_sys::OrtCANNProviderOptions = std::ptr::null_mut();
-				status_to_result(ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)]).map_err(OrtError::ExecutionProvider)?;
+				status_to_result(ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)]).map_err(Error::ExecutionProvider)?;
 				let (key_ptrs, value_ptrs, len, keys, values) = map_keys! {
 					device_id = options.device_id,
 					npu_mem_limit = options.npu_mem_limit,
@@ -849,7 +849,7 @@ impl ExecutionProvider {
 					optypelist_for_impl_mode = options.optypelist_for_impl_mode.clone()
 				};
 				if let Err(e) = status_to_result(ortsys![unsafe UpdateCANNProviderOptions(cann_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), len as _)])
-					.map_err(OrtError::ExecutionProvider)
+					.map_err(Error::ExecutionProvider)
 				{
 					ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
 					std::mem::drop((keys, values));
@@ -859,9 +859,9 @@ impl ExecutionProvider {
 				let status = ortsys![unsafe SessionOptionsAppendExecutionProvider_CANN(session_options, cann_options)];
 				ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
 				std::mem::drop((keys, values));
-				status_to_result(status).map_err(OrtError::ExecutionProvider)?;
+				status_to_result(status).map_err(Error::ExecutionProvider)?;
 			}
-			_ => return Err(OrtError::ExecutionProviderNotRegistered(self.as_str()))
+			_ => return Err(Error::ExecutionProviderNotRegistered(self.as_str()))
 		}
 		Ok(())
 	}
@@ -872,7 +872,7 @@ pub(crate) fn apply_execution_providers(options: *mut ort_sys::OrtSessionOptions
 	let mut fallback_to_cpu = true;
 	for ex in execution_providers.as_ref() {
 		if let Err(e) = ex.apply(options) {
-			if let &OrtError::ExecutionProviderNotRegistered(_) = &e {
+			if let &Error::ExecutionProviderNotRegistered(_) = &e {
 				tracing::debug!("{}", e);
 			} else {
 				tracing::warn!("An error occurred when attempting to register `{}`: {e}", ex.as_str());

@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use ndarray::{array, concatenate, s, Array1, Axis};
 use ort::{
 	download::language::machine_comprehension::GPT2, inputs, CUDAExecutionProviderOptions, Environment, ExecutionProvider, GraphOptimizationLevel,
-	OrtOwnedTensor, OrtResult, SessionBuilder
+	SessionBuilder, Tensor
 };
 use rand::Rng;
 use tokenizers::Tokenizer;
@@ -12,7 +12,7 @@ const PROMPT: &str = "The corsac fox (Vulpes corsac), also known simply as a cor
 const GEN_TOKENS: i32 = 90;
 const TOP_K: usize = 5;
 
-fn main() -> OrtResult<()> {
+fn main() -> ort::Result<()> {
 	tracing_subscriber::fmt::init();
 
 	let mut stdout = io::stdout();
@@ -41,7 +41,7 @@ fn main() -> OrtResult<()> {
 	for _ in 0..GEN_TOKENS {
 		let array = tokens.view().insert_axis(Axis(0)).insert_axis(Axis(1));
 		let outputs = session.run(inputs![array]?)?;
-		let generated_tokens: OrtOwnedTensor<f32> = outputs["output1"].extract_tensor()?;
+		let generated_tokens: Tensor<f32> = outputs["output1"].extract_tensor()?;
 		let generated_tokens = generated_tokens.view();
 
 		let probabilities = &mut generated_tokens

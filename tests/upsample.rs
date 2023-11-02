@@ -2,7 +2,7 @@ use std::path::Path;
 
 use image::RgbImage;
 use ndarray::{Array, CowArray, Ix4};
-use ort::{inputs, Environment, GraphOptimizationLevel, LoggingLevel, OrtOwnedTensor, OrtResult, SessionBuilder};
+use ort::{inputs, Environment, GraphOptimizationLevel, LoggingLevel, SessionBuilder, Tensor};
 use test_log::test;
 
 fn load_input_image<P: AsRef<Path>>(name: P) -> RgbImage {
@@ -41,7 +41,7 @@ fn convert_image_to_cow_array(img: &RgbImage) -> CowArray<'_, f32, Ix4> {
 /// ])
 /// ```
 #[test]
-fn upsample() -> OrtResult<()> {
+fn upsample() -> ort::Result<()> {
 	const IMAGE_TO_LOAD: &str = "mushroom.png";
 
 	let environment = Environment::builder()
@@ -73,7 +73,7 @@ fn upsample() -> OrtResult<()> {
 	let outputs = session.run(inputs![&array]?)?;
 
 	assert_eq!(outputs.len(), 1);
-	let output: OrtOwnedTensor<f32> = outputs[0].extract_tensor()?;
+	let output: Tensor<f32> = outputs[0].extract_tensor()?;
 
 	// The image should have doubled in size
 	assert_eq!(output.view().shape(), [1, 448, 448, 3]);
@@ -86,7 +86,7 @@ fn upsample() -> OrtResult<()> {
 /// python -m onnxruntime.tools.convert_onnx_models_to_ort tests/data/upsample.onnx
 /// ```
 #[test]
-fn upsample_with_ort_model() -> OrtResult<()> {
+fn upsample_with_ort_model() -> ort::Result<()> {
 	const IMAGE_TO_LOAD: &str = "mushroom.png";
 
 	let environment = Environment::builder()
@@ -114,7 +114,7 @@ fn upsample_with_ort_model() -> OrtResult<()> {
 	let outputs = session.run(inputs![&array]?)?;
 
 	assert_eq!(outputs.len(), 1);
-	let output: OrtOwnedTensor<f32> = outputs[0].extract_tensor()?;
+	let output: Tensor<f32> = outputs[0].extract_tensor()?;
 
 	// The image should have doubled in size
 	assert_eq!(output.view().shape(), [1, 448, 448, 3]);

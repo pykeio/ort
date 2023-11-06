@@ -16,7 +16,6 @@ use crate::{
 
 #[cfg(all(not(feature = "load-dynamic"), not(target_arch = "x86")))]
 extern "C" {
-	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CPU(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr;
 	#[cfg(feature = "acl")]
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr;
 	#[cfg(feature = "onednn")]
@@ -30,10 +29,6 @@ extern "C" {
 	#[cfg(feature = "tvm")]
 	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut sys::OrtSessionOptions, opt_str: *const std::os::raw::c_char)
 	-> sys::OrtStatusPtr;
-}
-#[cfg(all(not(feature = "load-dynamic"), target_arch = "x86"))]
-extern "stdcall" {
-	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CPU(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr;
 }
 
 #[derive(Debug, Clone, Default)]
@@ -606,9 +601,11 @@ impl ExecutionProvider {
 	pub(crate) fn apply(&self, session_options: *mut sys::OrtSessionOptions) -> OrtResult<()> {
 		match &self {
 			&Self::CPU(options) => {
-				get_ep_register!(OrtSessionOptionsAppendExecutionProvider_CPU(options: *mut sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> sys::OrtStatusPtr);
-				status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_CPU(session_options, options.use_arena.into()) })
-					.map_err(OrtError::ExecutionProvider)?;
+				if options.use_arena {
+					status_to_result(ortsys![unsafe EnableCpuMemArena(session_options)]).map_err(OrtError::ExecutionProvider)?;
+				} else {
+					status_to_result(ortsys![unsafe DisableCpuMemArena(session_options)]).map_err(OrtError::ExecutionProvider)?;
+				}
 			}
 			#[cfg(any(feature = "load-dynamic", feature = "cuda"))]
 			&Self::CUDA(options) => {

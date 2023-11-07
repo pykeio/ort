@@ -1,6 +1,6 @@
 [package]
 publish = false
-name = "gpt2"
+name = "example-gpt2"
 version = "0.0.0"
 edition = "2021"
 

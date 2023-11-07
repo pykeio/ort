@@ -12,12 +12,13 @@ default-members = [
 
 [package]
 name = "ort"
-description = "A Rust wrapper for ONNX Runtime 1.15 - Optimize and Accelerate Machine Learning Inferencing"
-version = "2.0.0"
+description = "A safe Rust wrapper for ONNX Runtime 1.16 - Optimize and Accelerate Machine Learning Inferencing"
+version = "2.0.0-alpha.0"
 edition = "2021"
 rust-version = "1.70"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/pykeio/ort"
+documentation = "https://ort.pyke.io/"
 readme = "README.md"
 keywords = [ "machine-learning", "ai", "ml" ]
 categories = [ "algorithms", "mathematics", "science", "science" ]
@@ -25,7 +26,7 @@ authors = [
 	"pyke.io <contact@pyke.io>",
 	"Nicolas Bigaouette <nbigaouette@gmail.com>"
 ]
-include = [ "src/", "examples/", "tests/", "toolchains/", "LICENSE", "README.md" ]
+include = [ "src/", "examples/", "tests/", "LICENSE-APACHE", "LICENSE-MIT", "README.md" ]
 
 [profile.release]
 opt-level = 3
@@ -68,7 +69,7 @@ qnn = []
 [dependencies]
 ndarray = "0.15"
 thiserror = "1.0"
-ort-sys = { path = "ort-sys" }
+ort-sys = { version = "2.0.0-alpha.0", path = "ort-sys" }
 libloading = { version = "0.8", optional = true }
 smallvec = "1.11"
 

@@ -1,6 +1,6 @@
 [package]
 publish = false
-name = "yolov8"
+name = "example-yolov8"
 version = "0.0.0"
 edition = "2021"
 

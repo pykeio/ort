@@ -4,7 +4,7 @@ use std::{path::PathBuf, time::Duration};
 
 use image::{imageops::FilterType, GenericImageView};
 use ndarray::{s, Array, Axis};
-use ort::{inputs, Environment, SessionBuilder};
+use ort::{inputs, CUDAExecutionProvider, Environment, SessionBuilder, SessionOutputs};
 use raqote::{DrawOptions, DrawTarget, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle};
 use show_image::{event, AsImageView, WindowOptions};
 
@@ -84,12 +84,18 @@ fn main() -> ort::Result<()> {
 		input[[0, 2, y, x]] = (b as f32) / 255.;
 	}
 
-	let env = Environment::default().into_arc();
+	let env = Environment::builder()
+		.with_execution_providers([CUDAExecutionProvider::default().build()])
+		.build()?
+		.into_arc();
 	let path = download_model(std::env::current_dir().unwrap());
 	let model = SessionBuilder::new(&env).unwrap().with_model_from_file(path).unwrap();
 
 	// Run YOLOv8 inference
-	let outputs = model.run(inputs!["images" => input]?).unwrap();
+	let mut outputs: SessionOutputs = model.run(inputs!["images" => input.view()]?).unwrap();
+	for _ in 0..1000 {
+		outputs = model.run(inputs!["images" => input.view()]?).unwrap();
+	}
 	let output = outputs["output0"].extract_tensor::<f32>().unwrap().view().t().into_owned();
 
 	let mut boxes = Vec::new();

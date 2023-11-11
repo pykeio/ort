@@ -1,13 +1,16 @@
 use std::{any::Any, ffi, fmt::Debug, ops::Deref, ptr, sync::Arc};
 
+#[cfg(feature = "ndarray")]
 use ndarray::{ArcArray, Array, ArrayView, CowArray, Dimension, IxDyn};
 
+#[cfg(feature = "ndarray")]
+use crate::tensor::Tensor;
 use crate::{
 	error::assert_non_null_pointer,
 	memory::{Allocator, MemoryInfo},
 	ortsys,
 	session::SharedSessionInner,
-	tensor::{ExtractTensorData, IntoTensorElementDataType, Tensor, TensorElementDataType, Utf8Data},
+	tensor::{ExtractTensorData, IntoTensorElementDataType, TensorElementDataType, Utf8Data},
 	AllocatorType, Error, MemType, Result
 };
 
@@ -30,11 +33,15 @@ impl ValueType {
 
 #[doc(hidden)]
 #[derive(Debug)]
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fetch-models")))]
 pub enum DynArrayRef<'v> {
 	Float(CowArray<'v, f32, IxDyn>),
 	#[cfg(feature = "half")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "half")))]
 	Float16(CowArray<'v, half::f16, IxDyn>),
 	#[cfg(feature = "half")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "half")))]
 	Bfloat16(CowArray<'v, half::bf16, IxDyn>),
 	Uint8(CowArray<'v, u8, IxDyn>),
 	Int8(CowArray<'v, i8, IxDyn>),
@@ -51,16 +58,22 @@ pub enum DynArrayRef<'v> {
 
 macro_rules! impl_convert_trait {
 	($type_:ty, $variant:expr) => {
+		#[cfg(feature = "ndarray")]
+		#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 		impl<'v, D: Dimension> From<ArrayView<'v, $type_, D>> for DynArrayRef<'v> {
 			fn from(array: ArrayView<'v, $type_, D>) -> DynArrayRef<'v> {
 				$variant(CowArray::from(array.into_dyn()))
 			}
 		}
+		#[cfg(feature = "ndarray")]
+		#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 		impl<'v, D: Dimension> From<Array<$type_, D>> for DynArrayRef<'v> {
 			fn from(array: Array<$type_, D>) -> DynArrayRef<'v> {
 				$variant(CowArray::from(array.into_dyn()))
 			}
 		}
+		#[cfg(feature = "ndarray")]
+		#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 		impl<'v, D: Dimension> From<CowArray<'v, $type_, D>> for DynArrayRef<'v> {
 			fn from(array: CowArray<'v, $type_, D>) -> DynArrayRef<'v> {
 				$variant(array.into_dyn())
@@ -71,8 +84,10 @@ macro_rules! impl_convert_trait {
 
 impl_convert_trait!(f32, DynArrayRef::Float);
 #[cfg(feature = "half")]
+#[cfg_attr(docsrs, doc(cfg(feature = "half")))]
 impl_convert_trait!(half::f16, DynArrayRef::Float16);
 #[cfg(feature = "half")]
+#[cfg_attr(docsrs, doc(cfg(feature = "half")))]
 impl_convert_trait!(half::bf16, DynArrayRef::Bfloat16);
 impl_convert_trait!(u8, DynArrayRef::Uint8);
 impl_convert_trait!(i8, DynArrayRef::Int8);
@@ -123,7 +138,9 @@ impl Value {
 
 	/// Attempt to extract the underlying data into a Rust `ndarray`.
 	///
-	/// The resulting array will be wrapped within an [`OrtOwnedTensor`].
+	/// The resulting array will be wrapped within a [`Tensor`].
+	#[cfg(feature = "ndarray")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn extract_tensor<T>(&self) -> Result<Tensor<'_, T>>
 	where
 		T: ExtractTensorData + Clone + Debug
@@ -162,6 +179,53 @@ impl Value {
 
 				let data = T::extract_tensor_array(shape, len as _, self.ptr())?;
 				Ok(Tensor { data })
+			}
+		};
+		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
+		res
+	}
+
+	pub fn extract_raw_tensor<T>(&self) -> Result<(Vec<i64>, &[T])>
+	where
+		T: ExtractTensorData + Clone + Debug
+	{
+		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
+
+		let res = {
+			let mut num_dims = 0;
+			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
+
+			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
+			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
+
+			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
+			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
+			let data_type: TensorElementDataType = type_sys.into();
+			if data_type != T::tensor_element_data_type() {
+				Err(Error::DataTypeMismatch {
+					actual: data_type,
+					requested: T::tensor_element_data_type()
+				})
+			} else {
+				// Note: Both tensor and array will point to the same data, nothing is copied.
+				// As such, there is no need to free the pointer used to create the slice.
+				assert_ne!(self.ptr(), ptr::null_mut());
+
+				let mut is_tensor = 0;
+				ortsys![unsafe IsTensor(self.ptr(), &mut is_tensor) -> Error::FailedTensorCheck];
+				assert_eq!(is_tensor, 1);
+
+				let mut output_array_ptr: *mut T = ptr::null_mut();
+				let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
+				let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr as *mut *mut std::ffi::c_void;
+				ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
+
+				let mut len = 0;
+				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
+
+				Ok((node_dims, unsafe { std::slice::from_raw_parts(output_array_ptr, len) }))
 			}
 		};
 		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
@@ -326,6 +390,8 @@ impl Value {
 	}
 }
 
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<'i, 'v, T: Clone + 'static, D: Dimension + 'static> OrtInput for &'i CowArray<'v, T, D>
 where
 	'i: 'v
@@ -349,6 +415,8 @@ where
 	}
 }
 
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<T: Clone + 'static, D: Dimension + 'static> OrtInput for &mut ArcArray<T, D> {
 	type Item = T;
 
@@ -378,6 +446,8 @@ impl<T: Clone + 'static, D: Dimension + 'static> OrtInput for &mut ArcArray<T, D
 	}
 }
 
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<T: Clone + 'static, D: Dimension + 'static> OrtInput for Array<T, D> {
 	type Item = T;
 
@@ -407,6 +477,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> OrtInput for Array<T, D> {
 	}
 }
 
+#[cfg(feature = "ndarray")]
 impl<'v, T: Clone + 'static, D: Dimension + 'static> OrtInput for ArrayView<'v, T, D> {
 	type Item = T;
 
@@ -445,6 +516,8 @@ impl<T: Clone + 'static> OrtInput for (Vec<i64>, Arc<Box<[T]>>) {
 	}
 }
 
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<'i, 'v, T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for Value
 where
 	'i: 'v
@@ -455,6 +528,8 @@ where
 	}
 }
 
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&mut ArcArray<T, D>> for Value {
 	type Error = Error;
 	fn try_from(arr: &mut ArcArray<T, D>) -> Result<Self, Self::Error> {
@@ -462,6 +537,8 @@ impl<T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'sta
 	}
 }
 
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<Array<T, D>> for Value {
 	type Error = Error;
 	fn try_from(arr: Array<T, D>) -> Result<Self, Self::Error> {
@@ -469,6 +546,8 @@ impl<T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'sta
 	}
 }
 
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<'v, T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for Value {
 	type Error = Error;
 	fn try_from(arr: ArrayView<'v, T, D>) -> Result<Self, Self::Error> {

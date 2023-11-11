@@ -1,12 +1,6 @@
-use std::{
-	ffi::{c_char, c_void, CString},
-	fmt::Debug,
-	mem::ManuallyDrop,
-	ptr,
-	sync::Arc
-};
+use std::{ffi::CString, fmt::Debug, ptr, sync::Arc};
 
-use crate::{memory::MemoryInfo, ortfree, ortsys, session::output::SessionOutputs, value::Value, Error, Result, Session};
+use crate::{memory::MemoryInfo, ortsys, session::output::SessionOutputs, value::Value, Error, Result, Session};
 
 /// Enables binding of session inputs and/or outputs to pre-allocated memory.
 ///
@@ -21,8 +15,8 @@ use crate::{memory::MemoryInfo, ortfree, ortsys, session::output::SessionOutputs
 pub struct IoBinding<'s> {
 	pub(crate) ptr: *mut ort_sys::OrtIoBinding,
 	session: &'s Session,
-	// Hold onto input values until we run the `IoBinding`.
-	input_values: Vec<Value>
+	input_values: Vec<Value>,
+	output_names: Vec<String>
 }
 
 impl<'s> IoBinding<'s> {
@@ -32,90 +26,55 @@ impl<'s> IoBinding<'s> {
 		Ok(Self {
 			ptr,
 			session,
-			input_values: Vec::new()
+			input_values: Vec::new(),
+			output_names: Vec::new()
 		})
 	}
 
 	/// Bind a [`Value`] to a session input.
-	pub fn bind_input<S: AsRef<str> + Clone + Debug>(&mut self, name: S, ort_value: Value) -> Result<()> {
+	pub fn bind_input<S: AsRef<str>>(&mut self, name: S, ort_value: Value) -> Result<&mut Value> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
 		ortsys![unsafe BindInput(self.ptr, cname.as_ptr(), ort_value.ptr()) -> Error::BindInput];
 		self.input_values.push(ort_value);
-		Ok(())
+		Ok(self.input_values.last_mut().unwrap())
 	}
 
 	/// Bind a session output to a pre-allocated [`Value`].
-	pub fn bind_output<'a, 'b: 'a, S: AsRef<str> + Clone + Debug>(&'a mut self, name: S, ort_value: &'b mut Value) -> Result<()> {
+	pub fn bind_output<'o: 's, S: AsRef<str>>(&mut self, name: S, ort_value: &'o mut Value) -> Result<()> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
 		ortsys![unsafe BindOutput(self.ptr, cname.as_ptr(), ort_value.ptr()) -> Error::BindOutput];
+		self.output_names.push(name.to_string());
 		Ok(())
 	}
 
 	/// Bind a session output to a device which is specified by `mem_info`.
-	pub fn bind_output_to_device<S: AsRef<str> + Clone + Debug>(&mut self, name: S, mem_info: MemoryInfo) -> Result<()> {
+	pub fn bind_output_to_device<S: AsRef<str>>(&mut self, name: S, mem_info: MemoryInfo) -> Result<()> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
 		ortsys![unsafe BindOutputToDevice(self.ptr, cname.as_ptr(), mem_info.ptr) -> Error::BindOutput];
+		self.output_names.push(name.to_string());
 		Ok(())
 	}
 
-	pub fn run(&mut self) -> Result<SessionOutputs> {
+	pub fn run<'i: 's>(&'i self) -> Result<SessionOutputs<'s>> {
 		let run_options_ptr: *const ort_sys::OrtRunOptions = std::ptr::null();
 		ortsys![unsafe RunWithBinding(self.session.inner.session_ptr, run_options_ptr, self.ptr) -> Error::SessionRunWithIoBinding];
-		self.input_values.clear();
-		self.outputs()
-	}
 
-	pub fn clean(&mut self) {
-		self.input_values.clear();
-	}
-
-	pub fn outputs(&self) -> Result<SessionOutputs> {
-		let mut names_ptr: *mut c_char = ptr::null_mut();
-		let mut lengths_ptr: *mut ort_sys::size_t = ptr::null_mut();
-		let mut count = 0;
-
-		ortsys![
-			unsafe GetBoundOutputNames(
-				self.ptr,
-				self.session.allocator().ptr,
-				&mut names_ptr,
-				&mut lengths_ptr,
-				&mut count
-			) -> Error::GetBoundOutputs;
-			nonNull(names_ptr)
-		];
+		let mut count = self.output_names.len();
 		if count > 0 {
-			let lengths = unsafe { std::slice::from_raw_parts(lengths_ptr, count as _).to_vec() };
-			let output_names = unsafe {
-				ManuallyDrop::new(String::from_raw_parts(
-					names_ptr as *mut u8,
-					lengths.iter().sum::<ort_sys::size_t>() as _,
-					lengths.iter().sum::<ort_sys::size_t>() as _
-				))
-			};
-			let mut output_names_chars = output_names.chars();
-
-			let output_names = lengths
-				.into_iter()
-				.map(|length| output_names_chars.by_ref().take(length as _).collect::<String>())
-				.collect::<Vec<_>>();
-
-			ortfree![unsafe self.session.allocator().ptr, names_ptr as *mut c_void];
-			ortfree![unsafe self.session.allocator().ptr, lengths_ptr as *mut c_void];
-
 			let mut output_values_ptr: *mut *mut ort_sys::OrtValue = ptr::null_mut();
-			ortsys![unsafe GetBoundOutputValues(self.ptr, self.session.allocator().ptr, &mut output_values_ptr, &mut count) -> Error::GetBoundOutputs; nonNull(output_values_ptr)];
+			let allocator = self.session.allocator();
+			ortsys![unsafe GetBoundOutputValues(self.ptr, allocator.ptr, &mut output_values_ptr, &mut count) -> Error::GetBoundOutputs; nonNull(output_values_ptr)];
 
-			let output_values_ptr = unsafe { std::slice::from_raw_parts(output_values_ptr, count as _).to_vec() }
+			let output_values = unsafe { std::slice::from_raw_parts(output_values_ptr, count as _).to_vec() }
 				.into_iter()
 				.map(|v| unsafe { Value::from_raw(v, Arc::clone(&self.session.inner)) });
 
 			// output values will be freed when the `Value`s in `SessionOutputs` drop
 
-			Ok(SessionOutputs::new(output_names, output_values_ptr))
+			Ok(SessionOutputs::new_backed(self.output_names.iter().map(|c| c.as_str()), output_values, allocator.ptr, output_values_ptr as *mut _))
 		} else {
 			Ok(SessionOutputs::new_empty())
 		}

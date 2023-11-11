@@ -1,10 +1,7 @@
 use std::io::{self, Write};
 
 use ndarray::{array, concatenate, s, Array1, Axis};
-use ort::{
-	download::language::machine_comprehension::GPT2, inputs, CUDAExecutionProviderOptions, Environment, ExecutionProvider, GraphOptimizationLevel,
-	SessionBuilder, Tensor
-};
+use ort::{download::language::machine_comprehension::GPT2, inputs, CUDAExecutionProvider, Environment, GraphOptimizationLevel, SessionBuilder, Tensor};
 use rand::Rng;
 use tokenizers::Tokenizer;
 
@@ -20,7 +17,7 @@ fn main() -> ort::Result<()> {
 
 	let environment = Environment::builder()
 		.with_name("GPT-2")
-		.with_execution_providers([ExecutionProvider::CUDA(CUDAExecutionProviderOptions::default())])
+		.with_execution_providers([CUDAExecutionProvider::default().build()])
 		.build()?
 		.into_arc();
 

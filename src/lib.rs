@@ -1,4 +1,6 @@
 #![doc = include_str!("../README.md")]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/pykeio/ort/v2/docs/icon.png")]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod download;
 pub(crate) mod environment;
@@ -19,25 +21,27 @@ use std::{
 };
 
 use once_cell::sync::Lazy;
-#[doc(hidden)]
-pub use smallvec;
 use tracing::warn;
 
 pub use self::environment::{Environment, EnvironmentBuilder};
 #[cfg(feature = "fetch-models")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fetch-models")))]
 pub use self::error::FetchModelError;
 pub use self::error::{Error, ErrorInternal, Result};
 pub use self::execution_providers::{
-	ACLExecutionProviderOptions, ArenaExtendStrategy, CPUExecutionProviderOptions, CUDAExecutionProviderCuDNNConvAlgoSearch, CUDAExecutionProviderOptions,
-	CoreMLExecutionProviderOptions, DirectMLExecutionProviderOptions, ExecutionProvider, NNAPIExecutionProviderOptions, OneDNNExecutionProviderOptions,
-	OpenVINOExecutionProviderOptions, QNNExecutionHTPPerformanceMode, QNNExecutionProviderOptions, ROCmExecutionProviderOptions, TVMExecutionProviderOptions,
-	TVMExecutorType, TVMTuningType, TensorRTExecutionProviderOptions
+	ACLExecutionProvider, ArenaExtendStrategy, CANNExecutionProvider, CANNExecutionProviderImplementationMode, CANNExecutionProviderPrecisionMode,
+	CPUExecutionProvider, CUDAExecutionProvider, CUDAExecutionProviderCuDNNConvAlgoSearch, CoreMLExecutionProvider, DirectMLExecutionProvider,
+	ExecutionProviderDispatch, NNAPIExecutionProvider, OneDNNExecutionProvider, OpenVINOExecutionProvider, QNNExecutionProvider,
+	QNNExecutionProviderPerformanceMode, ROCmExecutionProvider, TVMExecutionProvider, TVMExecutorType, TVMTuningType, TensorRTExecutionProvider
 };
 pub use self::io_binding::IoBinding;
-pub use self::memory::{AllocationDevice, MemoryInfo};
+pub use self::memory::{AllocationDevice, Allocator, MemoryInfo};
 pub use self::metadata::ModelMetadata;
 pub use self::session::{InMemorySession, Session, SessionBuilder, SessionInputs, SessionOutputs, SharedSessionInner};
-pub use self::tensor::{ArrayExtensions, ArrayViewHolder, ExtractTensorData, IntoTensorElementDataType, Tensor, TensorData, TensorElementDataType};
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+pub use self::tensor::{ArrayExtensions, ArrayViewHolder, Tensor, TensorData};
+pub use self::tensor::{ExtractTensorData, IntoTensorElementDataType, TensorElementDataType};
 pub use self::value::Value;
 
 #[cfg(not(all(target_arch = "x86", target_os = "windows")))]
@@ -108,13 +112,13 @@ pub(crate) static G_ORT_API: Lazy<Arc<Mutex<AtomicPtr<ort_sys::OrtApi>>>> = Lazy
 		let version_string = get_version_string();
 		let version_string = CStr::from_ptr(version_string).to_string_lossy();
 		let lib_minor_version = version_string.split('.').nth(1).map(|x| x.parse::<u32>().unwrap_or(0)).unwrap_or(0);
-		match lib_minor_version.cmp(&15) {
+		match lib_minor_version.cmp(&16) {
 			std::cmp::Ordering::Less => panic!(
-				"ort 2.0 is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.15.x', but got '{version_string}'",
+				"ort 2.0 is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.16.x', but got '{version_string}'",
 				**G_ORT_DYLIB_PATH
 			),
 			std::cmp::Ordering::Greater => warn!(
-				"ort 2.0 may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.15.x', but got '{version_string}'",
+				"ort 2.0 may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.16.x', but got '{version_string}'",
 				**G_ORT_DYLIB_PATH
 			),
 			std::cmp::Ordering::Equal => {}

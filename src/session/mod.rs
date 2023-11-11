@@ -14,7 +14,7 @@ use super::{
 	char_p_to_string,
 	environment::Environment,
 	error::{assert_non_null_pointer, assert_null_pointer, status_to_result, Error, ErrorInternal, Result},
-	execution_providers::{apply_execution_providers, ExecutionProvider},
+	execution_providers::{apply_execution_providers, ExecutionProviderDispatch},
 	extern_system_fn,
 	io_binding::IoBinding,
 	memory::Allocator,
@@ -55,13 +55,13 @@ pub use self::{input::SessionInputs, output::SessionOutputs};
 /// # }
 /// ```
 pub struct SessionBuilder {
-	session_options_ptr: *mut ort_sys::OrtSessionOptions,
+	pub(crate) session_options_ptr: *mut ort_sys::OrtSessionOptions,
 
 	allocator: AllocatorType,
 	memory_type: MemType,
 	#[cfg(feature = "custom-ops")]
 	custom_runtime_handles: Vec<*mut std::os::raw::c_void>,
-	execution_providers: Vec<ExecutionProvider>,
+	execution_providers: Vec<ExecutionProviderDispatch>,
 
 	// env must be last to drop it after everything else
 	env: Arc<Environment>
@@ -163,7 +163,7 @@ impl SessionBuilder {
 	///   it will hard crash the process with a "stack buffer overrun" error. This can occur when CUDA/TensorRT is
 	///   missing a DLL such as `zlibwapi.dll`. To prevent your app from crashing, you can check to see if you can load
 	///   `zlibwapi.dll` before enabling the CUDA/TensorRT execution providers.
-	pub fn with_execution_providers(mut self, execution_providers: impl AsRef<[ExecutionProvider]>) -> Result<Self> {
+	pub fn with_execution_providers(mut self, execution_providers: impl AsRef<[ExecutionProviderDispatch]>) -> Result<Self> {
 		self.execution_providers = execution_providers.as_ref().to_vec();
 		Ok(self)
 	}
@@ -228,8 +228,9 @@ impl SessionBuilder {
 	}
 
 	/// Enables profiling. Profile information will be writen to `profiling_file` after profiling completes.
-	/// See `Session::end_profiling`.
+	/// See [`Session::end_profiling`].
 	#[cfg(feature = "profiling")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "profiling")))]
 	pub fn with_profiling<S: AsRef<str>>(self, profiling_file: S) -> Result<Self> {
 		#[cfg(windows)]
 		let profiling_file = widestring::WideCString::from_str(profiling_file.as_ref())?;
@@ -263,6 +264,7 @@ impl SessionBuilder {
 
 	/// Registers a custom operator library with the given library path in the session.
 	#[cfg(feature = "custom-ops")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "custom-ops")))]
 	pub fn with_custom_ops_lib(mut self, lib_path: impl AsRef<str>) -> Result<Self> {
 		let path_cstr = CString::new(lib_path.as_ref())?;
 
@@ -288,6 +290,7 @@ impl SessionBuilder {
 
 	/// Enable custom operators. See onnxruntime-extensions: https://github.com/microsoft/onnxruntime-extensions
 	#[cfg(feature = "custom-ops")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "custom-ops")))]
 	pub fn with_enable_custom_ops(self) -> Result<Self> {
 		let status = ortsys![unsafe EnableOrtCustomOps(self.session_options_ptr)];
 		status_to_result(status).map_err(Error::CreateSessionOptions)?;
@@ -296,6 +299,7 @@ impl SessionBuilder {
 
 	/// Downloads a pre-trained ONNX model from the [ONNX Model Zoo](https://github.com/onnx/models) and builds the session.
 	#[cfg(feature = "fetch-models")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "fetch-models")))]
 	pub fn with_model_downloaded<M>(self, model: M) -> Result<Session>
 	where
 		M: ModelUrl
@@ -382,14 +386,7 @@ impl SessionBuilder {
             .map(|b| *b as std::os::raw::c_char)
             .collect();
 
-		apply_execution_providers(
-			self.session_options_ptr,
-			self.execution_providers
-				.iter()
-				.chain(&self.env.execution_providers)
-				.cloned()
-				.collect::<Vec<_>>()
-		);
+		apply_execution_providers(&self, self.execution_providers.iter().chain(&self.env.execution_providers).cloned());
 
 		let env_ptr: *const ort_sys::OrtEnv = self.env.ptr();
 
@@ -452,14 +449,7 @@ impl SessionBuilder {
             .map(|b| *b as std::os::raw::c_char)
             .collect();
 
-		apply_execution_providers(
-			self.session_options_ptr,
-			self.execution_providers
-				.iter()
-				.chain(&self.env.execution_providers)
-				.cloned()
-				.collect::<Vec<_>>()
-		);
+		apply_execution_providers(&self, self.execution_providers.iter().chain(&self.env.execution_providers).cloned());
 
 		let env_ptr: *const ort_sys::OrtEnv = self.env.ptr();
 
@@ -533,14 +523,7 @@ impl SessionBuilder {
 
 		let env_ptr: *const ort_sys::OrtEnv = self.env.ptr();
 
-		apply_execution_providers(
-			self.session_options_ptr,
-			self.execution_providers
-				.iter()
-				.chain(&self.env.execution_providers)
-				.cloned()
-				.collect::<Vec<_>>()
-		);
+		apply_execution_providers(&self, self.execution_providers.iter().chain(&self.env.execution_providers).cloned());
 
 		let model_data = model_bytes.as_ptr() as *const std::ffi::c_void;
 		let model_data_length = model_bytes.len();
@@ -659,55 +642,45 @@ impl Session {
 	}
 
 	/// Run the input data through the ONNX graph, performing inference.
-	pub fn run<'s, 'm, 'v, 'i>(&'s self, input_values: impl Into<SessionInputs<'s>>) -> Result<SessionOutputs>
-	where
-		's: 'm, // 's outlives 'm (session outlives memory info)
-		'i: 'v
-	{
-		let input_values = input_values.into();
-		if let SessionInputs::IoBinding(mut binding) = input_values {
-			return binding.run();
-		}
-
-		match input_values {
-			SessionInputs::ValueVec(input_values) => {
-				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.clone()).collect::<Vec<_>>(), &input_values)?;
+	pub fn run<'s, 'i, const N: usize>(&'s self, input_values: impl Into<SessionInputs<'i, N>>) -> Result<SessionOutputs<'s>> {
+		match input_values.into() {
+			SessionInputs::ValueSlice(input_values) => {
+				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values)?;
+				Ok(outputs)
+			}
+			SessionInputs::ValueArray(input_values) => {
+				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), &input_values)?;
 				Ok(outputs)
 			}
 			SessionInputs::ValueMap(input_values) => {
 				let (input_names, values): (Vec<&'static str>, Vec<Value>) = input_values.into_iter().unzip();
 				self.run_inner(&input_names, &values)
 			}
-			_ => panic!()
 		}
 	}
 
-	fn run_inner<'s, 'm, 'v, 'i, I>(&'s self, input_names: &[I], input_values: &[Value]) -> Result<SessionOutputs>
-	where
-		I: AsRef<str>,
-		's: 'm, // 's outlives 'm (session outlives memory info)
-		'i: 'v
-	{
+	fn run_inner(&self, input_names: &[&str], input_values: &[Value]) -> Result<SessionOutputs<'_>> {
 		let input_names_ptr: Vec<*const c_char> = input_names
 			.iter()
-			.map(|n| CString::new(n.as_ref()).unwrap())
+			.map(|n| CString::new(*n).unwrap())
 			.map(|n| n.into_raw() as *const c_char)
 			.collect();
-		let output_names: Vec<String> = self.outputs.iter().map(|output| output.name.clone()).collect();
-		let output_names_cstring: Vec<CString> = output_names.iter().cloned().map(|n| CString::new(n).unwrap()).collect();
-		let output_names_ptr: Vec<*const c_char> = output_names_cstring.iter().map(|n| n.as_ptr() as *const c_char).collect();
+		let output_names_ptr: Vec<*const c_char> = self
+			.outputs
+			.iter()
+			.map(|output| CString::new(output.name.as_str()).unwrap())
+			.map(|n| n.into_raw() as *const c_char)
+			.collect();
 
 		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![std::ptr::null_mut(); self.outputs.len()];
 
 		// The C API expects pointers for the arrays (pointers to C-arrays)
 		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.iter().map(|input_array_ort| input_array_ort.ptr() as *const _).collect();
 
-		let run_options_ptr: *const ort_sys::OrtRunOptions = std::ptr::null();
-
 		ortsys![
 			unsafe Run(
 				self.inner.session_ptr,
-				run_options_ptr,
+				ptr::null(),
 				input_names_ptr.as_ptr(),
 				input_ort_values.as_ptr(),
 				input_ort_values.len() as _,
@@ -717,27 +690,24 @@ impl Session {
 			) -> Error::SessionRun
 		];
 
-		std::mem::drop(input_ort_values);
-
 		let outputs: Vec<Value> = output_tensor_ptrs
 			.into_iter()
 			.map(|tensor_ptr| unsafe { Value::from_raw(tensor_ptr, Arc::clone(&self.inner)) })
 			.collect();
 
 		// Reconvert to CString so drop impl is called and memory is freed
-		let cstrings: Result<Vec<CString>> = input_names_ptr
+		let _ = input_names_ptr
 			.into_iter()
 			.map(|p| {
 				assert_non_null_pointer(p, "c_char for CString")?;
 				unsafe { Ok(CString::from_raw(p as *mut c_char)) }
 			})
-			.collect();
-		cstrings?;
+			.collect::<Result<Vec<_>>>()?;
 
-		Ok(SessionOutputs::new(output_names, outputs))
+		Ok(SessionOutputs::new(self.outputs.iter().map(|o| o.name.as_str()), outputs))
 	}
 
-	/// Gets the session model metadata. See [`Metadata`] for more info.
+	/// Gets the session model metadata. See [`ModelMetadata`] for more info.
 	pub fn metadata(&self) -> Result<ModelMetadata> {
 		let mut metadata_ptr: *mut ort_sys::OrtModelMetadata = std::ptr::null_mut();
 		ortsys![unsafe SessionGetModelMetadata(self.inner.session_ptr, &mut metadata_ptr) -> Error::GetModelMetadata; nonNull(metadata_ptr)];
@@ -748,6 +718,7 @@ impl Session {
 	///
 	/// Note that this must be explicitly called at the end of profiling, otherwise the profiing file will be empty.
 	#[cfg(feature = "profiling")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "profiling")))]
 	pub fn end_profiling(&self) -> Result<String> {
 		let mut profiling_name: *mut c_char = std::ptr::null_mut();
 

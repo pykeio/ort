@@ -14,16 +14,21 @@
 //! convert it internally to an [`OrtTensor`]. After inference, a [`OrtOwnedTensor`] will be returned by the method
 //! which can be derefed into its internal [`ndarray::ArrayView`].
 
+#[cfg(feature = "ndarray")]
 mod ndarray;
 mod types;
 
-use std::{fmt::Debug, ops::Deref, ptr};
+use std::{fmt::Debug, ptr};
 
+#[cfg(feature = "ndarray")]
 use ::ndarray::{ArrayView, IxDyn};
 
-pub use self::ndarray::ArrayExtensions;
-pub use self::types::{ExtractTensorData, IntoTensorElementDataType, TensorData, TensorElementDataType, Utf8Data};
-use super::{ortsys, Error, Result};
+pub use self::types::{ExtractTensorData, IntoTensorElementDataType, TensorElementDataType, Utf8Data};
+#[cfg(feature = "ndarray")]
+pub use self::{ndarray::ArrayExtensions, types::TensorData};
+use crate::ortsys;
+#[cfg(feature = "ndarray")]
+use crate::{Error, Result};
 
 /// Tensor containing data owned by the ONNX Runtime C library, used to return values from inference.
 ///
@@ -36,6 +41,8 @@ use super::{ortsys, Error, Result};
 /// `OrtOwnedTensor` implements the [`std::deref::Deref`](#impl-Deref) trait for ergonomic access to
 /// the underlying [`ndarray::ArrayView`](https://docs.rs/ndarray/latest/ndarray/type.ArrayView.html).
 #[derive(Debug)]
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 pub struct Tensor<'t, T>
 where
 	T: ExtractTensorData
@@ -43,6 +50,7 @@ where
 	pub(crate) data: TensorData<'t, T>
 }
 
+#[cfg(feature = "ndarray")]
 impl<'t, T> Tensor<'t, T>
 where
 	T: ExtractTensorData
@@ -61,6 +69,8 @@ where
 // be a field in a struct. This struct exists only to hold that field.
 // Its lifetime 's is bound to the TensorData its view was created around, not the underlying tensor
 // pointer, since in the case of strings the data is the Array in the TensorData, not the pointer.
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 pub struct ArrayViewHolder<'s, T>
 where
 	T: ExtractTensorData
@@ -68,6 +78,7 @@ where
 	array_view: ArrayView<'s, T, IxDyn>
 }
 
+#[cfg(feature = "ndarray")]
 impl<'s, T> ArrayViewHolder<'s, T>
 where
 	T: ExtractTensorData
@@ -91,7 +102,8 @@ where
 	}
 }
 
-impl<'t, T> Deref for ArrayViewHolder<'t, T>
+#[cfg(feature = "ndarray")]
+impl<'t, T> std::ops::Deref for ArrayViewHolder<'t, T>
 where
 	T: ExtractTensorData
 {

@@ -1,11 +1,8 @@
-use std::{
-	ffi,
-	fmt::{self, Debug},
-	ptr, result, string
-};
+use std::fmt::{self, Debug};
+#[cfg(feature = "ndarray")]
+use std::{ffi, ptr, result, string};
 
-use ndarray::IxDyn;
-
+#[cfg(feature = "ndarray")]
 use super::{ortsys, Error, Result};
 
 /// Enum mapping ONNX Runtime's supported tensor data types.
@@ -29,8 +26,9 @@ pub enum TensorElementDataType {
 	String,
 	/// Boolean, equivalent to Rust's `bool`.
 	Bool,
-	/// 16-bit floating point number, equivalent to `half::f16` (requires the `half` crate).
+	/// 16-bit floating point number, equivalent to [`half::f16`] (requires the `half` feature).
 	#[cfg(feature = "half")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "half")))]
 	Float16,
 	/// 64-bit floating point number, equivalent to Rust's `f64`. Also known as `double`.
 	Float64,
@@ -43,8 +41,9 @@ pub enum TensorElementDataType {
 	// TODO: `num_complex` crate doesn't support i128 provided by the `decimal` crate.
 	// /// Complex 128-bit floating point number, equivalent to Rust's `num_complex::Complex<f128>`.
 	// Complex128,
-	/// Brain 16-bit floating point number, equivalent to `half::bf16` (requires the `half` crate).
+	/// Brain 16-bit floating point number, equivalent to [`half::bf16`] (requires the `half` feature).
 	#[cfg(feature = "half")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "half")))]
 	Bfloat16
 }
 
@@ -123,6 +122,7 @@ impl_type_trait!(i32, Int32);
 impl_type_trait!(i64, Int64);
 impl_type_trait!(bool, Bool);
 #[cfg(feature = "half")]
+#[cfg_attr(docsrs, doc(cfg(feature = "half")))]
 impl_type_trait!(half::f16, Float16);
 impl_type_trait!(f64, Float64);
 impl_type_trait!(u32, Uint32);
@@ -130,6 +130,7 @@ impl_type_trait!(u64, Uint64);
 // impl_type_trait!(num_complex::Complex<f64>, Complex64);
 // impl_type_trait!(num_complex::Complex<f128>, Complex128);
 #[cfg(feature = "half")]
+#[cfg_attr(docsrs, doc(cfg(feature = "half")))]
 impl_type_trait!(half::bf16, Bfloat16);
 
 /// Adapter for common Rust string types to ONNX strings.
@@ -160,6 +161,8 @@ pub trait ExtractTensorData: Sized + fmt::Debug + Clone {
 	/// The tensor element type that this type can extract from.
 	fn tensor_element_data_type() -> TensorElementDataType;
 
+	#[cfg(feature = "ndarray")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	/// Extract an `ArrayView` from the ORT-owned tensor.
 	fn extract_tensor_array<'t, D>(shape: D, tensor_element_len: usize, tensor_ptr: *mut ort_sys::OrtValue) -> Result<TensorData<'t, Self>>
 	where
@@ -170,6 +173,8 @@ pub trait ExtractTensorData: Sized + fmt::Debug + Clone {
 ///
 /// This should only be used internally.
 #[derive(Debug)]
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 pub enum TensorData<'t, T> {
 	/// Data residing in ONNX Runtime's tensor, in which case the `'t` lifetime is what makes this valid.
 	/// This is used for data types whose in-memory form from ONNX Runtime is compatible with Rust's, like
@@ -178,18 +183,18 @@ pub enum TensorData<'t, T> {
 		/// The pointer ONNX Runtime produced. Kept alive so that `array_view` is valid.
 		ptr: *mut ort_sys::OrtValue,
 		/// A view into `ptr`.
-		array_view: ndarray::ArrayView<'t, T, IxDyn>
+		array_view: ndarray::ArrayView<'t, T, ndarray::IxDyn>
 	},
 	/// String data is output differently by ONNX, and is of course also variable size, so it cannot
 	/// use the same simple pointer representation.
 	// Since `'t` outlives this struct, the 't lifetime is more than we need, but no harm done.
 	Strings {
 		/// Owned Strings copied out of ONNX Runtime's output.
-		strings: ndarray::Array<T, IxDyn>
+		strings: ndarray::Array<T, ndarray::IxDyn>
 	}
 }
 
-/// Implements [`TensorDataToType`] for primitives which can use `GetTensorMutableData`.
+/// Implements [`ExtractTensorData`] for primitives which can use `GetTensorMutableData`.
 macro_rules! impl_prim_type_from_ort_trait {
 	($type_: ty, $variant: ident) => {
 		impl ExtractTensorData for $type_ {
@@ -197,6 +202,7 @@ macro_rules! impl_prim_type_from_ort_trait {
 				TensorElementDataType::$variant
 			}
 
+			#[cfg(feature = "ndarray")]
 			fn extract_tensor_array<'t, D>(shape: D, _tensor_element_len: usize, tensor_ptr: *mut ort_sys::OrtValue) -> Result<TensorData<'t, Self>>
 			where
 				D: ndarray::Dimension
@@ -211,7 +217,8 @@ macro_rules! impl_prim_type_from_ort_trait {
 ///
 /// Only to be used on types whose Rust in-memory representation matches ONNX Runtime's (e.g. primitive numeric types
 /// like u32)
-fn extract_primitive_array<'t, D, T: ExtractTensorData>(shape: D, tensor: *mut ort_sys::OrtValue) -> Result<ndarray::ArrayView<'t, T, IxDyn>>
+#[cfg(feature = "ndarray")]
+fn extract_primitive_array<'t, D, T: ExtractTensorData>(shape: D, tensor: *mut ort_sys::OrtValue) -> Result<ndarray::ArrayView<'t, T, ndarray::IxDyn>>
 where
 	D: ndarray::Dimension
 {
@@ -226,8 +233,10 @@ where
 }
 
 #[cfg(feature = "half")]
+#[cfg_attr(docsrs, doc(cfg(feature = "half")))]
 impl_prim_type_from_ort_trait!(half::f16, Float16);
 #[cfg(feature = "half")]
+#[cfg_attr(docsrs, doc(cfg(feature = "half")))]
 impl_prim_type_from_ort_trait!(half::bf16, Bfloat16);
 impl_prim_type_from_ort_trait!(f32, Float32);
 impl_prim_type_from_ort_trait!(f64, Float64);
@@ -246,6 +255,7 @@ impl ExtractTensorData for String {
 		TensorElementDataType::String
 	}
 
+	#[cfg(feature = "ndarray")]
 	#[allow(clippy::not_unsafe_ptr_arg_deref)]
 	fn extract_tensor_array<'t, D: ndarray::Dimension>(
 		shape: D,

@@ -9,7 +9,7 @@ use tracing::{debug, error, warn};
 use super::{
 	custom_logger,
 	error::{status_to_result, Error, Result},
-	ort, ortsys, ExecutionProvider, LoggingLevel
+	ort, ortsys, ExecutionProviderDispatch, LoggingLevel
 };
 
 static G_ENV: Lazy<Arc<Mutex<EnvironmentSingleton>>> = Lazy::new(|| {
@@ -55,7 +55,7 @@ pub struct EnvironmentGlobalThreadPoolOptions {
 #[derive(Debug, Clone)]
 pub struct Environment {
 	env: Arc<Mutex<EnvironmentSingleton>>,
-	pub(crate) execution_providers: Vec<ExecutionProvider>
+	pub(crate) execution_providers: Vec<ExecutionProviderDispatch>
 }
 
 unsafe impl Send for Environment {}
@@ -185,7 +185,7 @@ impl Drop for Environment {
 pub struct EnvironmentBuilder {
 	name: String,
 	log_level: LoggingLevel,
-	execution_providers: Vec<ExecutionProvider>,
+	execution_providers: Vec<ExecutionProviderDispatch>,
 	global_thread_pool_options: Option<EnvironmentGlobalThreadPoolOptions>
 }
 
@@ -248,7 +248,7 @@ impl EnvironmentBuilder {
 	///   it will hard crash the process with a "stack buffer overrun" error. This can occur when CUDA/TensorRT is
 	///   missing a DLL such as `zlibwapi.dll`. To prevent your app from crashing, you can check to see if you can load
 	///   `zlibwapi.dll` before enabling the CUDA/TensorRT execution providers.
-	pub fn with_execution_providers(mut self, execution_providers: impl AsRef<[ExecutionProvider]>) -> EnvironmentBuilder {
+	pub fn with_execution_providers(mut self, execution_providers: impl AsRef<[ExecutionProviderDispatch]>) -> EnvironmentBuilder {
 		self.execution_providers = execution_providers.as_ref().to_vec();
 		self
 	}

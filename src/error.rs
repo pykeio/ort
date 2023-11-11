@@ -178,6 +178,8 @@ pub enum Error {
 	BindInput(ErrorInternal),
 	#[error("Error when binding output: {0}")]
 	BindOutput(ErrorInternal),
+	#[error("Failed to clear IO binding: {0}")]
+	ClearBinding(ErrorInternal),
 	#[error("Error when retrieving session outputs from `IoBinding`: {0}")]
 	GetBoundOutputs(ErrorInternal)
 }
@@ -237,6 +239,7 @@ pub enum FetchModelError {
 	IoError(#[from] io::Error),
 	/// Download error by ureq
 	#[cfg(feature = "fetch-models")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "fetch-models")))]
 	#[error("Error downloading to file: {0}")]
 	FetchError(#[from] Box<ureq::Error>),
 	/// Error getting Content-Length from HTTP GET request.

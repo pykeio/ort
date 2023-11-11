@@ -225,7 +225,7 @@ impl Value {
 				let mut len = 0;
 				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
 
-				Ok((node_dims, unsafe { std::slice::from_raw_parts(output_array_ptr, len) }))
+				Ok((node_dims, unsafe { std::slice::from_raw_parts(output_array_ptr, len as _) }))
 			}
 		};
 		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];

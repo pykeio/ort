@@ -62,7 +62,7 @@ impl<'s> IoBinding<'s> {
 		let run_options_ptr: *const ort_sys::OrtRunOptions = std::ptr::null();
 		ortsys![unsafe RunWithBinding(self.session.inner.session_ptr, run_options_ptr, self.ptr) -> Error::SessionRunWithIoBinding];
 
-		let mut count = self.output_names.len();
+		let mut count = self.output_names.len() as ort_sys::size_t;
 		if count > 0 {
 			let mut output_values_ptr: *mut *mut ort_sys::OrtValue = ptr::null_mut();
 			let allocator = self.session.allocator();

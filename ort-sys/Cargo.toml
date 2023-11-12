@@ -7,12 +7,10 @@ rust-version = "1.70"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/pykeio/ort"
 documentation = "https://ort.pyke.io/"
-readme = "README.md"
 keywords = [ "machine-learning", "ai", "ml" , "sys"]
 categories = [ "algorithms", "mathematics", "science" ]
 authors = [
-	"pyke.io <contact@pyke.io>",
-	"Nicolas Bigaouette <nbigaouette@gmail.com>"
+	"pyke.io <contact@pyke.io>"
 ]
 include = [ "src/", "build.rs", "LICENSE-APACHE", "LICENSE-MIT" ]
 

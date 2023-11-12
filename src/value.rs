@@ -248,7 +248,6 @@ impl Value {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemType::Default)?;
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
-		let value_ptr_ptr: *mut *mut ort_sys::OrtValue = &mut value_ptr;
 
 		let guard = match T::into_tensor_element_data_type() {
 			TensorElementDataType::Float32
@@ -279,7 +278,7 @@ impl Value {
 						shape_ptr,
 						shape_len as _,
 						T::into_tensor_element_data_type().into(),
-						value_ptr_ptr
+						&mut value_ptr
 					) -> Error::CreateTensorWithData;
 					nonNull(value_ptr)
 				];
@@ -307,7 +306,7 @@ impl Value {
 						shape_ptr,
 						shape_len as _,
 						T::into_tensor_element_data_type().into(),
-						value_ptr_ptr
+						&mut value_ptr
 					) -> Error::CreateTensorWithData;
 					nonNull(value_ptr)
 				];
@@ -338,7 +337,6 @@ impl Value {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemType::Default)?;
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
-		let value_ptr_ptr: *mut *mut ort_sys::OrtValue = &mut value_ptr;
 
 		let (shape, data) = input.ref_parts();
 		let shape_ptr: *const i64 = shape.as_ptr();
@@ -346,8 +344,9 @@ impl Value {
 
 		// create tensor without data -- data is filled in later
 		ortsys![
-			unsafe CreateTensorAsOrtValue(allocator.ptr, shape_ptr, shape_len as _, TensorElementDataType::String.into(), value_ptr_ptr)
-				-> Error::CreateTensor
+			unsafe CreateTensorAsOrtValue(allocator.ptr, shape_ptr, shape_len as _, TensorElementDataType::String.into(), &mut value_ptr)
+				-> Error::CreateTensor;
+			nonNull(value_ptr)
 		];
 
 		// create null-terminated copies of each string, as per `FillStringTensor` docs

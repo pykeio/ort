@@ -1,7 +1,5 @@
 //! Contains the [`Session`] and [`SessionBuilder`] types for managing ONNX Runtime sessions and performing inference.
 
-#![allow(clippy::tabs_in_doc_comments)]
-
 #[cfg(not(target_family = "windows"))]
 use std::os::unix::ffi::OsStrExt;
 #[cfg(target_family = "windows")]
@@ -695,14 +693,17 @@ impl Session {
 			.map(|tensor_ptr| unsafe { Value::from_raw(tensor_ptr, Arc::clone(&self.inner)) })
 			.collect();
 
-		// Reconvert to CString so drop impl is called and memory is freed
-		let _ = input_names_ptr
-			.into_iter()
-			.map(|p| {
-				assert_non_null_pointer(p, "c_char for CString")?;
-				unsafe { Ok(CString::from_raw(p as *mut c_char)) }
-			})
-			.collect::<Result<Vec<_>>>()?;
+		// Reconvert name ptrs to CString so drop impl is called and memory is freed
+		drop(
+			input_names_ptr
+				.into_iter()
+				.chain(output_names_ptr.into_iter())
+				.map(|p| {
+					assert_non_null_pointer(p, "c_char for CString")?;
+					unsafe { Ok(CString::from_raw(p as *mut c_char)) }
+				})
+				.collect::<Result<Vec<_>>>()?
+		);
 
 		Ok(SessionOutputs::new(self.outputs.iter().map(|o| o.name.as_str()), outputs))
 	}

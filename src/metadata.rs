@@ -1,5 +1,3 @@
-#![allow(clippy::tabs_in_doc_comments)]
-
 use std::{ffi::CString, os::raw::c_char};
 
 use super::{char_p_to_string, error::Result, ortfree, ortsys, Error};

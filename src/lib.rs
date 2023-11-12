@@ -1,6 +1,14 @@
-#![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://raw.githubusercontent.com/pykeio/ort/v2/docs/icon.png")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![allow(clippy::tabs_in_doc_comments)]
+
+//! <div align=center>
+//! 	<img src="https://raw.githubusercontent.com/pykeio/ort/v2/docs/banner.png" width="350px">
+//! 	<hr />
+//! </div>
+//!
+//! `ort` is a Rust binding for [ONNX Runtime](https://onnxruntime.ai/). For information on how to get started with `ort`,
+//! see <https://ort.pyke.io/introduction>.
 
 pub mod download;
 pub(crate) mod environment;

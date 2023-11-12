@@ -93,9 +93,6 @@ fn main() -> ort::Result<()> {
 
 	// Run YOLOv8 inference
 	let mut outputs: SessionOutputs = model.run(inputs!["images" => input.view()]?).unwrap();
-	for _ in 0..1000 {
-		outputs = model.run(inputs!["images" => input.view()]?).unwrap();
-	}
 	let output = outputs["output0"].extract_tensor::<f32>().unwrap().view().t().into_owned();
 
 	let mut boxes = Vec::new();

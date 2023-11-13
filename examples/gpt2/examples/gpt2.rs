@@ -8,10 +8,50 @@ use ort::{download::language::machine_comprehension::GPT2, inputs, CUDAExecution
 use rand::Rng;
 use tokenizers::Tokenizer;
 
+/// Prompt
 const PROMPT: &str = "The corsac fox (Vulpes corsac), also known simply as a corsac, is a medium-sized fox found in";
+/// Max Tokens to Generate
 const GEN_TOKENS: i32 = 90;
+/// Top_K -> Sample from the k most likely next tokens at each step. Lower k focuses on higher probability tokens.
 const TOP_K: usize = 5;
 
+/// GPT-2 Text Generation
+///
+/// This Rust program demonstrates text generation using the GPT-2 language model with the ONNX Runtime.
+/// The program initializes the model, tokenizes a prompt, and generates a sequence of tokens.
+/// It utilizes top-k sampling for diverse and contextually relevant text generation.
+///
+/// # Constants
+/// - `PROMPT`: The initial prompt for text generation.
+/// - `GEN_TOKENS`: The maximum number of tokens to generate.
+/// - `TOP_K`: Parameter for top-k sampling, influencing the diversity of generated text.
+///
+/// # Usage
+/// Ensure that the required dependencies are installed and run the Rust script to generate text using the GPT-2 model.
+///
+/// # Main Function
+/// The main function initializes dependencies, loads the GPT-2 model, tokenizes the prompt,
+/// and iteratively generates text based on the model's output probabilities.
+///
+/// ## Steps
+/// 1. Initialize tracing, stdout, and the random number generator.
+/// 2. Create the ONNX Runtime environment and session for the GPT-2 model.
+/// 3. Load the tokenizer and encode the prompt into a sequence of tokens.
+/// 4. Iteratively generate tokens using the GPT-2 model and top-k sampling.
+/// 5. Print the generated text to the console.
+///
+/// # Panics
+/// The program panics if there is an issue with the ONNX Runtime or tokenizer.
+///
+/// # Errors
+/// Returns an `ort::Result` indicating success or an error during ONNX Runtime execution.
+///
+/// # Examples
+/// ```rust
+/// fn main() -> ort::Result<()> {
+/// 	// ... (see the main function for the complete example)
+/// }
+/// ```
 fn main() -> ort::Result<()> {
 	tracing_subscriber::fmt::init();
 

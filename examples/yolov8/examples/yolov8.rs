@@ -1,5 +1,7 @@
 #![allow(clippy::manual_retain)]
 
+use std::path::Path;
+
 use image::{imageops::FilterType, GenericImageView};
 use ndarray::{s, Array, Axis};
 use ort::{inputs, CUDAExecutionProvider, Environment, SessionBuilder, SessionOutputs};
@@ -40,7 +42,7 @@ const YOLOV8_CLASS_LABELS: [&str; 80] = [
 fn main() -> ort::Result<()> {
 	tracing_subscriber::fmt::init();
 
-	let original_img = image::open("tests/data/baseball.jpg").unwrap();
+	let original_img = image::open(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("baseball.jpg")).unwrap();
 	let (img_width, img_height) = (original_img.width(), original_img.height());
 	let img = original_img.resize_exact(640, 640, FilterType::CatmullRom);
 	let mut input = Array::zeros((1, 3, 640, 640));

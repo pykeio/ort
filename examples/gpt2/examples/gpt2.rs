@@ -1,4 +1,7 @@
-use std::io::{self, Write};
+use std::{
+	io::{self, Write},
+	path::Path
+};
 
 use ndarray::{array, concatenate, s, Array1, Axis};
 use ort::{download::language::machine_comprehension::GPT2, inputs, CUDAExecutionProvider, Environment, GraphOptimizationLevel, SessionBuilder, Tensor};
@@ -26,7 +29,7 @@ fn main() -> ort::Result<()> {
 		.with_intra_threads(1)?
 		.with_model_downloaded(GPT2::GPT2LmHead)?;
 
-	let tokenizer = Tokenizer::from_file("tests/data/gpt2-tokenizer.json").unwrap();
+	let tokenizer = Tokenizer::from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("tokenizer.json")).unwrap();
 	let tokens = tokenizer.encode(PROMPT, false).unwrap();
 	let tokens = tokens.get_ids().iter().map(|i| *i as i64).collect::<Vec<_>>();
 

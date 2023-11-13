@@ -218,13 +218,14 @@ where
 
 #[cfg(feature = "download-binaries")]
 fn extract_archive(filename: &Path, output: &Path) {
-	match filename.extension().map(|e| e.to_str()) {
-		Some(Some("zip")) => extract_zip(filename, output),
-		#[cfg(not(target_os = "windows"))]
-		Some(Some("tgz")) => extract_tgz(filename, output),
-		_ => unimplemented!()
-	}
+    match filename.extension().and_then(|e| e.to_str()) {
+        Some("zip") => extract_zip(filename, output),
+        #[cfg(not(target_os = "windows"))]
+        Some("tgz") => extract_tgz(filename, output),
+        _ => unimplemented!(),
+    }
 }
+
 
 #[cfg(all(feature = "download-binaries", not(target_os = "windows")))]
 fn extract_tgz(filename: &Path, output: &Path) {

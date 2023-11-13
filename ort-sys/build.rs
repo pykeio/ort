@@ -260,22 +260,26 @@ fn extract_zip(filename: &Path, outpath: &Path) {
 fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 	// get the target directory - we need to place the dlls next to the executable so they can be properly loaded by windows
 	let out_dir = out_dir.ancestors().nth(3).unwrap();
-
-	let lib_files = fs::read_dir(lib_dir).unwrap();
-	for lib_file in lib_files.filter(|e| {
-		e.as_ref().ok().map_or(false, |e| {
-			e.file_type().map_or(false, |e| !e.is_dir())
-				&& [".dll", ".so", ".dylib"]
-					.into_iter()
-					.any(|v| e.path().into_os_string().into_string().unwrap().contains(v))
-		})
-	}) {
-		let lib_file = lib_file.unwrap();
-		let lib_path = lib_file.path();
-		let lib_name = lib_path.file_name().unwrap();
-		let out_path = out_dir.join(lib_name);
-		if !out_path.exists() {
-			fs::copy(&lib_path, out_path).unwrap();
+	for out_dir in [out_dir.to_path_buf(), out_dir.join("examples"), out_dir.join("deps")] {
+		let lib_files = fs::read_dir(lib_dir).unwrap();
+		for lib_file in lib_files.filter(|e| {
+			e.as_ref().ok().map_or(false, |e| {
+				e.file_type().map_or(false, |e| !e.is_dir())
+					&& [".dll", ".so", ".dylib"]
+						.into_iter()
+						.any(|v| e.path().into_os_string().into_string().unwrap().contains(v))
+			})
+		}) {
+			let lib_file = lib_file.unwrap();
+			let lib_path = lib_file.path();
+			let lib_name = lib_path.file_name().unwrap();
+			let out_path = out_dir.join(lib_name);
+			if !out_path.exists() {
+				#[cfg(windows)]
+				std::os::windows::fs::symlink_file(&lib_path, out_path).unwrap();
+				#[cfg(unix)]
+				std::os::unix::fs::symlink(&lib_path, out_path).unwrap();
+			}
 		}
 	}
 }

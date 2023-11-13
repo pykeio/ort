@@ -259,7 +259,7 @@ fn extract_zip(filename: &Path, outpath: &Path) {
 
 fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 	// get the target directory - we need to place the dlls next to the executable so they can be properly loaded by windows
-	let out_dir = out_dir.parent().unwrap().parent().unwrap().parent().unwrap();
+	let out_dir = out_dir.ancestors().nth(3).unwrap();
 
 	let lib_files = fs::read_dir(lib_dir).unwrap();
 	for lib_file in lib_files.filter(|e| {

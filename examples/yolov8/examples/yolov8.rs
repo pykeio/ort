@@ -1,7 +1,5 @@
 #![allow(clippy::manual_retain)]
 
-use std::{path::PathBuf, time::Duration};
-
 use image::{imageops::FilterType, GenericImageView};
 use ndarray::{s, Array, Axis};
 use ort::{inputs, CUDAExecutionProvider, Environment, SessionBuilder, SessionOutputs};
@@ -38,35 +36,6 @@ const YOLOV8_CLASS_LABELS: [&str; 80] = [
 	"book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"
 ];
 
-fn download_model(download_dir: PathBuf) -> PathBuf {
-	let model_filename = PathBuf::from(YOLOV8M_URL.split('/').last().unwrap());
-	let model_filepath = download_dir.join(model_filename);
-	if model_filepath.exists() {
-		tracing::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), "Model already exists, skipping download");
-		model_filepath
-	} else {
-		tracing::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), url = format!("{:?}", YOLOV8M_URL).as_str(), "Downloading model");
-
-		let resp = ureq::get(YOLOV8M_URL).timeout(Duration::from_secs(180)).call().unwrap();
-
-		assert!(resp.has("Content-Length"));
-		let len = resp.header("Content-Length").and_then(|s| s.parse::<usize>().ok()).unwrap();
-		tracing::info!(len, "Downloading {} bytes", len);
-
-		let mut reader = resp.into_reader();
-
-		let f = std::fs::File::create(&model_filepath).unwrap();
-		let mut writer = std::io::BufWriter::new(f);
-
-		let bytes_io_count = std::io::copy(&mut reader, &mut writer).unwrap();
-		if bytes_io_count == len as u64 {
-			model_filepath
-		} else {
-			panic!("failed to download");
-		}
-	}
-}
-
 #[show_image::main]
 fn main() -> ort::Result<()> {
 	tracing_subscriber::fmt::init();
@@ -88,11 +57,10 @@ fn main() -> ort::Result<()> {
 		.with_execution_providers([CUDAExecutionProvider::default().build()])
 		.build()?
 		.into_arc();
-	let path = download_model(std::env::current_dir().unwrap());
-	let model = SessionBuilder::new(&env).unwrap().with_model_from_file(path).unwrap();
+	let model = SessionBuilder::new(&env).unwrap().with_model_downloaded(YOLOV8M_URL).unwrap();
 
 	// Run YOLOv8 inference
-	let mut outputs: SessionOutputs = model.run(inputs!["images" => input.view()]?).unwrap();
+	let outputs: SessionOutputs = model.run(inputs!["images" => input.view()]?).unwrap();
 	let output = outputs["output0"].extract_tensor::<f32>().unwrap().view().t().into_owned();
 
 	let mut boxes = Vec::new();

@@ -12,6 +12,8 @@ pub struct SessionOutputs<'s> {
 	backing_ptr: Option<(*mut ort_sys::OrtAllocator, *mut c_void)>
 }
 
+unsafe impl<'s> Send for SessionOutputs<'s> {}
+
 impl<'s> SessionOutputs<'s> {
 	pub(crate) fn new(output_names: impl Iterator<Item = &'s str> + Clone, output_values: impl IntoIterator<Item = Value>) -> Self {
 		let map = output_names.clone().zip(output_values).collect();

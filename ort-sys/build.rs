@@ -110,6 +110,16 @@ fn add_search_dir<P: AsRef<Path>>(base: P) {
 	}
 }
 
+fn static_link_prerequisites() {
+	let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+	if target_os == "macos" {
+		println!("cargo:rustc-link-lib=c++");
+		println!("cargo:rustc-link-lib=framework=Foundation");
+	} else if target_os == "linux" {
+		println!("cargo:rustc-link-lib=stdc++");
+	}
+}
+
 fn system_strategy() -> (PathBuf, bool) {
 	let lib_dir = PathBuf::from(env::var(ORT_ENV_SYSTEM_LIB_LOCATION).expect("[ort] system strategy requires ORT_LIB_LOCATION env var to be set"));
 
@@ -127,12 +137,7 @@ fn system_strategy() -> (PathBuf, bool) {
 		}
 	}
 
-	if cfg!(target_os = "macos") {
-		println!("cargo:rustc-link-lib=c++");
-		println!("cargo:rustc-link-lib=framework=Foundation");
-	} else if cfg!(target_os = "linux") {
-		println!("cargo:rustc-link-lib=stdc++");
-	}
+	static_link_prerequisites();
 
 	add_search_dir(&lib_dir);
 
@@ -225,10 +230,11 @@ fn system_strategy() -> (PathBuf, bool) {
 			// none of the static link patterns matched, we might be trying to dynamic link so copy dylibs if requested
 			#[cfg(feature = "copy-dylibs")]
 			{
+				let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 				if lib_dir.join("lib").is_dir() {
-					copy_libraries(&lib_dir.join("lib"), &PathBuf::from(env::var("OUT_DIR").unwrap()));
+					copy_libraries(&lib_dir.join("lib"), &out_dir);
 				} else if lib_dir.join(&profile).is_dir() {
-					copy_libraries(&lib_dir.join(profile), &PathBuf::from(env::var("OUT_DIR").unwrap()));
+					copy_libraries(&lib_dir.join(profile), &out_dir);
 				}
 			}
 		}
@@ -303,6 +309,8 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 				assert!(verify_file(&downloaded_file, prebuilt_hash));
 				extract_tzs(&downloaded_file, &out_dir);
 			}
+
+			static_link_prerequisites();
 
 			#[cfg(feature = "copy-dylibs")]
 			{

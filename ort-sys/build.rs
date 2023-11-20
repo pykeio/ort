@@ -1,16 +1,9 @@
-#![allow(unused)]
-
 use std::{
-	borrow::Cow,
 	env, fs,
-	io::{self, Read, Write},
-	path::{Path, PathBuf},
-	process::Stdio,
-	str::FromStr
+	io::{self, Read},
+	path::{Path, PathBuf}
 };
 
-const ORT_VERSION: &str = "1.16.2";
-const ORT_RELEASE_BASE_URL: &str = "https://github.com/microsoft/onnxruntime/releases/download";
 const ORT_ENV_STRATEGY: &str = "ORT_STRATEGY";
 const ORT_ENV_SYSTEM_LIB_LOCATION: &str = "ORT_LIB_LOCATION";
 const ORT_EXTRACT_DIR: &str = "onnxruntime";
@@ -26,178 +19,7 @@ macro_rules! incompatible_providers {
 }
 
 #[cfg(feature = "download-binaries")]
-trait OnnxPrebuiltArchive {
-	fn as_onnx_str(&self) -> Cow<str>;
-}
-
-#[cfg(feature = "download-binaries")]
-#[derive(Debug)]
-enum Architecture {
-	X86,
-	X86_64,
-	Arm,
-	Arm64
-}
-
-#[cfg(feature = "download-binaries")]
-impl FromStr for Architecture {
-	type Err = String;
-
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		match s {
-			"x86" => Ok(Architecture::X86),
-			"x86_64" => Ok(Architecture::X86_64),
-			"arm" => Ok(Architecture::Arm),
-			"aarch64" => Ok(Architecture::Arm64),
-			_ => Err(format!(
-				"Unsupported architecture for binary download: {s}\nMicrosoft does not provide prebuilt binaries for this platform.\nYou'll need to build ONNX Runtime from source, disable the `download-binaries` feature, and link `ort` to your compiled libraries. See https://github.com/pykeio/ort#how-to-get-binaries"
-			))
-		}
-	}
-}
-
-#[cfg(feature = "download-binaries")]
-impl OnnxPrebuiltArchive for Architecture {
-	fn as_onnx_str(&self) -> Cow<str> {
-		match self {
-			Architecture::X86 => "x86".into(),
-			Architecture::X86_64 => "x64".into(),
-			Architecture::Arm => "arm".into(),
-			Architecture::Arm64 => "arm64".into()
-		}
-	}
-}
-
-#[cfg(feature = "download-binaries")]
-#[derive(Debug)]
-#[allow(clippy::enum_variant_names)]
-enum Os {
-	Windows,
-	Linux,
-	MacOS
-}
-
-#[cfg(feature = "download-binaries")]
-impl Os {
-	fn archive_extension(&self) -> &'static str {
-		match self {
-			Os::Windows => "zip",
-			Os::Linux => "tgz",
-			Os::MacOS => "tgz"
-		}
-	}
-}
-
-#[cfg(feature = "download-binaries")]
-impl FromStr for Os {
-	type Err = String;
-
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		match s {
-			"windows" => Ok(Os::Windows),
-			"linux" => Ok(Os::Linux),
-			"macos" => Ok(Os::MacOS),
-			_ => Err(format!(
-				"Unsupported OS for binary download: {s}\nMicrosoft does not provide prebuilt binaries for this platform.\nYou'll need to build ONNX Runtime from source, disable the `download-binaries` feature, and link `ort` to your compiled libraries. See https://github.com/pykeio/ort#how-to-get-binaries"
-			))
-		}
-	}
-}
-
-#[cfg(feature = "download-binaries")]
-impl OnnxPrebuiltArchive for Os {
-	fn as_onnx_str(&self) -> Cow<str> {
-		match self {
-			Os::Windows => "win".into(),
-			Os::Linux => "linux".into(),
-			Os::MacOS => "osx".into()
-		}
-	}
-}
-
-#[cfg(feature = "download-binaries")]
-#[derive(Debug)]
-enum Accelerator {
-	None,
-	Gpu
-}
-
-#[cfg(feature = "download-binaries")]
-impl OnnxPrebuiltArchive for Accelerator {
-	fn as_onnx_str(&self) -> Cow<str> {
-		match self {
-			Accelerator::None => "unaccelerated".into(),
-			Accelerator::Gpu => "gpu".into()
-		}
-	}
-}
-
-#[cfg(feature = "download-binaries")]
-#[derive(Debug)]
-struct Triplet {
-	os: Os,
-	arch: Architecture,
-	accelerator: Accelerator
-}
-
-#[cfg(feature = "download-binaries")]
-impl OnnxPrebuiltArchive for Triplet {
-	fn as_onnx_str(&self) -> Cow<str> {
-		match (&self.os, &self.arch, &self.accelerator) {
-			(Os::Windows, Architecture::X86, Accelerator::None)
-			| (Os::Windows, Architecture::X86_64, Accelerator::None)
-			| (Os::Windows, Architecture::Arm, Accelerator::None)
-			| (Os::Windows, Architecture::Arm64, Accelerator::None)
-			| (Os::Linux, Architecture::X86_64, Accelerator::None)
-			| (Os::MacOS, Architecture::Arm64, Accelerator::None) => format!("{}-{}", self.os.as_onnx_str(), self.arch.as_onnx_str()).into(),
-			// for some reason, arm64/Linux uses `aarch64` instead of `arm64`
-			(Os::Linux, Architecture::Arm64, Accelerator::None) => format!("{}-{}", self.os.as_onnx_str(), "aarch64").into(),
-			// for another odd reason, x64/macOS uses `x86_64` instead of `x64`
-			(Os::MacOS, Architecture::X86_64, Accelerator::None) => format!("{}-{}", self.os.as_onnx_str(), "x86_64").into(),
-			(Os::Windows, Architecture::X86_64, Accelerator::Gpu) | (Os::Linux, Architecture::X86_64, Accelerator::Gpu) => {
-				format!("{}-{}-{}", self.os.as_onnx_str(), self.arch.as_onnx_str(), self.accelerator.as_onnx_str()).into()
-			}
-			_ => panic!(
-				"Microsoft does not provide ONNX Runtime downloads for triplet: {}-{}-{}; you may have to use the `system` strategy instead",
-				self.os.as_onnx_str(),
-				self.arch.as_onnx_str(),
-				self.accelerator.as_onnx_str()
-			)
-		}
-	}
-}
-
-#[cfg(feature = "download-binaries")]
-fn prebuilt_onnx_url() -> (PathBuf, String) {
-	let accelerator = if cfg!(feature = "cuda") || cfg!(feature = "tensorrt") {
-		Accelerator::Gpu
-	} else {
-		Accelerator::None
-	};
-
-	let triplet = Triplet {
-		os: env::var("CARGO_CFG_TARGET_OS")
-			.expect("unable to get target OS")
-			.parse()
-			.expect("unsupported target OS"),
-		arch: env::var("CARGO_CFG_TARGET_ARCH")
-			.expect("unable to get target arch")
-			.parse()
-			.expect("unsupported target arch"),
-		accelerator
-	};
-
-	let prebuilt_archive = format!("onnxruntime-{}-{}.{}", triplet.as_onnx_str(), ORT_VERSION, triplet.os.archive_extension());
-	let prebuilt_url = format!("{ORT_RELEASE_BASE_URL}/v{ORT_VERSION}/{prebuilt_archive}");
-
-	(PathBuf::from(prebuilt_archive), prebuilt_url)
-}
-
-#[cfg(feature = "download-binaries")]
-fn download<P>(source_url: &str, target_file: P)
-where
-	P: AsRef<Path>
-{
+fn fetch_file(source_url: &str) -> Vec<u8> {
 	let resp = ureq::get(source_url)
 		.timeout(std::time::Duration::from_secs(1800))
 		.call()
@@ -205,56 +27,37 @@ where
 
 	let len = resp.header("Content-Length").and_then(|s| s.parse::<usize>().ok()).unwrap();
 	let mut reader = resp.into_reader();
-	// FIXME: Save directly to the file
-	let mut buffer = vec![];
-	let read_len = reader.read_to_end(&mut buffer).unwrap();
+	let mut buffer = Vec::new();
+	reader.read_to_end(&mut buffer).unwrap();
 	assert_eq!(buffer.len(), len);
-	assert_eq!(buffer.len(), read_len);
-
-	let f = fs::File::create(&target_file).unwrap();
-	let mut writer = io::BufWriter::new(f);
-	writer.write_all(&buffer).unwrap();
+	buffer
 }
 
 #[cfg(feature = "download-binaries")]
-fn extract_archive(filename: &Path, output: &Path) {
-	match filename.extension().map(|e| e.to_str()) {
-		Some(Some("zip")) => extract_zip(filename, output),
-		#[cfg(not(target_os = "windows"))]
-		Some(Some("tgz")) => extract_tgz(filename, output),
-		_ => unimplemented!()
-	}
-}
-
-#[cfg(all(feature = "download-binaries", not(target_os = "windows")))]
-fn extract_tgz(filename: &Path, output: &Path) {
-	let file = fs::File::open(filename).unwrap();
-	let buf = io::BufReader::new(file);
-	let tar = flate2::read::GzDecoder::new(buf);
-	let mut archive = tar::Archive::new(tar);
-	archive.unpack(output).unwrap();
-}
-
-#[cfg(feature = "download-binaries")]
-fn extract_zip(filename: &Path, outpath: &Path) {
-	let file = fs::File::open(filename).unwrap();
-	let buf = io::BufReader::new(file);
-	let mut archive = zip::ZipArchive::new(buf).unwrap();
-	for i in 0..archive.len() {
-		let mut file = archive.by_index(i).unwrap();
-		#[allow(deprecated)]
-		let outpath = outpath.join(file.enclosed_name().unwrap());
-		if !file.name().ends_with('/') {
-			println!("File {} extracted to \"{}\" ({} bytes)", i, outpath.as_path().display(), file.size());
-			if let Some(p) = outpath.parent() {
-				if !p.exists() {
-					fs::create_dir_all(p).unwrap();
-				}
-			}
-			let mut outfile = fs::File::create(&outpath).unwrap();
-			io::copy(&mut file, &mut outfile).unwrap();
+fn hex_str_to_bytes(c: impl AsRef<[u8]>) -> Vec<u8> {
+	fn nibble(c: u8) -> u8 {
+		match c {
+			b'A'..=b'F' => c - b'A' + 10,
+			b'a'..=b'f' => c - b'a' + 10,
+			b'0'..=b'9' => c - b'0',
+			_ => panic!()
 		}
 	}
+
+	c.as_ref().chunks(2).map(|n| nibble(n[0]) << 4 | nibble(n[1])).collect()
+}
+
+#[cfg(feature = "download-binaries")]
+fn verify_file(buf: &[u8], hash: impl AsRef<[u8]>) -> bool {
+	use sha2::Digest;
+	sha2::Sha256::digest(buf)[..] == hex_str_to_bytes(hash)
+}
+
+fn extract_tzs(buf: &[u8], output: &Path) {
+	let buf: io::BufReader<&[u8]> = io::BufReader::new(buf);
+	let tar = ruzstd::StreamingDecoder::new(buf).unwrap();
+	let mut archive = tar::Archive::new(tar);
+	archive.unpack(output).unwrap();
 }
 
 fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
@@ -305,7 +108,7 @@ fn system_strategy() -> (PathBuf, bool) {
 	};
 
 	let mut profile = String::new();
-	for i in ["Release", "Debug", "MinSizeRel", "RelWithDebInfo"] {
+	for i in ["Release", "RelWithDebInfo", "MinSizeRel", "Debug"] {
 		if lib_dir.join(i).exists() && lib_dir.join(i).join(platform_format_lib("onnxruntime_common")).exists() {
 			profile = String::from(i);
 			break;
@@ -453,24 +256,42 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 				incompatible_providers![ONEDNN, COREML, OPENVINO, VITIS, TVM, MIGRAPHX, DIRECTML, WINML, ACML, ARMNN, ROCM];
 			}
 
-			let (prebuilt_archive, prebuilt_url) = prebuilt_onnx_url();
+			let (prebuilt_url, prebuilt_hash) = match env::var("TARGET").unwrap().as_str() {
+				"aarch64-apple-darwin" => (
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2/ortrs-msort_static-v1.16.2-aarch64-apple-darwin.tzs",
+					"33F15C09A9AA209AEB02C6C53DA9EA4DCD79E9FBF9E7A3A0FBD0F89099118162"
+				),
+				"aarch64-pc-windows-msvc" => (
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2/ortrs-msort_static-v1.16.2-aarch64-pc-windows-msvc.tzs",
+					"E465FAEA1F32D6141E448D376989516BB9462E554AD70122281931440CEAA6F2"
+				),
+				"wasm32-unknown-emscripten" => (
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2/ortrs-msort_static-v1.16.2-wasm32-unknown-emscripten.tzs",
+					"3AF4B556B0D486A7DB7DDF72EF1B16ED4C960C1F3270ADBBBE01AE4248500F45"
+				),
+				"x86_64-apple-darwin" => (
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2/ortrs-msort_static-v1.16.2-x86_64-apple-darwin.tzs",
+					"70565D22DDDD312B56D74B816BCE7FA17F55EA4DFF4A650C2E4C9F57512DFEEC"
+				),
+				"x86_64-pc-windows-msvc" => (
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2/ortrs-msort_static-v1.16.2-x86_64-pc-windows-msvc.tzs",
+					"5E3B8F3B37876F9C85300845C72BEF50A4F7157B6244DE7A938657346D385413"
+				),
+				"x86_64-unknown-linux-gnu" => (
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2/ortrs-msort_static-v1.16.2-x86_64-unknown-linux-gnu.tzs",
+					"EFE9C5AAF2B05B2E52963A8A838D2E256AD913745D43675177DC57F79D65F836"
+				),
+				x => panic!("downloaded binaries not available for target {x}\nyou may have to compile ONNX Runtime from source")
+			};
 
 			let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-			let extract_dir = out_dir.join(ORT_EXTRACT_DIR);
-			let downloaded_file = out_dir.join(&prebuilt_archive);
-
-			println!("cargo:rerun-if-changed={}", downloaded_file.display());
-
-			if !downloaded_file.exists() {
-				fs::create_dir_all(&out_dir).unwrap();
-				download(&prebuilt_url, &downloaded_file);
+			let lib_dir = out_dir.join(ORT_EXTRACT_DIR);
+			if !lib_dir.exists() {
+				let downloaded_file = fetch_file(prebuilt_url);
+				assert!(verify_file(&downloaded_file, prebuilt_hash));
+				extract_tzs(&downloaded_file, &out_dir);
 			}
 
-			if !extract_dir.exists() {
-				extract_archive(&downloaded_file, &extract_dir);
-			}
-
-			let lib_dir = extract_dir.join(prebuilt_archive.file_stem().unwrap());
 			#[cfg(feature = "copy-dylibs")]
 			{
 				copy_libraries(&lib_dir.join("lib"), &out_dir);
@@ -495,11 +316,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 fn real_main(link: bool) {
 	let (install_dir, needs_link) = prepare_libort_dir();
 
-	let (include_dir, lib_dir) = if install_dir.join("include").exists() && install_dir.join("lib").exists() {
-		(install_dir.join("include"), install_dir.join("lib"))
-	} else {
-		(install_dir.clone(), install_dir)
-	};
+	let lib_dir = if install_dir.join("lib").exists() { install_dir.join("lib") } else { install_dir };
 
 	if link {
 		if needs_link {
@@ -514,17 +331,19 @@ fn real_main(link: bool) {
 }
 
 fn main() {
-	if env::var("DOCS_RS").is_err() {
-		if cfg!(feature = "load-dynamic") {
-			// we only need to execute the real main step if we are using the download strategy...
-			if cfg!(feature = "download-binaries") && std::env::var(ORT_ENV_STRATEGY).as_ref().map_or("download", String::as_str) == "download" {
-				// but we don't need to link to the binaries we download (so all we are doing is downloading them and placing them in
-				// the output directory)
-				real_main(false);
-			}
-		} else {
-			// if we are not using the load-dynamic feature then we need to link to dylibs.
-			real_main(true);
+	if env::var("DOCS_RS").is_ok() {
+		return;
+	}
+
+	if cfg!(feature = "load-dynamic") {
+		// we only need to execute the real main step if we are using the download strategy...
+		if cfg!(feature = "download-binaries") && std::env::var(ORT_ENV_STRATEGY).as_ref().map_or("download", String::as_str) == "download" {
+			// but we don't need to link to the binaries we download (so all we are doing is downloading them and placing them in
+			// the output directory)
+			real_main(false);
 		}
+	} else {
+		// if we are not using the load-dynamic feature then we need to link to dylibs.
+		real_main(true);
 	}
 }

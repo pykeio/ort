@@ -64,6 +64,9 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 	// get the target directory - we need to place the dlls next to the executable so they can be properly loaded by windows
 	let out_dir = out_dir.ancestors().nth(3).unwrap();
 	for out_dir in [out_dir.to_path_buf(), out_dir.join("examples"), out_dir.join("deps")] {
+		#[cfg(windows)]
+		let mut copy_fallback = false;
+
 		let lib_files = fs::read_dir(lib_dir).unwrap();
 		for lib_file in lib_files.filter(|e| {
 			e.as_ref().ok().map_or(false, |e| {
@@ -79,10 +82,19 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 			let out_path = out_dir.join(lib_name);
 			if !out_path.exists() {
 				#[cfg(windows)]
-				std::os::windows::fs::symlink_file(&lib_path, out_path).unwrap();
+				if std::os::windows::fs::symlink_file(&lib_path, &out_path).is_err() {
+					copy_fallback = true;
+					std::fs::copy(&lib_path, out_path).unwrap();
+				}
 				#[cfg(unix)]
 				std::os::unix::fs::symlink(&lib_path, out_path).unwrap();
 			}
+		}
+
+		// If we had to fallback to copying files on Windows, break early to avoid copying to 3 different directories
+		#[cfg(windows)]
+		if copy_fallback {
+			break;
 		}
 	}
 }

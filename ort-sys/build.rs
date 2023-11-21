@@ -137,8 +137,6 @@ fn system_strategy() -> (PathBuf, bool) {
 		}
 	}
 
-	static_link_prerequisites();
-
 	add_search_dir(&lib_dir);
 
 	let mut needs_link = true;
@@ -343,6 +341,8 @@ fn real_main(link: bool) {
 			println!("cargo:rustc-link-lib=onnxruntime");
 			println!("cargo:rustc-link-search=native={}", lib_dir.display());
 		}
+
+		static_link_prerequisites();
 
 		println!("cargo:rerun-if-env-changed={}", ORT_ENV_SYSTEM_LIB_LOCATION);
 	}

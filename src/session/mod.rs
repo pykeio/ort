@@ -760,7 +760,13 @@ mod dangerous {
 	}
 
 	pub(crate) fn raw_pointer_to_string(allocator_ptr: *mut ort_sys::OrtAllocator, c_str: *mut c_char) -> Result<String> {
-		let name = char_p_to_string(c_str)?;
+		let name = match char_p_to_string(c_str) {
+			Ok(name) => name,
+			Err(e) => {
+				ortfree!(unsafe allocator_ptr, c_str);
+				return Err(e);
+			}
+		};
 		ortfree!(unsafe allocator_ptr, c_str);
 		Ok(name)
 	}

@@ -12,15 +12,22 @@ on:
       - '.cargo/**/*'
       - 'tests/**/*'
       - 'codecov.yml'
+      - 'ort-sys/build.rs'
+      - 'ort-sys/src/**/*.rs'
+      - 'ort-sys/wrapper.h'
+      - 'ort-sys/Cargo.toml'
   pull_request:
     paths:
       - '.github/workflows/code-quality.yml'
       - 'src/**/*.rs'
-      - 'build.rs'
       - 'Cargo.toml'
       - '.cargo/**/*'
       - 'tests/**/*'
       - 'codecov.yml'
+      - 'ort-sys/build.rs'
+      - 'ort-sys/src/**/*.rs'
+      - 'ort-sys/wrapper.h'
+      - 'ort-sys/Cargo.toml'
 env:
   RUST_BACKTRACE: 1
   CARGO_INCREMENTAL: 0
@@ -40,7 +47,7 @@ jobs:
       - name: Check fmt
         run: cargo fmt --all -- --check
       - name: Run clippy
-        run: cargo clippy --all-targets --features fetch-models
+        run: cargo clippy -p ort --all-targets --workspace --features fetch-models
   coverage:
     name: Code coverage
     runs-on: ubuntu-latest
@@ -64,8 +71,8 @@ jobs:
         run: cargo install cargo-tarpaulin
       - name: Generate code coverage
         run: |
-          cargo tarpaulin --features fetch-models --verbose --timeout 120 --out xml
+          cargo tarpaulin -p ort --features fetch-models --verbose --timeout 120 --out xml
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v2
         with:
-          fail_ci_if_error: true
+          fail_ci_if_error: false

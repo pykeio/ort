@@ -26,7 +26,14 @@ env:
 jobs:
   test:
     name: Run tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - os: ubuntu-latest
+          - os: windows-latest
+          - os: macos-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install stable Rust toolchain
@@ -35,24 +42,18 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v1
       - name: Run tests
-        # do not run doctests until rust-lang/cargo#10469 is merged
         run: |
-          cargo test --verbose --lib --features fetch-models
+          cargo test -p ort --verbose --features fetch-models -- --test-threads 1
   cross-compile:
     name: Cross-platform compile
     runs-on: ${{ matrix.platform.os }}
     needs: [test]
     strategy:
+      fail-fast: false
       matrix:
         platform:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            command: test
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
-            command: test
-          - target: x86_64-apple-darwin
-            os: macos-latest
             command: test
     steps:
       - uses: actions/checkout@v4
@@ -73,6 +74,4 @@ jobs:
         with:
           command: ${{ matrix.platform.command }}
           target: ${{ matrix.platform.target }}
-          args: "--features fetch-models"
-        env:
-          LC_ALL: C
+          args: "-p ort --features fetch-models"

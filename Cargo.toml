@@ -1,19 +1,32 @@
+[workspace]
+members = [
+	'ort-sys',
+	'examples/gpt2',
+	'examples/yolov8'
+]
+default-members = [
+	'.',
+	'examples/gpt2',
+	'examples/yolov8'
+]
+
 [package]
 name = "ort"
-description = "A Rust wrapper for ONNX Runtime 1.15 - Optimize and Accelerate Machine Learning Inferencing"
-version = "1.15.2"
+description = "A safe Rust wrapper for ONNX Runtime 1.16 - Optimize and Accelerate Machine Learning Inferencing"
+version = "2.0.0-alpha.0"
 edition = "2021"
 rust-version = "1.70"
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/pykeio/ort"
+documentation = "https://ort.pyke.io/"
 readme = "README.md"
 keywords = [ "machine-learning", "ai", "ml" ]
-categories = [ "algorithms", "mathematics", "science" ]
+categories = [ "algorithms", "mathematics", "science", "science" ]
 authors = [
 	"pyke.io <contact@pyke.io>",
 	"Nicolas Bigaouette <nbigaouette@gmail.com>"
 ]
-include = [ "src/", "examples/", "tests/", "toolchains/", "build.rs", "LICENSE", "README.md" ]
+include = [ "src/", "examples/", "tests/", "LICENSE-APACHE", "LICENSE-MIT", "README.md" ]
 
 [profile.release]
 opt-level = 3
@@ -22,37 +35,29 @@ strip = true
 codegen-units = 1
 
 [package.metadata.docs.rs]
-features = [ "half", "fetch-models", "copy-dylibs" ]
-
-[[example]]
-name = "gpt"
-required-features = ["fetch-models"]
+features = [ "ndarray", "half", "profiling", "custom-ops", "fetch-models", "copy-dylibs" ]
+rustdoc-args = [ "--cfg", "docsrs" ]
 
 [features]
-default = [ "half", "download-binaries", "copy-dylibs" ]
+default = [ "ndarray", "half", "download-binaries", "copy-dylibs" ]
 
 profiling = [ "widestring" ]
+custom-ops = [ "libc", "winapi" ]
 
 fetch-models = [ "ureq" ]
-download-binaries = [ "ureq", "zip" ]
-load-dynamic = [ "libloading" ]
-copy-dylibs = []
+download-binaries = [ "ort-sys/download-binaries" ]
+load-dynamic = [ "libloading", "ort-sys/load-dynamic" ]
+copy-dylibs = [ "ort-sys/copy-dylibs" ]
 
-minimal-build = []
-experimental = []
-mimalloc = []
-compile-static = []
-
-cuda = []
-tensorrt = []
+cuda = [ "ort-sys/cuda" ]
+tensorrt = [ "ort-sys/tensorrt" ]
 openvino = []
 onednn = []
 directml = []
-snpe = []
 nnapi = []
 coreml = []
 xnnpack = []
-rocm = []
+rocm = [ "ort-sys/rocm" ]
 acl = []
 armnn = []
 tvm = []
@@ -63,20 +68,21 @@ cann = []
 qnn = []
 
 [dependencies]
-ndarray = "0.15"
+ndarray = { version = "0.15", optional = true }
 thiserror = "1.0"
-libloading = { version = "0.7", optional = true }
+ort-sys = { version = "2.0.0-alpha.0", path = "ort-sys" }
+libloading = { version = "0.8", optional = true }
 
 ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }
-lazy_static = "1.4"
+once_cell = "1.18"
 tracing = "0.1"
 half = { version = "2.1", optional = true }
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2"
+libc = { version = "0.2", optional = true }
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = [ "std", "libloaderapi" ] }
+winapi = { version = "0.3", optional = true, features = [ "std", "libloaderapi" ] }
 widestring = { version = "1.0", optional = true }
 
 [dev-dependencies]
@@ -85,16 +91,3 @@ ureq = "2.1"
 image = "0.24"
 test-log = { version = "0.2", default-features = false, features = [ "trace" ] }
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
-tokenizers = { version = ">=0.13.4", default-features = false, features = [ "onig" ] }
-rand = "0.8"
-
-[build-dependencies]
-ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }
-zip = { version = "0.6", optional = true, default-features = false, features = [ "deflate" ] }
-
-[target.'cfg(not(target_os = "windows"))'.build-dependencies]
-flate2 = "1.0"
-tar = "0.4"
-
-[target.'cfg(target_os = "windows")'.build-dependencies]
-vswhom = "0.1"

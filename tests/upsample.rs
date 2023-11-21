@@ -1,11 +1,8 @@
 use std::path::Path;
 
 use image::RgbImage;
-use ndarray::{Array, CowArray, IxDyn};
-use ort::{
-	environment::Environment, execution_providers::CPUExecutionProviderOptions, tensor::OrtOwnedTensor, value::Value, ExecutionProvider,
-	GraphOptimizationLevel, LoggingLevel, OrtResult, SessionBuilder
-};
+use ndarray::{Array, CowArray, Ix4};
+use ort::{inputs, GraphOptimizationLevel, LoggingLevel, Session, Tensor};
 use test_log::test;
 
 fn load_input_image<P: AsRef<Path>>(name: P) -> RgbImage {
@@ -15,11 +12,10 @@ fn load_input_image<P: AsRef<Path>>(name: P) -> RgbImage {
 		.to_rgb8()
 }
 
-fn convert_image_to_cow_array(img: &RgbImage) -> CowArray<'_, f32, IxDyn> {
+fn convert_image_to_cow_array(img: &RgbImage) -> CowArray<'_, f32, Ix4> {
 	let array = Array::from_shape_vec((1, img.height() as usize, img.width() as usize, 3), img.to_vec())
 		.unwrap()
-		.map(|x| *x as f32 / 255.0)
-		.into_dyn();
+		.map(|x| *x as f32 / 255.0);
 	CowArray::from(array)
 }
 
@@ -45,19 +41,14 @@ fn convert_image_to_cow_array(img: &RgbImage) -> CowArray<'_, f32, IxDyn> {
 /// ])
 /// ```
 #[test]
-fn upsample() -> OrtResult<()> {
+fn upsample() -> ort::Result<()> {
 	const IMAGE_TO_LOAD: &str = "mushroom.png";
 
-	let environment = Environment::builder()
-		.with_name("integration_test")
-		.with_log_level(LoggingLevel::Warning)
-		.with_execution_providers([ExecutionProvider::CPU(CPUExecutionProviderOptions { use_arena: true })])
-		.build()?
-		.into_arc();
+	ort::init().with_name("integration_test").with_log_level(LoggingLevel::Warning).commit()?;
 
 	let session_data =
 		std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("upsample.onnx")).expect("Could not open model from file");
-	let session = SessionBuilder::new(&environment)?
+	let session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
 		.with_model_from_memory(&session_data)
@@ -67,21 +58,18 @@ fn upsample() -> OrtResult<()> {
 	assert_eq!(metadata.name()?, "tf2onnx");
 	assert_eq!(metadata.producer()?, "tf2onnx");
 
-	assert_eq!(session.inputs[0].dimensions().collect::<Vec<_>>(), [None, None, None, Some(3)]);
-	assert_eq!(session.outputs[0].dimensions().collect::<Vec<_>>(), [None, None, None, Some(3)]);
+	assert_eq!(session.inputs[0].input_type.tensor_dimensions().expect("input0 to be a tensor type"), &[-1, -1, -1, 3]);
+	assert_eq!(session.outputs[0].output_type.tensor_dimensions().expect("output0 to be a tensor type"), &[-1, -1, -1, 3]);
 
 	// Load image, converting to RGB format
 	let image_buffer = load_input_image(IMAGE_TO_LOAD);
 	let array = convert_image_to_cow_array(&image_buffer);
 
-	// Just one input
-	let input_tensor_values = vec![Value::from_array(session.allocator(), &array)?];
-
 	// Perform the inference
-	let outputs: Vec<Value> = session.run(input_tensor_values)?;
+	let outputs = session.run(inputs![&array]?)?;
 
 	assert_eq!(outputs.len(), 1);
-	let output: OrtOwnedTensor<'_, f32, IxDyn> = outputs[0].try_extract()?;
+	let output: Tensor<f32> = outputs[0].extract_tensor()?;
 
 	// The image should have doubled in size
 	assert_eq!(output.view().shape(), [1, 448, 448, 3]);
@@ -94,39 +82,31 @@ fn upsample() -> OrtResult<()> {
 /// python -m onnxruntime.tools.convert_onnx_models_to_ort tests/data/upsample.onnx
 /// ```
 #[test]
-fn upsample_with_ort_model() -> OrtResult<()> {
+fn upsample_with_ort_model() -> ort::Result<()> {
 	const IMAGE_TO_LOAD: &str = "mushroom.png";
 
-	let environment = Environment::builder()
-		.with_name("integration_test")
-		.with_log_level(LoggingLevel::Warning)
-		.with_execution_providers([ExecutionProvider::CPU(CPUExecutionProviderOptions { use_arena: true })])
-		.build()?
-		.into_arc();
+	ort::init().with_name("integration_test").with_log_level(LoggingLevel::Warning).commit()?;
 
 	let session_data =
 		std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("upsample.ort")).expect("Could not open model from file");
-	let session = SessionBuilder::new(&environment)?
+	let session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
 		.with_model_from_memory_directly(&session_data) // Zero-copy.
 		.expect("Could not read model from memory");
 
-	assert_eq!(session.inputs[0].dimensions().collect::<Vec<_>>(), [None, None, None, Some(3)]);
-	assert_eq!(session.outputs[0].dimensions().collect::<Vec<_>>(), [None, None, None, Some(3)]);
+	assert_eq!(session.inputs[0].input_type.tensor_dimensions().expect("input0 to be a tensor type"), &[-1, -1, -1, 3]);
+	assert_eq!(session.outputs[0].output_type.tensor_dimensions().expect("output0 to be a tensor type"), &[-1, -1, -1, 3]);
 
 	// Load image, converting to RGB format
 	let image_buffer = load_input_image(IMAGE_TO_LOAD);
 	let array = convert_image_to_cow_array(&image_buffer);
 
-	// Just one input
-	let input_tensor_values = vec![Value::from_array(session.allocator(), &array)?];
-
 	// Perform the inference
-	let outputs: Vec<Value> = session.run(input_tensor_values)?;
+	let outputs = session.run(inputs![&array]?)?;
 
 	assert_eq!(outputs.len(), 1);
-	let output: OrtOwnedTensor<'_, f32, IxDyn> = outputs[0].try_extract()?;
+	let output: Tensor<f32> = outputs[0].extract_tensor()?;
 
 	// The image should have doubled in size
 	assert_eq!(output.view().shape(), [1, 448, 448, 3]);

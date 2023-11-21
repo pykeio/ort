@@ -1,79 +1,82 @@
-use std::{
-	collections::HashMap,
-	ffi::{c_char, c_void, CString},
-	fmt::Debug,
-	mem::ManuallyDrop,
-	ptr,
-	sync::Arc
-};
+use std::{ffi::CString, fmt::Debug, ptr, sync::Arc};
 
-use crate::{memory::MemoryInfo, ortsys, sys, value::Value, OrtError, OrtResult, Session};
+use crate::{memory::MemoryInfo, ortsys, session::output::SessionOutputs, value::Value, Error, Result, Session};
 
+/// Enables binding of session inputs and/or outputs to pre-allocated memory.
+///
+/// Note that this arrangement is designed to minimize data copies, and to that effect, your memory allocations must
+/// match what is expected by the model, whether you run on CPU or GPU. Data will still be copied if the
+/// pre-allocated memory location does not match the one expected by the model. However, copies with `IoBinding`s are
+/// only done once, at the time of the binding, not at run time. This means, that if your input data required a copy,
+/// your further input modifications would not be seen by ONNX Runtime unless you rebind it, even if it is the same
+/// buffer. If your scenario requires that the data is copied, `IoBinding` may not be the best match for your use case.
+/// The fact that data copy is not made during runtime may also have performance implications.
 #[derive(Debug)]
 pub struct IoBinding<'s> {
-	pub(crate) ptr: *mut sys::OrtIoBinding,
-	session: &'s Session
+	pub(crate) ptr: *mut ort_sys::OrtIoBinding,
+	session: &'s Session,
+	input_values: Vec<Value>,
+	output_names: Vec<String>
 }
 
 impl<'s> IoBinding<'s> {
-	pub(crate) fn new(session: &'s Session) -> OrtResult<Self> {
-		let mut ptr: *mut sys::OrtIoBinding = ptr::null_mut();
-		ortsys![unsafe CreateIoBinding(session.session_ptr.inner, &mut ptr) -> OrtError::CreateIoBinding; nonNull(ptr)];
-		Ok(Self { ptr, session })
+	pub(crate) fn new(session: &'s Session) -> Result<Self> {
+		let mut ptr: *mut ort_sys::OrtIoBinding = ptr::null_mut();
+		ortsys![unsafe CreateIoBinding(session.inner.session_ptr, &mut ptr) -> Error::CreateIoBinding; nonNull(ptr)];
+		Ok(Self {
+			ptr,
+			session,
+			input_values: Vec::new(),
+			output_names: Vec::new()
+		})
 	}
 
-	pub fn bind_input<'a, 'b: 'a, S: AsRef<str> + Clone + Debug>(&'a mut self, name: S, ort_value: Value<'b>) -> OrtResult<()> {
+	/// Bind a [`Value`] to a session input.
+	pub fn bind_input<S: AsRef<str>>(&mut self, name: S, ort_value: Value) -> Result<&mut Value> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
-		ortsys![unsafe BindInput(self.ptr, cname.as_ptr(), ort_value.ptr()) -> OrtError::CreateIoBinding];
+		ortsys![unsafe BindInput(self.ptr, cname.as_ptr(), ort_value.ptr()) -> Error::BindInput];
+		self.input_values.push(ort_value);
+		Ok(self.input_values.last_mut().unwrap())
+	}
+
+	/// Bind a session output to a pre-allocated [`Value`].
+	pub fn bind_output<'o: 's, S: AsRef<str>>(&mut self, name: S, ort_value: &'o mut Value) -> Result<()> {
+		let name = name.as_ref();
+		let cname = CString::new(name)?;
+		ortsys![unsafe BindOutput(self.ptr, cname.as_ptr(), ort_value.ptr()) -> Error::BindOutput];
+		self.output_names.push(name.to_string());
 		Ok(())
 	}
 
-	pub fn bind_output<S: AsRef<str> + Clone + Debug>(&mut self, name: S, mem_info: MemoryInfo) -> OrtResult<()> {
+	/// Bind a session output to a device which is specified by `mem_info`.
+	pub fn bind_output_to_device<S: AsRef<str>>(&mut self, name: S, mem_info: MemoryInfo) -> Result<()> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
-		ortsys![unsafe BindOutputToDevice(self.ptr, cname.as_ptr(), mem_info.ptr) -> OrtError::CreateIoBinding];
+		ortsys![unsafe BindOutputToDevice(self.ptr, cname.as_ptr(), mem_info.ptr) -> Error::BindOutput];
+		self.output_names.push(name.to_string());
 		Ok(())
 	}
 
-	pub fn outputs(&self) -> OrtResult<HashMap<String, Value<'static>>> {
-		let mut names_ptr: *mut c_char = ptr::null_mut();
-		let mut lengths = Vec::new();
-		let mut lengths_ptr = lengths.as_mut_ptr();
-		let mut count = 0;
+	pub fn run<'i: 's>(&'i self) -> Result<SessionOutputs<'s>> {
+		let run_options_ptr: *const ort_sys::OrtRunOptions = std::ptr::null();
+		ortsys![unsafe RunWithBinding(self.session.inner.session_ptr, run_options_ptr, self.ptr) -> Error::SessionRunWithIoBinding];
 
-		ortsys![
-			unsafe GetBoundOutputNames(
-				self.ptr,
-				self.session.allocator(),
-				&mut names_ptr,
-				&mut lengths_ptr,
-				&mut count
-			) -> OrtError::CreateIoBinding;
-			nonNull(names_ptr)
-		];
+		let mut count = self.output_names.len() as ort_sys::size_t;
 		if count > 0 {
-			let lengths = unsafe { std::slice::from_raw_parts(lengths_ptr, count).to_vec() };
-			let output_names = unsafe { ManuallyDrop::new(String::from_raw_parts(names_ptr as *mut u8, lengths.iter().sum(), lengths.iter().sum())) };
-			let mut output_names_chars = output_names.chars();
+			let mut output_values_ptr: *mut *mut ort_sys::OrtValue = ptr::null_mut();
+			let allocator = self.session.allocator();
+			ortsys![unsafe GetBoundOutputValues(self.ptr, allocator.ptr, &mut output_values_ptr, &mut count) -> Error::GetBoundOutputs; nonNull(output_values_ptr)];
 
-			let output_names = lengths
+			let output_values = unsafe { std::slice::from_raw_parts(output_values_ptr, count as _).to_vec() }
 				.into_iter()
-				.map(|length| output_names_chars.by_ref().take(length).collect::<String>())
-				.collect::<Vec<_>>();
+				.map(|v| unsafe { Value::from_raw(v, Arc::clone(&self.session.inner)) });
 
-			ortsys![unsafe AllocatorFree(self.session.allocator(), names_ptr as *mut c_void) -> OrtError::CreateIoBinding];
+			// output values will be freed when the `Value`s in `SessionOutputs` drop
 
-			let mut output_values_ptr: *mut *mut sys::OrtValue = vec![ptr::null_mut(); count].as_mut_ptr();
-			ortsys![unsafe GetBoundOutputValues(self.ptr, self.session.allocator(), &mut output_values_ptr, &mut count) -> OrtError::CreateIoBinding; nonNull(output_values_ptr)];
-
-			let output_values_ptr = unsafe { std::slice::from_raw_parts(output_values_ptr, count).to_vec() }
-				.into_iter()
-				.map(|v| Value::from_raw(v, Arc::clone(&self.session.session_ptr)));
-
-			Ok(output_names.into_iter().zip(output_values_ptr).collect::<HashMap<_, _>>())
+			Ok(SessionOutputs::new_backed(self.output_names.iter().map(|c| c.as_str()), output_values, allocator.ptr, output_values_ptr as *mut _))
 		} else {
-			Ok(HashMap::new())
+			Ok(SessionOutputs::new_empty())
 		}
 	}
 }

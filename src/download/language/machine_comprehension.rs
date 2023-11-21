@@ -38,18 +38,18 @@ pub enum GPT2 {
 }
 
 impl ModelUrl for MachineComprehension {
-	fn fetch_url(&self) -> &'static str {
+	fn model_url(&self) -> &'static str {
 		match self {
 			MachineComprehension::BiDAF => "https://github.com/onnx/models/raw/main/text/machine_comprehension/bidirectional_attention_flow/model/bidaf-9.onnx",
 			MachineComprehension::BERTSquad => "https://github.com/onnx/models/raw/main/text/machine_comprehension/bert-squad/model/bertsquad-10.onnx",
-			MachineComprehension::RoBERTa(variant) => variant.fetch_url(),
-			MachineComprehension::GPT2(variant) => variant.fetch_url()
+			MachineComprehension::RoBERTa(variant) => variant.model_url(),
+			MachineComprehension::GPT2(variant) => variant.model_url()
 		}
 	}
 }
 
 impl ModelUrl for RoBERTa {
-	fn fetch_url(&self) -> &'static str {
+	fn model_url(&self) -> &'static str {
 		match self {
 			RoBERTa::RoBERTaBase => "https://github.com/onnx/models/raw/main/text/machine_comprehension/roberta/model/roberta-base-11.onnx",
 			RoBERTa::RoBERTaSequenceClassification => {
@@ -60,7 +60,7 @@ impl ModelUrl for RoBERTa {
 }
 
 impl ModelUrl for GPT2 {
-	fn fetch_url(&self) -> &'static str {
+	fn model_url(&self) -> &'static str {
 		match self {
 			GPT2::GPT2 => "https://github.com/onnx/models/raw/main/text/machine_comprehension/gpt-2/model/gpt2-10.onnx",
 			GPT2::GPT2LmHead => "https://github.com/onnx/models/raw/main/text/machine_comprehension/gpt-2/model/gpt2-lm-head-10.onnx"

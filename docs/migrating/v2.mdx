@@ -1,0 +1,105 @@
+---
+title: Migrating from v1.x to v2
+description: Here's what you need to know to update your application to use the latest & greatest version of ort.
+---
+
+## Session inputs
+
+### `CowArray`/`IxDyn`/`ndarray` no longer required
+One of the biggest usability changes is that the usual pattern of `CowArray::from(array.into_dyn())` is no longer required to create `Value`s. Now, `Value`s can be created from:
+- Owned `Array`s of any dimensionality
+- `ArrayView`s of any dimensionality
+- Shared references to `CowArray`s of any dimensionality (i.e. `&CowArray<'_, f32, Ix3>`)
+- Mutable references to `ArcArray`s of any dimensionality (i.e. `&mut ArcArray<f32, Ix3>`)
+- A raw shape definition & data array, of type `(Vec<i64>, Arc<Box<[T]>>)`
+
+```diff
+-// v1.x
+-let mut tokens = CowArray::from(Array1::from_iter(tokens.iter().cloned()).into_dyn());
++// v2
++let mut tokens = Array1::from_iter(tokens.iter().cloned()));
+```
+
+It should be noted that there are some cases in which an array is cloned when converting into a `Value` which may lead to a surprising performance hit. ONNX Runtime does not expose an API to specify the strides of a tensor, so if an array is reshaped before being transformed into a `Value`, it must be cloned in order to make the data contiguous. Specifically:
+- `&CowArray`, `ArrayView` will **always be cloned** (due to the fact that we cannot guarantee the lifetime of the array).
+- `Array`, `&mut ArcArray` will only be cloned **if the memory layout is not contiguous**, i.e. if it has been reshaped.
+- Raw data will never be cloned.
+
+### `ort::inputs!` macro
+
+v2.0 makes the transition to the new input/output system easier by providing an `inputs!` macro. This new macro allows you to specify inputs either by position as they appear in the graph (like previous versions), or by name.
+
+The `ort::inputs!` macro will painlessly convert compatible data types (see above) into the new inputs system.
+
+```diff
+-// v1.x
+-let chunk_embeddings = text_encoder.run(&[CowArray::from(text_input_chunk.into_dyn())])?;
++// v2
++let chunk_embeddings = text_encoder.run(ort::inputs![text_input_chunk]?)?;
+```
+
+Note the `?` after the macro call - `ort::inputs!` returns an `ort::Result<SessionInputs>`, so you'll need to handle any errors accordingly.
+
+As mentioned, you can now also specify inputs by name using a map-like syntax. This is especially useful for graphs with optional inputs.
+```rust
+let noise_pred = unet.run(ort::inputs![
+    "latents" => latents,
+    "timestep" => Array1::from_iter([t]),
+    "encoder_hidden_states" => text_embeddings.view()
+]?)?;
+```
+
+You can also supply `ort::inputs!` your `IoBinding` by specifying `bind =`:
+```rust
+let binding = model.create_binding()?;
+...
+let outputs = model.run(ort::inputs![bind = binding]?)?;
+```
+
+### `Value::from_array` no longer requires the session's allocator
+In previous versions, `Value::from_array` took an allocator parameter. The allocator was only used because the string data contained in string tensors had to be cloned into ONNX Runtime-managed memory. However, 99% of users only ever use primitive tensors, so the extra parameter served little purpose. `Value::from_array` now takes only an array, and the logic for converting string arrays has been moved to a new function, `Value::from_string_array`.
+
+```diff
+-// v1.x
+-let val = Value::from_array(session.allocator(), &array)?;
++// v2.0
++let val = Value::from_array(&array)?;
+```
+
+### Separate string tensor creation
+As previously mentioned, the logic for creating string tensors has been moved from `Value::from_array` to `Value::from_string_array`.
+
+To use string tensors with `ort::inputs!`, you must create a `Value` using `Value::from_string_array`.
+
+```rust
+let array = ndarray::Array::from_shape_vec((1,), vec![document]).unwrap();
+let outputs = session.run(ort::inputs![
+    "input" => Value::from_string_array(session.allocator(), array)?
+]?)?;
+```
+
+## Session outputs
+
+### `try_extract` -> `extract_tensor`
+v2.0 adds the groundwork for supporting sequence and maps types in `Value`s, so for clarity, the definition of `Value::try_extract` is made more explicit. No changes other than a rename are required.
+
+```diff
+-// v1.x
+-let output1 = outputs[0].try_extract::<f32>()?;
++// v2.0
++let output1 = outputs[0].extract_tensor::<f32>()?;
+```
+
+### New: Retrieve outputs by name
+Just like how inputs can now be specified by name, you can now retrieve session outputs by name.
+
+```rust
+let l = outputs["latents"].extract_tensor::<f32>()?;
+```
+
+## Renamed types
+The following types have been renamed with no other changes.
+- `NdArrayExtensions` -> `ArrayExtensions`
+- `OrtOwnedTensor` -> `Tensor`
+- `OrtResult`, `OrtError` -> `ort::Result`, `ort::Error`
+- `TensorDataToType` -> `ExtractTensorData`

@@ -1,0 +1,19 @@
+[package]
+publish = false
+name = "example-yolov8"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+ort = { path = "../../" }
+ndarray = "0.15"
+tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
+image = "0.24"
+show-image = { version = "0.13", features = [ "image", "raqote" ] }
+raqote = { version = "0.8", default-features = false }
+ureq = "2.1"
+tracing = "0.1"
+
+[features]
+load-dynamic = [ "ort/load-dynamic" ]
+cuda = [ "ort/cuda" ]

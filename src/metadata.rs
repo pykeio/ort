@@ -18,7 +18,13 @@ impl ModelMetadata {
 		let mut str_bytes: *mut c_char = std::ptr::null_mut();
 		ortsys![unsafe ModelMetadataGetDescription(self.metadata_ptr, self.allocator_ptr, &mut str_bytes) -> Error::GetModelMetadata; nonNull(str_bytes)];
 
-		let value = char_p_to_string(str_bytes)?;
+		let value = match char_p_to_string(str_bytes) {
+			Ok(value) => value,
+			Err(e) => {
+				ortfree!(unsafe self.allocator_ptr, str_bytes);
+				return Err(e);
+			}
+		};
 		ortfree!(unsafe self.allocator_ptr, str_bytes);
 		Ok(value)
 	}
@@ -28,7 +34,13 @@ impl ModelMetadata {
 		let mut str_bytes: *mut c_char = std::ptr::null_mut();
 		ortsys![unsafe ModelMetadataGetProducerName(self.metadata_ptr, self.allocator_ptr, &mut str_bytes) -> Error::GetModelMetadata; nonNull(str_bytes)];
 
-		let value = char_p_to_string(str_bytes)?;
+		let value = match char_p_to_string(str_bytes) {
+			Ok(value) => value,
+			Err(e) => {
+				ortfree!(unsafe self.allocator_ptr, str_bytes);
+				return Err(e);
+			}
+		};
 		ortfree!(unsafe self.allocator_ptr, str_bytes);
 		Ok(value)
 	}
@@ -38,7 +50,13 @@ impl ModelMetadata {
 		let mut str_bytes: *mut c_char = std::ptr::null_mut();
 		ortsys![unsafe ModelMetadataGetGraphName(self.metadata_ptr, self.allocator_ptr, &mut str_bytes) -> Error::GetModelMetadata; nonNull(str_bytes)];
 
-		let value = char_p_to_string(str_bytes)?;
+		let value = match char_p_to_string(str_bytes) {
+			Ok(value) => value,
+			Err(e) => {
+				ortfree!(unsafe self.allocator_ptr, str_bytes);
+				return Err(e);
+			}
+		};
 		ortfree!(unsafe self.allocator_ptr, str_bytes);
 		Ok(value)
 	}
@@ -56,11 +74,15 @@ impl ModelMetadata {
 		let key_str = CString::new(key)?;
 		ortsys![unsafe ModelMetadataLookupCustomMetadataMap(self.metadata_ptr, self.allocator_ptr, key_str.as_ptr(), &mut str_bytes) -> Error::GetModelMetadata];
 		if !str_bytes.is_null() {
-			unsafe {
-				let value = char_p_to_string(str_bytes)?;
-				ortfree!(self.allocator_ptr, str_bytes);
-				Ok(Some(value))
-			}
+			let value = match char_p_to_string(str_bytes) {
+				Ok(value) => value,
+				Err(e) => {
+					ortfree!(unsafe self.allocator_ptr, str_bytes);
+					return Err(e);
+				}
+			};
+			ortfree!(unsafe self.allocator_ptr, str_bytes);
+			Ok(Some(value))
 		} else {
 			Ok(None)
 		}

@@ -61,7 +61,13 @@ pub trait ExecutionProvider {
 		}
 
 		for i in 0..num_providers {
-			let avail = char_p_to_string(unsafe { *providers.offset(i as isize) })?;
+			let avail = match char_p_to_string(unsafe { *providers.offset(i as isize) }) {
+				Ok(avail) => avail,
+				Err(e) => {
+					let _ = ortsys![unsafe ReleaseAvailableProviders(providers, num_providers)];
+					return Err(e);
+				}
+			};
 			if self.as_str() == avail {
 				let _ = ortsys![unsafe ReleaseAvailableProviders(providers, num_providers)];
 				return Ok(true);

@@ -7,22 +7,16 @@ use std::{
 
 use image::{imageops::FilterType, ImageBuffer, Pixel, Rgb};
 use ndarray::s;
-use ort::{
-	download::vision::ImageClassification, inputs, ArrayExtensions, Environment, FetchModelError, GraphOptimizationLevel, LoggingLevel, SessionBuilder, Tensor
-};
+use ort::{download::vision::ImageClassification, inputs, ArrayExtensions, FetchModelError, GraphOptimizationLevel, LoggingLevel, Session, Tensor};
 use test_log::test;
 
 #[test]
 fn squeezenet_mushroom() -> ort::Result<()> {
 	const IMAGE_TO_LOAD: &str = "mushroom.png";
 
-	let environment = Environment::builder()
-		.with_name("integration_test")
-		.with_log_level(LoggingLevel::Warning)
-		.build()?
-		.into_arc();
+	ort::init().with_name("integration_test").with_log_level(LoggingLevel::Warning).commit()?;
 
-	let session = SessionBuilder::new(&environment)?
+	let session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
 		.with_model_downloaded(ImageClassification::SqueezeNet)

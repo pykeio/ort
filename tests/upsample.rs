@@ -2,7 +2,7 @@ use std::path::Path;
 
 use image::RgbImage;
 use ndarray::{Array, CowArray, Ix4};
-use ort::{inputs, Environment, GraphOptimizationLevel, LoggingLevel, SessionBuilder, Tensor};
+use ort::{inputs, GraphOptimizationLevel, LoggingLevel, Session, Tensor};
 use test_log::test;
 
 fn load_input_image<P: AsRef<Path>>(name: P) -> RgbImage {
@@ -44,15 +44,11 @@ fn convert_image_to_cow_array(img: &RgbImage) -> CowArray<'_, f32, Ix4> {
 fn upsample() -> ort::Result<()> {
 	const IMAGE_TO_LOAD: &str = "mushroom.png";
 
-	let environment = Environment::builder()
-		.with_name("integration_test")
-		.with_log_level(LoggingLevel::Warning)
-		.build()?
-		.into_arc();
+	ort::init().with_name("integration_test").with_log_level(LoggingLevel::Warning).commit()?;
 
 	let session_data =
 		std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("upsample.onnx")).expect("Could not open model from file");
-	let session = SessionBuilder::new(&environment)?
+	let session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
 		.with_model_from_memory(&session_data)
@@ -89,15 +85,11 @@ fn upsample() -> ort::Result<()> {
 fn upsample_with_ort_model() -> ort::Result<()> {
 	const IMAGE_TO_LOAD: &str = "mushroom.png";
 
-	let environment = Environment::builder()
-		.with_name("integration_test")
-		.with_log_level(LoggingLevel::Warning)
-		.build()?
-		.into_arc();
+	ort::init().with_name("integration_test").with_log_level(LoggingLevel::Warning).commit()?;
 
 	let session_data =
 		std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("upsample.ort")).expect("Could not open model from file");
-	let session = SessionBuilder::new(&environment)?
+	let session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
 		.with_model_from_memory_directly(&session_data) // Zero-copy.

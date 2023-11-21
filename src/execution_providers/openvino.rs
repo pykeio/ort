@@ -15,6 +15,9 @@ pub struct OpenVINOExecutionProvider {
 	enable_vpu_fast_compile: bool
 }
 
+unsafe impl Send for OpenVINOExecutionProvider {}
+unsafe impl Sync for OpenVINOExecutionProvider {}
+
 impl Default for OpenVINOExecutionProvider {
 	fn default() -> Self {
 		Self {

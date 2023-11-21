@@ -17,6 +17,9 @@ pub struct ROCmExecutionProvider {
 	tunable_op_max_tuning_duration_ms: i32
 }
 
+unsafe impl Send for ROCmExecutionProvider {}
+unsafe impl Sync for ROCmExecutionProvider {}
+
 impl Default for ROCmExecutionProvider {
 	fn default() -> Self {
 		Self {

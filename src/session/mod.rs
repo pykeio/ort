@@ -6,11 +6,20 @@ use std::os::unix::ffi::OsStrExt;
 use std::os::windows::ffi::OsStrExt;
 #[cfg(feature = "fetch-models")]
 use std::{env, path::PathBuf, time::Duration};
-use std::{ffi::CString, fmt, marker::PhantomData, ops::Deref, os::raw::c_char, path::Path, ptr, sync::Arc};
+use std::{
+	ffi::CString,
+	fmt,
+	marker::PhantomData,
+	ops::Deref,
+	os::raw::c_char,
+	path::Path,
+	ptr,
+	sync::{atomic::Ordering, Arc}
+};
 
 use super::{
 	char_p_to_string,
-	environment::Environment,
+	environment::get_environment,
 	error::{assert_non_null_pointer, assert_null_pointer, status_to_result, Error, ErrorInternal, Result},
 	execution_providers::{apply_execution_providers, ExecutionProviderDispatch},
 	extern_system_fn,
@@ -28,8 +37,8 @@ pub(crate) mod input;
 pub(crate) mod output;
 pub use self::{input::SessionInputs, output::SessionOutputs};
 
-/// Type used to create a session using the _builder pattern_. Once created, you can use the different methods to
-/// configure the session.
+/// Type used to create a session using the _builder pattern_. Once created with [`Session::builder`], you can use the
+/// different methods to configure the session.
 ///
 /// Once configured, use the [`SessionBuilder::with_model_from_file`](crate::SessionBuilder::with_model_from_file)
 /// method to "commit" the builder configuration into a [`Session`].
@@ -38,14 +47,9 @@ pub use self::{input::SessionInputs, output::SessionOutputs};
 ///
 /// ```no_run
 /// # use std::{error::Error, sync::Arc};
-/// # use ort::{Environment, LoggingLevel, GraphOptimizationLevel, SessionBuilder};
+/// # use ort::{GraphOptimizationLevel, Session};
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// let environment = Environment::builder()
-/// 	.with_name("test")
-/// 	.with_log_level(LoggingLevel::Verbose)
-/// 	.build()?
-/// 	.into_arc();
-/// let mut session = SessionBuilder::new(&environment)?
+/// let mut session = Session::builder()?
 /// 	.with_optimization_level(GraphOptimizationLevel::Level1)?
 /// 	.with_intra_threads(1)?
 /// 	.with_model_from_file("squeezenet.onnx")?;
@@ -59,16 +63,12 @@ pub struct SessionBuilder {
 	memory_type: MemType,
 	#[cfg(feature = "custom-ops")]
 	custom_runtime_handles: Vec<*mut std::os::raw::c_void>,
-	execution_providers: Vec<ExecutionProviderDispatch>,
-
-	// env must be last to drop it after everything else
-	env: Arc<Environment>
+	execution_providers: Vec<ExecutionProviderDispatch>
 }
 
 impl fmt::Debug for SessionBuilder {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
 		f.debug_struct("SessionBuilder")
-			.field("env", &self.env.name())
 			.field("allocator", &self.allocator)
 			.field("memory_type", &self.memory_type)
 			.finish()
@@ -81,7 +81,6 @@ impl Clone for SessionBuilder {
 		status_to_result(ortsys![unsafe CloneSessionOptions(self.session_options_ptr, &mut session_options_ptr as *mut _)])
 			.expect("error cloning session options");
 		Self {
-			env: Arc::clone(&self.env),
 			session_options_ptr,
 			allocator: self.allocator,
 			memory_type: self.memory_type,
@@ -108,12 +107,11 @@ impl Drop for SessionBuilder {
 
 impl SessionBuilder {
 	/// Creates a new session builder in the given environment.
-	pub fn new(env: &Arc<Environment>) -> Result<Self> {
+	pub fn new() -> Result<Self> {
 		let mut session_options_ptr: *mut ort_sys::OrtSessionOptions = std::ptr::null_mut();
 		ortsys![unsafe CreateSessionOptions(&mut session_options_ptr) -> Error::CreateSessionOptions; nonNull(session_options_ptr)];
 
 		Ok(Self {
-			env: Arc::clone(env),
 			session_options_ptr,
 			allocator: AllocatorType::Device,
 			memory_type: MemType::Default,
@@ -384,9 +382,10 @@ impl SessionBuilder {
             .map(|b| *b as std::os::raw::c_char)
             .collect();
 
-		apply_execution_providers(&self, self.execution_providers.iter().chain(&self.env.execution_providers).cloned());
+		let env = get_environment()?;
+		apply_execution_providers(&self, self.execution_providers.iter().chain(&env.execution_providers).cloned());
 
-		let env_ptr: *const ort_sys::OrtEnv = self.env.ptr();
+		let env_ptr = env.env_ptr.load(Ordering::Relaxed);
 
 		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
 		ortsys![unsafe CreateSession(env_ptr, model_path.as_ptr(), self.session_options_ptr, &mut session_ptr) -> Error::CreateSession; nonNull(session_ptr)];
@@ -404,90 +403,7 @@ impl SessionBuilder {
 			.collect::<Result<Vec<Output>>>()?;
 
 		Ok(Session {
-			inner: Arc::new(SharedSessionInner {
-				env: Arc::clone(&self.env),
-				session_ptr,
-				allocator
-			}),
-			inputs,
-			outputs
-		})
-	}
-
-	/// Loads an ONNX model from a file, replacing external data with data provided in initializers.
-	///
-	/// This will find initialized tensors with external data in the graph with the provided names and replace them with
-	/// the provided tensors. The replacement will occur before any optimizations take place, and the data will be
-	/// copied into the graph. Tensors replaced by this function must be using external data. (you cannot replace a
-	/// non-external tensor)
-	pub fn with_model_from_file_and_external_initializers<'v, 'i, P>(self, model_filepath_ref: P, initializers: &'i [(String, Value)]) -> Result<Session>
-	where
-		'i: 'v,
-		P: AsRef<Path>
-	{
-		let model_filepath = model_filepath_ref.as_ref();
-		if !model_filepath.exists() {
-			return Err(Error::FileDoesNotExist {
-				filename: model_filepath.to_path_buf()
-			});
-		}
-
-		// Build an OsString, then a vector of bytes to pass to C
-		let model_path = std::ffi::OsString::from(model_filepath);
-		#[cfg(target_family = "windows")]
-		let model_path: Vec<u16> = model_path
-            .encode_wide()
-            .chain(std::iter::once(0)) // Make sure we have a null terminated string
-            .collect();
-		#[cfg(not(target_family = "windows"))]
-		let model_path: Vec<std::os::raw::c_char> = model_path
-            .as_bytes()
-            .iter()
-            .chain(std::iter::once(&b'\0')) // Make sure we have a null terminated string
-            .map(|b| *b as std::os::raw::c_char)
-            .collect();
-
-		apply_execution_providers(&self, self.execution_providers.iter().chain(&self.env.execution_providers).cloned());
-
-		let env_ptr: *const ort_sys::OrtEnv = self.env.ptr();
-
-		let allocator = Allocator::default();
-
-		let initializer_names: Vec<CString> = initializers
-			.iter()
-			.map(|(name, _)| CString::new(name.as_str()).unwrap())
-			.map(|n| CString::new(n).unwrap())
-			.collect();
-		let initializer_names_ptr: Vec<*const c_char> = initializer_names.iter().map(|n| n.as_ptr() as *const c_char).collect();
-
-		let initializers: Vec<*const ort_sys::OrtValue> = initializers.iter().map(|input_array_ort| input_array_ort.1.ptr() as *const _).collect();
-		if !initializers.is_empty() {
-			assert_eq!(initializer_names.len(), initializers.len());
-			ortsys![unsafe AddExternalInitializers(self.session_options_ptr, initializer_names_ptr.as_ptr(), initializers.as_ptr(), initializers.len() as _) -> Error::CreateSession];
-		}
-
-		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
-		ortsys![unsafe CreateSession(env_ptr, model_path.as_ptr(), self.session_options_ptr, &mut session_ptr) -> Error::CreateSession; nonNull(session_ptr)];
-
-		std::mem::drop(initializer_names);
-		std::mem::drop(initializers);
-
-		// Extract input and output properties
-		let num_input_nodes = dangerous::extract_inputs_count(session_ptr)?;
-		let num_output_nodes = dangerous::extract_outputs_count(session_ptr)?;
-		let inputs = (0..num_input_nodes)
-			.map(|i| dangerous::extract_input(session_ptr, allocator.ptr, i))
-			.collect::<Result<Vec<Input>>>()?;
-		let outputs = (0..num_output_nodes)
-			.map(|i| dangerous::extract_output(session_ptr, allocator.ptr, i))
-			.collect::<Result<Vec<Output>>>()?;
-
-		Ok(Session {
-			inner: Arc::new(SharedSessionInner {
-				env: Arc::clone(&self.env),
-				session_ptr,
-				allocator
-			}),
+			inner: Arc::new(SharedSessionInner { session_ptr, allocator }),
 			inputs,
 			outputs
 		})
@@ -496,8 +412,9 @@ impl SessionBuilder {
 	/// Load an ONNX graph from memory and commit the session
 	/// For `.ort` models, we enable `session.use_ort_model_bytes_directly`.
 	/// For more information, check [Load ORT format model from an in-memory byte array](https://onnxruntime.ai/docs/performance/model-optimizations/ort-format-models.html#load-ort-format-model-from-an-in-memory-byte-array).
-	/// If you want to store the model file and the [`InMemorySession`] in same struct,
-	/// please check crates for creating self-referential structs, such as [`ouroboros`](https://github.com/joshua-maros/ouroboros).
+	///
+	/// If you wish to store the model bytes and the [`InMemorySession`] in the same struct, look for crates that
+	/// facilitate creating self-referential structs, such as [`ouroboros`](https://github.com/joshua-maros/ouroboros).
 	pub fn with_model_from_memory_directly(self, model_bytes: &[u8]) -> Result<InMemorySession<'_>> {
 		let str_to_char = |s: &str| {
 			s.as_bytes()
@@ -519,9 +436,10 @@ impl SessionBuilder {
 	pub fn with_model_from_memory(self, model_bytes: &[u8]) -> Result<Session> {
 		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
 
-		let env_ptr: *const ort_sys::OrtEnv = self.env.ptr();
+		let env = get_environment()?;
+		apply_execution_providers(&self, self.execution_providers.iter().chain(&env.execution_providers).cloned());
 
-		apply_execution_providers(&self, self.execution_providers.iter().chain(&self.env.execution_providers).cloned());
+		let env_ptr = env.env_ptr.load(Ordering::Relaxed);
 
 		let model_data = model_bytes.as_ptr() as *const std::ffi::c_void;
 		let model_data_length = model_bytes.len();
@@ -543,11 +461,7 @@ impl SessionBuilder {
 			.collect::<Result<Vec<Output>>>()?;
 
 		let session = Session {
-			inner: Arc::new(SharedSessionInner {
-				env: Arc::clone(&self.env),
-				session_ptr,
-				allocator
-			}),
+			inner: Arc::new(SharedSessionInner { session_ptr, allocator }),
 			inputs,
 			outputs
 		};
@@ -560,11 +474,7 @@ impl SessionBuilder {
 #[derive(Debug)]
 pub struct SharedSessionInner {
 	pub(crate) session_ptr: *mut ort_sys::OrtSession,
-	allocator: Allocator,
-	// hold onto an environment arc to ensure the environment also stays alive
-	// env must be last to drop it after everything else
-	#[allow(dead_code)]
-	env: Arc<Environment>
+	allocator: Allocator
 }
 
 unsafe impl Send for SharedSessionInner {}
@@ -624,6 +534,10 @@ pub struct Output {
 }
 
 impl Session {
+	pub fn builder() -> Result<SessionBuilder> {
+		SessionBuilder::new()
+	}
+
 	/// Returns this session's [`Allocator`].
 	pub fn allocator(&self) -> &Allocator {
 		&self.inner.allocator

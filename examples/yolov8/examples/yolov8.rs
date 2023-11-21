@@ -4,7 +4,7 @@ use std::path::Path;
 
 use image::{imageops::FilterType, GenericImageView};
 use ndarray::{s, Array, Axis};
-use ort::{inputs, CUDAExecutionProvider, Environment, SessionBuilder, SessionOutputs};
+use ort::{inputs, CUDAExecutionProvider, Session, SessionOutputs};
 use raqote::{DrawOptions, DrawTarget, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle};
 use show_image::{event, AsImageView, WindowOptions};
 
@@ -42,6 +42,10 @@ const YOLOV8_CLASS_LABELS: [&str; 80] = [
 fn main() -> ort::Result<()> {
 	tracing_subscriber::fmt::init();
 
+	ort::init()
+		.with_execution_providers([CUDAExecutionProvider::default().build()])
+		.commit()?;
+
 	let original_img = image::open(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("baseball.jpg")).unwrap();
 	let (img_width, img_height) = (original_img.width(), original_img.height());
 	let img = original_img.resize_exact(640, 640, FilterType::CatmullRom);
@@ -55,14 +59,10 @@ fn main() -> ort::Result<()> {
 		input[[0, 2, y, x]] = (b as f32) / 255.;
 	}
 
-	let env = Environment::builder()
-		.with_execution_providers([CUDAExecutionProvider::default().build()])
-		.build()?
-		.into_arc();
-	let model = SessionBuilder::new(&env).unwrap().with_model_downloaded(YOLOV8M_URL).unwrap();
+	let model = Session::builder()?.with_model_downloaded(YOLOV8M_URL)?;
 
 	// Run YOLOv8 inference
-	let outputs: SessionOutputs = model.run(inputs!["images" => input.view()]?).unwrap();
+	let outputs: SessionOutputs = model.run(inputs!["images" => input.view()]?)?;
 	let output = outputs["output0"].extract_tensor::<f32>().unwrap().view().t().into_owned();
 
 	let mut boxes = Vec::new();

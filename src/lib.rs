@@ -31,7 +31,7 @@ use std::{
 use once_cell::sync::Lazy;
 use tracing::warn;
 
-pub use self::environment::{Environment, EnvironmentBuilder};
+pub use self::environment::{init, EnvironmentBuilder};
 #[cfg(feature = "fetch-models")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fetch-models")))]
 pub use self::error::FetchModelError;

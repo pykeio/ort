@@ -330,9 +330,7 @@ impl Value {
 		})
 	}
 
-	/// Construct a [`Value`] from a Rust-owned [`CowArray`].
-	///
-	/// `allocator` is required to be `Some` when converting a String tensor. See [`crate::Session::allocator`].
+	/// Construct a [`Value`] from a Rust-owned array.
 	pub fn from_string_array<T: Utf8Data + Debug + Clone + 'static>(allocator: &Allocator, input: impl OrtInput<Item = T>) -> Result<Value> {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemType::Default)?;
 

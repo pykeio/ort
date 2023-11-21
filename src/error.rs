@@ -4,7 +4,7 @@ use std::{convert::Infallible, io, path::PathBuf, string};
 
 use thiserror::Error;
 
-use super::{char_p_to_string, ort, tensor::TensorElementDataType};
+use super::{char_p_to_string, ortsys, tensor::TensorElementDataType};
 
 /// Type alias for the Result type returned by ORT functions.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -281,7 +281,7 @@ impl From<OrtStatusWrapper> for Result<(), ErrorInternal> {
 		if status.0.is_null() {
 			Ok(())
 		} else {
-			let raw: *const std::os::raw::c_char = unsafe { ort().GetErrorMessage.unwrap()(status.0) };
+			let raw: *const std::os::raw::c_char = ortsys![unsafe GetErrorMessage(status.0)];
 			match char_p_to_string(raw) {
 				Ok(msg) => Err(ErrorInternal::Msg(msg)),
 				Err(err) => match err {
@@ -295,7 +295,7 @@ impl From<OrtStatusWrapper> for Result<(), ErrorInternal> {
 
 impl Drop for OrtStatusWrapper {
 	fn drop(&mut self) {
-		unsafe { ort().ReleaseStatus.unwrap()(self.0) }
+		ortsys![unsafe ReleaseStatus(self.0)];
 	}
 }
 

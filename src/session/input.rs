@@ -41,10 +41,9 @@ impl<'i, const N: usize> From<[Value; N]> for SessionInputs<'i, N> {
 /// ```no_run
 /// # use std::{error::Error, sync::Arc};
 /// # use ndarray::Array1;
-/// # use ort::{Environment, LoggingLevel, GraphOptimizationLevel, SessionBuilder};
+/// # use ort::{GraphOptimizationLevel, Session};
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// # let environment = Environment::default().into_arc();
-/// let mut session = SessionBuilder::new(&environment)?.with_model_from_file("model.onnx")?;
+/// let mut session = Session::builder()?.with_model_from_file("model.onnx")?;
 /// let _ = session.run(ort::inputs![Array1::from_vec(vec![1, 2, 3, 4, 5])]?);
 /// # Ok(())
 /// # }
@@ -55,10 +54,9 @@ impl<'i, const N: usize> From<[Value; N]> for SessionInputs<'i, N> {
 /// ```no_run
 /// # use std::{error::Error, sync::Arc};
 /// # use ndarray::Array1;
-/// # use ort::{Environment, LoggingLevel, GraphOptimizationLevel, SessionBuilder};
+/// # use ort::{GraphOptimizationLevel, Session};
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// # let environment = Environment::default().into_arc();
-/// let mut session = SessionBuilder::new(&environment)?.with_model_from_file("model.onnx")?;
+/// let mut session = Session::builder()?.with_model_from_file("model.onnx")?;
 /// let _ = session.run(ort::inputs! {
 /// 	"tokens" => Array1::from_vec(vec![1, 2, 3, 4, 5])
 /// }?);

@@ -1,15 +1,13 @@
 use std::path::Path;
 
 use ndarray::{ArrayD, IxDyn};
-use ort::{inputs, Environment, GraphOptimizationLevel, SessionBuilder, Value};
+use ort::{inputs, GraphOptimizationLevel, Session, Value};
 use test_log::test;
 
 #[test]
 #[cfg(not(target_arch = "aarch64"))]
 fn vectorizer() -> ort::Result<()> {
-	let environment = Environment::default().into_arc();
-
-	let session = SessionBuilder::new(&environment)?
+	let session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
 		.with_model_from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("vectorizer.onnx"))

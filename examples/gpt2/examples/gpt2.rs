@@ -4,7 +4,7 @@ use std::{
 };
 
 use ndarray::{array, concatenate, s, Array1, Axis};
-use ort::{download::language::machine_comprehension::GPT2, inputs, CUDAExecutionProvider, Environment, GraphOptimizationLevel, SessionBuilder, Tensor};
+use ort::{download::language::machine_comprehension::GPT2, inputs, CUDAExecutionProvider, GraphOptimizationLevel, Session, Tensor};
 use rand::Rng;
 use tokenizers::Tokenizer;
 
@@ -23,17 +23,17 @@ fn main() -> ort::Result<()> {
 	// Initialize tracing to receive debug messages from `ort`
 	tracing_subscriber::fmt::init();
 
+	// Create the ONNX Runtime environment, enabling CUDA execution providers for all sessions created in this process.
+	ort::init()
+		.with_name("GPT-2")
+		.with_execution_providers([CUDAExecutionProvider::default().build()])
+		.commit()?;
+
 	let mut stdout = io::stdout();
 	let mut rng = rand::thread_rng();
 
-	// Create the ONNX Runtime environment and session for the GPT-2 model.
-	let environment = Environment::builder()
-		.with_name("GPT-2")
-		.with_execution_providers([CUDAExecutionProvider::default().build()])
-		.build()?
-		.into_arc();
-
-	let session = SessionBuilder::new(&environment)?
+	// Load our model
+	let session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
 		.with_model_downloaded(GPT2::GPT2LmHead)?;

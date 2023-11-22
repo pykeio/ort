@@ -1,11 +1,11 @@
 use std::{
-	env, fs,
-	io::{self, Read},
+	env,
 	path::{Path, PathBuf}
 };
 
 const ORT_ENV_STRATEGY: &str = "ORT_STRATEGY";
 const ORT_ENV_SYSTEM_LIB_LOCATION: &str = "ORT_LIB_LOCATION";
+#[cfg(feature = "download-binaries")]
 const ORT_EXTRACT_DIR: &str = "onnxruntime";
 
 macro_rules! incompatible_providers {
@@ -53,13 +53,15 @@ fn verify_file(buf: &[u8], hash: impl AsRef<[u8]>) -> bool {
 	sha2::Sha256::digest(buf)[..] == hex_str_to_bytes(hash)
 }
 
+#[cfg(feature = "download-binaries")]
 fn extract_tgz(buf: &[u8], output: &Path) {
-	let buf: io::BufReader<&[u8]> = io::BufReader::new(buf);
+	let buf: std::io::BufReader<&[u8]> = std::io::BufReader::new(buf);
 	let tar = flate2::read::GzDecoder::new(buf);
 	let mut archive = tar::Archive::new(tar);
 	archive.unpack(output).unwrap();
 }
 
+#[cfg(feature = "copy-dylibs")]
 fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 	// get the target directory - we need to place the dlls next to the executable so they can be properly loaded by windows
 	let out_dir = out_dir.ancestors().nth(3).unwrap();
@@ -67,7 +69,7 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 		#[cfg(windows)]
 		let mut copy_fallback = false;
 
-		let lib_files = fs::read_dir(lib_dir).unwrap();
+		let lib_files = std::fs::read_dir(lib_dir).unwrap();
 		for lib_file in lib_files.filter(|e| {
 			e.as_ref().ok().map_or(false, |e| {
 				e.file_type().map_or(false, |e| !e.is_dir())

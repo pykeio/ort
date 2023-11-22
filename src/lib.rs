@@ -37,10 +37,11 @@ pub use self::environment::{init, EnvironmentBuilder};
 pub use self::error::FetchModelError;
 pub use self::error::{Error, ErrorInternal, Result};
 pub use self::execution_providers::{
-	ACLExecutionProvider, ArenaExtendStrategy, CANNExecutionProvider, CANNExecutionProviderImplementationMode, CANNExecutionProviderPrecisionMode,
-	CPUExecutionProvider, CUDAExecutionProvider, CUDAExecutionProviderCuDNNConvAlgoSearch, CoreMLExecutionProvider, DirectMLExecutionProvider,
-	ExecutionProviderDispatch, NNAPIExecutionProvider, OneDNNExecutionProvider, OpenVINOExecutionProvider, QNNExecutionProvider,
-	QNNExecutionProviderPerformanceMode, ROCmExecutionProvider, TVMExecutionProvider, TVMExecutorType, TVMTuningType, TensorRTExecutionProvider
+	ACLExecutionProvider, ArenaExtendStrategy, ArmNNExecutionProvider, CANNExecutionProvider, CANNExecutionProviderImplementationMode,
+	CANNExecutionProviderPrecisionMode, CPUExecutionProvider, CUDAExecutionProvider, CUDAExecutionProviderCuDNNConvAlgoSearch, CoreMLExecutionProvider,
+	DirectMLExecutionProvider, ExecutionProviderDispatch, NNAPIExecutionProvider, OneDNNExecutionProvider, OpenVINOExecutionProvider, QNNExecutionProvider,
+	QNNExecutionProviderPerformanceMode, ROCmExecutionProvider, TVMExecutionProvider, TVMExecutorType, TVMTuningType, TensorRTExecutionProvider,
+	XNNPACKExecutionProvider
 };
 pub use self::io_binding::IoBinding;
 pub use self::memory::{AllocationDevice, Allocator, MemoryInfo};

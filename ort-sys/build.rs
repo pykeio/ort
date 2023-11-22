@@ -117,7 +117,7 @@ fn static_link_prerequisites() {
 	if target_os == "macos" || target_os == "ios" {
 		println!("cargo:rustc-link-lib=c++");
 		println!("cargo:rustc-link-lib=framework=Foundation");
-	} else if target_os == "linux" {
+	} else if target_os == "linux" || target_os == "android" {
 		println!("cargo:rustc-link-lib=stdc++");
 	}
 }

@@ -6,6 +6,7 @@ use std::{
 
 const ORT_ENV_STRATEGY: &str = "ORT_STRATEGY";
 const ORT_ENV_SYSTEM_LIB_LOCATION: &str = "ORT_LIB_LOCATION";
+const ORT_ENV_SYSTEM_LIB_PROFILE: &str = "ORT_LIB_PROFILE";
 const ORT_EXTRACT_DIR: &str = "onnxruntime";
 
 macro_rules! incompatible_providers {
@@ -53,6 +54,7 @@ fn verify_file(buf: &[u8], hash: impl AsRef<[u8]>) -> bool {
 	sha2::Sha256::digest(buf)[..] == hex_str_to_bytes(hash)
 }
 
+#[cfg(feature = "download-binaries")]
 fn extract_tzs(buf: &[u8], output: &Path) {
 	let buf: io::BufReader<&[u8]> = io::BufReader::new(buf);
 	let tar = ruzstd::StreamingDecoder::new(buf).unwrap();
@@ -112,7 +114,7 @@ fn add_search_dir<P: AsRef<Path>>(base: P) {
 
 fn static_link_prerequisites() {
 	let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
-	if target_os == "macos" {
+	if target_os == "macos" || target_os == "ios" {
 		println!("cargo:rustc-link-lib=c++");
 		println!("cargo:rustc-link-lib=framework=Foundation");
 	} else if target_os == "linux" {
@@ -129,11 +131,13 @@ fn system_strategy() -> (PathBuf, bool) {
 		if target_os.contains("windows") { format!("{}.lib", a) } else { format!("lib{}.a", a) }
 	};
 
-	let mut profile = String::new();
-	for i in ["Release", "RelWithDebInfo", "MinSizeRel", "Debug"] {
-		if lib_dir.join(i).exists() && lib_dir.join(i).join(platform_format_lib("onnxruntime_common")).exists() {
-			profile = String::from(i);
-			break;
+	let mut profile = env::var(ORT_ENV_SYSTEM_LIB_PROFILE).unwrap_or_default();
+	if profile.is_empty() {
+		for i in ["Release", "RelWithDebInfo", "MinSizeRel", "Debug"] {
+			if lib_dir.join(i).exists() && lib_dir.join(i).join(platform_format_lib("onnxruntime_common")).exists() {
+				profile = String::from(i);
+				break;
+			}
 		}
 	}
 
@@ -164,7 +168,7 @@ fn system_strategy() -> (PathBuf, bool) {
 					}
 				}
 
-				if extension_lib_dir.exists() {
+				if extension_lib_dir.exists() && extension_lib_dir.join(platform_format_lib("ortcustomops")).exists() {
 					add_search_dir(&extension_lib_dir);
 					println!("cargo:rustc-link-lib=static=ortcustomops");
 					println!("cargo:rustc-link-lib=static=ocos_operators");

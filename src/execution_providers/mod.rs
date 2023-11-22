@@ -28,6 +28,10 @@ mod nnapi;
 pub use self::nnapi::NNAPIExecutionProvider;
 mod qnn;
 pub use self::qnn::{QNNExecutionProvider, QNNExecutionProviderPerformanceMode};
+mod xnnpack;
+pub use self::xnnpack::XNNPACKExecutionProvider;
+mod armnn;
+pub use self::armnn::ArmNNExecutionProvider;
 
 /// ONNX Runtime works with different hardware acceleration libraries through its extensible **Execution Providers**
 /// (EP) framework to optimally execute the ONNX models on the hardware platform. This interface enables flexibility for
@@ -112,7 +116,9 @@ pub enum ExecutionProviderDispatch {
 	NNAPI(NNAPIExecutionProvider),
 	QNN(QNNExecutionProvider),
 	TVM(TVMExecutionProvider),
-	CANN(CANNExecutionProvider)
+	CANN(CANNExecutionProvider),
+	XNNPACK(XNNPACKExecutionProvider),
+	ArmNN(ArmNNExecutionProvider)
 }
 
 macro_rules! impl_dispatch {
@@ -139,7 +145,7 @@ macro_rules! impl_dispatch {
 	};
 }
 
-impl_dispatch!(CPU, CUDA, TensorRT, ACL, OneDNN, OpenVINO, CoreML, CANN, ROCm, DirectML, TVM, NNAPI, QNN);
+impl_dispatch!(CPU, CUDA, TensorRT, ACL, OneDNN, OpenVINO, CoreML, CANN, ROCm, DirectML, TVM, NNAPI, QNN, XNNPACK, ArmNN);
 
 #[allow(unused)]
 macro_rules! map_keys {

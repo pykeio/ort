@@ -1,35 +1,27 @@
 ---
 title: Platform support
+description: ONNX Runtime, and by extension `ort`, supports a wide variety of platforms. For most desktop users, pre-built binaries are available, so setting up `ort` is as simple as adding it to your `Cargo.toml`!
 ---
-
-ONNX Runtime, and by extension `ort`, supports a wide variety of platforms. For some platforms, pre-built binaries are available, so setting up `ort` is as simple as adding it to your `Cargo.toml`!
-
-Binaries may be provided by Microsoft, pyke, or both. Binaries provided by Microsoft are downloaded directly from ONNX Runtime's CI pipeline, though they may include telemetry. Binaries provided by pyke do not include this telemetry.
 
 Here are the supported platforms and binary availability status, as of v2.0.
 
-* 🟢 - Supported. Binaries provided by both Microsoft and pyke.
-* 🔷 - Supported. Binaries provided by pyke.
-* 🟨 - Supported. No binaries available.
-* ❌ - Not supported. No binaries available.
+* 🟢 - Supported. Dynamic & static binaries provided by pyke.
+* 🔷 - Supported. Static binaries provided by pyke.
+* 🟨 - Supported. Dynamic binaries provided by pyke.
+* ⭕ - Supported. Precompiled binaries not available.
+* ❌ - Not supported.
 
-| Platform | Dynamic | Static |
-|:-------- |:------- |:------ |
-| **Windows** | 🟢 x86/x64, ARM/ARM64 | 🔷 x64, ARM64 |
-| **Linux** | 🟢 x86/x64, ARM/ARM64 | 🔷 x64, ARM64 |
-| **macOS** | 🟢 x64, ARM64 | 🔷 x64, ARM64 |
-| **WebAssembly** | ❌ | 🔷 |
-| **iOS** | 🟨 | 🟨 |
-| **Android** | 🟨 | 🟨 |
+| Platform | x86 | x86-64 | ARMv7 | ARM64 | WASM32 |
+|:-------- |:------- |:------ |:------ |:------ |:------ |
+| **Windows** | ⭕ | 🟢 | ⭕ | 🔷 | ❌ |
+| **Linux** | ⭕ | 🟢 | ⭕ | 🔷 | ❌ |
+| **macOS** | ❌ | 🔷 | ❌ | 🔷 | ❌ |
+| **iOS** | ❌ | ❌ | ❌ | ⭕ | ❌ |
+| **Android** | ❌ | ❌ | ⭕ | ⭕ | ❌ |
+| **Web** | ❌ | ❌ | ❌ | ❌ | 🔷 |
 
 Remember that "Dynamic" linking means ONNX Runtime will come as a DLL or `.so` alongside your application. "Static" means ONNX Runtime is linked directly into your application in a single file. If available, `ort` will always prefer linking to static binaries over dynamic binaries.
 
-Currently, the default behavior in `ort` is to only download Microsoft binaries. To enable pyke binaries, enable the `"pyke-parcel"` feature in your `Cargo.toml`.
-```toml
-[dependencies]
-ort = { version = "2.0", features = [ "pyke-parcel" ] }
-```
-
-Certain execution providers may or may not have binaries available; check EP support in the [execution providers](/perf/execution-providers) documentation.
+Certain execution providers may not have binaries available. Most EPs only work with dynamic linking. You can check EP binary support in the [execution providers](/perf/execution-providers) documentation.
 
 For platforms marked as 🟨, you'll need to [compile ONNX Runtime from source](https://onnxruntime.ai/docs/build/).

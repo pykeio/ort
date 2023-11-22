@@ -3,6 +3,29 @@ title: Migrating from v1.x to v2
 description: Here's what you need to know to update your application to use the latest & greatest version of ort.
 ---
 
+## `Environment` no more
+The `Environment` struct has been removed. Only one `Environment` was allowed per process, so it didn't really make sense to have an environment as a struct.
+
+To configure an `Environment`, you instead use the `ort::init` function, which returns the same `EnvironmentBuilder` as v1.x. Use `commit()` to then commit the environment.
+
+```rust
+ort::init()
+    .with_execution_providers([CUDAExecutionProvider::default().build()])
+    .commit()?;
+```
+
+`commit()` must be called before any sessions are created to take effect. Otherwise, the environment will be set to default and cannot be modified afterwards.
+
+## Session creation
+`SessionBuilder::new(&environment)` has been soft-replaced with `Session::builder()`:
+
+```diff
+-// v1.x
+-let session = SessionBuilder::new(&environment)?.with_model_from_file("model.onnx")?;
++// v2
++let session = Session::builder()?.with_model_from_file("model.onnx")?;
+```
+
 ## Session inputs
 
 ### `CowArray`/`IxDyn`/`ndarray` no longer required
@@ -17,7 +40,7 @@ One of the biggest usability changes is that the usual pattern of `CowArray::fro
 -// v1.x
 -let mut tokens = CowArray::from(Array1::from_iter(tokens.iter().cloned()).into_dyn());
 +// v2
-+let mut tokens = Array1::from_iter(tokens.iter().cloned()));
++let mut tokens = Array1::from_iter(tokens.iter().cloned());
 ```
 
 It should be noted that there are some cases in which an array is cloned when converting into a `Value` which may lead to a surprising performance hit. ONNX Runtime does not expose an API to specify the strides of a tensor, so if an array is reshaped before being transformed into a `Value`, it must be cloned in order to make the data contiguous. Specifically:
@@ -62,7 +85,7 @@ In previous versions, `Value::from_array` took an allocator parameter. The alloc
 ```diff
 -// v1.x
 -let val = Value::from_array(session.allocator(), &array)?;
-+// v2.0
++// v2
 +let val = Value::from_array(&array)?;
 ```
 
@@ -86,7 +109,7 @@ v2.0 adds the groundwork for supporting sequence and maps types in `Value`s, so 
 ```diff
 -// v1.x
 -let output1 = outputs[0].try_extract::<f32>()?;
-+// v2.0
++// v2
 +let output1 = outputs[0].extract_tensor::<f32>()?;
 ```
 
@@ -96,6 +119,33 @@ Just like how inputs can now be specified by name, you can now retrieve session 
 ```rust
 let l = outputs["latents"].extract_tensor::<f32>()?;
 ```
+
+## Execution providers
+Execution provider structs with public fields have been replaced with builder pattern structs. See the [API reference](https://docs.rs/ort/2.0.0-alpha.1/ort/index.html?search=ExecutionProvider) and the [execution providers reference](/perf/execution-providers) for more information.
+
+```diff
+-// v1.x
+-builder = builder.with_execution_providers(ExecutionProvider::DirectML(DirectMLExecutionProvider {
+-    device_id: 1
+-}))?;
++// v2
++builder = builder.with_execution_providers([
++    DirectMLExecutionProvider::default()
++        .with_device_id(1)
++        .build()
++])?;
+```
+
+## Updated dependencies & features
+
+### `ort::sys` has been split into `ort-sys`
+The `ort::sys` module has been split out into [its own `ort-sys` crate](https://crates.io/crates/ort-sys). If you don't use `ort::sys` in your application, this won't affect you.
+
+### `ndarray` is now optional
+The dependency on `ndarray` is now declared optional. If you use `ort` with `default-features = false`, you'll need to add the `ndarray` feature.
+
+## The Flattening
+All modules except `download` are no longer public. Exports have been flattened to the crate root, so i.e. `ort::session::Session` becomes `ort::Session`.
 
 ## Renamed types
 The following types have been renamed with no other changes.

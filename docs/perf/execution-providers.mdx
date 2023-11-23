@@ -2,3 +2,158 @@
 title: Execution providers
 description: Learn how to enable execution providers to leverage hardware acceleration.
 ---
+
+Execution providers (EPs) enable ONNX Runtime to execute ONNX graphs with hardware acceleration. If you have specialized hardware like a GPU or NPU, execution providers can provide a massive performance boost to your `ort` applications. For more information on the intricacies of execution providers, see the [ONNX Runtime docs](https://onnxruntime.ai/docs/execution-providers/).
+
+ONNX Runtime must be compiled with support for each execution provider. pyke provides precompiled binaries for some of the most common EPs. Below is a table showing available EPs, their support in `ort`, and their binary availability status.
+
+| EP | Supported | Binaries | Static linking
+|:-------- |:------- |:------ |:------ |
+| NVIDIA CUDA | 🟢 | 🟢 | ❌ |
+| NVIDIA TensorRT | 🟢 | 🟢 | ❌ |
+| Microsoft DirectML | 🟢 | 🟢 | 🟢 |
+| Apple CoreML | 🟢 | 🟢 | 🟢 |
+| AMD ROCm | 🟢 | ❌ | ❌ |
+| Intel OpenVINO | 🟢 | ❌ | ❓ |
+| Intel oneDNN | 🟢 | ❌ | ❓ |
+| XNNPACK | 🟢 | 🟢 | 🟢 |
+| Qualcomm QNN | 🟢 | ❌ | ❓ |
+| Huawei CANN | 🟢 | ❌ | ❓ |
+| Android NNAPI | 🟢 | ❌ | ❓ |
+| Apache TVM | 🟢 | ❌ | ❓ |
+| Arm ACL | 🟢 | ❌ | ❓ |
+| ArmNN | 🟢 | ❌ | ❓ |
+| AMD MIGraphX | ❌ | ❌ | ❓ |
+| AMD Vitis AI | ❌ | ❌ | ❓ |
+| Microsoft Azure | ❌ | ❌ | ❓ |
+| Rockchip RKNPU | ❌ | ❌ | ❓ |
+
+Some EPs supported by ONNX Runtime are not supported by `ort` due to a lack of hardware for testing. If your preferred EP is missing support and you've got the hardware, please [open an issue](https://github.com/pykeio/ort/issues/new)!
+
+## Registering execution providers
+In order to use an execution provider, you must **register** it before creating an environment or session. You can do this via the `SessionBuilder::with_execution_providers` method. For example, to register the CUDA execution provider:
+
+```rust
+use ort::{CUDAExecutionProvider, Session};
+
+fn main() -> anyhow::Result<()> {
+    let session = Session::builder()?
+        .with_execution_providers([CUDAExecutionProvider::default().build()])?
+        .with_model_from_file("model.onnx")?;
+
+    Ok(())
+}
+```
+
+You can, of course, specify multiple execution providers. `ort` will register all EPs specified, in order. If registration of an EP succeeds, `ort` will still continue to register the rest of the EPs so that ONNX Runtime can fallback to other EPs in case an EP does not support a certain operator.
+
+```rust
+use ort::{CoreMLExecutionProvider, CUDAExecutionProvider, DirectMLExecutionProvider, TensorRTExecutionProvider, Session};
+
+fn main() -> anyhow::Result<()> {
+    let session = Session::builder()?
+        .with_execution_providers([
+            // Prefer TensorRT over CUDA.
+            TensorRTExecutionProvider::default().build(),
+            CUDAExecutionProvider::default().build(),
+            // Use DirectML on Windows if NVIDIA EPs are not available
+            DirectMLExecutionProvider::default().build(),
+            // Or use ANE on Apple platforms
+            CoreMLExecutionProvider::default().build()
+        ])?
+        .with_model_from_file("model.onnx")?;
+
+    Ok(())
+}
+```
+
+## Configuring EPs
+EPs have configuration options to control behavior or increase performance. Each `XXXExecutionProvider` struct returns a builder with configuration methods. See the [API reference](https://docs.rs/ort/2.0.0-alpha.1/ort/index.html?search=ExecutionProvider) for the EP structs for more information on which options are supported and what they do.
+
+```rust
+use ort::{CoreMLExecutionProvider, Session};
+
+fn main() -> anyhow::Result<()> {
+    let session = Session::builder()?
+        .with_execution_providers([
+            CoreMLExecutionProvider::default()
+                // this model uses control flow operators, so enable CoreML on subgraphs too
+                .with_subgraphs()
+                // only use the ANE as the CoreML CPU implementation is super slow for this model
+                .with_ane_only()
+                .build()
+        ])?
+        .with_model_from_file("model.onnx")?;
+
+    Ok(())
+}
+```
+
+## Fallback behavior
+`ort` will silently fail and fall back to executing on the CPU if all execution providers fail to register. In many cases, though, you'll want to show the user an error message when an EP fails to register, or outright abort the process.
+
+If you need to know the status of an EP registration, use `ExecutionProvider::register` on a `SessionBuilder`.
+
+```rust
+use ort::{CUDAExecutionProvider, ExecutionProvider, Session};
+
+fn main() -> anyhow::Result<()> {
+    let builder = Session::builder()?;
+
+    let cuda = CUDAExecutionProvider::default();
+    if cuda.register(&builder).is_err() {
+        eprintln!("Failed to register CUDA!");
+        std::process::exit(1);
+    }
+
+    let session = builder.with_model_from_file("model.onnx")?;
+
+    Ok(())
+}
+```
+
+You can also check whether ONNX Runtime is even compiled with support for the execution provider with the `is_available` method.
+
+```rust
+use ort::{CoreMLExecutionProvider, ExecutionProvider, Session};
+
+fn main() -> anyhow::Result<()> {
+    let builder = Session::builder()?;
+
+    let coreml = CoreMLExecutionProvider::default();
+    if !coreml.is_available() {
+        eprintln!("Please compile ONNX Runtime with CoreML!");
+        std::process::exit(1);
+    }
+
+    let session = builder.with_model_from_file("model.onnx")?;
+
+    Ok(())
+}
+```
+
+## Global defaults
+You can configure `ort` to attempt to register a list of execution providers for all sessions created in an environment.
+
+```rust
+use ort::{CUDAExecutionProvider, Session};
+
+fn main() -> anyhow::Result<()> {
+    ort::init()
+        .with_execution_providers([CUDAExecutionProvider::default().build()])
+        .commit()?;
+
+    let session = Session::builder()?.with_model_from_file("model.onnx")?;
+    // The session will attempt to register the CUDA EP
+    // since we configured the environment default.
+
+    Ok(())
+}
+```
+
+If a session is built `with_execution_providers` after configuring global defaults, the EPs provided by the session will be registered *after* the environment defaults. It does not override the environment EPs.
+
+Note that `ort::init` must come before you create any sessions, otherwise the configuration will not take effect!
+
+## Troubleshooting
+If it seems like the execution provider is not registering properly, or you are not getting acceptable performance, see the [Troubleshooting: Performance](/troubleshooting/performance) page for more information on how to debug any EP issues.

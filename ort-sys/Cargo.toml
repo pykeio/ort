@@ -1,7 +1,7 @@
 [package]
 name = "ort-sys"
 description = "Unsafe Rust bindings for ONNX Runtime 1.16 - Optimize and Accelerate Machine Learning Inferencing"
-version = "2.0.0-alpha.0"
+version = "2.0.0-alpha.1"
 edition = "2021"
 rust-version = "1.70"
 license = "MIT OR Apache-2.0"
@@ -16,15 +16,31 @@ include = [ "src/", "build.rs", "LICENSE-APACHE", "LICENSE-MIT" ]
 
 [features]
 default = []
-download-binaries = [ "ureq", "tar", "ruzstd", "sha2" ]
+download-binaries = [ "ureq", "tar", "flate2", "sha2" ]
 load-dynamic = []
 copy-dylibs = []
+
 cuda = []
 tensorrt = []
+openvino = []
+onednn = []
+directml = []
+nnapi = []
+coreml = []
+xnnpack = []
 rocm = []
+acl = []
+armnn = []
+tvm = []
+migraphx = []
+rknpu = []
+vitis = []
+cann = []
+qnn = []
+
 
 [build-dependencies]
 ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }
 tar = { version = "0.4", optional = true }
-ruzstd = { version = "0.5", optional = true }
+flate2 = { version = "1.0", optional = true }
 sha2 = { version = "0.10", optional = true }

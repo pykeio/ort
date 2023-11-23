@@ -1,12 +1,12 @@
 use std::{
-	env, fs,
-	io::{self, Read},
+	env,
 	path::{Path, PathBuf}
 };
 
 const ORT_ENV_STRATEGY: &str = "ORT_STRATEGY";
 const ORT_ENV_SYSTEM_LIB_LOCATION: &str = "ORT_LIB_LOCATION";
 const ORT_ENV_SYSTEM_LIB_PROFILE: &str = "ORT_LIB_PROFILE";
+#[cfg(feature = "download-binaries")]
 const ORT_EXTRACT_DIR: &str = "onnxruntime";
 
 macro_rules! incompatible_providers {
@@ -55,13 +55,14 @@ fn verify_file(buf: &[u8], hash: impl AsRef<[u8]>) -> bool {
 }
 
 #[cfg(feature = "download-binaries")]
-fn extract_tzs(buf: &[u8], output: &Path) {
-	let buf: io::BufReader<&[u8]> = io::BufReader::new(buf);
-	let tar = ruzstd::StreamingDecoder::new(buf).unwrap();
+fn extract_tgz(buf: &[u8], output: &Path) {
+	let buf: std::io::BufReader<&[u8]> = std::io::BufReader::new(buf);
+	let tar = flate2::read::GzDecoder::new(buf);
 	let mut archive = tar::Archive::new(tar);
 	archive.unpack(output).unwrap();
 }
 
+#[cfg(feature = "copy-dylibs")]
 fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 	// get the target directory - we need to place the dlls next to the executable so they can be properly loaded by windows
 	let out_dir = out_dir.ancestors().nth(3).unwrap();
@@ -69,7 +70,7 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 		#[cfg(windows)]
 		let mut copy_fallback = false;
 
-		let lib_files = fs::read_dir(lib_dir).unwrap();
+		let lib_files = std::fs::read_dir(lib_dir).unwrap();
 		for lib_file in lib_files.filter(|e| {
 			e.as_ref().ok().map_or(false, |e| {
 				e.file_type().map_or(false, |e| !e.is_dir())
@@ -272,35 +273,59 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 		"download" => {
 			if target.contains("darwin") {
 				incompatible_providers![CUDA, ONEDNN, OPENVINO, VITIS, TVM, TENSORRT, MIGRAPHX, DIRECTML, WINML, ACML, ARMNN, ROCM];
+			} else if target.contains("windows") {
+				incompatible_providers![ONEDNN, OPENVINO, VITIS, TVM, MIGRAPHX, WINML, ACML, ARMNN, ROCM];
 			} else {
-				incompatible_providers![ONEDNN, COREML, OPENVINO, VITIS, TVM, MIGRAPHX, DIRECTML, WINML, ACML, ARMNN, ROCM];
+				incompatible_providers![ONEDNN, OPENVINO, VITIS, TVM, MIGRAPHX, DIRECTML, WINML, ACML, ARMNN, ROCM];
 			}
 
 			let (prebuilt_url, prebuilt_hash) = match env::var("TARGET").unwrap().as_str() {
 				"aarch64-apple-darwin" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2/ortrs-msort_static-v1.16.2-aarch64-apple-darwin.tzs",
-					"33F15C09A9AA209AEB02C6C53DA9EA4DCD79E9FBF9E7A3A0FBD0F89099118162"
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_static-v1.16.2-aarch64-apple-darwin.tgz",
+					"142644EB9A95E01C609873EEB6C581C1FB2C0699B60300C44A9DCB4BA2A75975"
 				),
 				"aarch64-pc-windows-msvc" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2/ortrs-msort_static-v1.16.2-aarch64-pc-windows-msvc.tzs",
-					"E465FAEA1F32D6141E448D376989516BB9462E554AD70122281931440CEAA6F2"
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_static-v1.16.2-aarch64-pc-windows-msvc.tgz",
+					"5730A8C23C1C1C3D62AAC24FD6F5496A2897FC4967B36F1CC5308519C332399E"
+				),
+				"aarch64-unknown-linux-gnu" => (
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_static-v1.16.2-aarch64-unknown-linux-gnu.tgz",
+					"A05AA5CB2FF4F9471ABFFA295F3F65423FF55A560727386E12A6BE96950A8E5B"
 				),
 				"wasm32-unknown-emscripten" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2/ortrs-msort_static-v1.16.2-wasm32-unknown-emscripten.tzs",
-					"3AF4B556B0D486A7DB7DDF72EF1B16ED4C960C1F3270ADBBBE01AE4248500F45"
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_static-v1.16.2-wasm32-unknown-emscripten.tgz",
+					"51CB0F74A422501E810483E67CEFD74765C1164AD5D77C90527AB2697ADA48B4"
 				),
 				"x86_64-apple-darwin" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2/ortrs-msort_static-v1.16.2-x86_64-apple-darwin.tzs",
-					"70565D22DDDD312B56D74B816BCE7FA17F55EA4DFF4A650C2E4C9F57512DFEEC"
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_static-v1.16.2-x86_64-apple-darwin.tgz",
+					"F3B58C9AAA1DE2184BF58B5F928A26660FD8F26232BE3F8A2C6A61896D7FA23A"
 				),
-				"x86_64-pc-windows-msvc" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2/ortrs-msort_static-v1.16.2-x86_64-pc-windows-msvc.tzs",
-					"5E3B8F3B37876F9C85300845C72BEF50A4F7157B6244DE7A938657346D385413"
-				),
-				"x86_64-unknown-linux-gnu" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2/ortrs-msort_static-v1.16.2-x86_64-unknown-linux-gnu.tzs",
-					"EFE9C5AAF2B05B2E52963A8A838D2E256AD913745D43675177DC57F79D65F836"
-				),
+				"x86_64-pc-windows-msvc" => {
+					if cfg!(any(feature = "cuda", feature = "tensorrt")) {
+						(
+							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_dylib_cuda-v1.16.2-x86_64-pc-windows-msvc.tgz",
+							"6C12CA3FDF4CF06D11AE4E8DE8E7243BEE259FB9998B8386EE46801BBC437D3D"
+						)
+					} else {
+						(
+							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_static-v1.16.2-x86_64-pc-windows-msvc.tgz",
+							"B9EC5CC19032825645F8A2F34E66397C2D8E05DB87472EB3B293882178B043D6"
+						)
+					}
+				}
+				"x86_64-unknown-linux-gnu" => {
+					if cfg!(any(feature = "cuda", feature = "tensorrt")) {
+						(
+							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_dylib_cuda-v1.16.2-x86_64-unknown-linux-gnu.tgz",
+							"6083247B508585B871264DDF3C44DB298A077D1CB092E3270EFA8B411288086A"
+						)
+					} else {
+						(
+							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_static-v1.16.2-x86_64-unknown-linux-gnu.tgz",
+							"93F77F7BF5B95C2430BDBC063E830878328CA13CC8466AADA9F7EA5CE35F366A"
+						)
+					}
+				}
 				x => panic!("downloaded binaries not available for target {x}\nyou may have to compile ONNX Runtime from source")
 			};
 
@@ -309,7 +334,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 			if !lib_dir.exists() {
 				let downloaded_file = fetch_file(prebuilt_url);
 				assert!(verify_file(&downloaded_file, prebuilt_hash));
-				extract_tzs(&downloaded_file, &out_dir);
+				extract_tgz(&downloaded_file, &out_dir);
 			}
 
 			static_link_prerequisites();

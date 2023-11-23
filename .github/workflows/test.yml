@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/test.yml'
       - 'src/**/*.rs'
+      - 'ort-sys/**/*.rs'
       - 'build.rs'
       - 'Cargo.toml'
       - '.cargo/**/*'
@@ -15,6 +16,7 @@ on:
     paths:
       - '.github/workflows/test.yml'
       - 'src/**/*.rs'
+      - 'ort-sys/**/*.rs'
       - 'build.rs'
       - 'Cargo.toml'
       - '.cargo/**/*'

@@ -113,15 +113,16 @@ fn add_search_dir<P: AsRef<Path>>(base: P) {
 	}
 }
 
-fn static_link_prerequisites() {
+fn static_link_prerequisites(using_pyke_libs: bool) {
 	let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
 	if target_os == "macos" || target_os == "ios" {
 		println!("cargo:rustc-link-lib=c++");
 		println!("cargo:rustc-link-lib=framework=Foundation");
 	} else if target_os == "linux" || target_os == "android" {
 		println!("cargo:rustc-link-lib=stdc++");
-	} else if target_os == "windows" {
+	} else if target_os == "windows" && (using_pyke_libs || cfg!(feature = "directml")) {
 		println!("cargo:rustc-link-lib=dxguid");
+		println!("cargo:rustc-link-lib=D3D12");
 		println!("cargo:rustc-link-lib=DirectML");
 	}
 }
@@ -340,7 +341,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 				extract_tgz(&downloaded_file, &out_dir);
 			}
 
-			static_link_prerequisites();
+			static_link_prerequisites(true);
 
 			#[cfg(feature = "copy-dylibs")]
 			{
@@ -374,7 +375,7 @@ fn real_main(link: bool) {
 			println!("cargo:rustc-link-search=native={}", lib_dir.display());
 		}
 
-		static_link_prerequisites();
+		static_link_prerequisites(false);
 
 		println!("cargo:rerun-if-env-changed={}", ORT_ENV_SYSTEM_LIB_LOCATION);
 	}

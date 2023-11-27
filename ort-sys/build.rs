@@ -122,6 +122,7 @@ fn static_link_prerequisites(using_pyke_libs: bool) {
 		println!("cargo:rustc-link-lib=stdc++");
 	} else if target_os == "windows" && (using_pyke_libs || cfg!(feature = "directml")) {
 		println!("cargo:rustc-link-lib=dxguid");
+		println!("cargo:rustc-link-lib=DXGI");
 		println!("cargo:rustc-link-lib=D3D12");
 		println!("cargo:rustc-link-lib=DirectML");
 	}

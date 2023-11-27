@@ -120,6 +120,9 @@ fn static_link_prerequisites() {
 		println!("cargo:rustc-link-lib=framework=Foundation");
 	} else if target_os == "linux" || target_os == "android" {
 		println!("cargo:rustc-link-lib=stdc++");
+	} else if target_os == "windows" && cfg!(feature = "directml") {
+		println!("cargo:rustc-link-lib=dxguid");
+		println!("cargo:rustc-link-lib=DirectML");
 	}
 }
 

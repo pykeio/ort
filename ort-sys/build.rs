@@ -286,48 +286,48 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 
 			let (prebuilt_url, prebuilt_hash) = match env::var("TARGET").unwrap().as_str() {
 				"aarch64-apple-darwin" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_static-v1.16.2-aarch64-apple-darwin.tgz",
-					"142644EB9A95E01C609873EEB6C581C1FB2C0699B60300C44A9DCB4BA2A75975"
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.3/ortrs-msort_static-v1.16.3-aarch64-apple-darwin.tgz",
+					"188E07B9304CCC28877195ECD2177EF3EA6603A0B5B3497681A6C9E584721387"
 				),
 				"aarch64-pc-windows-msvc" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_static-v1.16.2-aarch64-pc-windows-msvc.tgz",
-					"5730A8C23C1C1C3D62AAC24FD6F5496A2897FC4967B36F1CC5308519C332399E"
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.3/ortrs-msort_static-v1.16.3-aarch64-pc-windows-msvc.tgz",
+					"B35F6526EAF61527531D6F73EBA19EF09D6B0886FB66C14E1B594EE70F447817"
 				),
 				"aarch64-unknown-linux-gnu" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_static-v1.16.2-aarch64-unknown-linux-gnu.tgz",
-					"A05AA5CB2FF4F9471ABFFA295F3F65423FF55A560727386E12A6BE96950A8E5B"
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.3/ortrs-msort_static-v1.16.3-aarch64-unknown-linux-gnu.tgz",
+					"C1E315515856D7880545058479020756BC5CE4C0BA07FB3DD2104233EC7C3C81"
 				),
 				"wasm32-unknown-emscripten" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_static-v1.16.2-wasm32-unknown-emscripten.tgz",
-					"51CB0F74A422501E810483E67CEFD74765C1164AD5D77C90527AB2697ADA48B4"
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.3/ortrs-msort_static-v1.16.3-wasm32-unknown-emscripten.tgz",
+					"468F74FB4C7451DC94EBABC080779CDFF0C7DA0617D85ADF21D5435A96F9D470"
 				),
 				"x86_64-apple-darwin" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_static-v1.16.2-x86_64-apple-darwin.tgz",
-					"F3B58C9AAA1DE2184BF58B5F928A26660FD8F26232BE3F8A2C6A61896D7FA23A"
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.3/ortrs-msort_static-v1.16.3-x86_64-apple-darwin.tgz",
+					"0191C95D9E797BF77C723AD82DC078C6400834B55B8465FA5176BA984FFEAB08"
 				),
 				"x86_64-pc-windows-msvc" => {
 					if cfg!(any(feature = "cuda", feature = "tensorrt")) {
 						(
-							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_dylib_cuda-v1.16.2-x86_64-pc-windows-msvc.tgz",
-							"6C12CA3FDF4CF06D11AE4E8DE8E7243BEE259FB9998B8386EE46801BBC437D3D"
+							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.3/ortrs-msort_dylib_cuda-v1.16.3-x86_64-pc-windows-msvc.tgz",
+							"B0F08E93E580297C170F04933742D04813C9C3BAD3705E1100CA9EF464AE4011"
 						)
 					} else {
 						(
-							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_static-v1.16.2-x86_64-pc-windows-msvc.tgz",
-							"B9EC5CC19032825645F8A2F34E66397C2D8E05DB87472EB3B293882178B043D6"
+							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.3/ortrs-msort_static-v1.16.3-x86_64-pc-windows-msvc.tgz",
+							"32ADC031C0EAA6C521680EEB9A8C39572C600A5B4F90AFE984590EA92B99E3BE"
 						)
 					}
 				}
 				"x86_64-unknown-linux-gnu" => {
 					if cfg!(any(feature = "cuda", feature = "tensorrt")) {
 						(
-							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_dylib_cuda-v1.16.2-x86_64-unknown-linux-gnu.tgz",
-							"6083247B508585B871264DDF3C44DB298A077D1CB092E3270EFA8B411288086A"
+							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.3/ortrs-msort_dylib_cuda-v1.16.3-x86_64-unknown-linux-gnu.tgz",
+							"0F0651D10BA56A6EA613F10B60E5C4D892384416C4D76E1F618BE57D1270993F"
 						)
 					} else {
 						(
-							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.2+001/ortrs-msort_static-v1.16.2-x86_64-unknown-linux-gnu.tgz",
-							"93F77F7BF5B95C2430BDBC063E830878328CA13CC8466AADA9F7EA5CE35F366A"
+							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.3/ortrs-msort_static-v1.16.3-x86_64-unknown-linux-gnu.tgz",
+							"D0E63AC1E5A56D0480009049183542E0BB1482CE29A1D110CC8550BEC5D994E2"
 						)
 					}
 				}

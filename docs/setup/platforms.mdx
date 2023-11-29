@@ -7,7 +7,6 @@ Here are the supported platforms and binary availability status, as of v2.0.
 
 * 🟢 - Supported. Dynamic & static binaries provided by pyke.
 * 🔷 - Supported. Static binaries provided by pyke.
-* 🟨 - Supported. Dynamic binaries provided by pyke.
 * ⭕ - Supported. Precompiled binaries not available.
 * ❌ - Not supported.
 
@@ -20,8 +19,6 @@ Here are the supported platforms and binary availability status, as of v2.0.
 | **Android** | ❌ | ❌ | ⭕ | ⭕ | ❌ |
 | **Web** | ❌ | ❌ | ❌ | ❌ | 🔷 |
 
-Remember that "Dynamic" linking means ONNX Runtime will come as a DLL or `.so` alongside your application. "Static" means ONNX Runtime is linked directly into your application in a single file. If available, `ort` will always prefer linking to static binaries over dynamic binaries.
+If your platform is marked as 🟢 or 🔷, you're in luck! Almost no setup will be required to get `ort` up and running. For platforms marked as ⭕, you'll need to [compile ONNX Runtime from source](https://onnxruntime.ai/docs/build/).
 
-Certain execution providers may not have binaries available. Most EPs only work with dynamic linking. You can check EP binary support in the [execution providers](/perf/execution-providers) documentation.
-
-For platforms marked as 🟨, you'll need to [compile ONNX Runtime from source](https://onnxruntime.ai/docs/build/).
+<Note>Certain execution providers may not have binaries available. You can check EP binary support in the [execution providers](/perf/execution-providers) documentation.</Note>

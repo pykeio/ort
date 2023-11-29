@@ -58,7 +58,7 @@
 			"group": "Setup",
 			"pages": [
 				"setup/platforms",
-				"setup/dynamic-linking",
+				"setup/linking",
 				"setup/compiling-onnxruntime",
 				"setup/cargo-features"
 			]

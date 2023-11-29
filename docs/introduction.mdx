@@ -6,3 +6,84 @@ title: Introduction
     `ort` is an open-source Rust binding for [ONNX Runtime](https://github.com/microsoft/onnxruntime).
 </p>
 
+`ort` makes it easy to deploy your machine learning models to production via ONNX Runtime, a [hardware-accelerated](/perf/execution-providers) inference engine. With `ort` + ONNX Runtime, you can run almost any ML model (including ResNet, YOLOv8, BERT, LLaMA), often much faster than PyTorch, and with the added bonus of Rust's efficiency.
+
+# Why `ort`?
+There are a few other ONNX Runtime crates out there, so why use `ort`?
+
+For one, `ort` simply supports more features:
+
+| Feature comparison     | **📕 ort** | **📗 [ors](https://github.com/HaoboGu/ors)** | **🪟 [onnxruntime-rs](https://github.com/microsoft/onnxruntime/tree/main/rust)** |
+|------------------------|-----------|-----------|----------------------|
+| Upstream version       | **v1.16.3** | v1.12.0 | v1.8               |
+| `dlopen()`?            | ✅         | ✅         | ❌                    |
+| Execution providers?   | ✅         | ❌         | ❌                    |
+| IOBinding?             | ✅         | ❌         | ❌                    |
+| String tensors?        | ✅         | ❌         | ⚠️ input only         |
+| Multiple output types? | ✅         | ✅         | ❌                    |
+| Multiple input types?  | ✅         | ✅         | ❌                    |
+| In-memory session?     | ✅         | ✅         | ✅                    |
+| WebAssembly?           | ✅         | ❌         | ❌                    |
+
+Users of `ort` appreciate its ease of use and ergonomic API. `ort` is also battle tested in some pretty serious production scenarios.
+- [**Twitter**](https://twitter.com/) uses `ort` in part of their recommendations system, serving hundreds of millions of requests a day.
+- [**Bloop**](https://bloop.ai/)'s semantic code search feature is powered by `ort`.
+- [**Numerical Elixir**](https://github.com/elixir-nx) uses `ort` to create ONNX Runtime bindings for the Elixir language.
+- [**`rust-bert`**](https://github.com/guillaume-be/rust-bert) implements many ready-to-use NLP pipelines in Rust a la Hugging Face Transformers, with an optional `ort` backend.
+- [**`edge-transformers`**](https://github.com/npc-engine/edge-transformers) also implements Hugging Face Transformers pipelines in Rust using `ort`.
+- We use `ort` in nearly all of our ML projects, including [VITRI](https://vitri.pyke.io/) 😊
+
+# Getting started
+<Steps>
+    <Step title="Add ort to your Cargo.toml">
+        If you have a [supported platform](/setup/platforms), installing `ort` couldn't be any simpler!
+        ```toml
+        [dependencies]
+        ort = "2.0"
+        ```
+    </Step>
+    <Step title="Convert your model">
+        Your model will need to be converted to the [ONNX](https://onnx.ai/) format before you can use it; here's how to do that:
+        - The awesome folks at Hugging Face have [a guide](https://huggingface.co/docs/transformers/serialization) to export Transformers models to ONNX with 🤗 Optimum.
+        - For other PyTorch models, see the [`torch.onnx` module docs](https://pytorch.org/docs/stable/onnx.html).
+    </Step>
+    <Step title="Load your model">
+        Once you've got a model, load it via `ort` by creating a [`Session`](/fundamentals/session):
+
+        ```rust
+        use ort::{GraphOptimizationLevel, Session};
+
+        let model = Session::builder()?
+            .with_optimization_level(GraphOptimizationLevel::Level3)?
+            .with_intra_threads(4)?
+            .with_model_from_file("yolov8m.onnx")?;
+        ```
+    </Step>
+    <Step title="Perform inference">
+        Preprocess your inputs, then `run()` the session to perform inference.
+
+        ```rust
+        let outputs = model.run(ort::inputs!["image" => image]?)?;
+        let output = outputs["output0"]
+            .extract_tensor::<f32>()
+            .unwrap()
+            .view()
+            .t()
+            .slice(s![.., .., 0])
+            .into_owned();
+        ...
+        ```
+
+        <Note>There are some [more useful examples](https://github.com/pykeio/ort/tree/main/examples) in our repo!</Note>
+    </Step>
+</Steps>
+
+# Next steps
+<Steps>
+    <Step title="Unlock more performance with EPs">
+        Use [execution providers](/perf/execution-providers) to enable hardware acceleration in your app and unlock the full power of your GPU or NPU.
+    </Step>
+    <Step title="Show off your project!">
+        We'd love to see what you've made with `ort`! Show off your project in [GitHub Discussions](https://github.com/pykeio/ort/discussions/categories/show-and-tell) or on our [Discord](https://discord.gg/uQtsNu2xMa).
+    </Step>
+</Steps>

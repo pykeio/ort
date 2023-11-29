@@ -1,0 +1,105 @@
+---
+title: Linking
+description: Here's how `ort` links to ONNX Runtime, and how to configure its behavior.
+---
+
+# Linking to a custom build of ONNX Runtime
+In some cases, you'll want to use a custom build of ONNX Runtime with `ort`. Luckily, we make this very easy by handling all of the linking configuration automagically. Just point `ort` to the output of ONNX Runtime's build pipeline and it'll Just Work™.
+
+To direct `ort` to your ONNX Runtime binaries, use the `ORT_LIB_LOCATION` environment variable when running `cargo build`. Point it to the location where the ONNX Runtime binaries are compiled to. This will typically be `onnxruntime/build/<os>`. For example:
+```shell
+$ ORT_LIB_LOCATION=~/onnxruntime/build/Linux cargo build
+```
+
+For iOS (or for other platforms if you are compiling multiple profiles at once), you'll need to manually specify the profile with the `ORT_LIB_PROFILE` environment variable. If not specified, `ort` will prefer `Release` over `RelWithDebInfo` over `MinSizeRel` over `Debug`.
+
+## Static linking
+Most ONNX Runtime compile configurations will support static linking - just build without `--build_shared_lib`. You should prefer static linking if possible, as it avoids many issues and follows de facto Rust practices. If you compile both static libraries and dynamic libraries, `ort` will prefer linking to the static libraries.
+
+## Dynamic linking
+Some execution providers unfortunately only support dynamic linking. Dynamic linking doesn't play well with the Rust ecosystem, though `ort` tries to alleviate the pain as much as possible.
+
+When it comes to dynamic linking, there are two options: `load-dynamic`, or standard dynamic linking. We recommend `load-dynamic` as it gives more control and is far less troublesome to work with.
+
+### `load-dynamic`, a glimmer of hope
+The `load-dynamic` Cargo feature solves a few of the issues with dynamic linking by **loading the library at runtime** rather than **linking at compile time**. This means that the path to the ONNX Runtime library can be configured at runtime, and the executable will not just completely fail to start if the binary couldn't be found.
+
+To use `load-dynamic`:
+<Steps>
+    <Step title="Enable the feature in Cargo.toml">
+        ```toml
+        [dependencies]
+        ort = { version = "2", features = [ "load-dynamic" ] }
+        ```
+    </Step>
+    <Step title="Point ort to the dylib with ORT_DYLIB_PATH">
+        <Tabs>
+            <Tab title="Via shell">
+                ```shell
+                $ ORT_DYLIB_PATH=../onnxruntime-build/linux-x64/libonnxruntime.so ./mirai
+                ```
+            </Tab>
+            <Tab title="Programmatically">
+                ```rust
+                use std::env;
+
+                fn main() -> anyhow::Result<()> {
+                    // Find our downloaded ONNX Runtime dylibs and set the environment variable for ort
+                    env::set_var("ORT_DYLIB_PATH", crate::internal::find_onnxruntime_dylib()?);
+
+                    // IMPORTANT: You must set the environment variable **before** you use `ort`!!!
+                    ort::init().commit()?;
+
+                    Ok(())
+                }
+                ```
+
+                <Warning>
+                    You MUST set the environment variable **before** you use any `ort` APIs!
+                </Warning>
+            </Tab>
+        </Tabs>
+    </Step>
+</Steps>
+
+<Note>`ORT_DYLIB_PATH` is relative to the executable. Cargo examples and tests are compiled to a different directory than binary crates: `target/<profile>/examples` and `target/<profile>/deps` respectively. Keep this in mind when configuring relative paths.</Note>
+
+### Standard dynamic linking
+If using standard dynamic linking, the dylibs have to be placed in a certain location for them to be found by the executable. For Windows, this is either somewhere on the `PATH`, or in the same folder as the executable.
+
+On macOS and Linux, they have to be placed somewhere in the `LD_LIBRARY_PATH`, or you can use rpath to configure the executable to search for dylibs in its parent folder. We've had the least issues with rpath, but YMMV.
+
+To configure rpath, you'll need to:
+<Steps>
+    <Step title="Enable rpath in Cargo.toml">
+        ```toml
+        [profile.dev]
+        rpath = true
+
+        [profile.release]
+        rpath = true
+
+        # do this for any other profiles
+        ```
+    </Step>
+    <Step title="Configure the path in the linker args in .cargo/config.toml to be relative to the executable">
+        <Tabs>
+            <Tab title="Linux">
+                ```toml
+                [target.x86_64-unknown-linux-gnu]
+                rustflags = [ "-Clink-args=-Wl,-rpath,\\$ORIGIN" ]
+
+                # do this for any other Linux targets as well
+                ```
+            </Tab>
+            <Tab title="macOS">
+                ```toml
+                [target.x86_64-apple-darwin]
+                rustflags = [ "-Clink-args=-Wl,-rpath,@loader_path" ]
+
+                # do this for any other macOS targets as well
+                ```
+            </Tab>
+        </Tabs>
+    </Step>
+</Steps>

@@ -136,6 +136,17 @@ impl Value {
 		}
 	}
 
+	pub fn dtype(&self) -> Result<TensorElementDataType> {
+		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
+
+		let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+		ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
+		assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
+
+		Ok(type_sys.into())
+	}
+
 	/// Attempt to extract the underlying data into a Rust `ndarray`.
 	///
 	/// The resulting array will be wrapped within a [`Tensor`].

@@ -506,7 +506,7 @@ impl<'v, T: Clone + 'static, D: Dimension + 'static> OrtInput for ArrayView<'v, 
 	}
 }
 
-impl<T: Clone + 'static> OrtInput for (Vec<i64>, Arc<Box<[T]>>) {
+impl<T: Clone + Debug + 'static> OrtInput for (Vec<i64>, Arc<Box<[T]>>) {
 	type Item = T;
 
 	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
@@ -563,12 +563,24 @@ impl<'v, T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 
 	}
 }
 
+impl<T: IntoTensorElementDataType + Debug + Clone + 'static> TryFrom<(Vec<i64>, Arc<Box<[T]>>)> for Value {
+	type Error = Error;
+	fn try_from(d: (Vec<i64>, Arc<Box<[T]>>)) -> Result<Self, Self::Error> {
+		Value::from_array(d)
+	}
+}
+
 impl Drop for Value {
+	#[tracing::instrument]
 	fn drop(&mut self) {
-		ortsys![unsafe ReleaseValue(self.ptr())];
-		match &mut self.inner {
-			ValueInner::CppOwned { ptr, .. } => *ptr = ptr::null_mut(),
-			ValueInner::RustOwned { ptr, .. } => *ptr = ptr::null_mut()
-		}
+		let ptr = self.ptr();
+		tracing::trace!(
+			"dropping {} value at {ptr:p}",
+			match &self.inner {
+				ValueInner::RustOwned { .. } => "rust-owned",
+				ValueInner::CppOwned { .. } => "cpp-owned"
+			}
+		);
+		ortsys![unsafe ReleaseValue(ptr)];
 	}
 }

@@ -8,7 +8,7 @@ use tracing::debug;
 use super::{
 	custom_logger,
 	error::{Error, Result},
-	ortsys, ExecutionProviderDispatch, LoggingLevel
+	ortsys, ExecutionProviderDispatch
 };
 
 static G_ENV: OnceLock<EnvironmentSingleton> = OnceLock::new();
@@ -48,7 +48,6 @@ pub struct EnvironmentGlobalThreadPoolOptions {
 /// times, the last value will have precedence.
 pub struct EnvironmentBuilder {
 	name: String,
-	log_level: LoggingLevel,
 	execution_providers: Vec<ExecutionProviderDispatch>,
 	global_thread_pool_options: Option<EnvironmentGlobalThreadPoolOptions>
 }
@@ -57,7 +56,6 @@ impl Default for EnvironmentBuilder {
 	fn default() -> Self {
 		EnvironmentBuilder {
 			name: "default".to_string(),
-			log_level: LoggingLevel::Error,
 			execution_providers: vec![],
 			global_thread_pool_options: None
 		}
@@ -75,16 +73,6 @@ impl EnvironmentBuilder {
 		S: Into<String>
 	{
 		self.name = name.into();
-		self
-	}
-
-	/// Configure the environment with a given log level
-	///
-	/// **NOTE**: Since ONNX can only define one environment per process, creating multiple environments using multiple
-	/// [`EnvironmentBuilder`]s will end up re-using the same environment internally; a new one will _not_ be created.
-	/// New parameters will be ignored.
-	pub fn with_log_level(mut self, log_level: LoggingLevel) -> EnvironmentBuilder {
-		self.log_level = log_level;
 		self
 	}
 
@@ -164,7 +152,14 @@ impl EnvironmentBuilder {
 					ortsys![unsafe SetGlobalIntraOpThreadAffinity(thread_options, cstr.as_ptr()) -> Error::CreateEnvironment];
 				}
 
-				ortsys![unsafe CreateEnvWithCustomLoggerAndGlobalThreadPools(logging_function, logger_param, self.log_level.into(), cname.as_ptr(), thread_options, &mut env_ptr) -> Error::CreateEnvironment; nonNull(env_ptr)];
+				ortsys![unsafe CreateEnvWithCustomLoggerAndGlobalThreadPools(
+					logging_function,
+					logger_param,
+					ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
+					cname.as_ptr(),
+					thread_options,
+					&mut env_ptr
+				) -> Error::CreateEnvironment; nonNull(env_ptr)];
 				ortsys![unsafe ReleaseThreadingOptions(thread_options)];
 				env_ptr
 			} else {
@@ -173,7 +168,13 @@ impl EnvironmentBuilder {
 				// FIXME: What should go here?
 				let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
 				let cname = CString::new(self.name.clone()).unwrap();
-				ortsys![unsafe CreateEnvWithCustomLogger(logging_function, logger_param, self.log_level.into(), cname.as_ptr(), &mut env_ptr) -> Error::CreateEnvironment; nonNull(env_ptr)];
+				ortsys![unsafe CreateEnvWithCustomLogger(
+					logging_function,
+					logger_param,
+					ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
+					cname.as_ptr(),
+					&mut env_ptr
+				) -> Error::CreateEnvironment; nonNull(env_ptr)];
 				env_ptr
 			};
 			debug!(env_ptr = format!("{:?}", env_ptr).as_str(), "Environment created");
@@ -225,11 +226,7 @@ mod tests {
 		assert!(!is_env_initialized());
 		assert_eq!(env_ptr(), None);
 
-		EnvironmentBuilder::default()
-			.with_name("env_is_initialized")
-			.with_log_level(LoggingLevel::Warning)
-			.commit()
-			.unwrap();
+		EnvironmentBuilder::default().with_name("env_is_initialized").commit().unwrap();
 		assert!(is_env_initialized());
 		assert_ne!(env_ptr(), None);
 	}

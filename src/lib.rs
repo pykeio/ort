@@ -29,7 +29,7 @@ use std::{
 };
 
 use once_cell::sync::Lazy;
-use tracing::warn;
+use tracing::{warn, Level};
 
 pub use self::environment::{init, EnvironmentBuilder};
 #[cfg(feature = "fetch-models")]
@@ -92,7 +92,8 @@ pub(crate) static G_ORT_LIB: Lazy<Arc<Mutex<AtomicPtr<libloading::Library>>>> = 
 				.join(&path);
 			if relative.exists() { relative } else { path }
 		};
-		let lib = libloading::Library::new(&absolute_path).unwrap_or_else(|e| panic!("could not load the library at `{}`: {e:?}", absolute_path.display()));
+		let lib = libloading::Library::new(&absolute_path)
+			.unwrap_or_else(|e| panic!("An error occurred while attempting to load the ONNX Runtime binary at `{}`: {e}", absolute_path.display()));
 		Arc::new(Mutex::new(AtomicPtr::new(Box::leak(Box::new(lib)) as *mut _)))
 	}
 });
@@ -102,7 +103,7 @@ pub(crate) static G_ORT_API: Lazy<Arc<Mutex<AtomicPtr<ort_sys::OrtApi>>>> = Lazy
 	unsafe {
 		let dylib = *G_ORT_LIB
 			.lock()
-			.expect("failed to acquire ONNX Runtime dylib lock; another thread panicked?")
+			.expect("Failed to acquire global ONNX Runtime dylib lock; did another thread using ort panic?")
 			.get_mut();
 		let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const ort_sys::OrtApiBase> = (*dylib)
 			.get(b"OrtGetApiBase")
@@ -114,6 +115,8 @@ pub(crate) static G_ORT_API: Lazy<Arc<Mutex<AtomicPtr<ort_sys::OrtApi>>>> = Lazy
 			(*base).GetVersionString.expect("`GetVersionString` must be present in `OrtApiBase`");
 		let version_string = get_version_string();
 		let version_string = CStr::from_ptr(version_string).to_string_lossy();
+		tracing::info!("Using ONNX Runtime version '{version_string}'");
+
 		let lib_minor_version = version_string.split('.').nth(1).map(|x| x.parse::<u32>().unwrap_or(0)).unwrap_or(0);
 		match lib_minor_version.cmp(&16) {
 			std::cmp::Ordering::Less => panic!(
@@ -146,7 +149,9 @@ pub(crate) static G_ORT_API: Lazy<Arc<Mutex<AtomicPtr<ort_sys::OrtApi>>>> = Lazy
 ///
 /// Panics if another thread panicked while holding the API lock, or if the ONNX Runtime API could not be initialized.
 pub fn ort() -> ort_sys::OrtApi {
-	let mut api_ref = G_ORT_API.lock().expect("failed to acquire OrtApi lock; another thread panicked?");
+	let mut api_ref = G_ORT_API
+		.lock()
+		.expect("Failed to acquire global ONNX Runtime API lock; did another thread using ort panic?");
 	let api_ref_mut: &mut *mut ort_sys::OrtApi = api_ref.get_mut();
 	let api_ptr_mut: *mut ort_sys::OrtApi = *api_ref_mut;
 
@@ -237,71 +242,30 @@ impl<'a> From<&'a str> for CodeLocation<'a> {
 
 extern_system_fn! {
 	/// Callback from C that will handle ONNX logging, forwarding ONNX's logs to the `tracing` crate.
-	pub(crate) fn custom_logger(_params: *mut ffi::c_void, severity: ort_sys::OrtLoggingLevel, category: *const c_char, log_id: *const c_char, code_location: *const c_char, message: *const c_char) {
-		use tracing::{span, Level, trace, debug, warn, info, error};
-
-		let log_level = match severity {
-			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE => Level::TRACE,
-			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_INFO => Level::DEBUG,
-			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING => Level::INFO,
-			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_ERROR => Level::WARN,
-			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_FATAL => Level::ERROR
-		};
-
+	pub(crate) fn custom_logger(_params: *mut ffi::c_void, severity: ort_sys::OrtLoggingLevel, category: *const c_char, _: *const c_char, code_location: *const c_char, message: *const c_char) {
 		assert_ne!(category, ptr::null());
 		let category = unsafe { CStr::from_ptr(category) };
 		assert_ne!(code_location, ptr::null());
-		let code_location = unsafe { CStr::from_ptr(code_location) }.to_str().unwrap_or("unknown");
+		let code_location_str = unsafe { CStr::from_ptr(code_location) }.to_str().unwrap();
 		assert_ne!(message, ptr::null());
-		let message = unsafe { CStr::from_ptr(message) }.to_str().unwrap_or("<invalid>");
-		assert_ne!(log_id, ptr::null());
-		let log_id = unsafe { CStr::from_ptr(log_id) };
+		let message = unsafe { CStr::from_ptr(message) }.to_str().unwrap();
 
-		let code_location = CodeLocation::from(code_location);
-		let span = span!(
+		let code_location = CodeLocation::from(code_location_str);
+		let span = tracing::span!(
 			Level::TRACE,
 			"ort",
 			category = category.to_str().unwrap_or("<unknown>"),
 			file = code_location.file,
 			line = code_location.line,
-			function = code_location.function,
-			log_id = log_id.to_str().unwrap_or("<unknown>")
+			function = code_location.function
 		);
-		let _enter = span.enter();
 
-		match log_level {
-			Level::TRACE => trace!("{}", message),
-			Level::DEBUG => debug!("{}", message),
-			Level::INFO => info!("{}", message),
-			Level::WARN => warn!("{}", message),
-			Level::ERROR => error!("{}", message)
-		}
-	}
-}
-
-/// The minimum logging level. Logs will be handled by the `tracing` crate.
-#[derive(Debug)]
-pub enum LoggingLevel {
-	/// Verbose logging level. This will log *a lot* of messages!
-	Verbose,
-	/// Info logging level.
-	Info,
-	/// Warning logging level. Recommended to receive potentially important warnings.
-	Warning,
-	/// Error logging level.
-	Error,
-	/// Fatal logging level.
-	Fatal
-}
-
-impl From<LoggingLevel> for ort_sys::OrtLoggingLevel {
-	fn from(logging_level: LoggingLevel) -> Self {
-		match logging_level {
-			LoggingLevel::Verbose => ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
-			LoggingLevel::Info => ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_INFO,
-			LoggingLevel::Warning => ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING,
-			LoggingLevel::Error => ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_ERROR,
-			LoggingLevel::Fatal => ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_FATAL
+		match severity {
+			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE => tracing::event!(parent: &span, Level::TRACE, "{message}"),
+			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_INFO => tracing::event!(parent: &span, Level::DEBUG, "{message}"),
+			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING => tracing::event!(parent: &span, Level::INFO, "{message}"),
+			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_ERROR => tracing::event!(parent: &span, Level::WARN, "{message}"),
+			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_FATAL=> tracing::event!(parent: &span, Level::ERROR, "{message}")
 		}
 	}
 }

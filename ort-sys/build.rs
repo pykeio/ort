@@ -13,12 +13,17 @@ fn fetch_file(source_url: &str) -> Vec<u8> {
 	let resp = ureq::get(source_url)
 		.timeout(std::time::Duration::from_secs(1800))
 		.call()
-		.unwrap_or_else(|err| panic!("[ort] failed to download {source_url}: {err:?}"));
+		.unwrap_or_else(|err| panic!("Failed to GET `{source_url}`: {err}"));
 
-	let len = resp.header("Content-Length").and_then(|s| s.parse::<usize>().ok()).unwrap();
+	let len = resp
+		.header("Content-Length")
+		.and_then(|s| s.parse::<usize>().ok())
+		.expect("Content-Length header should be present on archive response");
 	let mut reader = resp.into_reader();
 	let mut buffer = Vec::new();
-	reader.read_to_end(&mut buffer).unwrap();
+	reader
+		.read_to_end(&mut buffer)
+		.unwrap_or_else(|err| panic!("Failed to download from `{source_url}`: {err}"));
 	assert_eq!(buffer.len(), len);
 	buffer
 }
@@ -48,7 +53,7 @@ fn extract_tgz(buf: &[u8], output: &Path) {
 	let buf: std::io::BufReader<&[u8]> = std::io::BufReader::new(buf);
 	let tar = flate2::read::GzDecoder::new(buf);
 	let mut archive = tar::Archive::new(tar);
-	archive.unpack(output).unwrap();
+	archive.unpack(output).expect("Failed to extract .tgz file");
 }
 
 #[cfg(feature = "copy-dylibs")]
@@ -59,13 +64,10 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 		#[cfg(windows)]
 		let mut copy_fallback = false;
 
-		let lib_files = std::fs::read_dir(lib_dir).unwrap();
+		let lib_files = std::fs::read_dir(lib_dir).unwrap_or_else(|_| panic!("Failed to read contents of `{}` (does it exist?)", lib_dir.display()));
 		for lib_file in lib_files.filter(|e| {
 			e.as_ref().ok().map_or(false, |e| {
-				e.file_type().map_or(false, |e| !e.is_dir())
-					&& [".dll", ".so", ".dylib"]
-						.into_iter()
-						.any(|v| e.path().into_os_string().into_string().unwrap().contains(v))
+				e.file_type().map_or(false, |e| !e.is_dir()) && [".dll", ".so", ".dylib"].into_iter().any(|v| e.path().to_string_lossy().contains(v))
 			})
 		}) {
 			let lib_file = lib_file.unwrap();

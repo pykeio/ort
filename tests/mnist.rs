@@ -1,14 +1,14 @@
 use std::path::Path;
 
 use image::{imageops::FilterType, ImageBuffer, Luma, Pixel};
-use ort::{download::vision::DomainBasedImageClassification, inputs, ArrayExtensions, GraphOptimizationLevel, LoggingLevel, Session, Tensor};
+use ort::{download::vision::DomainBasedImageClassification, inputs, ArrayExtensions, GraphOptimizationLevel, Session, Tensor};
 use test_log::test;
 
 #[test]
 fn mnist_5() -> ort::Result<()> {
 	const IMAGE_TO_LOAD: &str = "mnist_5.jpg";
 
-	ort::init().with_name("integration_test").with_log_level(LoggingLevel::Warning).commit()?;
+	ort::init().with_name("integration_test").commit()?;
 
 	let session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?

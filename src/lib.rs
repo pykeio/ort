@@ -45,7 +45,7 @@ pub use self::session::{InMemorySession, Session, SessionBuilder, SessionInputs,
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 pub use self::tensor::{ArrayExtensions, ArrayViewHolder, Tensor, TensorData};
 pub use self::tensor::{ExtractTensorData, IntoTensorElementDataType, TensorElementDataType};
-pub use self::value::Value;
+pub use self::value::{Value, ValueType};
 
 #[cfg(not(all(target_arch = "x86", target_os = "windows")))]
 macro_rules! extern_system_fn {

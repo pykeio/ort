@@ -2,11 +2,13 @@
 members = [
 	'ort-sys',
 	'examples/gpt2',
+	'examples/model-info',
 	'examples/yolov8'
 ]
 default-members = [
 	'.',
 	'examples/gpt2',
+	'examples/model-info',
 	'examples/yolov8'
 ]
 

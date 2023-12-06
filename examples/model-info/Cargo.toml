@@ -1,0 +1,11 @@
+[package]
+publish = false
+name = "example-model-info"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+ort = { path = "../../" }
+
+[features]
+load-dynamic = [ "ort/load-dynamic" ]

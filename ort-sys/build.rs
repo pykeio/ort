@@ -1,5 +1,5 @@
 use std::{
-	env,
+	env, fs,
 	path::{Path, PathBuf}
 };
 
@@ -7,6 +7,10 @@ const ORT_ENV_SYSTEM_LIB_LOCATION: &str = "ORT_LIB_LOCATION";
 const ORT_ENV_SYSTEM_LIB_PROFILE: &str = "ORT_LIB_PROFILE";
 #[cfg(feature = "download-binaries")]
 const ORT_EXTRACT_DIR: &str = "onnxruntime";
+
+#[path = "src/internal/dirs.rs"]
+mod dirs;
+use self::dirs::cache_dir;
 
 #[cfg(feature = "download-binaries")]
 fn fetch_file(source_url: &str) -> Vec<u8> {
@@ -244,7 +248,8 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 	} else {
 		#[cfg(feature = "download-binaries")]
 		{
-			let (prebuilt_url, prebuilt_hash) = match env::var("TARGET").unwrap().as_str() {
+			let target = env::var("TARGET").unwrap().to_string();
+			let (prebuilt_url, prebuilt_hash) = match target.as_str() {
 				"aarch64-apple-darwin" => (
 					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.16.3/ortrs-msort_static-v1.16.3-aarch64-apple-darwin.tgz",
 					"188E07B9304CCC28877195ECD2177EF3EA6603A0B5B3497681A6C9E584721387"
@@ -294,18 +299,25 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 				x => panic!("downloaded binaries not available for target {x}\nyou may have to compile ONNX Runtime from source")
 			};
 
-			let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-			let lib_dir = out_dir.join(ORT_EXTRACT_DIR);
+			let cache_dir = cache_dir()
+				.expect("could not determine cache directory")
+				.join("dfbin")
+				.join(target)
+				.join(prebuilt_hash);
+			fs::create_dir_all(&cache_dir).expect("failed to create cache directory");
+
+			let lib_dir = cache_dir.join(ORT_EXTRACT_DIR);
 			if !lib_dir.exists() {
 				let downloaded_file = fetch_file(prebuilt_url);
 				assert!(verify_file(&downloaded_file, prebuilt_hash));
-				extract_tgz(&downloaded_file, &out_dir);
+				extract_tgz(&downloaded_file, &cache_dir);
 			}
 
 			static_link_prerequisites(true);
 
 			#[cfg(feature = "copy-dylibs")]
 			{
+				let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 				copy_libraries(&lib_dir.join("lib"), &out_dir);
 			}
 

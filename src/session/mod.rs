@@ -4,8 +4,6 @@
 use std::os::unix::ffi::OsStrExt;
 #[cfg(target_family = "windows")]
 use std::os::windows::ffi::OsStrExt;
-#[cfg(feature = "fetch-models")]
-use std::{env, path::PathBuf, time::Duration};
 use std::{
 	ffi::CString,
 	fmt,
@@ -16,6 +14,8 @@ use std::{
 	ptr,
 	sync::{atomic::Ordering, Arc}
 };
+#[cfg(feature = "fetch-models")]
+use std::{path::PathBuf, time::Duration};
 
 use super::{
 	char_p_to_string,
@@ -305,7 +305,11 @@ impl SessionBuilder {
 
 	#[cfg(feature = "fetch-models")]
 	fn with_model_downloaded_monomorphized(self, model: &str) -> Result<Session> {
-		let download_dir = env::current_dir().map_err(FetchModelError::IoError)?;
+		let download_dir = ort_sys::internal::dirs::cache_dir()
+			.expect("could not determine cache directory")
+			.join("models");
+		std::fs::create_dir_all(&download_dir).expect("could not create cache directory");
+
 		let downloaded_path = self.download_to(model, download_dir)?;
 		self.with_model_from_file(downloaded_path)
 	}

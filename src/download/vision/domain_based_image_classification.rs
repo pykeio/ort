@@ -12,7 +12,9 @@ pub enum DomainBasedImageClassification {
 impl ModelUrl for DomainBasedImageClassification {
 	fn model_url(&self) -> &'static str {
 		match self {
-			DomainBasedImageClassification::Mnist => "https://github.com/onnx/models/raw/main/vision/classification/mnist/model/mnist-8.onnx"
+			DomainBasedImageClassification::Mnist => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/mnist/model/mnist-8.onnx"
+			}
 		}
 	}
 }

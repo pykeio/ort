@@ -15,9 +15,11 @@ pub enum BodyFaceGestureAnalysis {
 impl ModelUrl for BodyFaceGestureAnalysis {
 	fn model_url(&self) -> &'static str {
 		match self {
-			BodyFaceGestureAnalysis::ArcFace => "https://github.com/onnx/models/raw/main/vision/body_analysis/arcface/model/arcfaceresnet100-8.onnx",
+			BodyFaceGestureAnalysis::ArcFace => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/body_analysis/arcface/model/arcfaceresnet100-8.onnx"
+			}
 			BodyFaceGestureAnalysis::EmotionFerPlus => {
-				"https://github.com/onnx/models/raw/main/vision/body_analysis/emotion_ferplus/model/emotion-ferplus-8.onnx"
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/body_analysis/emotion_ferplus/model/emotion-ferplus-8.onnx"
 			}
 		}
 	}

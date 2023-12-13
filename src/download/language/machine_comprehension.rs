@@ -40,8 +40,8 @@ pub enum GPT2 {
 impl ModelUrl for MachineComprehension {
 	fn model_url(&self) -> &'static str {
 		match self {
-			MachineComprehension::BiDAF => "https://github.com/onnx/models/raw/main/text/machine_comprehension/bidirectional_attention_flow/model/bidaf-9.onnx",
-			MachineComprehension::BERTSquad => "https://github.com/onnx/models/raw/main/text/machine_comprehension/bert-squad/model/bertsquad-10.onnx",
+			MachineComprehension::BiDAF => "https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/text/machine_comprehension/bidirectional_attention_flow/model/bidaf-9.onnx",
+			MachineComprehension::BERTSquad => "https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/text/machine_comprehension/bert-squad/model/bertsquad-10.onnx",
 			MachineComprehension::RoBERTa(variant) => variant.model_url(),
 			MachineComprehension::GPT2(variant) => variant.model_url()
 		}
@@ -51,9 +51,9 @@ impl ModelUrl for MachineComprehension {
 impl ModelUrl for RoBERTa {
 	fn model_url(&self) -> &'static str {
 		match self {
-			RoBERTa::RoBERTaBase => "https://github.com/onnx/models/raw/main/text/machine_comprehension/roberta/model/roberta-base-11.onnx",
+			RoBERTa::RoBERTaBase => "https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/text/machine_comprehension/roberta/model/roberta-base-11.onnx",
 			RoBERTa::RoBERTaSequenceClassification => {
-				"https://github.com/onnx/models/raw/main/text/machine_comprehension/roberta/model/roberta-sequence-classification-9.onnx"
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/text/machine_comprehension/roberta/model/roberta-sequence-classification-9.onnx"
 			}
 		}
 	}
@@ -62,8 +62,8 @@ impl ModelUrl for RoBERTa {
 impl ModelUrl for GPT2 {
 	fn model_url(&self) -> &'static str {
 		match self {
-			GPT2::GPT2 => "https://github.com/onnx/models/raw/main/text/machine_comprehension/gpt-2/model/gpt2-10.onnx",
-			GPT2::GPT2LmHead => "https://github.com/onnx/models/raw/main/text/machine_comprehension/gpt-2/model/gpt2-lm-head-10.onnx"
+			GPT2::GPT2 => "https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/text/machine_comprehension/gpt-2/model/gpt2-10.onnx",
+			GPT2::GPT2LmHead => "https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/text/machine_comprehension/gpt-2/model/gpt2-lm-head-10.onnx"
 		}
 	}
 }

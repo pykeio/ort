@@ -204,9 +204,15 @@ pub enum ShuffleNetVersion {
 impl ModelUrl for AlexNet {
 	fn model_url(&self) -> &'static str {
 		match self {
-			AlexNet::FullPrecision => "https://github.com/onnx/models/raw/main/vision/classification/alexnet/model/bvlcalexnet-12.onnx",
-			AlexNet::Int8 => "https://github.com/onnx/models/raw/main/vision/classification/alexnet/model/bvlcalexnet-12-int8.onnx",
-			AlexNet::QDQ => "https://github.com/onnx/models/raw/main/vision/classification/alexnet/model/bvlcalexnet-12-qdq.onnx"
+			AlexNet::FullPrecision => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/alexnet/model/bvlcalexnet-12.onnx"
+			}
+			AlexNet::Int8 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/alexnet/model/bvlcalexnet-12-int8.onnx"
+			}
+			AlexNet::QDQ => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/alexnet/model/bvlcalexnet-12-qdq.onnx"
+			}
 		}
 	}
 }
@@ -214,9 +220,15 @@ impl ModelUrl for AlexNet {
 impl ModelUrl for CaffeNet {
 	fn model_url(&self) -> &'static str {
 		match self {
-			CaffeNet::FullPrecision => "https://github.com/onnx/models/raw/main/vision/classification/caffenet/model/caffenet-12.onnx",
-			CaffeNet::Int8 => "https://github.com/onnx/models/raw/main/vision/classification/caffenet/model/caffenet-12-int8.onnx",
-			CaffeNet::QDQ => "https://github.com/onnx/models/raw/main/vision/classification/caffenet/model/caffenet-12-qdq.onnx"
+			CaffeNet::FullPrecision => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/caffenet/model/caffenet-12.onnx"
+			}
+			CaffeNet::Int8 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/caffenet/model/caffenet-12-int8.onnx"
+			}
+			CaffeNet::QDQ => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/caffenet/model/caffenet-12-qdq.onnx"
+			}
 		}
 	}
 }
@@ -224,21 +236,35 @@ impl ModelUrl for CaffeNet {
 impl ModelUrl for ImageClassification {
 	fn model_url(&self) -> &'static str {
 		match self {
-			ImageClassification::MobileNet => "https://github.com/onnx/models/raw/main/vision/classification/mobilenet/model/mobilenetv2-7.onnx",
-			ImageClassification::SqueezeNet => "https://github.com/onnx/models/raw/main/vision/classification/squeezenet/model/squeezenet1.1-7.onnx",
+			ImageClassification::MobileNet => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/mobilenet/model/mobilenetv2-7.onnx"
+			}
+			ImageClassification::SqueezeNet => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/squeezenet/model/squeezenet1.1-7.onnx"
+			}
 			ImageClassification::Inception(version) => version.model_url(),
 			ImageClassification::Vgg(variant) => variant.model_url(),
-			ImageClassification::AlexNet => "https://github.com/onnx/models/raw/main/vision/classification/alexnet/model/bvlcalexnet-9.onnx",
-			ImageClassification::GoogleNet => {
-				"https://github.com/onnx/models/raw/main/vision/classification/inception_and_googlenet/googlenet/model/googlenet-9.onnx"
+			ImageClassification::AlexNet => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/alexnet/model/bvlcalexnet-9.onnx"
 			}
-			ImageClassification::CaffeNet => "https://github.com/onnx/models/raw/main/vision/classification/caffenet/model/caffenet-9.onnx",
-			ImageClassification::RcnnIlsvrc13 => "https://github.com/onnx/models/raw/main/vision/classification/rcnn_ilsvrc13/model/rcnn-ilsvrc13-9.onnx",
-			ImageClassification::DenseNet121 => "https://github.com/onnx/models/raw/main/vision/classification/densenet-121/model/densenet-9.onnx",
+			ImageClassification::GoogleNet => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/inception_and_googlenet/googlenet/model/googlenet-9.onnx"
+			}
+			ImageClassification::CaffeNet => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/caffenet/model/caffenet-9.onnx"
+			}
+			ImageClassification::RcnnIlsvrc13 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/rcnn_ilsvrc13/model/rcnn-ilsvrc13-9.onnx"
+			}
+			ImageClassification::DenseNet121 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/densenet-121/model/densenet-9.onnx"
+			}
 			ImageClassification::ShuffleNet(version) => version.model_url(),
-			ImageClassification::ZFNet512 => "https://github.com/onnx/models/raw/main/vision/classification/zfnet-512/model/zfnet512-9.onnx",
+			ImageClassification::ZFNet512 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/zfnet-512/model/zfnet512-9.onnx"
+			}
 			ImageClassification::EfficientNetLite4 => {
-				"https://github.com/onnx/models/raw/main/vision/classification/efficientnet-lite4/model/efficientnet-lite4.onnx"
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/efficientnet-lite4/model/efficientnet-lite4.onnx"
 			}
 		}
 	}
@@ -248,10 +274,10 @@ impl ModelUrl for InceptionVersion {
 	fn model_url(&self) -> &'static str {
 		match self {
 			InceptionVersion::V1 => {
-				"https://github.com/onnx/models/raw/main/vision/classification/inception_and_googlenet/inception_v1/model/inception-v1-9.onnx"
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/inception_and_googlenet/inception_v1/model/inception-v1-9.onnx"
 			}
 			InceptionVersion::V2 => {
-				"https://github.com/onnx/models/raw/main/vision/classification/inception_and_googlenet/inception_v2/model/inception-v2-9.onnx"
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/inception_and_googlenet/inception_v2/model/inception-v2-9.onnx"
 			}
 		}
 	}
@@ -260,11 +286,21 @@ impl ModelUrl for InceptionVersion {
 impl ModelUrl for ResNetV1 {
 	fn model_url(&self) -> &'static str {
 		match self {
-			ResNetV1::L18 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet18-v1-7.onnx",
-			ResNetV1::L34 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet34-v1-7.onnx",
-			ResNetV1::L50 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet50-v1-7.onnx",
-			ResNetV1::L101 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet101-v1-7.onnx",
-			ResNetV1::L152 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet152-v1-7.onnx"
+			ResNetV1::L18 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/resnet/model/resnet18-v1-7.onnx"
+			}
+			ResNetV1::L34 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/resnet/model/resnet34-v1-7.onnx"
+			}
+			ResNetV1::L50 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/resnet/model/resnet50-v1-7.onnx"
+			}
+			ResNetV1::L101 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/resnet/model/resnet101-v1-7.onnx"
+			}
+			ResNetV1::L152 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/resnet/model/resnet152-v1-7.onnx"
+			}
 		}
 	}
 }
@@ -272,11 +308,21 @@ impl ModelUrl for ResNetV1 {
 impl ModelUrl for ResNetV2 {
 	fn model_url(&self) -> &'static str {
 		match self {
-			ResNetV2::L18 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet18-v2-7.onnx",
-			ResNetV2::L34 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet34-v2-7.onnx",
-			ResNetV2::L50 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet50-v2-7.onnx",
-			ResNetV2::L101 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet101-v2-7.onnx",
-			ResNetV2::L152 => "https://github.com/onnx/models/raw/main/vision/classification/resnet/model/resnet152-v2-7.onnx"
+			ResNetV2::L18 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/resnet/model/resnet18-v2-7.onnx"
+			}
+			ResNetV2::L34 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/resnet/model/resnet34-v2-7.onnx"
+			}
+			ResNetV2::L50 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/resnet/model/resnet50-v2-7.onnx"
+			}
+			ResNetV2::L101 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/resnet/model/resnet101-v2-7.onnx"
+			}
+			ResNetV2::L152 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/resnet/model/resnet152-v2-7.onnx"
+			}
 		}
 	}
 }
@@ -284,10 +330,10 @@ impl ModelUrl for ResNetV2 {
 impl ModelUrl for Vgg {
 	fn model_url(&self) -> &'static str {
 		match self {
-			Vgg::Vgg16 => "https://github.com/onnx/models/raw/main/vision/classification/vgg/model/vgg16-7.onnx",
-			Vgg::Vgg16Bn => "https://github.com/onnx/models/raw/main/vision/classification/vgg/model/vgg16-bn-7.onnx",
-			Vgg::Vgg19 => "https://github.com/onnx/models/raw/main/vision/classification/vgg/model/vgg19-7.onnx",
-			Vgg::Vgg19Bn => "https://github.com/onnx/models/raw/main/vision/classification/vgg/model/vgg19-bn-7.onnx"
+			Vgg::Vgg16 => "https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/vgg/model/vgg16-7.onnx",
+			Vgg::Vgg16Bn => "https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/vgg/model/vgg16-bn-7.onnx",
+			Vgg::Vgg19 => "https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/vgg/model/vgg19-7.onnx",
+			Vgg::Vgg19Bn => "https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/vgg/model/vgg19-bn-7.onnx"
 		}
 	}
 }
@@ -295,8 +341,12 @@ impl ModelUrl for Vgg {
 impl ModelUrl for ShuffleNetVersion {
 	fn model_url(&self) -> &'static str {
 		match self {
-			ShuffleNetVersion::V1 => "https://github.com/onnx/models/raw/main/vision/classification/shufflenet/model/shufflenet-9.onnx",
-			ShuffleNetVersion::V2 => "https://github.com/onnx/models/raw/main/vision/classification/shufflenet/model/shufflenet-v2-10.onnx"
+			ShuffleNetVersion::V1 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/shufflenet/model/shufflenet-9.onnx"
+			}
+			ShuffleNetVersion::V2 => {
+				"https://github.com/onnx/models/raw/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/shufflenet/model/shufflenet-v2-10.onnx"
+			}
 		}
 	}
 }

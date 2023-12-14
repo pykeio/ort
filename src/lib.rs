@@ -29,7 +29,7 @@ use std::{
 };
 
 use once_cell::sync::Lazy;
-use tracing::{warn, Level};
+use tracing::Level;
 
 pub use self::environment::{init, EnvironmentBuilder};
 #[cfg(feature = "fetch-models")]
@@ -123,7 +123,7 @@ pub(crate) static G_ORT_API: Lazy<Arc<Mutex<AtomicPtr<ort_sys::OrtApi>>>> = Lazy
 				"ort 2.0 is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.16.x', but got '{version_string}'",
 				**G_ORT_DYLIB_PATH
 			),
-			std::cmp::Ordering::Greater => warn!(
+			std::cmp::Ordering::Greater => tracing::warn!(
 				"ort 2.0 may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.16.x', but got '{version_string}'",
 				**G_ORT_DYLIB_PATH
 			),

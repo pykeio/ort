@@ -74,4 +74,4 @@ jobs:
       - name: Build/test
         run: |
           cargo install cross --git https://github.com/cross-rs/cross
-          cross test -p ort --features fetch-models --target aarch64-unknown-linux-gnu -Vv
+          cross test -p ort --features fetch-models --target aarch64-unknown-linux-gnu -v

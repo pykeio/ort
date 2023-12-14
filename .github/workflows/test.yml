@@ -72,8 +72,6 @@ jobs:
           $LLVM_ROOT = Join-Path $VCINSTALLDIR "Tools\Llvm\x64"
           echo "PATH=$Env:PATH;${LLVM_ROOT}\bin" >> $Env:GITHUB_ENV
       - name: Build/test
-        uses: houseabsolute/actions-rust-cross@v0
-        with:
-          command: ${{ matrix.platform.command }}
-          target: ${{ matrix.platform.target }}
-          args: "-p ort --features fetch-models"
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+          cross test -p ort --features fetch-models --target aarch64-unknown-linux-gnu -Vv

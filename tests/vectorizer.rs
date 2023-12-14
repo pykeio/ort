@@ -1,3 +1,5 @@
+#![cfg(not(target_arch = "aarch64"))]
+
 use std::path::Path;
 
 use ndarray::{ArrayD, IxDyn};
@@ -5,7 +7,6 @@ use ort::{inputs, GraphOptimizationLevel, Session, Value};
 use test_log::test;
 
 #[test]
-#[cfg(not(target_arch = "aarch64"))]
 fn vectorizer() -> ort::Result<()> {
 	let session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?

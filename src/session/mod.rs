@@ -305,10 +305,12 @@ impl SessionBuilder {
 
 	#[cfg(feature = "fetch-models")]
 	fn with_model_downloaded_monomorphized(self, model: &str) -> Result<Session> {
-		let download_dir = ort_sys::internal::dirs::cache_dir()
+		let mut download_dir = ort_sys::internal::dirs::cache_dir()
 			.expect("could not determine cache directory")
 			.join("models");
-		std::fs::create_dir_all(&download_dir).expect("could not create cache directory");
+		if std::fs::create_dir_all(&download_dir).is_err() {
+			download_dir = std::env::current_dir().unwrap();
+		}
 
 		let downloaded_path = self.download_to(model, download_dir)?;
 		self.with_model_from_file(downloaded_path)

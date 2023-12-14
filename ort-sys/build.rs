@@ -299,12 +299,14 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 				x => panic!("downloaded binaries not available for target {x}\nyou may have to compile ONNX Runtime from source")
 			};
 
-			let cache_dir = cache_dir()
+			let mut cache_dir = cache_dir()
 				.expect("could not determine cache directory")
 				.join("dfbin")
 				.join(target)
 				.join(prebuilt_hash);
-			fs::create_dir_all(&cache_dir).expect("failed to create cache directory");
+			if fs::create_dir_all(&cache_dir).is_err() {
+				cache_dir = env::var("OUT_DIR").unwrap().into();
+			}
 
 			let lib_dir = cache_dir.join(ORT_EXTRACT_DIR);
 			if !lib_dir.exists() {

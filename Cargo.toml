@@ -72,7 +72,7 @@ qnn = [ "ort-sys/qnn" ]
 [dependencies]
 ndarray = { version = "0.15", optional = true }
 thiserror = "1.0"
-ort-sys = { version = "2.0.0-alpha.2", path = "ort-sys" }
+ort-sys = { version = "2.0.0-alpha.3", path = "ort-sys" }
 libloading = { version = "0.8", optional = true }
 
 ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }

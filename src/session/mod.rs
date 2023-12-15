@@ -18,7 +18,7 @@ use std::{
 use std::{path::PathBuf, time::Duration};
 
 use super::{
-	char_p_to_string,
+	api, char_p_to_string,
 	environment::get_environment,
 	error::{assert_non_null_pointer, assert_null_pointer, status_to_result, Error, ErrorInternal, Result},
 	execution_providers::{apply_execution_providers, ExecutionProviderDispatch},
@@ -26,7 +26,7 @@ use super::{
 	io_binding::IoBinding,
 	memory::Allocator,
 	metadata::ModelMetadata,
-	ort, ortsys,
+	ortsys,
 	value::{Value, ValueType},
 	AllocatorType, GraphOptimizationLevel, MemType
 };
@@ -732,12 +732,12 @@ mod dangerous {
 	}
 
 	pub(super) fn extract_inputs_count(session_ptr: *mut ort_sys::OrtSession) -> Result<usize> {
-		let f = ort().SessionGetInputCount.unwrap();
+		let f = api().SessionGetInputCount.unwrap();
 		extract_io_count(f, session_ptr)
 	}
 
 	pub(super) fn extract_outputs_count(session_ptr: *mut ort_sys::OrtSession) -> Result<usize> {
-		let f = ort().SessionGetOutputCount.unwrap();
+		let f = api().SessionGetOutputCount.unwrap();
 		extract_io_count(f, session_ptr)
 	}
 
@@ -756,12 +756,12 @@ mod dangerous {
 	}
 
 	fn extract_input_name(session_ptr: *mut ort_sys::OrtSession, allocator_ptr: *mut ort_sys::OrtAllocator, i: ort_sys::size_t) -> Result<String> {
-		let f = ort().SessionGetInputName.unwrap();
+		let f = api().SessionGetInputName.unwrap();
 		extract_io_name(f, session_ptr, allocator_ptr, i)
 	}
 
 	fn extract_output_name(session_ptr: *mut ort_sys::OrtSession, allocator_ptr: *mut ort_sys::OrtAllocator, i: ort_sys::size_t) -> Result<String> {
-		let f = ort().SessionGetOutputName.unwrap();
+		let f = api().SessionGetOutputName.unwrap();
 		extract_io_name(f, session_ptr, allocator_ptr, i)
 	}
 
@@ -799,14 +799,14 @@ mod dangerous {
 
 	pub(super) fn extract_input(session_ptr: *mut ort_sys::OrtSession, allocator_ptr: *mut ort_sys::OrtAllocator, i: usize) -> Result<Input> {
 		let input_name = extract_input_name(session_ptr, allocator_ptr, i as _)?;
-		let f = ort().SessionGetInputTypeInfo.unwrap();
+		let f = api().SessionGetInputTypeInfo.unwrap();
 		let input_type = extract_io(f, session_ptr, i as _)?;
 		Ok(Input { name: input_name, input_type })
 	}
 
 	pub(super) fn extract_output(session_ptr: *mut ort_sys::OrtSession, allocator_ptr: *mut ort_sys::OrtAllocator, i: usize) -> Result<Output> {
 		let output_name = extract_output_name(session_ptr, allocator_ptr, i as _)?;
-		let f = ort().SessionGetOutputTypeInfo.unwrap();
+		let f = api().SessionGetOutputTypeInfo.unwrap();
 		let output_type = extract_io(f, session_ptr, i as _)?;
 		Ok(Output { name: output_name, output_type })
 	}

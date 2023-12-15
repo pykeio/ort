@@ -1,3 +1,5 @@
+#[cfg(feature = "load-dynamic")]
+use std::sync::Arc;
 use std::{
 	ffi::CString,
 	sync::{atomic::AtomicPtr, OnceLock}
@@ -10,6 +12,8 @@ use super::{
 	error::{Error, Result},
 	ortsys, ExecutionProviderDispatch
 };
+#[cfg(feature = "load-dynamic")]
+use crate::G_ORT_DYLIB_PATH;
 
 static G_ENV: OnceLock<EnvironmentSingleton> = OnceLock::new();
 
@@ -188,15 +192,32 @@ impl EnvironmentBuilder {
 	}
 }
 
+/// Creates an ONNX Runtime environment.
+///
+/// If this is not called, a default environment will be created.
+///
+/// In order for environment settings to apply, this must be called **before** you use other APIs like
+/// [`crate::Session`], and you *must* call `.commit()` on the builder returned by this function.
 pub fn init() -> EnvironmentBuilder {
+	EnvironmentBuilder::default()
+}
+
+/// Creates an ONNX Runtime environment, using the ONNX Runtime dynamic library specified by `path`.
+///
+/// If this is not called, a default environment will be created.
+///
+/// In order for environment settings to apply, this must be called **before** you use other APIs like
+/// [`crate::Session`], and you *must* call `.commit()` on the builder returned by this function.
+#[cfg(feature = "load-dynamic")]
+pub fn init_from(path: impl ToString) -> EnvironmentBuilder {
+	let _ = G_ORT_DYLIB_PATH.set(Arc::new(path.to_string()));
 	EnvironmentBuilder::default()
 }
 
 #[cfg(test)]
 mod tests {
-	use std::sync::{atomic::Ordering, Arc, RwLock, RwLockWriteGuard};
+	use std::sync::{atomic::Ordering, Arc, OnceLock, RwLock, RwLockWriteGuard};
 
-	use once_cell::sync::Lazy;
 	use test_log::test;
 
 	use super::*;
@@ -213,10 +234,14 @@ mod tests {
 		lock: Arc<RwLock<()>>
 	}
 
-	static CONCURRENT_TEST_RUN: Lazy<ConcurrentTestRun> = Lazy::new(|| ConcurrentTestRun { lock: Arc::new(RwLock::new(())) });
+	static CONCURRENT_TEST_RUN: OnceLock<ConcurrentTestRun> = OnceLock::new();
 
 	fn single_test_run() -> RwLockWriteGuard<'static, ()> {
-		CONCURRENT_TEST_RUN.lock.write().unwrap()
+		CONCURRENT_TEST_RUN
+			.get_or_init(|| ConcurrentTestRun { lock: Arc::new(RwLock::new(())) })
+			.lock
+			.write()
+			.unwrap()
 	}
 
 	#[test]

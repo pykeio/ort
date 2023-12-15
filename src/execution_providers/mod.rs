@@ -175,16 +175,13 @@ macro_rules! get_ep_register {
 		#[cfg(feature = "load-dynamic")]
 		#[allow(non_snake_case)]
 		let $symbol = unsafe {
-			let dylib = *$crate::G_ORT_LIB
-				.lock()
-				.expect("failed to acquire ONNX Runtime dylib lock; another thread panicked?")
-				.get_mut();
+			let dylib = $crate::lib_handle();
 			let symbol: ::std::result::Result<
 				::libloading::Symbol<unsafe extern "C" fn($($id: $type),*) -> $rt>,
 				::libloading::Error
-			> = (*dylib).get(stringify!($symbol).as_bytes());
+			> = dylib.get(stringify!($symbol).as_bytes());
 			match symbol {
-				Ok(symbol) => symbol,
+				Ok(symbol) => symbol.into_raw(),
 				Err(e) => {
 					return ::std::result::Result::Err($crate::Error::DlLoad { symbol: stringify!($symbol), error: e.to_string() });
 				}

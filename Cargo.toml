@@ -15,7 +15,7 @@ default-members = [
 [package]
 name = "ort"
 description = "A safe Rust wrapper for ONNX Runtime 1.16 - Optimize and Accelerate Machine Learning Inferencing"
-version = "2.0.0-alpha.3"
+version = "2.0.0-alpha.4"
 edition = "2021"
 rust-version = "1.70"
 license = "MIT OR Apache-2.0"
@@ -72,7 +72,7 @@ qnn = [ "ort-sys/qnn" ]
 [dependencies]
 ndarray = { version = "0.15", optional = true }
 thiserror = "1.0"
-ort-sys = { version = "2.0.0-alpha.3", path = "ort-sys" }
+ort-sys = { version = "2.0.0-alpha.4", path = "ort-sys" }
 libloading = { version = "0.8", optional = true }
 
 ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }

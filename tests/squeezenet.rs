@@ -23,8 +23,8 @@ fn squeezenet_mushroom() -> ort::Result<()> {
 		.expect("Could not download model from file");
 
 	let metadata = session.metadata()?;
-	assert_eq!(metadata.name()?, "main");
-	assert_eq!(metadata.producer()?, "");
+	assert_eq!(metadata.name()?, "main_graph");
+	assert_eq!(metadata.producer()?, "pytorch");
 
 	let class_labels = get_imagenet_labels()?;
 

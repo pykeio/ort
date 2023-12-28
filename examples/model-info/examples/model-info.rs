@@ -1,23 +1,23 @@
 use std::{env, process};
 
-use ort::{Session, TensorElementDataType, ValueType};
+use ort::{Session, TensorElementType, ValueType};
 
-fn display_element_type(t: TensorElementDataType) -> &'static str {
+fn display_element_type(t: TensorElementType) -> &'static str {
 	match t {
-		TensorElementDataType::Bfloat16 => "bf16",
-		TensorElementDataType::Bool => "bool",
-		TensorElementDataType::Float16 => "f16",
-		TensorElementDataType::Float32 => "f32",
-		TensorElementDataType::Float64 => "f64",
-		TensorElementDataType::Int16 => "i16",
-		TensorElementDataType::Int32 => "i32",
-		TensorElementDataType::Int64 => "i64",
-		TensorElementDataType::Int8 => "i8",
-		TensorElementDataType::String => "str",
-		TensorElementDataType::Uint16 => "u16",
-		TensorElementDataType::Uint32 => "u32",
-		TensorElementDataType::Uint64 => "u64",
-		TensorElementDataType::Uint8 => "u8"
+		TensorElementType::Bfloat16 => "bf16",
+		TensorElementType::Bool => "bool",
+		TensorElementType::Float16 => "f16",
+		TensorElementType::Float32 => "f32",
+		TensorElementType::Float64 => "f64",
+		TensorElementType::Int16 => "i16",
+		TensorElementType::Int32 => "i32",
+		TensorElementType::Int64 => "i64",
+		TensorElementType::Int8 => "i8",
+		TensorElementType::String => "str",
+		TensorElementType::Uint16 => "u16",
+		TensorElementType::Uint32 => "u32",
+		TensorElementType::Uint64 => "u64",
+		TensorElementType::Uint8 => "u8"
 	}
 }
 

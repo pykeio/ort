@@ -1,4 +1,4 @@
-use std::{any::Any, ffi, fmt::Debug, ops::Deref, ptr, sync::Arc};
+use std::{any::Any, collections::HashMap, ffi, fmt::Debug, hash::Hash, marker::PhantomData, ops::Deref, ptr, sync::Arc};
 
 #[cfg(feature = "ndarray")]
 use ndarray::{ArcArray, Array, ArrayView, CowArray, Dimension, IxDyn};
@@ -6,19 +6,19 @@ use ndarray::{ArcArray, Array, ArrayView, CowArray, Dimension, IxDyn};
 #[cfg(feature = "ndarray")]
 use crate::tensor::Tensor;
 use crate::{
-	error::assert_non_null_pointer,
+	error::{assert_non_null_pointer, status_to_result},
 	memory::{Allocator, MemoryInfo},
 	ortsys,
 	session::SharedSessionInner,
-	tensor::{ExtractTensorData, IntoTensorElementDataType, TensorElementDataType, Utf8Data},
+	tensor::{ExtractTensorData, IntoTensorElementType, TensorElementType, Utf8Data},
 	AllocatorType, Error, MemType, Result
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ValueType {
-	Tensor { ty: TensorElementDataType, dimensions: Vec<i64> },
+	Tensor { ty: TensorElementType, dimensions: Vec<i64> },
 	Sequence(Box<ValueType>),
-	Map { key: TensorElementDataType, value: TensorElementDataType }
+	Map { key: TensorElementType, value: TensorElementType }
 }
 
 impl ValueType {
@@ -112,6 +112,30 @@ pub(crate) enum ValueInner {
 		ptr: *mut ort_sys::OrtValue,
 		/// Hold [`SharedSessionInner`] to ensure that the value can stay alive after the main session is dropped.
 		_session: Arc<SharedSessionInner>
+	},
+	/// A version of `CppOwned` that does not belong to a session. Used exclusively in [`ValueRef`]s which are returned
+	/// by `extract_sequence` and used temporarily in `extract_map`.
+	///
+	/// We forego holding onto an `Arc<SharedSessionInner>` here because:
+	/// - a map value can be created independently of a session, and thus we wouldn't have anything to hold on to;
+	/// - this is only ever used by `ValueRef`s, whos owner value (which *is* holding the session Arc) will outlive it.
+	CppOwnedRef { ptr: *mut ort_sys::OrtValue }
+}
+
+/// A temporary version of [`Value`] with a lifetime specifier.
+///
+/// This is used exclusively by [`Value::extract_sequence`] to ensure the sequence value outlives its child elements.
+#[derive(Debug)]
+pub struct ValueRef<'v> {
+	inner: Value,
+	lifetime: PhantomData<&'v ()>
+}
+
+impl<'v> Deref for ValueRef<'v> {
+	type Target = Value;
+
+	fn deref(&self) -> &Self::Target {
+		&self.inner
 	}
 }
 
@@ -136,7 +160,13 @@ impl Value {
 		}
 	}
 
-	pub fn dtype(&self) -> Result<TensorElementDataType> {
+	unsafe fn from_raw_ref(ptr: *mut ort_sys::OrtValue) -> Value {
+		Value {
+			inner: ValueInner::CppOwnedRef { ptr }
+		}
+	}
+
+	pub fn tensor_element_type(&self) -> Result<TensorElementType> {
 		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
 		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
 
@@ -145,6 +175,36 @@ impl Value {
 		assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 
 		Ok(type_sys.into())
+	}
+
+	pub fn dtype(&self) -> Result<ValueType> {
+		let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
+		ortsys![unsafe GetTypeInfo(self.ptr(), &mut typeinfo_ptr) -> Error::GetTypeInfo; nonNull(typeinfo_ptr)];
+
+		let mut ty: ort_sys::ONNXType = ort_sys::ONNXType::ONNX_TYPE_UNKNOWN;
+		let status = ortsys![unsafe GetOnnxTypeFromTypeInfo(typeinfo_ptr, &mut ty)];
+		status_to_result(status).map_err(Error::GetOnnxTypeFromTypeInfo)?;
+		let io_type = match ty {
+			ort_sys::ONNXType::ONNX_TYPE_TENSOR | ort_sys::ONNXType::ONNX_TYPE_SPARSETENSOR => {
+				let mut info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+				ortsys![unsafe CastTypeInfoToTensorInfo(typeinfo_ptr, &mut info_ptr) -> Error::CastTypeInfoToTensorInfo; nonNull(info_ptr)];
+				unsafe { extract_data_type_from_tensor_info(info_ptr)? }
+			}
+			ort_sys::ONNXType::ONNX_TYPE_SEQUENCE => {
+				let mut info_ptr: *const ort_sys::OrtSequenceTypeInfo = std::ptr::null_mut();
+				ortsys![unsafe CastTypeInfoToSequenceTypeInfo(typeinfo_ptr, &mut info_ptr) -> Error::CastTypeInfoToSequenceTypeInfo; nonNull(info_ptr)];
+				unsafe { extract_data_type_from_sequence_info(info_ptr)? }
+			}
+			ort_sys::ONNXType::ONNX_TYPE_MAP => {
+				let mut info_ptr: *const ort_sys::OrtMapTypeInfo = std::ptr::null_mut();
+				ortsys![unsafe CastTypeInfoToMapTypeInfo(typeinfo_ptr, &mut info_ptr) -> Error::CastTypeInfoToMapTypeInfo; nonNull(info_ptr)];
+				unsafe { extract_data_type_from_map_info(info_ptr)? }
+			}
+			_ => unreachable!()
+		};
+
+		ortsys![unsafe ReleaseTypeInfo(typeinfo_ptr)];
+		Ok(io_type)
 	}
 
 	/// Attempt to extract the underlying data into a Rust `ndarray`.
@@ -170,11 +230,11 @@ impl Value {
 			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
 			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
 			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
-			let data_type: TensorElementDataType = type_sys.into();
-			if data_type != T::tensor_element_data_type() {
+			let data_type: TensorElementType = type_sys.into();
+			if data_type != T::tensor_element_type() {
 				Err(Error::DataTypeMismatch {
 					actual: data_type,
-					requested: T::tensor_element_data_type()
+					requested: T::tensor_element_type()
 				})
 			} else {
 				// Note: Both tensor and array will point to the same data, nothing is copied.
@@ -213,11 +273,11 @@ impl Value {
 			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
 			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
 			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
-			let data_type: TensorElementDataType = type_sys.into();
-			if data_type != T::tensor_element_data_type() {
+			let data_type: TensorElementType = type_sys.into();
+			if data_type != T::tensor_element_type() {
 				Err(Error::DataTypeMismatch {
 					actual: data_type,
-					requested: T::tensor_element_data_type()
+					requested: T::tensor_element_type()
 				})
 			} else {
 				// Note: Both tensor and array will point to the same data, nothing is copied.
@@ -242,6 +302,64 @@ impl Value {
 		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
 		res
 	}
+
+	pub fn extract_sequence<'s>(&'s self, allocator: &Allocator) -> Result<Vec<ValueRef<'s>>> {
+		match self.dtype()? {
+			ValueType::Sequence(_) => {
+				let mut len: ort_sys::size_t = 0;
+				ortsys![unsafe GetValueCount(self.ptr(), &mut len) -> Error::ExtractSequence];
+
+				let mut vec = Vec::with_capacity(len as usize);
+				for i in 0..len {
+					let mut value_ptr = ptr::null_mut();
+					ortsys![unsafe GetValue(self.ptr(), i as _, allocator.ptr, &mut value_ptr) -> Error::ExtractSequence; nonNull(value_ptr)];
+
+					vec.push(ValueRef {
+						inner: unsafe { Value::from_raw_ref(value_ptr) },
+						lifetime: PhantomData
+					});
+				}
+				Ok(vec)
+			}
+			t => Err(Error::NotSequence(t))
+		}
+	}
+
+	pub fn extract_map<K: ExtractTensorData + Clone + Hash + Eq, V: ExtractTensorData + Clone>(&self, allocator: &Allocator) -> Result<HashMap<K, V>> {
+		match self.dtype()? {
+			ValueType::Map { key, value } => {
+				let k_type = K::tensor_element_type();
+				if k_type != key {
+					return Err(Error::InvalidMapKeyType { expected: k_type, actual: key });
+				}
+				let v_type = V::tensor_element_type();
+				if v_type != value {
+					return Err(Error::InvalidMapValueType { expected: v_type, actual: value });
+				}
+
+				let mut key_tensor_ptr = ptr::null_mut();
+				ortsys![unsafe GetValue(self.ptr(), 0, allocator.ptr, &mut key_tensor_ptr) -> Error::ExtractMap; nonNull(key_tensor_ptr)];
+				let key_value = unsafe { Value::from_raw_ref(key_tensor_ptr) };
+				let (key_tensor_shape, key_tensor) = key_value.extract_raw_tensor::<K>()?;
+
+				let mut value_tensor_ptr = ptr::null_mut();
+				ortsys![unsafe GetValue(self.ptr(), 1, allocator.ptr, &mut value_tensor_ptr) -> Error::ExtractMap; nonNull(value_tensor_ptr)];
+				let value_value = unsafe { Value::from_raw_ref(value_tensor_ptr) };
+				let (value_tensor_shape, value_tensor) = value_value.extract_raw_tensor::<V>()?;
+
+				assert_eq!(key_tensor_shape.len(), 1);
+				assert_eq!(value_tensor_shape.len(), 1);
+				assert_eq!(key_tensor_shape[0], value_tensor_shape[0]);
+
+				let mut vec = Vec::with_capacity(key_tensor_shape[0] as _);
+				for i in 0..key_tensor_shape[0] as usize {
+					vec.push((key_tensor[i].clone(), value_tensor[i].clone()));
+				}
+				Ok(vec.into_iter().collect())
+			}
+			t => Err(Error::NotMap(t))
+		}
+	}
 }
 
 pub trait OrtInput {
@@ -255,23 +373,23 @@ impl Value {
 	/// Construct a [`Value`] from a Rust-owned array.
 	///
 	/// `allocator` is required to be `Some` when converting a String tensor. See [`crate::Session::allocator`].
-	pub fn from_array<T: IntoTensorElementDataType + Debug + Clone + 'static>(input: impl OrtInput<Item = T>) -> Result<Value> {
+	pub fn from_array<T: IntoTensorElementType + Debug + Clone + 'static>(input: impl OrtInput<Item = T>) -> Result<Value> {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemType::Default)?;
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 
-		let guard = match T::into_tensor_element_data_type() {
-			TensorElementDataType::Float32
-			| TensorElementDataType::Uint8
-			| TensorElementDataType::Int8
-			| TensorElementDataType::Uint16
-			| TensorElementDataType::Int16
-			| TensorElementDataType::Int32
-			| TensorElementDataType::Int64
-			| TensorElementDataType::Float64
-			| TensorElementDataType::Uint32
-			| TensorElementDataType::Uint64
-			| TensorElementDataType::Bool => {
+		let guard = match T::into_tensor_element_type() {
+			TensorElementType::Float32
+			| TensorElementType::Uint8
+			| TensorElementType::Int8
+			| TensorElementType::Uint16
+			| TensorElementType::Int16
+			| TensorElementType::Int32
+			| TensorElementType::Int64
+			| TensorElementType::Float64
+			| TensorElementType::Uint32
+			| TensorElementType::Uint64
+			| TensorElementType::Bool => {
 				// primitive data is already suitably laid out in memory; provide it to
 				// onnxruntime as is
 				let (shape, ptr, ptr_len, guard) = input.into_parts();
@@ -288,7 +406,7 @@ impl Value {
 						(ptr_len * std::mem::size_of::<T>()) as _,
 						shape_ptr,
 						shape_len as _,
-						T::into_tensor_element_data_type().into(),
+						T::into_tensor_element_type().into(),
 						&mut value_ptr
 					) -> Error::CreateTensorWithData;
 					nonNull(value_ptr)
@@ -300,7 +418,7 @@ impl Value {
 				guard
 			}
 			#[cfg(feature = "half")]
-			TensorElementDataType::Bfloat16 | TensorElementDataType::Float16 => {
+			TensorElementType::Bfloat16 | TensorElementType::Float16 => {
 				// f16 and bf16 are repr(transparent) to u16, so memory layout should be identical to onnxruntime
 				let (shape, ptr, ptr_len, guard) = input.into_parts();
 				let shape_ptr: *const i64 = shape.as_ptr();
@@ -316,7 +434,7 @@ impl Value {
 						(ptr_len * std::mem::size_of::<T>()) as _,
 						shape_ptr,
 						shape_len as _,
-						T::into_tensor_element_data_type().into(),
+						T::into_tensor_element_type().into(),
 						&mut value_ptr
 					) -> Error::CreateTensorWithData;
 					nonNull(value_ptr)
@@ -327,7 +445,7 @@ impl Value {
 				assert_eq!(is_tensor, 1);
 				guard
 			}
-			TensorElementDataType::String => unreachable!()
+			TensorElementType::String => unreachable!()
 		};
 
 		assert_non_null_pointer(value_ptr, "Value")?;
@@ -353,7 +471,7 @@ impl Value {
 
 		// create tensor without data -- data is filled in later
 		ortsys![
-			unsafe CreateTensorAsOrtValue(allocator.ptr, shape_ptr, shape_len as _, TensorElementDataType::String.into(), &mut value_ptr)
+			unsafe CreateTensorAsOrtValue(allocator.ptr, shape_ptr, shape_len as _, TensorElementType::String.into(), &mut value_ptr)
 				-> Error::CreateTensor;
 			nonNull(value_ptr)
 		];
@@ -385,6 +503,7 @@ impl Value {
 
 	pub(crate) fn ptr(&self) -> *mut ort_sys::OrtValue {
 		match &self.inner {
+			ValueInner::CppOwnedRef { ptr } => *ptr,
 			ValueInner::CppOwned { ptr, .. } => *ptr,
 			ValueInner::RustOwned { ptr, .. } => *ptr
 		}
@@ -526,7 +645,7 @@ impl<T: Clone + Debug + 'static> OrtInput for (Vec<i64>, Arc<Box<[T]>>) {
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'i, 'v, T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for Value
+impl<'i, 'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for Value
 where
 	'i: 'v
 {
@@ -538,7 +657,7 @@ where
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&mut ArcArray<T, D>> for Value {
+impl<T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&mut ArcArray<T, D>> for Value {
 	type Error = Error;
 	fn try_from(arr: &mut ArcArray<T, D>) -> Result<Self, Self::Error> {
 		Value::from_array(arr)
@@ -547,7 +666,7 @@ impl<T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'sta
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<Array<T, D>> for Value {
+impl<T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<Array<T, D>> for Value {
 	type Error = Error;
 	fn try_from(arr: Array<T, D>) -> Result<Self, Self::Error> {
 		Value::from_array(arr)
@@ -556,14 +675,14 @@ impl<T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'sta
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'v, T: IntoTensorElementDataType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for Value {
+impl<'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for Value {
 	type Error = Error;
 	fn try_from(arr: ArrayView<'v, T, D>) -> Result<Self, Self::Error> {
 		Value::from_array(arr)
 	}
 }
 
-impl<T: IntoTensorElementDataType + Debug + Clone + 'static> TryFrom<(Vec<i64>, Arc<Box<[T]>>)> for Value {
+impl<T: IntoTensorElementType + Debug + Clone + 'static> TryFrom<(Vec<i64>, Arc<Box<[T]>>)> for Value {
 	type Error = Error;
 	fn try_from(d: (Vec<i64>, Arc<Box<[T]>>)) -> Result<Self, Self::Error> {
 		Value::from_array(d)
@@ -578,9 +697,70 @@ impl Drop for Value {
 			"dropping {} value at {ptr:p}",
 			match &self.inner {
 				ValueInner::RustOwned { .. } => "rust-owned",
-				ValueInner::CppOwned { .. } => "cpp-owned"
+				ValueInner::CppOwned { .. } | ValueInner::CppOwnedRef { .. } => "cpp-owned"
 			}
 		);
 		ortsys![unsafe ReleaseValue(ptr)];
 	}
+}
+
+pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo) -> Result<ValueType> {
+	let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+	ortsys![GetTensorElementType(info_ptr, &mut type_sys) -> Error::GetTensorElementType];
+	assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
+	// This transmute should be safe since its value is read from GetTensorElementType, which we must trust
+	let mut num_dims = 0;
+	ortsys![GetDimensionsCount(info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
+
+	let mut node_dims: Vec<i64> = vec![0; num_dims as _];
+	ortsys![GetDimensions(info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
+
+	Ok(ValueType::Tensor {
+		ty: type_sys.into(),
+		dimensions: node_dims
+	})
+}
+
+pub(crate) unsafe fn extract_data_type_from_sequence_info(info_ptr: *const ort_sys::OrtSequenceTypeInfo) -> Result<ValueType> {
+	let mut element_type_info: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
+	ortsys![GetSequenceElementType(info_ptr, &mut element_type_info) -> Error::GetSequenceElementType];
+
+	let mut ty: ort_sys::ONNXType = ort_sys::ONNXType::ONNX_TYPE_UNKNOWN;
+	let status = ortsys![unsafe GetOnnxTypeFromTypeInfo(element_type_info, &mut ty)];
+	status_to_result(status).map_err(Error::GetOnnxTypeFromTypeInfo)?;
+
+	match ty {
+		ort_sys::ONNXType::ONNX_TYPE_TENSOR => {
+			let mut info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+			ortsys![unsafe CastTypeInfoToTensorInfo(element_type_info, &mut info_ptr) -> Error::CastTypeInfoToTensorInfo; nonNull(info_ptr)];
+			let ty = unsafe { extract_data_type_from_tensor_info(info_ptr)? };
+			Ok(ValueType::Sequence(Box::new(ty)))
+		}
+		ort_sys::ONNXType::ONNX_TYPE_MAP => {
+			let mut info_ptr: *const ort_sys::OrtMapTypeInfo = std::ptr::null_mut();
+			ortsys![unsafe CastTypeInfoToMapTypeInfo(element_type_info, &mut info_ptr) -> Error::CastTypeInfoToMapTypeInfo; nonNull(info_ptr)];
+			let ty = unsafe { extract_data_type_from_map_info(info_ptr)? };
+			Ok(ValueType::Sequence(Box::new(ty)))
+		}
+		_ => unreachable!()
+	}
+}
+
+pub(crate) unsafe fn extract_data_type_from_map_info(info_ptr: *const ort_sys::OrtMapTypeInfo) -> Result<ValueType> {
+	let mut key_type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+	ortsys![GetMapKeyType(info_ptr, &mut key_type_sys) -> Error::GetMapKeyType];
+	assert_ne!(key_type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
+
+	let mut value_type_info: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
+	ortsys![GetMapValueType(info_ptr, &mut value_type_info) -> Error::GetMapValueType];
+	let mut value_info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+	ortsys![unsafe CastTypeInfoToTensorInfo(value_type_info, &mut value_info_ptr) -> Error::CastTypeInfoToTensorInfo; nonNull(value_info_ptr)];
+	let mut value_type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+	ortsys![GetTensorElementType(value_info_ptr, &mut value_type_sys) -> Error::GetTensorElementType];
+	assert_ne!(value_type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
+
+	Ok(ValueType::Map {
+		key: key_type_sys.into(),
+		value: value_type_sys.into()
+	})
 }

@@ -7,7 +7,7 @@ use super::{ortsys, Error, Result};
 
 /// Enum mapping ONNX Runtime's supported tensor data types.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum TensorElementDataType {
+pub enum TensorElementType {
 	/// 32-bit floating point number, equivalent to Rust's `f32`.
 	Float32,
 	/// Unsigned 8-bit integer, equivalent to Rust's `u8`.
@@ -47,67 +47,67 @@ pub enum TensorElementDataType {
 	Bfloat16
 }
 
-impl From<TensorElementDataType> for ort_sys::ONNXTensorElementDataType {
-	fn from(val: TensorElementDataType) -> Self {
+impl From<TensorElementType> for ort_sys::ONNXTensorElementDataType {
+	fn from(val: TensorElementType) -> Self {
 		match val {
-			TensorElementDataType::Float32 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
-			TensorElementDataType::Uint8 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8,
-			TensorElementDataType::Int8 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8,
-			TensorElementDataType::Uint16 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16,
-			TensorElementDataType::Int16 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16,
-			TensorElementDataType::Int32 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32,
-			TensorElementDataType::Int64 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
-			TensorElementDataType::String => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING,
-			TensorElementDataType::Bool => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL,
+			TensorElementType::Float32 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
+			TensorElementType::Uint8 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8,
+			TensorElementType::Int8 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8,
+			TensorElementType::Uint16 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16,
+			TensorElementType::Int16 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16,
+			TensorElementType::Int32 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32,
+			TensorElementType::Int64 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
+			TensorElementType::String => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING,
+			TensorElementType::Bool => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL,
 			#[cfg(feature = "half")]
-			TensorElementDataType::Float16 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16,
-			TensorElementDataType::Float64 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE,
-			TensorElementDataType::Uint32 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32,
-			TensorElementDataType::Uint64 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64,
+			TensorElementType::Float16 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16,
+			TensorElementType::Float64 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE,
+			TensorElementType::Uint32 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32,
+			TensorElementType::Uint64 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64,
 			// TensorElementDataType::Complex64 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX64,
 			// TensorElementDataType::Complex128 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX128,
 			#[cfg(feature = "half")]
-			TensorElementDataType::Bfloat16 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16
+			TensorElementType::Bfloat16 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16
 		}
 	}
 }
-impl From<ort_sys::ONNXTensorElementDataType> for TensorElementDataType {
+impl From<ort_sys::ONNXTensorElementDataType> for TensorElementType {
 	fn from(val: ort_sys::ONNXTensorElementDataType) -> Self {
 		match val {
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT => TensorElementDataType::Float32,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8 => TensorElementDataType::Uint8,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8 => TensorElementDataType::Int8,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16 => TensorElementDataType::Uint16,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16 => TensorElementDataType::Int16,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32 => TensorElementDataType::Int32,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64 => TensorElementDataType::Int64,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING => TensorElementDataType::String,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL => TensorElementDataType::Bool,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT => TensorElementType::Float32,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8 => TensorElementType::Uint8,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8 => TensorElementType::Int8,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16 => TensorElementType::Uint16,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16 => TensorElementType::Int16,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32 => TensorElementType::Int32,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64 => TensorElementType::Int64,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING => TensorElementType::String,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL => TensorElementType::Bool,
 			#[cfg(feature = "half")]
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16 => TensorElementDataType::Float16,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE => TensorElementDataType::Float64,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32 => TensorElementDataType::Uint32,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64 => TensorElementDataType::Uint64,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16 => TensorElementType::Float16,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE => TensorElementType::Float64,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32 => TensorElementType::Uint32,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64 => TensorElementType::Uint64,
 			// ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX64 => TensorElementDataType::Complex64,
 			// ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX128 => TensorElementDataType::Complex128,
 			#[cfg(feature = "half")]
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16 => TensorElementDataType::Bfloat16,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16 => TensorElementType::Bfloat16,
 			_ => panic!("Invalid ONNXTensorElementDataType value")
 		}
 	}
 }
 
 /// Trait used to map Rust types (for example `f32`) to ONNX tensor element data types (for example `Float`).
-pub trait IntoTensorElementDataType {
+pub trait IntoTensorElementType {
 	/// Returns the ONNX tensor element data type corresponding to the given Rust type.
-	fn into_tensor_element_data_type() -> TensorElementDataType;
+	fn into_tensor_element_type() -> TensorElementType;
 }
 
 macro_rules! impl_type_trait {
 	($type_:ty, $variant:ident) => {
-		impl IntoTensorElementDataType for $type_ {
-			fn into_tensor_element_data_type() -> TensorElementDataType {
-				TensorElementDataType::$variant
+		impl IntoTensorElementType for $type_ {
+			fn into_tensor_element_type() -> TensorElementType {
+				TensorElementType::$variant
 			}
 		}
 	};
@@ -159,7 +159,7 @@ impl<'a> Utf8Data for &'a str {
 /// Trait used to map ONNX Runtime types to Rust types.
 pub trait ExtractTensorData: Sized + fmt::Debug + Clone {
 	/// The tensor element type that this type can extract from.
-	fn tensor_element_data_type() -> TensorElementDataType;
+	fn tensor_element_type() -> TensorElementType;
 
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
@@ -198,8 +198,8 @@ pub enum TensorData<'t, T> {
 macro_rules! impl_prim_type_from_ort_trait {
 	($type_: ty, $variant: ident) => {
 		impl ExtractTensorData for $type_ {
-			fn tensor_element_data_type() -> TensorElementDataType {
-				TensorElementDataType::$variant
+			fn tensor_element_type() -> TensorElementType {
+				TensorElementType::$variant
 			}
 
 			#[cfg(feature = "ndarray")]
@@ -251,8 +251,8 @@ impl_prim_type_from_ort_trait!(i64, Int64);
 impl_prim_type_from_ort_trait!(bool, Bool);
 
 impl ExtractTensorData for String {
-	fn tensor_element_data_type() -> TensorElementDataType {
-		TensorElementDataType::String
+	fn tensor_element_type() -> TensorElementType {
+		TensorElementType::String
 	}
 
 	#[cfg(feature = "ndarray")]

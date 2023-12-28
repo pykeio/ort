@@ -4,7 +4,7 @@ use std::{convert::Infallible, io, path::PathBuf, string};
 
 use thiserror::Error;
 
-use super::{char_p_to_string, ortsys, tensor::TensorElementDataType};
+use super::{char_p_to_string, ortsys, tensor::TensorElementType, ValueType};
 
 /// Type alias for the Result type returned by ORT functions.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -113,7 +113,7 @@ pub enum Error {
 	DownloadError(#[from] FetchModelError),
 	/// Type of input data and the ONNX model do not match.
 	#[error("Data types do not match: expected {model:?}, got {input:?}")]
-	NonMatchingDataTypes { input: TensorElementDataType, model: TensorElementDataType },
+	NonMatchingDataTypes { input: TensorElementType, model: TensorElementType },
 	/// Dimensions of input data and the ONNX model do not match.
 	#[error("Dimensions do not match: {0:?}")]
 	NonMatchingDimensions(NonMatchingDimensionsError),
@@ -152,9 +152,9 @@ pub enum Error {
 	#[error("Data type mismatch: was {actual:?}, tried to convert to {requested:?}")]
 	DataTypeMismatch {
 		/// The actual type of the ort output
-		actual: TensorElementDataType,
+		actual: TensorElementType,
 		/// The type corresponding to the attempted conversion into a Rust type, not equal to `actual`
-		requested: TensorElementDataType
+		requested: TensorElementType
 	},
 	#[error("Error trying to load symbol `{symbol}` from dynamic library: {error}")]
 	DlLoad { symbol: &'static str, error: String },
@@ -181,7 +181,19 @@ pub enum Error {
 	#[error("Failed to clear IO binding: {0}")]
 	ClearBinding(ErrorInternal),
 	#[error("Error when retrieving session outputs from `IoBinding`: {0}")]
-	GetBoundOutputs(ErrorInternal)
+	GetBoundOutputs(ErrorInternal),
+	#[error("Cannot use `extract_sequence` on a value that is {0:?}")]
+	NotSequence(ValueType),
+	#[error("Cannot use `extract_map` on a value that is {0:?}")]
+	NotMap(ValueType),
+	#[error("Tried to extract a map with a key type of {expected:?}, but the map has key type {actual:?}")]
+	InvalidMapKeyType { expected: TensorElementType, actual: TensorElementType },
+	#[error("Tried to extract a map with a value type of {expected:?}, but the map has value type {actual:?}")]
+	InvalidMapValueType { expected: TensorElementType, actual: TensorElementType },
+	#[error("Error occurred while attempting to extract data from sequence value: {0}")]
+	ExtractSequence(ErrorInternal),
+	#[error("Error occurred while attempting to extract data from map value: {0}")]
+	ExtractMap(ErrorInternal)
 }
 
 impl From<Infallible> for Error {

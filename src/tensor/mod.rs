@@ -23,7 +23,7 @@ use std::{fmt::Debug, ptr};
 #[cfg(feature = "ndarray")]
 use ::ndarray::{ArrayView, IxDyn};
 
-pub use self::types::{ExtractTensorData, IntoTensorElementDataType, TensorElementDataType, Utf8Data};
+pub use self::types::{ExtractTensorData, IntoTensorElementType, TensorElementType, Utf8Data};
 #[cfg(feature = "ndarray")]
 pub use self::{ndarray::ArrayExtensions, types::TensorData};
 use crate::ortsys;

@@ -7,7 +7,7 @@ use std::{
 
 use image::{imageops::FilterType, ImageBuffer, Pixel, Rgb};
 use ndarray::s;
-use ort::{download::vision::ImageClassification, inputs, ArrayExtensions, FetchModelError, GraphOptimizationLevel, Session, Tensor};
+use ort::{inputs, ArrayExtensions, FetchModelError, GraphOptimizationLevel, Session, Tensor};
 use test_log::test;
 
 #[test]
@@ -19,7 +19,7 @@ fn squeezenet_mushroom() -> ort::Result<()> {
 	let session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
-		.with_model_downloaded(ImageClassification::SqueezeNet)
+		.with_model_downloaded("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/squeezenet.onnx")
 		.expect("Could not download model from file");
 
 	let metadata = session.metadata()?;

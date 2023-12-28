@@ -17,6 +17,8 @@ use std::{
 #[cfg(feature = "fetch-models")]
 use std::{path::PathBuf, time::Duration};
 
+#[cfg(feature = "fetch-models")]
+use super::error::FetchModelError;
 use super::{
 	api, char_p_to_string,
 	environment::get_environment,
@@ -30,8 +32,6 @@ use super::{
 	value::{Value, ValueType},
 	AllocatorType, GraphOptimizationLevel, MemType
 };
-#[cfg(feature = "fetch-models")]
-use super::{download::ModelUrl, error::FetchModelError};
 
 pub(crate) mod input;
 pub(crate) mod output;
@@ -293,18 +293,10 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
-	/// Downloads a pre-trained ONNX model from the [ONNX Model Zoo](https://github.com/onnx/models) and builds the session.
+	/// Downloads a pre-trained ONNX model from the given URL and builds the session.
 	#[cfg(feature = "fetch-models")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "fetch-models")))]
-	pub fn with_model_downloaded<M>(self, model: M) -> Result<Session>
-	where
-		M: ModelUrl
-	{
-		self.with_model_downloaded_monomorphized(model.model_url())
-	}
-
-	#[cfg(feature = "fetch-models")]
-	fn with_model_downloaded_monomorphized(self, model: &str) -> Result<Session> {
+	pub fn with_model_downloaded(self, model_url: impl AsRef<str>) -> Result<Session> {
 		let mut download_dir = ort_sys::internal::dirs::cache_dir()
 			.expect("could not determine cache directory")
 			.join("models");
@@ -312,7 +304,38 @@ impl SessionBuilder {
 			download_dir = std::env::current_dir().unwrap();
 		}
 
-		let downloaded_path = self.download_to(model, download_dir)?;
+		let url = model_url.as_ref();
+		let model_filename = PathBuf::from(url.split('/').last().unwrap());
+		let model_filepath = download_dir.join(model_filename);
+		let downloaded_path = if model_filepath.exists() {
+			tracing::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), "Model already exists, skipping download");
+			model_filepath
+		} else {
+			tracing::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), url = format!("{:?}", url).as_str(), "Downloading model");
+
+			let resp = ureq::get(url).call().map_err(Box::new).map_err(FetchModelError::FetchError)?;
+
+			assert!(resp.has("Content-Length"));
+			let len = resp.header("Content-Length").and_then(|s| s.parse::<usize>().ok()).unwrap();
+			tracing::info!(len, "Downloading {} bytes", len);
+
+			let mut reader = resp.into_reader();
+
+			let f = std::fs::File::create(&model_filepath).unwrap();
+			let mut writer = std::io::BufWriter::new(f);
+
+			let bytes_io_count = std::io::copy(&mut reader, &mut writer).map_err(FetchModelError::IoError)?;
+			if bytes_io_count == len as u64 {
+				model_filepath
+			} else {
+				return Err(FetchModelError::CopyError {
+					expected: len as u64,
+					io: bytes_io_count
+				}
+				.into());
+			}
+		};
+
 		self.with_model_from_file(downloaded_path)
 	}
 

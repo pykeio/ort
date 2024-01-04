@@ -52,7 +52,7 @@ title: 'Troubleshoot: Performance'
 
 ## Inference is slow, even with an EP!
 There are a few things you could try to improve performance:
-- **Run `onnxsim` on the model.** Direct exports from PyTorch can leave a lot of junk nodes in the graph, which could hinder performance. [`onnxsim`](https://github.com/daquexian/onnx-simplifier) is a neat tool that can be used to simplify the ONNX graph and remove junk.
+- **Run `onnxsim` on the model.** Direct exports from PyTorch can leave a lot of junk nodes in the graph, which could hinder performance. [`onnxsim`](https://github.com/daquexian/onnx-simplifier) is a neat tool that can be used to simplify the ONNX graph and potentially improve performance.
 - **Export with an older opset.** Some EPs might not support newer, more complex nodes. Try targeting an older ONNX opset when exporting your model to force it to export with simpler operations.
 - **Use the [transformer optimization tool](https://github.com/microsoft/onnxruntime/tree/main/onnxruntime/python/tools/transformers).** This is another neat tool that converts certain transformer-based models to far more optimized graphs.
 - **Try other EPs.** There may be multiple EPs for your hardware that have a more performant implementation.
@@ -60,5 +60,5 @@ There are a few things you could try to improve performance:
     - For AMD, you can try ROCm, MIGraphX, or DirectML. 
     - For ARM, you can try ArmNN, ACL, or XNNPACK.
     - See [Execution providers](/perf/execution-providers) for more information on supported EPs.
-- **Use [`I/O binding`](/perf/io-binding).** This can reduce the latency between copying the session inputs/outputs to/from devices.
+- **Use [`I/O binding`](/perf/io-binding).** This can reduce latency caused by copying the session inputs/outputs to/from devices.
 - **[Quantize your model.](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html)** You can try quantizing your model to 8-bit precision. This comes with a small accuracy loss, but can sometimes provide a large performance boost. If the accuracy loss is too high, you can also use [float16/mixed precision](https://onnxruntime.ai/docs/performance/model-optimizations/float16.html).

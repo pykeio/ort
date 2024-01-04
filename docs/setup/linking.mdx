@@ -32,7 +32,7 @@ To use `load-dynamic`:
         ort = { version = "2", features = [ "load-dynamic" ] }
         ```
     </Step>
-    <Step title="Point ort to the dylib with ORT_DYLIB_PATH">
+    <Step title="Point ort to the dylib">
         <Tabs>
             <Tab title="Via shell">
                 ```shell
@@ -41,22 +41,15 @@ To use `load-dynamic`:
             </Tab>
             <Tab title="Programmatically">
                 ```rust
-                use std::env;
-
                 fn main() -> anyhow::Result<()> {
-                    // Find our downloaded ONNX Runtime dylibs and set the environment variable for ort
-                    env::set_var("ORT_DYLIB_PATH", crate::internal::find_onnxruntime_dylib()?);
+                    // Find our custom ONNX Runtime dylibs and initialize `ort` with it.
+                    let dylib_path = crate::internal::find_onnxruntime_dylib()?; // /etc/.../libonnxruntime.so
 
-                    // IMPORTANT: You must set the environment variable **before** you use `ort`!!!
-                    ort::init().commit()?;
+                    ort::init_from(dylib_path).commit()?;
 
                     Ok(())
                 }
                 ```
-
-                <Warning>
-                    You MUST set the environment variable **before** you use any `ort` APIs!
-                </Warning>
             </Tab>
         </Tabs>
     </Step>

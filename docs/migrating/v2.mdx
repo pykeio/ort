@@ -144,6 +144,14 @@ The `ort::sys` module has been split out into [its own `ort-sys` crate](https://
 ### `ndarray` is now optional
 The dependency on `ndarray` is now declared optional. If you use `ort` with `default-features = false`, you'll need to add the `ndarray` feature.
 
+## Model Zoo structs have been removed
+ONNX pushed a new Model Zoo structure that adds hundreds of different models. This is impractical to maintain, so the built-in structs have been removed.
+
+You can still use `Session::with_model_downloaded`, it just now takes a URL string instead of a struct.
+
+## Changes to logging
+Environment-level logging configuration (i.e. `EnvironmentBuilder::with_log_level`) has been removed because it could cause unnecessary confusion with our `tracing` integration.
+
 ## The Flattening
 All modules except `download` are no longer public. Exports have been flattened to the crate root, so i.e. `ort::session::Session` becomes `ort::Session`.
 
@@ -153,3 +161,4 @@ The following types have been renamed with no other changes.
 - `OrtOwnedTensor` -> `Tensor`
 - `OrtResult`, `OrtError` -> `ort::Result`, `ort::Error`
 - `TensorDataToType` -> `ExtractTensorData`
+- `TensorElementDataType`, `IntoTensorElementDataType` -> `TensorElementType`, `IntoTensorElementType`

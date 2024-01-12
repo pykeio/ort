@@ -32,6 +32,7 @@ use super::{
 	value::{Value, ValueType},
 	AllocatorType, GraphOptimizationLevel, MemType
 };
+use crate::environment::Environment;
 
 pub(crate) mod input;
 pub(crate) mod output;
@@ -432,7 +433,11 @@ impl SessionBuilder {
 			.collect::<Result<Vec<Output>>>()?;
 
 		Ok(Session {
-			inner: Arc::new(SharedSessionInner { session_ptr, allocator }),
+			inner: Arc::new(SharedSessionInner {
+				session_ptr,
+				allocator,
+				_environment: Arc::clone(env)
+			}),
 			inputs,
 			outputs
 		})
@@ -490,7 +495,11 @@ impl SessionBuilder {
 			.collect::<Result<Vec<Output>>>()?;
 
 		let session = Session {
-			inner: Arc::new(SharedSessionInner { session_ptr, allocator }),
+			inner: Arc::new(SharedSessionInner {
+				session_ptr,
+				allocator,
+				_environment: Arc::clone(env)
+			}),
 			inputs,
 			outputs
 		};
@@ -503,7 +512,8 @@ impl SessionBuilder {
 #[derive(Debug)]
 pub struct SharedSessionInner {
 	pub(crate) session_ptr: *mut ort_sys::OrtSession,
-	allocator: Allocator
+	allocator: Allocator,
+	_environment: Arc<Environment>
 }
 
 unsafe impl Send for SharedSessionInner {}
@@ -680,7 +690,7 @@ impl Session {
 		// The C API expects pointers for the arrays (pointers to C-arrays)
 		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.iter().map(|input_array_ort| input_array_ort.ptr() as *const _).collect();
 
-		let run_options_ptr = if let Some(run_options) = run_options {
+		let run_options_ptr = if let Some(run_options) = &run_options {
 			run_options.run_options_ptr
 		} else {
 			std::ptr::null_mut()

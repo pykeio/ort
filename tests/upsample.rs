@@ -1,8 +1,11 @@
-use std::path::Path;
+use std::{
+	path::Path,
+	sync::{mpsc, Arc}
+};
 
 use image::RgbImage;
 use ndarray::{Array, CowArray, Ix4};
-use ort::{inputs, GraphOptimizationLevel, Session, Tensor};
+use ort::{inputs, GraphOptimizationLevel, RunOptions, Session, Tensor};
 use test_log::test;
 
 fn load_input_image<P: AsRef<Path>>(name: P) -> RgbImage {
@@ -110,6 +113,37 @@ fn upsample_with_ort_model() -> ort::Result<()> {
 
 	// The image should have doubled in size
 	assert_eq!(output.view().shape(), [1, 448, 448, 3]);
+
+	Ok(())
+}
+
+#[test]
+fn upsample_termination() -> ort::Result<()> {
+	const IMAGE_TO_LOAD: &str = "mushroom.png";
+
+	ort::init().with_name("integration_test").commit()?;
+
+	let session_data =
+		std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("upsample.onnx")).expect("Could not open model from file");
+	let session = Session::builder()?
+		.with_model_from_memory(&session_data)
+		.expect("Could not read model from memory");
+
+	// Load image, converting to RGB format
+	let image_buffer = load_input_image(IMAGE_TO_LOAD);
+	let array = convert_image_to_cow_array(&image_buffer);
+
+	let run_options = Arc::new(RunOptions::new()?);
+	let (sender, receiver) = mpsc::channel::<()>();
+
+	let run_options_ = Arc::clone(&run_options);
+	std::thread::spawn(move || {
+		receiver.recv().unwrap();
+		run_options_.set_terminate().unwrap();
+	});
+
+	sender.send(()).unwrap();
+	panic!("{:?}", session.run_with_options(inputs![&array]?, run_options).map(|_| ()).unwrap_err());
 
 	Ok(())
 }

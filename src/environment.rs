@@ -1,9 +1,4 @@
-#[cfg(feature = "load-dynamic")]
-use std::sync::Arc;
-use std::{
-	ffi::CString,
-	sync::{atomic::AtomicPtr, OnceLock}
-};
+use std::{cell::UnsafeCell, ffi::CString, sync::atomic::AtomicPtr, sync::Arc};
 
 use tracing::debug;
 
@@ -15,20 +10,40 @@ use super::{
 #[cfg(feature = "load-dynamic")]
 use crate::G_ORT_DYLIB_PATH;
 
-static G_ENV: OnceLock<EnvironmentSingleton> = OnceLock::new();
+struct EnvironmentSingleton {
+	cell: UnsafeCell<Option<Arc<Environment>>>
+}
+
+unsafe impl Sync for EnvironmentSingleton {}
+
+static G_ENV: EnvironmentSingleton = EnvironmentSingleton { cell: UnsafeCell::new(None) };
 
 #[derive(Debug)]
-pub(crate) struct EnvironmentSingleton {
+pub(crate) struct Environment {
 	pub(crate) execution_providers: Vec<ExecutionProviderDispatch>,
 	pub(crate) env_ptr: AtomicPtr<ort_sys::OrtEnv>
 }
 
-pub(crate) fn get_environment() -> Result<&'static EnvironmentSingleton> {
-	if G_ENV.get().is_none() {
-		EnvironmentBuilder::default().commit()?;
-		Ok(G_ENV.get().unwrap())
+impl Drop for Environment {
+	#[tracing::instrument]
+	fn drop(&mut self) {
+		let env_ptr: *mut ort_sys::OrtEnv = *self.env_ptr.get_mut();
+
+		debug!("Releasing environment");
+
+		assert_ne!(env_ptr, std::ptr::null_mut());
+		ortsys![unsafe ReleaseEnv(env_ptr)];
+	}
+}
+
+pub(crate) fn get_environment() -> Result<&'static Arc<Environment>> {
+	if let Some(c) = unsafe { &*G_ENV.cell.get() } {
+		Ok(c)
 	} else {
-		Ok(unsafe { G_ENV.get().unwrap_unchecked() })
+		debug!("Environment not yet initialized, creating a new one");
+		EnvironmentBuilder::default().commit()?;
+
+		Ok(unsafe { (*G_ENV.cell.get()).as_ref().unwrap_unchecked() })
 	}
 }
 
@@ -131,32 +146,29 @@ impl EnvironmentBuilder {
 
 	/// Commit the configuration to a new [`Environment`].
 	pub fn commit(self) -> Result<()> {
-		if G_ENV.get().is_none() {
-			debug!("Environment not yet initialized, creating a new one");
+		let env_ptr = if let Some(global_thread_pool) = self.global_thread_pool_options {
+			let mut env_ptr: *mut ort_sys::OrtEnv = std::ptr::null_mut();
+			let logging_function: ort_sys::OrtLoggingFunction = Some(custom_logger);
+			let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
+			let cname = CString::new(self.name.clone()).unwrap();
 
-			let env_ptr = if let Some(global_thread_pool) = self.global_thread_pool_options {
-				let mut env_ptr: *mut ort_sys::OrtEnv = std::ptr::null_mut();
-				let logging_function: ort_sys::OrtLoggingFunction = Some(custom_logger);
-				let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
-				let cname = CString::new(self.name.clone()).unwrap();
+			let mut thread_options: *mut ort_sys::OrtThreadingOptions = std::ptr::null_mut();
+			ortsys![unsafe CreateThreadingOptions(&mut thread_options) -> Error::CreateEnvironment; nonNull(thread_options)];
+			if let Some(inter_op_parallelism) = global_thread_pool.inter_op_parallelism {
+				ortsys![unsafe SetGlobalInterOpNumThreads(thread_options, inter_op_parallelism) -> Error::CreateEnvironment];
+			}
+			if let Some(intra_op_parallelism) = global_thread_pool.intra_op_parallelism {
+				ortsys![unsafe SetGlobalIntraOpNumThreads(thread_options, intra_op_parallelism) -> Error::CreateEnvironment];
+			}
+			if let Some(spin_control) = global_thread_pool.spin_control {
+				ortsys![unsafe SetGlobalSpinControl(thread_options, if spin_control { 1 } else { 0 }) -> Error::CreateEnvironment];
+			}
+			if let Some(intra_op_thread_affinity) = global_thread_pool.intra_op_thread_affinity {
+				let cstr = CString::new(intra_op_thread_affinity).unwrap();
+				ortsys![unsafe SetGlobalIntraOpThreadAffinity(thread_options, cstr.as_ptr()) -> Error::CreateEnvironment];
+			}
 
-				let mut thread_options: *mut ort_sys::OrtThreadingOptions = std::ptr::null_mut();
-				ortsys![unsafe CreateThreadingOptions(&mut thread_options) -> Error::CreateEnvironment; nonNull(thread_options)];
-				if let Some(inter_op_parallelism) = global_thread_pool.inter_op_parallelism {
-					ortsys![unsafe SetGlobalInterOpNumThreads(thread_options, inter_op_parallelism) -> Error::CreateEnvironment];
-				}
-				if let Some(intra_op_parallelism) = global_thread_pool.intra_op_parallelism {
-					ortsys![unsafe SetGlobalIntraOpNumThreads(thread_options, intra_op_parallelism) -> Error::CreateEnvironment];
-				}
-				if let Some(spin_control) = global_thread_pool.spin_control {
-					ortsys![unsafe SetGlobalSpinControl(thread_options, if spin_control { 1 } else { 0 }) -> Error::CreateEnvironment];
-				}
-				if let Some(intra_op_thread_affinity) = global_thread_pool.intra_op_thread_affinity {
-					let cstr = CString::new(intra_op_thread_affinity).unwrap();
-					ortsys![unsafe SetGlobalIntraOpThreadAffinity(thread_options, cstr.as_ptr()) -> Error::CreateEnvironment];
-				}
-
-				ortsys![unsafe CreateEnvWithCustomLoggerAndGlobalThreadPools(
+			ortsys![unsafe CreateEnvWithCustomLoggerAndGlobalThreadPools(
 					logging_function,
 					logger_param,
 					ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
@@ -164,30 +176,32 @@ impl EnvironmentBuilder {
 					thread_options,
 					&mut env_ptr
 				) -> Error::CreateEnvironment; nonNull(env_ptr)];
-				ortsys![unsafe ReleaseThreadingOptions(thread_options)];
-				env_ptr
-			} else {
-				let mut env_ptr: *mut ort_sys::OrtEnv = std::ptr::null_mut();
-				let logging_function: ort_sys::OrtLoggingFunction = Some(custom_logger);
-				// FIXME: What should go here?
-				let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
-				let cname = CString::new(self.name.clone()).unwrap();
-				ortsys![unsafe CreateEnvWithCustomLogger(
+			ortsys![unsafe ReleaseThreadingOptions(thread_options)];
+			env_ptr
+		} else {
+			let mut env_ptr: *mut ort_sys::OrtEnv = std::ptr::null_mut();
+			let logging_function: ort_sys::OrtLoggingFunction = Some(custom_logger);
+			// FIXME: What should go here?
+			let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
+			let cname = CString::new(self.name.clone()).unwrap();
+			ortsys![unsafe CreateEnvWithCustomLogger(
 					logging_function,
 					logger_param,
 					ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
 					cname.as_ptr(),
 					&mut env_ptr
 				) -> Error::CreateEnvironment; nonNull(env_ptr)];
-				env_ptr
-			};
-			debug!(env_ptr = format!("{:?}", env_ptr).as_str(), "Environment created");
+			env_ptr
+		};
+		debug!(env_ptr = format!("{:?}", env_ptr).as_str(), "Environment created");
 
-			let _ = G_ENV.set(EnvironmentSingleton {
+		unsafe {
+			*G_ENV.cell.get() = Some(Arc::new(Environment {
 				execution_providers: self.execution_providers,
 				env_ptr: AtomicPtr::new(env_ptr)
-			});
-		}
+			}));
+		};
+
 		Ok(())
 	}
 }
@@ -223,11 +237,11 @@ mod tests {
 	use super::*;
 
 	fn is_env_initialized() -> bool {
-		G_ENV.get().is_some() && !G_ENV.get().unwrap().env_ptr.load(Ordering::Relaxed).is_null()
+		unsafe { (*G_ENV.cell.get()).as_ref() }.is_some() && !unsafe { (*G_ENV.cell.get()).as_ref() }.unwrap().env_ptr.load(Ordering::Relaxed).is_null()
 	}
 
 	fn env_ptr() -> Option<*mut ort_sys::OrtEnv> {
-		G_ENV.get().map(|f| f.env_ptr.load(Ordering::Relaxed))
+		unsafe { (*G_ENV.cell.get()).as_ref() }.map(|f| f.env_ptr.load(Ordering::Relaxed))
 	}
 
 	struct ConcurrentTestRun {

@@ -66,7 +66,8 @@ fn squeezenet_mushroom() -> ort::Result<()> {
 	}
 
 	// Perform the inference
-	let outputs = session.run(inputs![array]?)?;
+	let run_options = None;
+	let outputs = session.run(inputs![array]?, run_options)?;
 
 	// Downloaded model does not have a softmax as final layer; call softmax on second axis
 	// and iterate on resulting probabilities, creating an index to later access labels.

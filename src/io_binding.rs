@@ -1,6 +1,12 @@
 use std::{ffi::CString, fmt::Debug, ptr, sync::Arc};
 
-use crate::{memory::MemoryInfo, ortsys, session::output::SessionOutputs, value::Value, Error, Result, Session};
+use crate::{
+	memory::MemoryInfo,
+	ortsys,
+	session::{output::SessionOutputs, RunOptions},
+	value::Value,
+	Error, Result, Session
+};
 
 /// Enables binding of session inputs and/or outputs to pre-allocated memory.
 ///
@@ -58,8 +64,12 @@ impl<'s> IoBinding<'s> {
 		Ok(())
 	}
 
-	pub fn run<'i: 's>(&'i self) -> Result<SessionOutputs<'s>> {
-		let run_options_ptr: *const ort_sys::OrtRunOptions = std::ptr::null();
+	pub fn run<'i: 's>(&'i self, run_options: Option<Arc<RunOptions>>) -> Result<SessionOutputs<'s>> {
+		let run_options_ptr = if let Some(run_options) = run_options {
+			run_options.run_options_ptr
+		} else {
+			std::ptr::null_mut()
+		};
 		ortsys![unsafe RunWithBinding(self.session.inner.session_ptr, run_options_ptr, self.ptr) -> Error::SessionRunWithIoBinding];
 
 		let mut count = self.output_names.len() as ort_sys::size_t;

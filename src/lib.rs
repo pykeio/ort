@@ -42,7 +42,7 @@ pub use self::execution_providers::*;
 pub use self::io_binding::IoBinding;
 pub use self::memory::{AllocationDevice, Allocator, MemoryInfo};
 pub use self::metadata::ModelMetadata;
-pub use self::session::{InMemorySession, Session, SessionBuilder, SessionInputs, SessionOutputs, SharedSessionInner};
+pub use self::session::{InMemorySession, RunOptions, Session, SessionBuilder, SessionInputs, SessionOutputs, SharedSessionInner};
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 pub use self::tensor::{ArrayExtensions, ArrayViewHolder, Tensor, TensorData};

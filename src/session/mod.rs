@@ -562,6 +562,46 @@ pub struct Output {
 	pub output_type: ValueType
 }
 
+/// ONNX Run Options which is used to terminate/unterminate run(s) in a session
+#[derive(Debug)]
+pub struct RunOptions {
+	pub(crate) run_options_ptr: *mut ort_sys::OrtRunOptions
+}
+
+// https://onnxruntime.ai/docs/api/c/struct_ort_api.html#ac2a08cac0a657604bd5899e0d1a13675
+unsafe impl Send for RunOptions {}
+unsafe impl Sync for RunOptions {}
+
+impl RunOptions {
+	/// Creates a new [`RunOptions`].
+	pub fn new() -> Result<Self> {
+		let mut run_options_ptr: *mut ort_sys::OrtRunOptions = std::ptr::null_mut();
+		ortsys![unsafe CreateRunOptions(&mut run_options_ptr) -> Error::CreateRunOptions; nonNull(run_options_ptr)];
+		Ok(Self { run_options_ptr })
+	}
+
+	/// Terminates the runs associated with [`RunOptions`].
+	pub fn set_terminate(&self) -> Result<()> {
+		ortsys![unsafe RunOptionsSetTerminate(self.run_options_ptr) -> Error::RunOptionsSetTerminate];
+		Ok(())
+	}
+
+	/// Unterminates the runs associated with [`RunOptions`].
+	pub fn set_unterminate(&self) -> Result<()> {
+		ortsys![unsafe RunOptionsUnsetTerminate(self.run_options_ptr) -> Error::RunOptionsUnsetTerminate];
+		Ok(())
+	}
+}
+
+impl Drop for RunOptions {
+	fn drop(&mut self) {
+		if !self.run_options_ptr.is_null() {
+			ortsys![unsafe ReleaseRunOptions(self.run_options_ptr)];
+		}
+		self.run_options_ptr = std::ptr::null_mut();
+	}
+}
+
 impl Session {
 	pub fn builder() -> Result<SessionBuilder> {
 		SessionBuilder::new()
@@ -583,24 +623,28 @@ impl Session {
 	}
 
 	/// Run the input data through the ONNX graph, performing inference.
-	pub fn run<'s, 'i, const N: usize>(&'s self, input_values: impl Into<SessionInputs<'i, N>>) -> Result<SessionOutputs<'s>> {
+	pub fn run<'s, 'i, const N: usize>(
+		&'s self,
+		input_values: impl Into<SessionInputs<'i, N>>,
+		run_options: Option<Arc<RunOptions>>
+	) -> Result<SessionOutputs<'s>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
-				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values)?;
+				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values, run_options)?;
 				Ok(outputs)
 			}
 			SessionInputs::ValueArray(input_values) => {
-				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), &input_values)?;
+				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), &input_values, run_options)?;
 				Ok(outputs)
 			}
 			SessionInputs::ValueMap(input_values) => {
 				let (input_names, values): (Vec<&'static str>, Vec<Value>) = input_values.into_iter().unzip();
-				self.run_inner(&input_names, &values)
+				self.run_inner(&input_names, &values, run_options)
 			}
 		}
 	}
 
-	fn run_inner(&self, input_names: &[&str], input_values: &[Value]) -> Result<SessionOutputs<'_>> {
+	fn run_inner(&self, input_names: &[&str], input_values: &[Value], run_options: Option<Arc<RunOptions>>) -> Result<SessionOutputs<'_>> {
 		let input_names_ptr: Vec<*const c_char> = input_names
 			.iter()
 			.map(|n| CString::new(*n).unwrap())
@@ -618,10 +662,16 @@ impl Session {
 		// The C API expects pointers for the arrays (pointers to C-arrays)
 		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.iter().map(|input_array_ort| input_array_ort.ptr() as *const _).collect();
 
+		let run_options_ptr = if let Some(run_options) = run_options {
+			run_options.run_options_ptr
+		} else {
+			std::ptr::null_mut()
+		};
+
 		ortsys![
 			unsafe Run(
 				self.inner.session_ptr,
-				ptr::null(),
+				run_options_ptr,
 				input_names_ptr.as_ptr(),
 				input_ort_values.as_ptr(),
 				input_ort_values.len() as _,

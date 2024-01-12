@@ -105,6 +105,15 @@ pub enum Error {
 	/// Error occurred when extracting string data from an ONNX tensor
 	#[error("Failed to get tensor string data: {0}")]
 	GetStringTensorContent(ErrorInternal),
+	/// Error occurred when creating run options.
+	#[error("Failed to create run options: {0}")]
+	CreateRunOptions(ErrorInternal),
+	/// Error occurred when terminating run options.
+	#[error("Failed to terminate run options: {0}")]
+	RunOptionsSetTerminate(ErrorInternal),
+	/// Error occurred when unterminating run options.
+	#[error("Failed to unterminate run options: {0}")]
+	RunOptionsUnsetTerminate(ErrorInternal),
 	/// Error occurred when converting data to a String
 	#[error("Data was not UTF-8: {0}")]
 	StringFromUtf8Error(#[from] string::FromUtf8Error),

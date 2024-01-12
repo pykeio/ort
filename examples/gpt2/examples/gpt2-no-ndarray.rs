@@ -50,7 +50,8 @@ fn main() -> ort::Result<()> {
 		// Raw tensor construction takes a tuple of (dimensions, data).
 		// The model expects our input to have shape [B, _, S]
 		let input = (vec![1, 1, tokens.len() as i64], Arc::clone(&tokens));
-		let outputs = session.run(inputs![input]?)?;
+		let run_options = None;
+		let outputs = session.run(inputs![input]?, run_options)?;
 		let (dim, mut probabilities) = outputs["output1"].extract_raw_tensor()?;
 
 		// The output tensor will have shape [B, _, S + 1, V]

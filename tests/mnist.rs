@@ -41,7 +41,8 @@ fn mnist_5() -> ort::Result<()> {
 	});
 
 	// Perform the inference
-	let outputs = session.run(inputs![array]?)?;
+	let run_options = None;
+	let outputs = session.run(inputs![array]?, run_options)?;
 
 	let output: Tensor<_> = outputs[0].extract_tensor()?;
 	let mut probabilities: Vec<(usize, f32)> = output.view().softmax(ndarray::Axis(1)).iter().copied().enumerate().collect::<Vec<_>>();

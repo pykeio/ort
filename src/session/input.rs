@@ -44,7 +44,8 @@ impl<'i, const N: usize> From<[Value; N]> for SessionInputs<'i, N> {
 /// # use ort::{GraphOptimizationLevel, Session};
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// let mut session = Session::builder()?.with_model_from_file("model.onnx")?;
-/// let _ = session.run(ort::inputs![Array1::from_vec(vec![1, 2, 3, 4, 5])]?);
+/// let run_options = None;
+/// let _ = session.run(ort::inputs![Array1::from_vec(vec![1, 2, 3, 4, 5])]?, run_options);
 /// # Ok(())
 /// # }
 /// ```
@@ -57,8 +58,9 @@ impl<'i, const N: usize> From<[Value; N]> for SessionInputs<'i, N> {
 /// # use ort::{GraphOptimizationLevel, Session};
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// let mut session = Session::builder()?.with_model_from_file("model.onnx")?;
+/// let run_options = None;
 /// let _ = session.run(ort::inputs! {
-/// 	"tokens" => Array1::from_vec(vec![1, 2, 3, 4, 5])
+/// 	"tokens" => Array1::from_vec(vec![1, 2, 3, 4, 5], run_options)
 /// }?);
 /// # Ok(())
 /// # }

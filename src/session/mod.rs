@@ -623,23 +623,41 @@ impl Session {
 	}
 
 	/// Run the input data through the ONNX graph, performing inference.
-	pub fn run<'s, 'i, const N: usize>(
-		&'s self,
-		input_values: impl Into<SessionInputs<'i, N>>,
-		run_options: Option<Arc<RunOptions>>
-	) -> Result<SessionOutputs<'s>> {
+	pub fn run<'s, 'i, const N: usize>(&'s self, input_values: impl Into<SessionInputs<'i, N>>) -> Result<SessionOutputs<'s>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
-				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values, run_options)?;
+				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values, None)?;
 				Ok(outputs)
 			}
 			SessionInputs::ValueArray(input_values) => {
-				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), &input_values, run_options)?;
+				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), &input_values, None)?;
 				Ok(outputs)
 			}
 			SessionInputs::ValueMap(input_values) => {
 				let (input_names, values): (Vec<&'static str>, Vec<Value>) = input_values.into_iter().unzip();
-				self.run_inner(&input_names, &values, run_options)
+				self.run_inner(&input_names, &values, None)
+			}
+		}
+	}
+
+	/// Run the input data through the ONNX graph, performing inference.
+	pub fn run_with_options<'s, 'i, const N: usize>(
+		&'s self,
+		input_values: impl Into<SessionInputs<'i, N>>,
+		run_options: Arc<RunOptions>
+	) -> Result<SessionOutputs<'s>> {
+		match input_values.into() {
+			SessionInputs::ValueSlice(input_values) => {
+				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values, Some(run_options))?;
+				Ok(outputs)
+			}
+			SessionInputs::ValueArray(input_values) => {
+				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), &input_values, Some(run_options))?;
+				Ok(outputs)
+			}
+			SessionInputs::ValueMap(input_values) => {
+				let (input_names, values): (Vec<&'static str>, Vec<Value>) = input_values.into_iter().unzip();
+				self.run_inner(&input_names, &values, Some(run_options))
 			}
 		}
 	}

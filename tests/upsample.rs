@@ -66,8 +66,7 @@ fn upsample() -> ort::Result<()> {
 	let array = convert_image_to_cow_array(&image_buffer);
 
 	// Perform the inference
-	let run_options = None;
-	let outputs = session.run(inputs![&array]?, run_options)?;
+	let outputs = session.run(inputs![&array]?)?;
 
 	assert_eq!(outputs.len(), 1);
 	let output: Tensor<f32> = outputs[0].extract_tensor()?;
@@ -104,8 +103,7 @@ fn upsample_with_ort_model() -> ort::Result<()> {
 	let array = convert_image_to_cow_array(&image_buffer);
 
 	// Perform the inference
-	let run_options = None;
-	let outputs = session.run(inputs![&array]?, run_options)?;
+	let outputs = session.run(inputs![&array]?)?;
 
 	assert_eq!(outputs.len(), 1);
 	let output: Tensor<f32> = outputs[0].extract_tensor()?;

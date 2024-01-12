@@ -64,7 +64,15 @@ impl<'s> IoBinding<'s> {
 		Ok(())
 	}
 
-	pub fn run<'i: 's>(&'i self, run_options: Option<Arc<RunOptions>>) -> Result<SessionOutputs<'s>> {
+	pub fn run<'i: 's>(&'i self) -> Result<SessionOutputs<'s>> {
+		self.run_inner(None)
+	}
+
+	pub fn run_with_options<'i: 's>(&'i self, run_options: Arc<RunOptions>) -> Result<SessionOutputs<'s>> {
+		self.run_inner(Some(run_options))
+	}
+
+	fn run_inner<'i: 's>(&'i self, run_options: Option<Arc<RunOptions>>) -> Result<SessionOutputs<'s>> {
 		let run_options_ptr = if let Some(run_options) = run_options {
 			run_options.run_options_ptr
 		} else {

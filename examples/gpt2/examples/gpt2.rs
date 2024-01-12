@@ -50,8 +50,7 @@ fn main() -> ort::Result<()> {
 
 	for _ in 0..GEN_TOKENS {
 		let array = tokens.view().insert_axis(Axis(0)).insert_axis(Axis(1));
-		let run_options = None;
-		let outputs = session.run(inputs![array]?, run_options)?;
+		let outputs = session.run(inputs![array]?)?;
 		let generated_tokens: Tensor<f32> = outputs["output1"].extract_tensor()?;
 		let generated_tokens = generated_tokens.view();
 

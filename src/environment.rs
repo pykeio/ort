@@ -146,6 +146,9 @@ impl EnvironmentBuilder {
 
 	/// Commit the configuration to a new [`Environment`].
 	pub fn commit(self) -> Result<()> {
+		// drop global reference to previous environment
+		drop(unsafe { (*G_ENV.cell.get()).take() });
+
 		let env_ptr = if let Some(global_thread_pool) = self.global_thread_pool_options {
 			let mut env_ptr: *mut ort_sys::OrtEnv = std::ptr::null_mut();
 			let logging_function: ort_sys::OrtLoggingFunction = Some(custom_logger);

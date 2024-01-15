@@ -1,0 +1,17 @@
+[package]
+publish = false
+name = "example-modnet"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+ort = { path = "../../" }
+ndarray = "0.15"
+tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
+image = "0.24"
+tracing = "0.1"
+show-image = { version = "0.13", features = [ "image", "raqote" ] }
+
+[features]
+load-dynamic = [ "ort/load-dynamic" ]
+cuda = [ "ort/cuda" ]

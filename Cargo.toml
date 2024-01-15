@@ -3,13 +3,15 @@ members = [
 	'ort-sys',
 	'examples/gpt2',
 	'examples/model-info',
-	'examples/yolov8'
+	'examples/yolov8',
+	'examples/modnet'
 ]
 default-members = [
 	'.',
 	'examples/gpt2',
 	'examples/model-info',
-	'examples/yolov8'
+	'examples/yolov8',
+	'examples/modnet'
 ]
 
 [package]

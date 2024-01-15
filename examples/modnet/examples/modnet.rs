@@ -1,22 +1,23 @@
 #![allow(clippy::manual_retain)]
 
-use std::ops::Mul;
+use std::{ops::Mul, path::Path};
 
 use image::{imageops::FilterType, GenericImageView, ImageBuffer, Rgba};
 use ndarray::Array;
 use ort::{inputs, CUDAExecutionProvider, Session};
+use show_image::{event, AsImageView, WindowOptions};
+
+#[show_image::main]
 fn main() -> ort::Result<()> {
 	// read args from command line
 	let model_path = std::env::args().nth(1).unwrap();
-	let input_image_path = std::env::args().nth(2).unwrap();
-	let output_image_path = std::env::args().nth(3).unwrap();
 	tracing_subscriber::fmt::init();
 
 	ort::init()
 		.with_execution_providers([CUDAExecutionProvider::default().build()])
 		.commit()?;
 
-	let original_img = image::open(input_image_path).unwrap();
+	let original_img = image::open(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("photo.jpg")).unwrap();
 	let (img_width, img_height) = (original_img.width(), original_img.height());
 	let img = original_img.resize_exact(512, 512, FilterType::Triangle);
 	let mut input = Array::zeros((1, 3, 512, 512));
@@ -47,6 +48,28 @@ fn main() -> ort::Result<()> {
 		pixel.0[1] = origin.0[1];
 		pixel.0[2] = origin.0[2];
 	});
-	image::save_buffer(output_image_path, &output, img_width, img_height, image::ColorType::Rgba8).unwrap();
+	let window = show_image::context()
+		.run_function_wait(move |context| -> Result<_, String> {
+			let mut window = context
+				.create_window(
+					"ort + modnet",
+					WindowOptions {
+						size: Some([img_width, img_height]),
+						..WindowOptions::default()
+					}
+				)
+				.map_err(|e| e.to_string())?;
+			window.set_image("photo", &output.as_image_view().map_err(|e| e.to_string())?);
+			Ok(window.proxy())
+		})
+		.unwrap();
+
+	for event in window.event_channel().unwrap() {
+		if let event::WindowEvent::KeyboardInput(event) = event {
+			if event.input.key_code == Some(event::VirtualKeyCode::Escape) && event.input.state.is_pressed() {
+				break;
+			}
+		}
+	}
 	Ok(())
 }

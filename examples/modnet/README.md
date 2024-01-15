@@ -6,9 +6,9 @@ Download the onnx model from [here](https://drive.google.com/drive/folders/1umYm
 
 ## Usage
 ```bash
-cargo run --example modnet -- /path/to/modnet_photographic_portrait_matting.onnx /path/to/input.jpg /path/to/output.png
+cargo run --example modnet -- /path/to/modnet_photographic_portrait_matting.onnx 
 ```
 e.g.
 ```bash
-cargo run --example modnet -- /Volumes/Extremessd/ort-modnet/models/modnet_photographic_portrait_matting.onnx /Volumes/Extremessd/ort/examples/modnet/data/1705031834805.jpg ./output.png
+cargo run --example modnet -- /Volumes/Extremessd/ort-modnet/models/modnet_photographic_portrait_matting.onnx
 ```

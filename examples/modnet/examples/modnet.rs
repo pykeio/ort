@@ -9,13 +9,14 @@ use show_image::{event, AsImageView, WindowOptions};
 
 #[show_image::main]
 fn main() -> ort::Result<()> {
-	// read args from command line
-	let model_path = std::env::args().nth(1).unwrap();
 	tracing_subscriber::fmt::init();
 
 	ort::init()
 		.with_execution_providers([CUDAExecutionProvider::default().build()])
 		.commit()?;
+
+	let model =
+		Session::builder()?.with_model_downloaded("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/modnet_photographic_portrait_matting.onnx")?;
 
 	let original_img = image::open(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("photo.jpg")).unwrap();
 	let (img_width, img_height) = (original_img.width(), original_img.height());
@@ -29,17 +30,22 @@ fn main() -> ort::Result<()> {
 		input[[0, 1, y, x]] = (g as f32 - 127.5) / 127.5;
 		input[[0, 2, y, x]] = (b as f32 - 127.5) / 127.5;
 	}
-	let model = Session::builder()?.with_model_from_file(model_path)?;
+
 	let outputs = model.run(inputs!["input" => input.view()]?)?;
+
 	let binding = outputs["output"].extract_tensor::<f32>().unwrap();
 	let output = binding.view();
+
+	// convert to 8-bit
 	let output = output.mul(255.0).map(|x| *x as u8);
 	let output = output.into_raw_vec();
-	// change to rgba
+
+	// change rgb to rgba
 	let output_img = ImageBuffer::from_fn(512, 512, |x, y| {
 		let i = (x + y * 512) as usize;
 		Rgba([output[i], output[i], output[i], 255])
 	});
+
 	let mut output = image::imageops::resize(&output_img, img_width, img_height, FilterType::Triangle);
 	output.enumerate_pixels_mut().for_each(|(x, y, pixel)| {
 		let origin = original_img.get_pixel(x, y);
@@ -48,6 +54,7 @@ fn main() -> ort::Result<()> {
 		pixel.0[1] = origin.0[1];
 		pixel.0[2] = origin.0[2];
 	});
+
 	let window = show_image::context()
 		.run_function_wait(move |context| -> Result<_, String> {
 			let mut window = context
@@ -71,5 +78,6 @@ fn main() -> ort::Result<()> {
 			}
 		}
 	}
+
 	Ok(())
 }

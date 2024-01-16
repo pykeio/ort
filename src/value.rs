@@ -764,3 +764,69 @@ pub(crate) unsafe fn extract_data_type_from_map_info(info_ptr: *const ort_sys::O
 		value: value_type_sys.into()
 	})
 }
+
+#[cfg(test)]
+mod tests {
+	use ndarray::{ArcArray1, Array1, CowArray};
+
+	use crate::*;
+
+	#[test]
+	#[cfg(feature = "ndarray")]
+	fn test_tensor_value() -> crate::Result<()> {
+		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
+		let value = Value::from_array(Array1::from_vec(v.clone()))?;
+		assert!(value.is_tensor()?);
+		assert_eq!(value.tensor_element_type()?, TensorElementType::Float32);
+		assert_eq!(
+			value.dtype()?,
+			ValueType::Tensor {
+				ty: TensorElementType::Float32,
+				dimensions: vec![v.len() as i64]
+			}
+		);
+
+		let (shape, data) = value.extract_raw_tensor::<f32>()?;
+		assert_eq!(shape, vec![v.len() as i64]);
+		assert_eq!(data, &v);
+
+		Ok(())
+	}
+
+	#[test]
+	#[cfg(feature = "ndarray")]
+	fn test_tensor_lifetimes() -> crate::Result<()> {
+		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
+
+		let arc1 = ArcArray1::from_vec(v.clone());
+		let mut arc2 = ArcArray1::clone(&arc1);
+		let value = Value::from_array(&mut arc2)?;
+		drop((arc1, arc2));
+
+		assert_eq!(value.extract_raw_tensor::<f32>()?.1, &v);
+
+		let cow = CowArray::from(Array1::from_vec(v.clone()));
+		let value = Value::from_array(&cow)?;
+		assert_eq!(value.extract_raw_tensor::<f32>()?.1, &v);
+
+		let owned = Array1::from_vec(v.clone());
+		let value = Value::from_array(owned.view())?;
+		drop(owned);
+		assert_eq!(value.extract_raw_tensor::<f32>()?.1, &v);
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_tensor_raw_lifetimes() -> crate::Result<()> {
+		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
+
+		let arc = Arc::new(v.clone().into_boxed_slice());
+		let shape = vec![v.len() as i64];
+		let value = Value::from_array((shape, Arc::clone(&arc)))?;
+		drop(arc);
+		assert_eq!(value.extract_raw_tensor::<f32>()?.1, &v);
+
+		Ok(())
+	}
+}

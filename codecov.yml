@@ -1,2 +1,2 @@
 ignore:
-  - src/execution_providers/**/*.rs
+  - "src/execution_providers"

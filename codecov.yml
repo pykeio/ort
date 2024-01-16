@@ -1,3 +1,2 @@
 ignore:
-  - src/download/**/*.rs
-  - src/download.rs
+  - src/execution_providers/**/*.rs

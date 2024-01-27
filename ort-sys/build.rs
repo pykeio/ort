@@ -67,6 +67,8 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 	for out_dir in [out_dir.to_path_buf(), out_dir.join("examples"), out_dir.join("deps")] {
 		#[cfg(windows)]
 		let mut copy_fallback = false;
+		#[cfg(not(windows))]
+		let copy_fallback = false;
 
 		let lib_files = std::fs::read_dir(lib_dir).unwrap_or_else(|_| panic!("Failed to read contents of `{}` (does it exist?)", lib_dir.display()));
 		for lib_file in lib_files.filter(|e| {
@@ -79,18 +81,23 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 			let lib_name = lib_path.file_name().unwrap();
 			let out_path = out_dir.join(lib_name);
 			if !out_path.exists() {
+				if out_path.is_symlink() {
+					fs::remove_file(&out_path).unwrap();
+				}
 				#[cfg(windows)]
 				if std::os::windows::fs::symlink_file(&lib_path, &out_path).is_err() {
 					copy_fallback = true;
-					std::fs::copy(&lib_path, out_path).unwrap();
+					std::fs::copy(&lib_path, &out_path).unwrap();
 				}
 				#[cfg(unix)]
-				std::os::unix::fs::symlink(&lib_path, out_path).unwrap();
+				std::os::unix::fs::symlink(&lib_path, &out_path).unwrap();
+			}
+			if !copy_fallback {
+				println!("cargo:rerun-if-changed={}", out_path.to_str().unwrap());
 			}
 		}
 
 		// If we had to fallback to copying files on Windows, break early to avoid copying to 3 different directories
-		#[cfg(windows)]
 		if copy_fallback {
 			break;
 		}

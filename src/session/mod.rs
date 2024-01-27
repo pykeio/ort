@@ -520,11 +520,11 @@ unsafe impl Send for SharedSessionInner {}
 unsafe impl Sync for SharedSessionInner {}
 
 impl Drop for SharedSessionInner {
-	#[tracing::instrument(skip_all)]
+	#[tracing::instrument]
 	fn drop(&mut self) {
-		tracing::warn!("dropping SharedSessionInner");
+		tracing::debug!("dropping SharedSessionInner");
 		if !self.session_ptr.is_null() {
-			tracing::warn!("dropping session ptr");
+			tracing::debug!("dropping session ptr");
 			ortsys![unsafe ReleaseSession(self.session_ptr)];
 		}
 		self.session_ptr = std::ptr::null_mut();

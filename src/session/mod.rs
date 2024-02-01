@@ -17,6 +17,8 @@ use std::{
 #[cfg(feature = "fetch-models")]
 use std::{path::PathBuf, time::Duration};
 
+use compact_str::CompactString;
+
 #[cfg(feature = "fetch-models")]
 use super::error::FetchModelError;
 use super::{
@@ -636,15 +638,31 @@ impl Session {
 	pub fn run<'s, 'i, const N: usize>(&'s self, input_values: impl Into<SessionInputs<'i, N>>) -> Result<SessionOutputs<'s>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
-				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values, None)?;
+				let outputs = self.run_inner(
+					&self
+						.inputs
+						.iter()
+						.map(|input| CompactString::new(input.name.as_str()))
+						.collect::<Vec<_>>(),
+					input_values,
+					None
+				)?;
 				Ok(outputs)
 			}
 			SessionInputs::ValueArray(input_values) => {
-				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), &input_values, None)?;
+				let outputs = self.run_inner(
+					&self
+						.inputs
+						.iter()
+						.map(|input| CompactString::new(input.name.as_str()))
+						.collect::<Vec<_>>(),
+					&input_values,
+					None
+				)?;
 				Ok(outputs)
 			}
 			SessionInputs::ValueMap(input_values) => {
-				let (input_names, values): (Vec<&'static str>, Vec<Value>) = input_values.into_iter().unzip();
+				let (input_names, values): (Vec<CompactString>, Vec<Value>) = input_values.into_iter().unzip();
 				self.run_inner(&input_names, &values, None)
 			}
 		}
@@ -658,24 +676,40 @@ impl Session {
 	) -> Result<SessionOutputs<'s>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
-				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values, Some(run_options))?;
+				let outputs = self.run_inner(
+					&self
+						.inputs
+						.iter()
+						.map(|input| CompactString::new(input.name.as_str()))
+						.collect::<Vec<_>>(),
+					input_values,
+					Some(run_options)
+				)?;
 				Ok(outputs)
 			}
 			SessionInputs::ValueArray(input_values) => {
-				let outputs = self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), &input_values, Some(run_options))?;
+				let outputs = self.run_inner(
+					&self
+						.inputs
+						.iter()
+						.map(|input| CompactString::new(input.name.as_str()))
+						.collect::<Vec<_>>(),
+					&input_values,
+					Some(run_options)
+				)?;
 				Ok(outputs)
 			}
 			SessionInputs::ValueMap(input_values) => {
-				let (input_names, values): (Vec<&'static str>, Vec<Value>) = input_values.into_iter().unzip();
+				let (input_names, values): (Vec<CompactString>, Vec<Value>) = input_values.into_iter().unzip();
 				self.run_inner(&input_names, &values, Some(run_options))
 			}
 		}
 	}
 
-	fn run_inner(&self, input_names: &[&str], input_values: &[Value], run_options: Option<Arc<RunOptions>>) -> Result<SessionOutputs<'_>> {
+	fn run_inner(&self, input_names: &[CompactString], input_values: &[Value], run_options: Option<Arc<RunOptions>>) -> Result<SessionOutputs<'_>> {
 		let input_names_ptr: Vec<*const c_char> = input_names
 			.iter()
-			.map(|n| CString::new(*n).unwrap())
+			.map(|n| CString::new(n.as_bytes()).unwrap())
 			.map(|n| n.into_raw() as *const c_char)
 			.collect();
 		let output_names_ptr: Vec<*const c_char> = self

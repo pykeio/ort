@@ -1,16 +1,18 @@
 use std::collections::HashMap;
 
+use compact_str::CompactString;
+
 use crate::Value;
 
 pub enum SessionInputs<'i, const N: usize = 0> {
-	ValueMap(HashMap<&'static str, Value>),
+	ValueMap(HashMap<CompactString, Value>),
 	ValueSlice(&'i [Value]),
 	ValueArray([Value; N])
 }
 
-impl<'i> From<HashMap<&'static str, Value>> for SessionInputs<'i> {
-	fn from(val: HashMap<&'static str, Value>) -> Self {
-		SessionInputs::ValueMap(val)
+impl<'i, K: Into<CompactString>> From<HashMap<K, Value>> for SessionInputs<'i> {
+	fn from(val: HashMap<K, Value>) -> Self {
+		SessionInputs::ValueMap(val.into_iter().map(|c| (c.0.into(), c.1)).collect())
 	}
 }
 

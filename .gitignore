@@ -191,3 +191,6 @@ WixTools/
 
 # IDEA
 .idea
+
+# Glassbench results
+/glassbench*.db

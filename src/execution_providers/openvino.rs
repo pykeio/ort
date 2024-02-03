@@ -12,7 +12,7 @@ pub struct OpenVINOExecutionProvider {
 	context: *mut c_void,
 	enable_opencl_throttling: bool,
 	enable_dynamic_shapes: bool,
-	enable_vpu_fast_compile: bool
+	enable_npu_fast_compile: bool
 }
 
 unsafe impl Send for OpenVINOExecutionProvider {}
@@ -28,7 +28,7 @@ impl Default for OpenVINOExecutionProvider {
 			context: std::ptr::null_mut(),
 			enable_opencl_throttling: false,
 			enable_dynamic_shapes: false,
-			enable_vpu_fast_compile: false
+			enable_npu_fast_compile: false
 		}
 	}
 }
@@ -82,8 +82,8 @@ impl OpenVINOExecutionProvider {
 		self
 	}
 
-	pub fn with_vpu_fast_compile(mut self) -> Self {
-		self.enable_vpu_fast_compile = true;
+	pub fn with_npu_fast_compile(mut self) -> Self {
+		self.enable_npu_fast_compile = true;
 		self
 	}
 
@@ -127,7 +127,7 @@ impl ExecutionProvider for OpenVINOExecutionProvider {
 				context: self.context,
 				enable_opencl_throttling: self.enable_opencl_throttling.into(),
 				enable_dynamic_shapes: self.enable_dynamic_shapes.into(),
-				enable_vpu_fast_compile: self.enable_vpu_fast_compile.into()
+				enable_npu_fast_compile: self.enable_npu_fast_compile.into()
 			};
 			return crate::error::status_to_result(
 				crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO(session_builder.session_options_ptr, &openvino_options as *const _)]

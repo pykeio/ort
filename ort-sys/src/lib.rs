@@ -76,7 +76,11 @@ pub enum ONNXTensorElementDataType {
 	ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64 = 13,
 	ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX64 = 14,
 	ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX128 = 15,
-	ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16 = 16
+	ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16 = 16,
+	ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E4M3FN = 17,
+	ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E4M3FNUZ = 18,
+	ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E5M2 = 19,
+	ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E5M2FNUZ = 20
 }
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
@@ -277,6 +281,11 @@ pub struct OrtOpAttr {
 pub struct OrtLogger {
 	_unused: [u8; 0]
 }
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OrtShapeInferContext {
+	_unused: [u8; 0]
+}
 pub type OrtStatusPtr = *mut OrtStatus;
 #[doc = " \\brief Memory allocation interface\n\n Structure of function pointers that defines a memory allocator. This can be created and filled in by the user for custom allocators.\n\n When an allocator is passed to any function, be sure that the allocator object is not destroyed until the last allocated object using it is freed."]
 #[repr(C)]
@@ -406,6 +415,7 @@ pub enum OrtCudnnConvAlgoSearch {
 }
 #[doc = " \\brief CUDA Provider Options\n\n \\see OrtApi::SessionOptionsAppendExecutionProvider_CUDA"]
 #[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct OrtCUDAProviderOptions {
 	#[doc = " \\brief CUDA device Id\n   Defaults to 0."]
 	pub device_id: ::std::os::raw::c_int,
@@ -494,6 +504,7 @@ fn bindgen_test_layout_OrtCUDAProviderOptions() {
 }
 #[doc = " \\brief ROCM Provider Options\n\n \\see OrtApi::SessionOptionsAppendExecutionProvider_ROCM"]
 #[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct OrtROCMProviderOptions {
 	#[doc = " \\brief ROCM device Id\n   Defaults to 0."]
 	pub device_id: ::std::os::raw::c_int,
@@ -582,6 +593,7 @@ fn bindgen_test_layout_OrtROCMProviderOptions() {
 }
 #[doc = " \\brief TensorRT Provider Options\n\n \\see OrtApi::SessionOptionsAppendExecutionProvider_TensorRT"]
 #[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct OrtTensorRTProviderOptions {
 	#[doc = "< CUDA device id (0 = default device)"]
 	pub device_id: ::std::os::raw::c_int,
@@ -706,14 +718,16 @@ fn bindgen_test_layout_OrtTensorRTProviderOptions() {
 pub struct OrtMIGraphXProviderOptions {
 	pub device_id: ::std::os::raw::c_int,
 	pub migraphx_fp16_enable: ::std::os::raw::c_int,
-	pub migraphx_int8_enable: ::std::os::raw::c_int
+	pub migraphx_int8_enable: ::std::os::raw::c_int,
+	pub migraphx_use_native_calibration_table: ::std::os::raw::c_int,
+	pub migraphx_int8_calibration_table_name: *const ::std::os::raw::c_char
 }
 #[test]
 fn bindgen_test_layout_OrtMIGraphXProviderOptions() {
 	const UNINIT: ::std::mem::MaybeUninit<OrtMIGraphXProviderOptions> = ::std::mem::MaybeUninit::uninit();
 	let ptr = UNINIT.as_ptr();
-	assert_eq!(::std::mem::size_of::<OrtMIGraphXProviderOptions>(), 12usize, concat!("Size of: ", stringify!(OrtMIGraphXProviderOptions)));
-	assert_eq!(::std::mem::align_of::<OrtMIGraphXProviderOptions>(), 4usize, concat!("Alignment of ", stringify!(OrtMIGraphXProviderOptions)));
+	assert_eq!(::std::mem::size_of::<OrtMIGraphXProviderOptions>(), 24usize, concat!("Size of: ", stringify!(OrtMIGraphXProviderOptions)));
+	assert_eq!(::std::mem::align_of::<OrtMIGraphXProviderOptions>(), 8usize, concat!("Alignment of ", stringify!(OrtMIGraphXProviderOptions)));
 	assert_eq!(
 		unsafe { ::std::ptr::addr_of!((*ptr).device_id) as usize - ptr as usize },
 		0usize,
@@ -729,14 +743,25 @@ fn bindgen_test_layout_OrtMIGraphXProviderOptions() {
 		8usize,
 		concat!("Offset of field: ", stringify!(OrtMIGraphXProviderOptions), "::", stringify!(migraphx_int8_enable))
 	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).migraphx_use_native_calibration_table) as usize - ptr as usize },
+		12usize,
+		concat!("Offset of field: ", stringify!(OrtMIGraphXProviderOptions), "::", stringify!(migraphx_use_native_calibration_table))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).migraphx_int8_calibration_table_name) as usize - ptr as usize },
+		16usize,
+		concat!("Offset of field: ", stringify!(OrtMIGraphXProviderOptions), "::", stringify!(migraphx_int8_calibration_table_name))
+	);
 }
 #[doc = " \\brief OpenVINO Provider Options\n\n \\see OrtApi::SessionOptionsAppendExecutionProvider_OpenVINO"]
 #[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct OrtOpenVINOProviderOptions {
 	#[doc = " \\brief Device type string\n\n Valid settings are one of: \"CPU_FP32\", \"CPU_FP16\", \"GPU_FP32\", \"GPU_FP16\""]
 	pub device_type: *const ::std::os::raw::c_char,
 	#[doc = "< 0 = disabled, nonzero = enabled"]
-	pub enable_vpu_fast_compile: ::std::os::raw::c_uchar,
+	pub enable_npu_fast_compile: ::std::os::raw::c_uchar,
 	pub device_id: *const ::std::os::raw::c_char,
 	#[doc = "< 0 = Use default number of threads"]
 	pub num_of_threads: size_t,
@@ -759,9 +784,9 @@ fn bindgen_test_layout_OrtOpenVINOProviderOptions() {
 		concat!("Offset of field: ", stringify!(OrtOpenVINOProviderOptions), "::", stringify!(device_type))
 	);
 	assert_eq!(
-		unsafe { ::std::ptr::addr_of!((*ptr).enable_vpu_fast_compile) as usize - ptr as usize },
+		unsafe { ::std::ptr::addr_of!((*ptr).enable_npu_fast_compile) as usize - ptr as usize },
 		8usize,
-		concat!("Offset of field: ", stringify!(OrtOpenVINOProviderOptions), "::", stringify!(enable_vpu_fast_compile))
+		concat!("Offset of field: ", stringify!(OrtOpenVINOProviderOptions), "::", stringify!(enable_npu_fast_compile))
 	);
 	assert_eq!(
 		unsafe { ::std::ptr::addr_of!((*ptr).device_id) as usize - ptr as usize },
@@ -1760,13 +1785,59 @@ pub struct OrtApi {
 				resource: *mut *mut ::std::os::raw::c_void
 			) -> OrtStatusPtr
 		)
+	>,
+	pub SetUserLoggingFunction: ::std::option::Option<
+		_system!(
+			unsafe fn(
+				options: *mut OrtSessionOptions,
+				user_logging_function: OrtLoggingFunction,
+				user_logging_param: *mut ::std::os::raw::c_void
+			) -> OrtStatusPtr
+		)
+	>,
+	pub ShapeInferContext_GetInputCount: ::std::option::Option<_system!(unsafe fn(context: *const OrtShapeInferContext, out: *mut size_t) -> OrtStatusPtr)>,
+	pub ShapeInferContext_GetInputTypeShape: ::std::option::Option<
+		_system!(unsafe fn(context: *const OrtShapeInferContext, index: size_t, info: *mut *mut OrtTensorTypeAndShapeInfo) -> OrtStatusPtr)
+	>,
+	pub ShapeInferContext_GetAttribute: ::std::option::Option<
+		_system!(unsafe fn(context: *const OrtShapeInferContext, attr_name: *const ::std::os::raw::c_char, attr: *mut *const OrtOpAttr) -> OrtStatusPtr)
+	>,
+	pub ShapeInferContext_SetOutputTypeShape:
+		::std::option::Option<_system!(unsafe fn(context: *const OrtShapeInferContext, index: size_t, info: *const OrtTensorTypeAndShapeInfo) -> OrtStatusPtr)>,
+	pub SetSymbolicDimensions: ::std::option::Option<
+		_system!(unsafe fn(info: *mut OrtTensorTypeAndShapeInfo, dim_params: *mut *const ::std::os::raw::c_char, dim_params_length: size_t) -> OrtStatusPtr)
+	>,
+	pub ReadOpAttr: ::std::option::Option<
+		_system!(unsafe fn(op_attr: *const OrtOpAttr, type_: OrtOpAttrType, data: *mut ::std::os::raw::c_void, len: size_t, out: *mut size_t) -> OrtStatusPtr)
+	>,
+	pub SetDeterministicCompute: ::std::option::Option<_system!(unsafe fn(options: *mut OrtSessionOptions, value: bool) -> OrtStatusPtr)>,
+	pub KernelContext_ParallelFor: ::std::option::Option<
+		_system!(
+			unsafe fn(
+				context: *const OrtKernelContext,
+				fn_: ::std::option::Option<_system!(unsafe fn(arg1: *mut ::std::os::raw::c_void, arg2: size_t))>,
+				total: size_t,
+				num_batch: size_t,
+				usr_data: *mut ::std::os::raw::c_void
+			) -> OrtStatusPtr
+		)
+	>,
+	pub SessionOptionsAppendExecutionProvider_OpenVINO_V2: ::std::option::Option<
+		_system!(
+			unsafe fn(
+				options: *mut OrtSessionOptions,
+				provider_options_keys: *const *const ::std::os::raw::c_char,
+				provider_options_values: *const *const ::std::os::raw::c_char,
+				num_keys: size_t
+			) -> OrtStatusPtr
+		)
 	>
 }
 #[test]
 fn bindgen_test_layout_OrtApi() {
 	const UNINIT: ::std::mem::MaybeUninit<OrtApi> = ::std::mem::MaybeUninit::uninit();
 	let ptr = UNINIT.as_ptr();
-	assert_eq!(::std::mem::size_of::<OrtApi>(), 2128usize, concat!("Size of: ", stringify!(OrtApi)));
+	assert_eq!(::std::mem::size_of::<OrtApi>(), 2208usize, concat!("Size of: ", stringify!(OrtApi)));
 	assert_eq!(::std::mem::align_of::<OrtApi>(), 8usize, concat!("Alignment of ", stringify!(OrtApi)));
 	assert_eq!(
 		unsafe { ::std::ptr::addr_of!((*ptr).CreateStatus) as usize - ptr as usize },
@@ -3098,6 +3169,56 @@ fn bindgen_test_layout_OrtApi() {
 		2120usize,
 		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(KernelContext_GetResource))
 	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).SetUserLoggingFunction) as usize - ptr as usize },
+		2128usize,
+		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(SetUserLoggingFunction))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).ShapeInferContext_GetInputCount) as usize - ptr as usize },
+		2136usize,
+		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(ShapeInferContext_GetInputCount))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).ShapeInferContext_GetInputTypeShape) as usize - ptr as usize },
+		2144usize,
+		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(ShapeInferContext_GetInputTypeShape))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).ShapeInferContext_GetAttribute) as usize - ptr as usize },
+		2152usize,
+		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(ShapeInferContext_GetAttribute))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).ShapeInferContext_SetOutputTypeShape) as usize - ptr as usize },
+		2160usize,
+		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(ShapeInferContext_SetOutputTypeShape))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).SetSymbolicDimensions) as usize - ptr as usize },
+		2168usize,
+		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(SetSymbolicDimensions))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).ReadOpAttr) as usize - ptr as usize },
+		2176usize,
+		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(ReadOpAttr))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).SetDeterministicCompute) as usize - ptr as usize },
+		2184usize,
+		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(SetDeterministicCompute))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).KernelContext_ParallelFor) as usize - ptr as usize },
+		2192usize,
+		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(KernelContext_ParallelFor))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).SessionOptionsAppendExecutionProvider_OpenVINO_V2) as usize - ptr as usize },
+		2200usize,
+		concat!("Offset of field: ", stringify!(OrtApi), "::", stringify!(SessionOptionsAppendExecutionProvider_OpenVINO_V2))
+	);
 }
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
@@ -3130,13 +3251,16 @@ pub struct OrtCustomOp {
 	pub CreateKernelV2: ::std::option::Option<
 		_system!(unsafe fn(op: *const OrtCustomOp, api: *const OrtApi, info: *const OrtKernelInfo, kernel: *mut *mut ::std::os::raw::c_void) -> OrtStatusPtr)
 	>,
-	pub KernelComputeV2: ::std::option::Option<_system!(unsafe fn(op_kernel: *mut ::std::os::raw::c_void, context: *mut OrtKernelContext) -> OrtStatusPtr)>
+	pub KernelComputeV2: ::std::option::Option<_system!(unsafe fn(op_kernel: *mut ::std::os::raw::c_void, context: *mut OrtKernelContext) -> OrtStatusPtr)>,
+	pub InferOutputShapeFn: ::std::option::Option<_system!(unsafe fn(op: *const OrtCustomOp, arg1: *mut OrtShapeInferContext) -> OrtStatusPtr)>,
+	pub GetStartVersion: ::std::option::Option<_system!(unsafe fn(op: *const OrtCustomOp) -> ::std::os::raw::c_int)>,
+	pub GetEndVersion: ::std::option::Option<_system!(unsafe fn(op: *const OrtCustomOp) -> ::std::os::raw::c_int)>
 }
 #[test]
 fn bindgen_test_layout_OrtCustomOp() {
 	const UNINIT: ::std::mem::MaybeUninit<OrtCustomOp> = ::std::mem::MaybeUninit::uninit();
 	let ptr = UNINIT.as_ptr();
-	assert_eq!(::std::mem::size_of::<OrtCustomOp>(), 152usize, concat!("Size of: ", stringify!(OrtCustomOp)));
+	assert_eq!(::std::mem::size_of::<OrtCustomOp>(), 176usize, concat!("Size of: ", stringify!(OrtCustomOp)));
 	assert_eq!(::std::mem::align_of::<OrtCustomOp>(), 8usize, concat!("Alignment of ", stringify!(OrtCustomOp)));
 	assert_eq!(
 		unsafe { ::std::ptr::addr_of!((*ptr).version) as usize - ptr as usize },
@@ -3233,6 +3357,21 @@ fn bindgen_test_layout_OrtCustomOp() {
 		144usize,
 		concat!("Offset of field: ", stringify!(OrtCustomOp), "::", stringify!(KernelComputeV2))
 	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).InferOutputShapeFn) as usize - ptr as usize },
+		152usize,
+		concat!("Offset of field: ", stringify!(OrtCustomOp), "::", stringify!(InferOutputShapeFn))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).GetStartVersion) as usize - ptr as usize },
+		160usize,
+		concat!("Offset of field: ", stringify!(OrtCustomOp), "::", stringify!(GetStartVersion))
+	);
+	assert_eq!(
+		unsafe { ::std::ptr::addr_of!((*ptr).GetEndVersion) as usize - ptr as usize },
+		168usize,
+		concat!("Offset of field: ", stringify!(OrtCustomOp), "::", stringify!(GetEndVersion))
+	);
 }
 _system_block! {
 	pub fn OrtSessionOptionsAppendExecutionProvider_CUDA(options: *mut OrtSessionOptions, device_id: ::std::os::raw::c_int) -> OrtStatusPtr;
@@ -3245,4 +3384,7 @@ _system_block! {
 }
 _system_block! {
 	pub fn OrtSessionOptionsAppendExecutionProvider_Dnnl(options: *mut OrtSessionOptions, use_arena: ::std::os::raw::c_int) -> OrtStatusPtr;
+}
+_system_block! {
+	pub fn OrtSessionOptionsAppendExecutionProvider_Tensorrt(options: *mut OrtSessionOptions, device_id: ::std::os::raw::c_int) -> OrtStatusPtr;
 }

@@ -9,7 +9,7 @@ title: Introduction
 `ort` makes it easy to deploy your machine learning models to production via [ONNX Runtime](https://onnxruntime.ai/), a hardware-accelerated inference engine. With `ort` + ONNX Runtime, you can run almost any ML model (including ResNet, YOLOv8, BERT, LLaMA) on almost any hardware, often far faster than PyTorch, and with the added bonus of Rust's efficiency.
 
 <Warning>
-    These docs are for the latest alpha version of `ort`, `2.0.0-alpha.4`. This alpha version is production-ready (just not API stable) and we recommend new & existing projects use it.
+    These docs are for the latest alpha version of `ort`, `2.0.0-rc.0`. This version is production-ready (just not API stable) and we recommend new & existing projects use it.
 </Warning>
 
 # Why `ort`?
@@ -38,7 +38,6 @@ Users of `ort` appreciate its ease of use and ergonomic API. `ort` is also battl
 - [**Numerical Elixir**](https://github.com/elixir-nx) uses `ort` to create ONNX Runtime bindings for the Elixir language.
 - [**`rust-bert`**](https://github.com/guillaume-be/rust-bert) implements many ready-to-use NLP pipelines in Rust à la Hugging Face Transformers with both [`tch`](https://crates.io/crates/tch) & `ort` backends.
 - [**`edge-transformers`**](https://github.com/npc-engine/edge-transformers) also implements Hugging Face Transformers pipelines in Rust using `ort`.
-- We use `ort` in nearly all of our ML projects, including [VITRI](https://vitri.pyke.io/) 😊
 
 # Getting started
 <Steps>

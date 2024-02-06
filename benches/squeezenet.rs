@@ -1,16 +1,9 @@
-use std::{
-	fs,
-	io::{self, BufRead, BufReader},
-	path::Path,
-	sync::Arc,
-	time::Duration
-};
+use std::{path::Path, sync::Arc};
 
 use glassbench::{pretend_used, Bench};
 use image::{imageops::FilterType, ImageBuffer, Pixel, Rgb};
 use ndarray::{s, Array4};
-use ort::{inputs, ArrayExtensions, FetchModelError, GraphOptimizationLevel, Session, Tensor};
-use test_log::test;
+use ort::{GraphOptimizationLevel, Session};
 
 fn load_squeezenet_data() -> ort::Result<(Session, Array4<f32>)> {
 	const IMAGE_TO_LOAD: &str = "mushroom.png";
@@ -45,34 +38,6 @@ fn load_squeezenet_data() -> ort::Result<(Session, Array4<f32>)> {
 	}
 
 	Ok((session, array))
-}
-
-fn get_imagenet_labels() -> Result<Vec<String>, FetchModelError> {
-	// Download the ImageNet class labels, matching SqueezeNet's classes.
-	let labels_path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("synset.txt");
-	if !labels_path.exists() {
-		let url = "https://s3.amazonaws.com/onnx-model-zoo/synset.txt";
-		println!("Downloading {:?} to {:?}...", url, labels_path);
-		let resp = ureq::get(url)
-            .timeout(Duration::from_secs(180)) // 3 minutes
-            .call()
-            .map_err(Box::new)
-            .map_err(FetchModelError::FetchError)?;
-
-		assert!(resp.has("Content-Length"));
-		let len = resp.header("Content-Length").and_then(|s| s.parse::<usize>().ok()).unwrap();
-		println!("Downloading {} bytes...", len);
-
-		let mut reader = resp.into_reader();
-		let f = fs::File::create(&labels_path).unwrap();
-		let mut writer = io::BufWriter::new(f);
-
-		let bytes_io_count = io::copy(&mut reader, &mut writer).unwrap();
-		assert_eq!(bytes_io_count, len as u64);
-	}
-
-	let file = BufReader::new(fs::File::open(labels_path).unwrap());
-	file.lines().map(|line| line.map_err(FetchModelError::IoError)).collect()
 }
 
 fn bench_squeezenet(bench: &mut Bench) {

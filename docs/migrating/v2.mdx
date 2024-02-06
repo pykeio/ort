@@ -14,7 +14,7 @@ ort::init()
     .commit()?;
 ```
 
-`commit()` must be called before any sessions are created to take effect. Otherwise, the environment will be set to default and cannot be modified afterwards.
+`commit()` must be called before any sessions are created to take effect. Otherwise, a default environment will be created. The global environment can be updated afterward by calling `commit()` on another `EnvironmentBuilder`, however you'll need to recreate sessions after comitting the new environment in order for them to use it.
 
 ## Session creation
 `SessionBuilder::new(&environment)` has been soft-replaced with `Session::builder()`:

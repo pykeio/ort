@@ -12,6 +12,7 @@ use std::{
 	os::raw::c_char,
 	path::Path,
 	ptr,
+	rc::Rc,
 	sync::{atomic::Ordering, Arc}
 };
 #[cfg(feature = "fetch-models")]
@@ -32,9 +33,9 @@ use super::{
 	metadata::ModelMetadata,
 	ortsys,
 	value::{Value, ValueType},
-	AllocatorType, GraphOptimizationLevel, MemType
+	GraphOptimizationLevel
 };
-use crate::environment::Environment;
+use crate::{environment::Environment, MemoryInfo};
 
 pub(crate) mod input;
 pub(crate) mod output;
@@ -61,9 +62,7 @@ pub use self::{input::SessionInputs, output::SessionOutputs};
 /// ```
 pub struct SessionBuilder {
 	pub(crate) session_options_ptr: *mut ort_sys::OrtSessionOptions,
-
-	allocator: AllocatorType,
-	memory_type: MemType,
+	memory_info: Option<Rc<MemoryInfo>>,
 	#[cfg(feature = "custom-ops")]
 	custom_runtime_handles: Vec<*mut std::os::raw::c_void>,
 	execution_providers: Vec<ExecutionProviderDispatch>
@@ -71,10 +70,7 @@ pub struct SessionBuilder {
 
 impl fmt::Debug for SessionBuilder {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-		f.debug_struct("SessionBuilder")
-			.field("allocator", &self.allocator)
-			.field("memory_type", &self.memory_type)
-			.finish()
+		f.debug_struct("SessionBuilder").field("memory_info", &self.memory_info).finish()
 	}
 }
 
@@ -85,8 +81,7 @@ impl Clone for SessionBuilder {
 			.expect("error cloning session options");
 		Self {
 			session_options_ptr,
-			allocator: self.allocator,
-			memory_type: self.memory_type,
+			memory_info: self.memory_info.clone(),
 			#[cfg(feature = "custom-ops")]
 			custom_runtime_handles: self.custom_runtime_handles.clone(),
 			execution_providers: self.execution_providers.clone()
@@ -116,8 +111,7 @@ impl SessionBuilder {
 
 		Ok(Self {
 			session_options_ptr,
-			allocator: AllocatorType::Device,
-			memory_type: MemType::Default,
+			memory_info: None,
 			#[cfg(feature = "custom-ops")]
 			custom_runtime_handles: Vec::new(),
 			execution_providers: Vec::new()
@@ -249,15 +243,11 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
-	/// Set the session's allocator. Defaults to [`AllocatorType::Device`].
-	pub fn with_allocator(mut self, allocator: AllocatorType) -> Result<Self> {
-		self.allocator = allocator;
-		Ok(self)
-	}
-
-	/// Set the session's memory type. Defaults to [`MemType::Default`].
-	pub fn with_memory_type(mut self, memory_type: MemType) -> Result<Self> {
-		self.memory_type = memory_type;
+	/// Set the session's allocator options from a [`MemoryInfo`].
+	///
+	/// If not provided, the session is created using ONNX Runtime's default device allocator.
+	pub fn with_allocator(mut self, info: MemoryInfo) -> Result<Self> {
+		self.memory_info = Some(Rc::new(info));
 		Ok(self)
 	}
 
@@ -422,7 +412,14 @@ impl SessionBuilder {
 		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
 		ortsys![unsafe CreateSession(env_ptr, model_path.as_ptr(), self.session_options_ptr, &mut session_ptr) -> Error::CreateSession; nonNull(session_ptr)];
 
-		let allocator = Allocator::default();
+		let allocator = match &self.memory_info {
+			Some(info) => {
+				let mut allocator_ptr: *mut ort_sys::OrtAllocator = std::ptr::null_mut();
+				ortsys![unsafe CreateAllocator(session_ptr, info.ptr, &mut allocator_ptr) -> Error::CreateAllocator; nonNull(allocator_ptr)];
+				Allocator::from_raw(allocator_ptr)
+			}
+			None => Allocator::default()
+		};
 
 		// Extract input and output properties
 		let num_input_nodes = dangerous::extract_inputs_count(session_ptr)?;
@@ -484,7 +481,14 @@ impl SessionBuilder {
 			nonNull(session_ptr)
 		];
 
-		let allocator = Allocator::default();
+		let allocator = match &self.memory_info {
+			Some(info) => {
+				let mut allocator_ptr: *mut ort_sys::OrtAllocator = std::ptr::null_mut();
+				ortsys![unsafe CreateAllocator(session_ptr, info.ptr, &mut allocator_ptr) -> Error::CreateAllocator; nonNull(allocator_ptr)];
+				Allocator::from_raw(allocator_ptr)
+			}
+			None => Allocator::default()
+		};
 
 		// Extract input and output properties
 		let num_input_nodes = dangerous::extract_inputs_count(session_ptr)?;

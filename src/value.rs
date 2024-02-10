@@ -11,7 +11,7 @@ use crate::{
 	ortsys,
 	session::SharedSessionInner,
 	tensor::{ExtractTensorData, IntoTensorElementType, TensorElementType, Utf8Data},
-	AllocatorType, Error, MemType, Result
+	AllocatorType, Error, MemoryType, Result
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -374,7 +374,7 @@ impl Value {
 	///
 	/// `allocator` is required to be `Some` when converting a String tensor. See [`crate::Session::allocator`].
 	pub fn from_array<T: IntoTensorElementType + Debug + Clone + 'static>(input: impl OrtInput<Item = T>) -> Result<Value> {
-		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemType::Default)?;
+		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemoryType::Default)?;
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 
@@ -461,7 +461,7 @@ impl Value {
 
 	/// Construct a [`Value`] from a Rust-owned array.
 	pub fn from_string_array<T: Utf8Data + Debug + Clone + 'static>(allocator: &Allocator, input: impl OrtInput<Item = T>) -> Result<Value> {
-		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemType::Default)?;
+		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemoryType::Default)?;
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 

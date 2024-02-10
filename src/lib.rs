@@ -394,27 +394,28 @@ impl From<AllocatorType> for ort_sys::OrtAllocatorType {
 }
 
 /// Memory types for allocated memory.
-#[derive(Debug, Copy, Clone)]
-pub enum MemType {
+#[derive(Default, Debug, Copy, Clone)]
+pub enum MemoryType {
 	/// Any CPU memory used by non-CPU execution provider.
 	CPUInput,
 	/// CPU accessible memory outputted by non-CPU execution provider, i.e. CUDA_PINNED.
 	CPUOutput,
 	/// The default allocator for an execution provider.
+	#[default]
 	Default
 }
 
-impl MemType {
+impl MemoryType {
 	/// Temporary CPU accessible memory allocated by non-CPU execution provider, i.e. `CUDA_PINNED`.
-	pub const CPU: MemType = MemType::CPUOutput;
+	pub const CPU: MemoryType = MemoryType::CPUOutput;
 }
 
-impl From<MemType> for ort_sys::OrtMemType {
-	fn from(val: MemType) -> Self {
+impl From<MemoryType> for ort_sys::OrtMemType {
+	fn from(val: MemoryType) -> Self {
 		match val {
-			MemType::CPUInput => ort_sys::OrtMemType::OrtMemTypeCPUInput,
-			MemType::CPUOutput => ort_sys::OrtMemType::OrtMemTypeCPUOutput,
-			MemType::Default => ort_sys::OrtMemType::OrtMemTypeDefault
+			MemoryType::CPUInput => ort_sys::OrtMemType::OrtMemTypeCPUInput,
+			MemoryType::CPUOutput => ort_sys::OrtMemType::OrtMemTypeCPUOutput,
+			MemoryType::Default => ort_sys::OrtMemType::OrtMemTypeDefault
 		}
 	}
 }

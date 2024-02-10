@@ -2,7 +2,7 @@ use std::ffi::{c_char, c_int, CString};
 
 use super::{
 	error::{Error, Result},
-	ortsys, AllocatorType, MemType
+	ortsys, AllocatorType, MemoryType
 };
 use crate::{char_p_to_string, error::status_to_result};
 
@@ -11,6 +11,12 @@ use crate::{char_p_to_string, error::status_to_result};
 pub struct Allocator {
 	pub(crate) ptr: *mut ort_sys::OrtAllocator,
 	is_default: bool
+}
+
+impl Allocator {
+	pub(crate) fn from_raw(ptr: *mut ort_sys::OrtAllocator) -> Allocator {
+		Allocator { ptr, is_default: false }
+	}
 }
 
 impl Default for Allocator {
@@ -82,12 +88,13 @@ impl TryFrom<&str> for AllocationDevice {
 #[derive(Debug)]
 pub struct MemoryInfo {
 	pub(crate) ptr: *mut ort_sys::OrtMemoryInfo,
-	pub(crate) should_release: bool
+	memory_type: MemoryType,
+	should_release: bool
 }
 
 impl MemoryInfo {
 	#[tracing::instrument]
-	pub fn new_cpu(allocator: AllocatorType, memory_type: MemType) -> Result<Self> {
+	pub fn new_cpu(allocator: AllocatorType, memory_type: MemoryType) -> Result<Self> {
 		let mut memory_info_ptr: *mut ort_sys::OrtMemoryInfo = std::ptr::null_mut();
 		ortsys![
 			unsafe CreateCpuMemoryInfo(allocator.into(), memory_type.into(), &mut memory_info_ptr) -> Error::CreateMemoryInfo;
@@ -95,12 +102,13 @@ impl MemoryInfo {
 		];
 		Ok(Self {
 			ptr: memory_info_ptr,
+			memory_type,
 			should_release: true
 		})
 	}
 
 	#[tracing::instrument]
-	pub fn new(allocation_device: AllocationDevice, device_id: c_int, allocator_type: AllocatorType, memory_type: MemType) -> Result<Self> {
+	pub fn new(allocation_device: AllocationDevice, device_id: c_int, allocator_type: AllocatorType, memory_type: MemoryType) -> Result<Self> {
 		let mut memory_info_ptr: *mut ort_sys::OrtMemoryInfo = std::ptr::null_mut();
 		let allocator_name = CString::new(allocation_device.as_str()).unwrap();
 		ortsys![
@@ -110,11 +118,17 @@ impl MemoryInfo {
 		];
 		Ok(Self {
 			ptr: memory_info_ptr,
+			memory_type,
 			should_release: true
 		})
 	}
 
-	/// Returns the [`AllocationDevice`] this memory info
+	/// Returns the [`MemoryType`] this struct was created with.
+	pub fn memory_type(&self) -> MemoryType {
+		self.memory_type
+	}
+
+	/// Returns the [`AllocationDevice`] this struct was created with.
 	pub fn allocation_device(&self) -> Result<AllocationDevice> {
 		let mut name_ptr: *const c_char = std::ptr::null_mut();
 		ortsys![unsafe MemoryInfoGetName(self.ptr, &mut name_ptr) -> Error::GetAllocationDevice; nonNull(name_ptr)];
@@ -144,7 +158,7 @@ mod tests {
 
 	#[test]
 	fn create_memory_info() {
-		let memory_info = MemoryInfo::new_cpu(AllocatorType::Device, MemType::Default).unwrap();
+		let memory_info = MemoryInfo::new_cpu(AllocatorType::Device, MemoryType::Default).unwrap();
 		std::mem::drop(memory_info);
 	}
 }

@@ -27,6 +27,9 @@ pub enum Error {
 	/// Error occurred when creating ONNX session options.
 	#[error("Failed to create ONNX Runtime session options: {0}")]
 	CreateSessionOptions(ErrorInternal),
+	/// Error occurred when creating an allocator from a [`crate::MemoryInfo`] struct while building a session.
+	#[error("Failed to create allocator from memory info: {0}")]
+	CreateAllocator(ErrorInternal),
 	/// Error occurred when creating an ONNX session.
 	#[error("Failed to create ONNX Runtime session: {0}")]
 	CreateSession(ErrorInternal),

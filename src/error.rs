@@ -1,6 +1,6 @@
 //! Types and helpers for handling ORT errors.
 
-use std::{convert::Infallible, io, path::PathBuf, string};
+use std::{convert::Infallible, ffi::CString, fmt::Debug, io, path::PathBuf, ptr, string};
 
 use thiserror::Error;
 
@@ -8,6 +8,22 @@ use super::{char_p_to_string, ortsys, tensor::TensorElementType, ValueType};
 
 /// Type alias for the Result type returned by ORT functions.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+pub trait IntoStatus {
+	fn into_status(self) -> *mut ort_sys::OrtStatus;
+}
+
+impl<T> IntoStatus for Result<T, Error> {
+	fn into_status(self) -> *mut ort_sys::OrtStatus {
+		let (code, message) = match &self {
+			Ok(_) => return ptr::null_mut(),
+			Err(e) => (ort_sys::OrtErrorCode::ORT_FAIL, Some(e.to_string()))
+		};
+		let message = message.map(|c| CString::new(c).unwrap());
+		// message will be copied, so this shouldn't leak
+		ortsys![unsafe CreateStatus(code, message.map(|c| c.as_ptr()).unwrap_or_else(std::ptr::null))]
+	}
+}
 
 /// An enum of all errors returned by ORT functions.
 #[non_exhaustive]
@@ -205,7 +221,17 @@ pub enum Error {
 	#[error("Error occurred while attempting to extract data from sequence value: {0}")]
 	ExtractSequence(ErrorInternal),
 	#[error("Error occurred while attempting to extract data from map value: {0}")]
-	ExtractMap(ErrorInternal)
+	ExtractMap(ErrorInternal),
+	#[error("Failed to add custom operator to operator domain: {0}")]
+	AddCustomOperator(ErrorInternal),
+	#[error("Failed to create custom operator domain: {0}")]
+	CreateOperatorDomain(ErrorInternal),
+	#[error("Failed to add custom operator domain to session: {0}")]
+	AddCustomOperatorDomain(ErrorInternal),
+	#[error("Failed to create kernel context: {0}")]
+	CreateKernelContext(ErrorInternal),
+	#[error("{0}")]
+	CustomError(#[from] Box<dyn std::error::Error + Send>)
 }
 
 impl From<Infallible> for Error {

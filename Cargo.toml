@@ -1,6 +1,7 @@
 [workspace]
 members = [
 	'ort-sys',
+	'examples/custom-ops',
 	'examples/gpt2',
 	'examples/model-info',
 	'examples/yolov8',
@@ -8,6 +9,7 @@ members = [
 ]
 default-members = [
 	'.',
+	'examples/custom-ops',
 	'examples/gpt2',
 	'examples/model-info',
 	'examples/yolov8',

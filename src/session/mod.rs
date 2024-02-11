@@ -35,7 +35,7 @@ use super::{
 	value::{Value, ValueType},
 	GraphOptimizationLevel
 };
-use crate::{environment::Environment, MemoryInfo};
+use crate::{environment::Environment, operator::OperatorDomain, MemoryInfo};
 
 pub(crate) mod input;
 pub(crate) mod output;
@@ -65,6 +65,7 @@ pub struct SessionBuilder {
 	memory_info: Option<Rc<MemoryInfo>>,
 	#[cfg(feature = "custom-ops")]
 	custom_runtime_handles: Vec<*mut std::os::raw::c_void>,
+	custom_op_domains: Vec<Rc<OperatorDomain>>,
 	execution_providers: Vec<ExecutionProviderDispatch>
 }
 
@@ -84,6 +85,7 @@ impl Clone for SessionBuilder {
 			memory_info: self.memory_info.clone(),
 			#[cfg(feature = "custom-ops")]
 			custom_runtime_handles: self.custom_runtime_handles.clone(),
+			custom_op_domains: self.custom_op_domains.clone(),
 			execution_providers: self.execution_providers.clone()
 		}
 	}
@@ -114,6 +116,7 @@ impl SessionBuilder {
 			memory_info: None,
 			#[cfg(feature = "custom-ops")]
 			custom_runtime_handles: Vec::new(),
+			custom_op_domains: Vec::new(),
 			execution_providers: Vec::new()
 		})
 	}
@@ -281,8 +284,14 @@ impl SessionBuilder {
 	#[cfg(feature = "custom-ops")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "custom-ops")))]
 	pub fn with_enable_custom_ops(self) -> Result<Self> {
-		let status = ortsys![unsafe EnableOrtCustomOps(self.session_options_ptr)];
-		status_to_result(status).map_err(Error::CreateSessionOptions)?;
+		ortsys![unsafe EnableOrtCustomOps(self.session_options_ptr) -> Error::CreateSessionOptions];
+		Ok(self)
+	}
+
+	pub fn with_operators(mut self, domain: OperatorDomain) -> Result<Self> {
+		ortsys![unsafe AddCustomOpDomain(self.session_options_ptr, domain.ptr.as_ptr()) -> Error::AddCustomOperatorDomain];
+		self.custom_op_domains.push(Rc::new(domain));
+
 		Ok(self)
 	}
 

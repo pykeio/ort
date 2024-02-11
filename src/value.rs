@@ -119,12 +119,15 @@ pub(crate) enum ValueInner {
 	/// We forego holding onto an `Arc<SharedSessionInner>` here because:
 	/// - a map value can be created independently of a session, and thus we wouldn't have anything to hold on to;
 	/// - this is only ever used by `ValueRef`s, whos owner value (which *is* holding the session Arc) will outlive it.
-	CppOwnedRef { ptr: *mut ort_sys::OrtValue }
+	CppOwnedRef {
+		ptr: *mut ort_sys::OrtValue
+	},
+	CppOwnedRefDropless {
+		ptr: *mut ort_sys::OrtValue
+	}
 }
 
 /// A temporary version of [`Value`] with a lifetime specifier.
-///
-/// This is used exclusively by [`Value::extract_sequence`] to ensure the sequence value outlives its child elements.
 #[derive(Debug)]
 pub struct ValueRef<'v> {
 	inner: Value,
@@ -132,6 +135,19 @@ pub struct ValueRef<'v> {
 }
 
 impl<'v> Deref for ValueRef<'v> {
+	type Target = Value;
+
+	fn deref(&self) -> &Self::Target {
+		&self.inner
+	}
+}
+
+#[derive(Debug)]
+pub struct ValueView {
+	pub(crate) inner: Value
+}
+
+impl Deref for ValueView {
 	type Target = Value;
 
 	fn deref(&self) -> &Self::Target {
@@ -163,6 +179,12 @@ impl Value {
 	unsafe fn from_raw_ref(ptr: *mut ort_sys::OrtValue) -> Value {
 		Value {
 			inner: ValueInner::CppOwnedRef { ptr }
+		}
+	}
+
+	pub(crate) unsafe fn from_raw_ref_dropless(ptr: *mut ort_sys::OrtValue) -> Value {
+		Value {
+			inner: ValueInner::CppOwnedRefDropless { ptr }
 		}
 	}
 
@@ -297,6 +319,53 @@ impl Value {
 				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
 
 				Ok((node_dims, unsafe { std::slice::from_raw_parts(output_array_ptr, len as _) }))
+			}
+		};
+		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
+		res
+	}
+
+	pub fn extract_raw_tensor_mut<T>(&mut self) -> Result<(Vec<i64>, &mut [T])>
+	where
+		T: ExtractTensorData + Clone + Debug
+	{
+		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
+
+		let res = {
+			let mut num_dims = 0;
+			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
+
+			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
+			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
+
+			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
+			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
+			let data_type: TensorElementType = type_sys.into();
+			if data_type != T::tensor_element_type() {
+				Err(Error::DataTypeMismatch {
+					actual: data_type,
+					requested: T::tensor_element_type()
+				})
+			} else {
+				// Note: Both tensor and array will point to the same data, nothing is copied.
+				// As such, there is no need to free the pointer used to create the slice.
+				assert_ne!(self.ptr(), ptr::null_mut());
+
+				let mut is_tensor = 0;
+				ortsys![unsafe IsTensor(self.ptr(), &mut is_tensor) -> Error::FailedTensorCheck];
+				assert_eq!(is_tensor, 1);
+
+				let mut output_array_ptr: *mut T = ptr::null_mut();
+				let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
+				let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr as *mut *mut std::ffi::c_void;
+				ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
+
+				let mut len = 0;
+				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
+
+				Ok((node_dims, unsafe { std::slice::from_raw_parts_mut(output_array_ptr, len as _) }))
 			}
 		};
 		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
@@ -503,6 +572,7 @@ impl Value {
 
 	pub(crate) fn ptr(&self) -> *mut ort_sys::OrtValue {
 		match &self.inner {
+			ValueInner::CppOwnedRefDropless { ptr } => *ptr,
 			ValueInner::CppOwnedRef { ptr } => *ptr,
 			ValueInner::CppOwned { ptr, .. } => *ptr,
 			ValueInner::RustOwned { ptr, .. } => *ptr
@@ -693,14 +763,16 @@ impl Drop for Value {
 	#[tracing::instrument]
 	fn drop(&mut self) {
 		let ptr = self.ptr();
-		tracing::trace!(
-			"dropping {} value at {ptr:p}",
-			match &self.inner {
-				ValueInner::RustOwned { .. } => "rust-owned",
-				ValueInner::CppOwned { .. } | ValueInner::CppOwnedRef { .. } => "cpp-owned"
-			}
-		);
-		ortsys![unsafe ReleaseValue(ptr)];
+		if !matches!(&self.inner, ValueInner::CppOwnedRefDropless { .. }) {
+			tracing::trace!(
+				"dropping {} value at {ptr:p}",
+				match &self.inner {
+					ValueInner::RustOwned { .. } => "rust-owned",
+					ValueInner::CppOwned { .. } | ValueInner::CppOwnedRef { .. } | ValueInner::CppOwnedRefDropless { .. } => "cpp-owned"
+				}
+			);
+			ortsys![unsafe ReleaseValue(ptr)];
+		}
 	}
 }
 

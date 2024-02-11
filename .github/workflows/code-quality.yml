@@ -6,28 +6,17 @@ on:
       - 'main'
     paths:
       - '.github/workflows/code-quality.yml'
-      - 'src/**/*.rs'
-      - 'build.rs'
+      - 'crates/**/*'
       - 'Cargo.toml'
       - '.cargo/**/*'
-      - 'tests/**/*'
       - 'codecov.yml'
-      - 'ort-sys/build.rs'
-      - 'ort-sys/src/**/*.rs'
-      - 'ort-sys/wrapper.h'
-      - 'ort-sys/Cargo.toml'
   pull_request:
     paths:
       - '.github/workflows/code-quality.yml'
-      - 'src/**/*.rs'
+      - 'crates/**/*'
       - 'Cargo.toml'
       - '.cargo/**/*'
-      - 'tests/**/*'
       - 'codecov.yml'
-      - 'ort-sys/build.rs'
-      - 'ort-sys/src/**/*.rs'
-      - 'ort-sys/wrapper.h'
-      - 'ort-sys/Cargo.toml'
 env:
   RUST_BACKTRACE: 1
   CARGO_INCREMENTAL: 0

@@ -5,7 +5,7 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
-ort = { path = "../../", features = [ "fetch-models" ] }
+ort = { path = "../../crates/ort", features = [ "fetch-models" ] }
 ndarray = "0.15"
 tokenizers = { version = ">=0.13.4", default-features = false, features = [ "onig" ] }
 rand = "0.8"

@@ -5,7 +5,7 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
-ort = { path = "../../" }
+ort = { path = "../../crates/ort" }
 
 [features]
 load-dynamic = [ "ort/load-dynamic" ]

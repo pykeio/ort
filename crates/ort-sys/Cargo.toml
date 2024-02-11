@@ -1,18 +1,17 @@
 [package]
 name = "ort-sys"
 description = "Unsafe Rust bindings for ONNX Runtime 1.17 - Optimize and Accelerate Machine Learning Inferencing"
-version = "2.0.0-rc.0"
-edition = "2021"
-rust-version = "1.70"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/pykeio/ort"
-documentation = "https://ort.pyke.io/"
-keywords = [ "machine-learning", "ai", "ml" , "sys"]
-categories = [ "algorithms", "mathematics", "science" ]
-authors = [
-	"pyke.io <contact@pyke.io>"
-]
 include = [ "src/", "build.rs", "LICENSE-APACHE", "LICENSE-MIT" ]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+authors.workspace = true
 
 [features]
 default = []

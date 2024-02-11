@@ -2,7 +2,7 @@ use crate::{MemoryType, TensorElementType};
 
 #[repr(i32)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum InputOutputCharacteristic {
+pub(crate) enum InputOutputCharacteristic {
 	#[default]
 	Required = 0,
 	Optional = 1,

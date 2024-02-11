@@ -48,7 +48,7 @@ pub use self::io_binding::IoBinding;
 pub use self::memory::{AllocationDevice, Allocator, MemoryInfo};
 pub use self::metadata::ModelMetadata;
 pub use self::operator::{
-	io::{InputOutputCharacteristic, OperatorInput, OperatorOutput},
+	io::{OperatorInput, OperatorOutput},
 	kernel::{Kernel, KernelAttributes, KernelContext},
 	InferShapeFn, Operator, OperatorDomain
 };

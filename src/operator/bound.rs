@@ -6,15 +6,22 @@ use std::{
 
 use super::{
 	io::InputOutputCharacteristic,
-	kernel::{Kernel, KernelAttributes},
+	kernel::{Kernel, KernelAttributes, KernelContext},
 	DummyOperator, Operator
 };
-use crate::{error::IntoStatus, KernelContext};
+use crate::error::IntoStatus;
 
+/// A layer between the unsafe [`ort_sys::OrtCustomOp`] structure and the safe [`Operator`] API.
+///
+/// Does not store any operator-specific data (as [`Operator`]s cannot be `Sized` or have state), but stores the name
+/// and execution provider type [`CString`]s since those are defined as `&'static str`s and the ONNX Runtime API expects
+/// null-terminated strings that last for as long as the operator.
 #[repr(C)]
 #[derive(Clone)]
 pub(crate) struct BoundOperator<O: Operator> {
 	implementation: ort_sys::OrtCustomOp,
+	// The ONNX Runtime API only ever passes around [`ort_sys::OrtCustomOp`] as a pointer, so with the right layout
+	// (`#[repr(C)]`) we can upcast it to a pointer to `BoundOperator` to get references to the strings.
 	name: CString,
 	execution_provider_type: Option<CString>,
 	_operator: PhantomData<O>
@@ -58,6 +65,7 @@ impl<O: Operator> BoundOperator<O> {
 		}
 	}
 
+	/// Upcast an [`ort_sys::OrtCustomOp`] pointer to a safe [`BoundOperator`] reference.
 	unsafe fn safe<'a>(op: *const ort_sys::OrtCustomOp) -> &'a BoundOperator<O> {
 		&*op.cast()
 	}
@@ -169,20 +177,30 @@ impl<O: Operator> BoundOperator<O> {
 			.into()
 	}
 
-	pub(crate) unsafe extern "C" fn InferOutputShapeFn(_: *const ort_sys::OrtCustomOp, arg1: *mut ort_sys::OrtShapeInferContext) -> *mut ort_sys::OrtStatus {
-		O::get_infer_shape_function().unwrap()(arg1).into_status()
+	pub(crate) unsafe extern "C" fn InferOutputShapeFn(
+		_: *const ort_sys::OrtCustomOp,
+		infer_ctx: *mut ort_sys::OrtShapeInferContext
+	) -> *mut ort_sys::OrtStatus {
+		// `unwrap_unchecked()` is safe here because `BoundOperator::new` will only add this function to the `OrtCustomOp`
+		// definition if the infer shape function is present.
+		O::get_infer_shape_function().unwrap_unchecked()(infer_ctx).into_status()
 	}
 }
 
+/// A type-erased [`BoundOperator`].
 pub(crate) struct ErasedBoundOperator(NonNull<()>);
 
 unsafe impl Send for ErasedBoundOperator {}
 
 impl ErasedBoundOperator {
 	pub(crate) fn new<O: Operator>(bound: BoundOperator<O>) -> Self {
-		ErasedBoundOperator(NonNull::from(unsafe { &mut *(Box::leak(Box::new(bound)) as *mut _ as *mut ()) }))
+		ErasedBoundOperator(NonNull::from(unsafe {
+			// I stopped writing C because I didn't like pointer trickery, and yet here I am...
+			&mut *(Box::leak(Box::new(bound)) as *mut _ as *mut ())
+		}))
 	}
 
+	/// Returns the pointer to the contained [`BoundOperator`] as an [`ort_sys::OrtCustomOp`] pointer.
 	pub(crate) fn op_ptr(&self) -> *mut ort_sys::OrtCustomOp {
 		self.0.as_ptr().cast()
 	}
@@ -190,6 +208,8 @@ impl ErasedBoundOperator {
 
 impl Drop for ErasedBoundOperator {
 	fn drop(&mut self) {
+		// [`Operator`]s cannot be `Sized`, so we don't have to call the drop implementation for the operator.
+		// We do need something to put in the type parameter though, so we use `DummyOperator`.
 		drop(unsafe { Box::from_raw(self.0.as_ptr().cast::<BoundOperator<DummyOperator>>()) });
 	}
 }

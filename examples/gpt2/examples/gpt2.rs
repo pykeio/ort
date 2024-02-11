@@ -4,7 +4,7 @@ use std::{
 };
 
 use ndarray::{array, concatenate, s, Array1, Axis};
-use ort::{inputs, CUDAExecutionProvider, GraphOptimizationLevel, Session, Tensor};
+use ort::{inputs, AllocationDevice, AllocatorType, CUDAExecutionProvider, GraphOptimizationLevel, MemoryInfo, MemoryType, Session, Tensor};
 use rand::Rng;
 use tokenizers::Tokenizer;
 
@@ -34,6 +34,7 @@ fn main() -> ort::Result<()> {
 
 	// Load our model
 	let session = Session::builder()?
+		.with_allocator(MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Arena, MemoryType::Default)?)?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
 		.with_model_downloaded("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/gpt2.onnx")?;

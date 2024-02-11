@@ -6,21 +6,15 @@ on:
       - 'main'
     paths:
       - '.github/workflows/test.yml'
-      - 'src/**/*.rs'
-      - 'ort-sys/**/*.rs'
-      - 'build.rs'
+      - 'crates/**/*'
       - 'Cargo.toml'
       - '.cargo/**/*'
-      - 'tests/**/*'
   pull_request:
     paths:
       - '.github/workflows/test.yml'
-      - 'src/**/*.rs'
-      - 'ort-sys/**/*.rs'
-      - 'build.rs'
+      - 'crates/**/*'
       - 'Cargo.toml'
       - '.cargo/**/*'
-      - 'tests/**/*'
 env:
   RUST_BACKTRACE: 1
   CARGO_INCREMENTAL: 0

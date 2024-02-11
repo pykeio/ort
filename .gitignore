@@ -186,11 +186,11 @@ WixTools/
 # ONNX Runtime downloaded models
 **/*.onnx
 **/*.ort
-!tests/data/*.onnx
-!tests/data/*.ort
+!crates/ort/tests/data/*.onnx
+!crates/ort/tests/data/*.ort
 
 # IDEA
 .idea
 
 # Glassbench results
-/glassbench*.db
+**/glassbench*.db

@@ -9,13 +9,19 @@ use super::{char_p_to_string, ortsys, tensor::TensorElementType, ValueType};
 /// Type alias for the Result type returned by ORT functions.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub trait IntoStatus {
+/// Trait to convert a type to an [`ort_sys::OrtStatus`] pointer.
+pub(crate) trait IntoStatus {
+	/// Convert this type to an [`ort_sys::OrtStatus`] pointer.
+	///
+	/// The pointer will be null if this type does not represent a failure status.
 	fn into_status(self) -> *mut ort_sys::OrtStatus;
 }
 
 impl<T> IntoStatus for Result<T, Error> {
 	fn into_status(self) -> *mut ort_sys::OrtStatus {
 		let (code, message) = match &self {
+			// I thought this would be (ort_sys::OrtErrorCode::ORT_OK, None) but it turns out most parts of the API
+			// treat ORT_OK as an error anyways.
 			Ok(_) => return ptr::null_mut(),
 			Err(e) => (ort_sys::OrtErrorCode::ORT_FAIL, Some(e.to_string()))
 		};

@@ -27,7 +27,7 @@ The `load-dynamic` Cargo feature solves a few of the issues with dynamic linking
 To use `load-dynamic`:
 <Steps>
     <Step title="Enable the feature in Cargo.toml">
-        ```toml
+        ```toml Cargo.toml
         [dependencies]
         ort = { version = "2", features = [ "load-dynamic" ] }
         ```
@@ -40,7 +40,7 @@ To use `load-dynamic`:
                 ```
             </Tab>
             <Tab title="Programmatically">
-                ```rust
+                ```rust main.rs
                 fn main() -> anyhow::Result<()> {
                     // Find our custom ONNX Runtime dylibs and initialize `ort` with it.
                     let dylib_path = crate::internal::find_onnxruntime_dylib()?; // /etc/.../libonnxruntime.so

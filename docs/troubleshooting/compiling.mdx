@@ -1,0 +1,6 @@
+---
+title: 'Troubleshoot: Compiling & Linking'
+---
+
+## Undefined symbols: `___isPlatformVersionAtLeast`, referenced from...
+If you run into this issue compiling with CoreML for macOS/iOS, you'll need to add a Rust flag to your crate to get it to link properly. See [Execution providers > CoreML](/perf/execution-providers#coreml) for instructions on how to do so.

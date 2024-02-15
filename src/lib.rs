@@ -83,7 +83,7 @@ pub(crate) fn dylib_path() -> &'static String {
 			_ => "onnxruntime.dll".to_owned(),
 			#[cfg(any(target_os = "linux", target_os = "android"))]
 			_ => "libonnxruntime.so".to_owned(),
-			#[cfg(target_os = "macos")]
+			#[cfg(any(target_os = "macos", target_os = "ios"))]
 			_ => "libonnxruntime.dylib".to_owned()
 		};
 		Arc::new(path)

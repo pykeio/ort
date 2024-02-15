@@ -237,6 +237,12 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("container"), &profile));
 					println!("cargo:rustc-link-lib=static=absl_raw_hash_set");
 
+					if cfg!(feature = "coreml") && (target_os == "macos" || target_os == "ios") {
+						println!("cargo:rustc-link-lib=framework=CoreML");
+						println!("cargo:rustc-link-lib=coreml_proto");
+						println!("cargo:rustc-link-lib=onnxruntime_providers_coreml");
+					}
+
 					// #[cfg(feature = "rocm")]
 					// println!("cargo:rustc-link-lib=onnxruntime_providers_rocm");
 

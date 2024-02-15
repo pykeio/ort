@@ -30,6 +30,8 @@ use std::{
 	sync::{atomic::AtomicPtr, Arc, Mutex, OnceLock}
 };
 
+#[cfg(feature = "macros")]
+pub use ort_macros::*;
 pub use ort_sys as sys;
 use tracing::Level;
 

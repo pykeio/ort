@@ -1,0 +1,23 @@
+[package]
+name = "ort-macros"
+description = "Helper macros for ort, a Rust binding for ONNX Runtime 1.17"
+include = [ "src/", "LICENSE-APACHE", "LICENSE-MIT" ]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+authors.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", default-features = false, features = [ "full", "parsing", "printing" ] }
+heck = "0.4"

@@ -26,7 +26,10 @@ use std::{
 	ffi::{self, CStr},
 	os::raw::c_char,
 	ptr,
-	sync::{atomic::AtomicPtr, Arc, Mutex, OnceLock}
+	sync::{
+		atomic::{AtomicPtr, Ordering},
+		Arc, Mutex, OnceLock
+	}
 };
 
 use tracing::Level;
@@ -113,15 +116,15 @@ pub(crate) fn lib_handle() -> MutexGuard<'static, libloading::Library> {
 		.expect("failed to acquire ONNX Runtime dylib lock; another thread panicked?")
 }
 
-pub(crate) static G_ORT_API: OnceLock<Arc<Mutex<AtomicPtr<ort_sys::OrtApi>>>> = OnceLock::new();
+pub(crate) static G_ORT_API: OnceLock<AtomicPtr<ort_sys::OrtApi>> = OnceLock::new();
 
 /// Attempts to acquire the global [`ort_sys::OrtApi`] object.
 ///
 /// # Panics
 ///
 /// Panics if another thread panicked while holding the API lock, or if the ONNX Runtime API could not be initialized.
-pub fn api() -> ort_sys::OrtApi {
-	let mut api_ref = G_ORT_API
+pub fn api() -> *const ort_sys::OrtApi {
+	G_ORT_API
 		.get_or_init(|| {
 			#[cfg(feature = "load-dynamic")]
 			unsafe {
@@ -152,7 +155,8 @@ pub fn api() -> ort_sys::OrtApi {
 				};
 				let get_api: extern_system_fn! { unsafe fn(u32) -> *const ort_sys::OrtApi } = (*base).GetApi.expect("`GetApi` must be present in `OrtApiBase`");
 				let api: *const ort_sys::OrtApi = get_api(ort_sys::ORT_API_VERSION);
-				Arc::new(Mutex::new(AtomicPtr::new(api as *mut ort_sys::OrtApi)))
+				assert!(!api.is_null());
+				AtomicPtr::new(api.cast_mut())
 			}
 			#[cfg(not(feature = "load-dynamic"))]
 			{
@@ -160,54 +164,48 @@ pub fn api() -> ort_sys::OrtApi {
 				assert_ne!(base, ptr::null());
 				let get_api: extern_system_fn! { unsafe fn(u32) -> *const ort_sys::OrtApi } = unsafe { (*base).GetApi.unwrap() };
 				let api: *const ort_sys::OrtApi = unsafe { get_api(ort_sys::ORT_API_VERSION) };
-				Arc::new(Mutex::new(AtomicPtr::new(api as *mut ort_sys::OrtApi)))
+				assert!(!api.is_null());
+				AtomicPtr::new(api.cast_mut())
 			}
 		})
-		.lock()
-		.expect("Failed to acquire global ONNX Runtime API lock; did another thread using ort panic?");
-
-	let api_ref_mut: &mut *mut ort_sys::OrtApi = api_ref.get_mut();
-	let api_ptr_mut: *mut ort_sys::OrtApi = *api_ref_mut;
-
-	assert_ne!(api_ptr_mut, ptr::null_mut());
-
-	unsafe { *api_ptr_mut }
+		.load(Ordering::Relaxed)
+		.cast_const()
 }
 
 macro_rules! ortsys {
 	($method:ident) => {
-		$crate::api().$method.unwrap()
+		(*$crate::api()).$method.unwrap()
 	};
 	(unsafe $method:ident) => {
-		unsafe { $crate::api().$method.unwrap() }
+		unsafe { (*$crate::api()).$method.unwrap() }
 	};
 	($method:ident($($n:expr),+ $(,)?)) => {
-		$crate::api().$method.unwrap()($($n),+)
+		(*$crate::api()).$method.unwrap()($($n),+)
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?)) => {
-		unsafe { $crate::api().$method.unwrap()($($n),+) }
+		unsafe { (*$crate::api()).$method.unwrap()($($n),+) }
 	};
 	($method:ident($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {
-		$crate::api().$method.unwrap()($($n),+);
+		(*$crate::api()).$method.unwrap()($($n),+);
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {{
-		let _x = unsafe { $crate::api().$method.unwrap()($($n),+) };
+		let _x = unsafe { (*$crate::api()).$method.unwrap()($($n),+) };
 		$($crate::error::assert_non_null_pointer($check, stringify!($method)).unwrap();)+
 		_x
 	}};
 	($method:ident($($n:expr),+ $(,)?) -> $err:expr$(;)?) => {
-		$crate::error::status_to_result($crate::api().$method.unwrap()($($n),+)).map_err($err)?;
+		$crate::error::status_to_result((*$crate::api()).$method.unwrap()($($n),+)).map_err($err)?;
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?) -> $err:expr$(;)?) => {
-		$crate::error::status_to_result(unsafe { $crate::api().$method.unwrap()($($n),+) }).map_err($err)?;
+		$crate::error::status_to_result(unsafe { (*$crate::api()).$method.unwrap()($($n),+) }).map_err($err)?;
 	};
 	($method:ident($($n:expr),+ $(,)?) -> $err:expr; nonNull($($check:expr),+ $(,)?)$(;)?) => {
-		$crate::error::status_to_result($crate::api().$method.unwrap()($($n),+)).map_err($err)?;
+		$crate::error::status_to_result((*$crate::api()).$method.unwrap()($($n),+)).map_err($err)?;
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?) -> $err:expr; nonNull($($check:expr),+ $(,)?)$(;)?) => {{
-		$crate::error::status_to_result(unsafe { $crate::api().$method.unwrap()($($n),+) }).map_err($err)?;
+		$crate::error::status_to_result(unsafe { (*$crate::api()).$method.unwrap()($($n),+) }).map_err($err)?;
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	}};
 }

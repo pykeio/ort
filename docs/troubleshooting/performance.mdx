@@ -7,13 +7,13 @@ title: 'Troubleshoot: Performance'
 
 <Steps>
     <Step title="Add tracing-subscriber to your dependencies">
-        ```toml
+        ```toml Cargo.toml
         [dependencies]
         tracing-subscriber = { version = "0.3", features = [ "env-filter", "fmt" ] }
         ```
     </Step>
     <Step title="Initialize the subscriber in the main function">
-        ```rust
+        ```rust main.rs
         fn main() {
             tracing_subscriber::fmt::init();
         }

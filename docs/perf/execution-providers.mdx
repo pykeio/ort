@@ -31,7 +31,18 @@ ONNX Runtime must be compiled with support for each execution provider. pyke pro
 Some EPs supported by ONNX Runtime are not supported by `ort` due to a lack of hardware for testing. If your preferred EP is missing support and you've got the hardware, please [open an issue](https://github.com/pykeio/ort/issues/new)!
 
 ## Registering execution providers
-In order to use an execution provider, you must **register** it before creating an environment or session. You can do this via the `SessionBuilder::with_execution_providers` method. For example, to register the CUDA execution provider:
+<Info>
+    To use an execution provider with `ort`, you'll need to enable its respective Cargo feature, e.g. the `cuda` feature to use CUDA, or the `coreml` feature to use CoreML.
+
+    ```toml Cargo.toml
+    [dependencies]
+    ort = { version = "2.0", features = [ "cuda" ] }
+    ```
+
+    See [Cargo features](/setup/cargo-features) for the full list of features.
+</Info>
+
+In order to configure sessions to use a certain execution provider, you must **register** it before creating an environment or session. You can do this via the `SessionBuilder::with_execution_providers` method. For example, to register the CUDA execution provider:
 
 ```rust
 use ort::{CUDAExecutionProvider, Session};
@@ -157,3 +168,38 @@ Note that `ort::init` must come before you create any sessions, otherwise the co
 
 ## Troubleshooting
 If it seems like the execution provider is not registering properly, or you are not getting acceptable performance, see the [Troubleshooting: Performance](/troubleshooting/performance) page for more information on how to debug any EP issues.
+
+## Notes
+
+### CoreML
+Statically linking to CoreML (the default behavior when using downloaded binaries + the `coreml` Cargo feature) requires an additional Rust flag in order to link properly. You'll need to provide the flag `-C link-arg=-fapple-link-rtlib` to `rustc`. You can do this via an entry in [`.cargo/config.toml`](https://doc.rust-lang.org/cargo/reference/config.html#hierarchical-structure), in a build script, or in an environment variable.
+
+<Tabs>
+    <Tab title="Cargo config">
+        See [Configuration: Hierarchical structure](https://doc.rust-lang.org/cargo/reference/config.html#hierarchical-structure) for more information on where the configuration file can be placed.
+
+        ```toml .cargo/config.toml
+        [target.aarch64-apple-darwin]
+        rustflags = ["-Clink-arg=-fapple-link-rtlib"]
+
+        [target.x86_64-apple-darwin]
+        rustflags = ["-Clink-arg=-fapple-link-rtlib"]
+        ```
+    </Tab>
+    <Tab title="Build script">
+        Add the following to the `build.rs` script of any **binary** crate that uses `ort`.
+
+        ```rust build.rs
+        fn main() {
+            println!("cargo:rustc-link-arg=-fapple-link-rtlib");
+        }
+        ```
+
+        Library crates do not need this flag, and the usage of it in a library crate will not transitively apply to any binary crates dependent on it.
+    </Tab>
+    <Tab title="Environment variable">
+        ```shell
+        $ RUSTFLAGS="-Clink-arg=-fapple-link-rtlib" cargo build
+        ```
+    </Tab>
+</Tabs>

@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
 	'crates/ort',
+	'crates/ort-macros',
 	'crates/ort-sys',
 	'examples/custom-ops',
 	'examples/gpt2',
@@ -11,6 +12,7 @@ members = [
 ]
 default-members = [
 	'crates/ort',
+	'crates/ort-macros',
 	'crates/ort-sys',
 	'examples/custom-ops',
 	'examples/gpt2',
@@ -33,6 +35,7 @@ authors = [ "pyke.io <contact@pyke.io>" ]
 
 [workspace.dependencies]
 ort-sys = { version = "2.0.0-rc.0", path = "crates/ort-sys" }
+ort-macros = { version = "2.0.0-rc.0", path = "crates/ort-macros" }
 
 [profile.release]
 opt-level = 3

@@ -33,6 +33,8 @@ use std::{
 	}
 };
 
+#[cfg(feature = "macros")]
+pub use ort_macros::*;
 pub use ort_sys as sys;
 use tracing::Level;
 

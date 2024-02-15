@@ -214,7 +214,12 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 
 					if target_arch != "wasm32" {
 						add_search_dir(transform_dep(external_lib_dir.join("pytorch_cpuinfo-build"), &profile));
-						add_search_dir(transform_dep(external_lib_dir.join("pytorch_cpuinfo-build").join("deps").join("clog"), &profile));
+						let clog_path = transform_dep(external_lib_dir.join("pytorch_cpuinfo-build").join("deps").join("clog"), &profile);
+						if clog_path.exists() {
+							add_search_dir(clog_path);
+						} else {
+							add_search_dir(transform_dep(external_lib_dir.join("pytorch_clog-build"), &profile));
+						}
 						println!("cargo:rustc-link-lib=static=cpuinfo");
 						println!("cargo:rustc-link-lib=static=clog");
 					}

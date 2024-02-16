@@ -36,6 +36,10 @@ impl ExecutionProvider for OneDNNExecutionProvider {
 		"DnnlExecutionProvider"
 	}
 
+	fn supported_by_platform(&self) -> bool {
+		cfg!(all(target_arch = "x86_64", any(target_os = "windows", target_os = "linux")))
+	}
+
 	#[allow(unused, unreachable_code)]
 	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "onednn"))]

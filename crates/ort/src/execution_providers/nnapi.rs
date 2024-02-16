@@ -63,6 +63,10 @@ impl ExecutionProvider for NNAPIExecutionProvider {
 		"NnapiExecutionProvider"
 	}
 
+	fn supported_by_platform(&self) -> bool {
+		cfg!(target_os = "android")
+	}
+
 	#[allow(unused, unreachable_code)]
 	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "nnapi"))]

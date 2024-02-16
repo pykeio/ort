@@ -51,6 +51,10 @@ impl ExecutionProvider for CoreMLExecutionProvider {
 		"CoreMLExecutionProvider"
 	}
 
+	fn supported_by_platform(&self) -> bool {
+		cfg!(any(target_os = "macos", target_os = "ios"))
+	}
+
 	#[allow(unused, unreachable_code)]
 	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "coreml"))]

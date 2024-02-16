@@ -46,6 +46,20 @@ pub trait ExecutionProvider {
 	/// [`TVMExecutionProvider`]'s identifier is `TvmExecutionProvider`.
 	fn as_str(&self) -> &'static str;
 
+	/// Returns whether this execution provider is supported on this platform.
+	///
+	/// For example, the CoreML execution provider implements this as:
+	/// ```ignore
+	/// impl ExecutionProvider for CoreMLExecutionProvider {
+	/// 	fn supported_by_platform() -> bool {
+	/// 		cfg!(any(target_os = "macos", target_os = "ios"))
+	/// 	}
+	/// }
+	/// ```
+	fn supported_by_platform(&self) -> bool {
+		true
+	}
+
 	/// Returns `Ok(true)` if ONNX Runtime was compiled with support for this execution provider, and `Ok(false)`
 	/// otherwise.
 	///
@@ -194,11 +208,16 @@ pub(crate) use get_ep_register;
 
 #[tracing::instrument(skip_all)]
 pub(crate) fn apply_execution_providers(session_builder: &SessionBuilder, execution_providers: impl Iterator<Item = ExecutionProviderDispatch>) {
-	let mut fallback_to_cpu = true;
+	let execution_providers: Vec<_> = execution_providers.collect();
+	let mut fallback_to_cpu = !execution_providers.is_empty();
 	for ex in execution_providers {
 		if let Err(e) = ex.register(session_builder) {
-			if let &Error::ExecutionProviderNotRegistered(_) = &e {
-				tracing::debug!("{}", e);
+			if let &Error::ExecutionProviderNotRegistered(ep_name) = &e {
+				if ex.supported_by_platform() {
+					tracing::warn!("{e}");
+				} else {
+					tracing::debug!("{e} (additionally, `{ep_name}` is not supported on this platform)");
+				}
 			} else {
 				tracing::warn!("An error occurred when attempting to register `{}`: {e}", ex.as_str());
 			}

@@ -33,6 +33,10 @@ impl ExecutionProvider for CPUExecutionProvider {
 		Ok(true)
 	}
 
+	fn supported_by_platform(&self) -> bool {
+		true
+	}
+
 	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
 		if self.use_arena {
 			status_to_result(ortsys![unsafe EnableCpuMemArena(session_builder.session_options_ptr)]).map_err(Error::ExecutionProvider)

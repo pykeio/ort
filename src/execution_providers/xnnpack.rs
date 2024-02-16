@@ -30,6 +30,15 @@ impl ExecutionProvider for XNNPACKExecutionProvider {
 		"XNNPACKExecutionProvider"
 	}
 
+	fn supported_by_platform(&self) -> bool {
+		cfg!(any(
+			target_arch = "aarch64",
+			all(target_arch = "arm", any(target_os = "linux", target_os = "android")),
+			target_arch = "x86_64",
+			target_arch = "wasm32"
+		))
+	}
+
 	#[allow(unused, unreachable_code)]
 	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "xnnpack"))]

@@ -160,6 +160,10 @@ impl ExecutionProvider for CUDAExecutionProvider {
 		"CUDAExecutionProvider"
 	}
 
+	fn supported_by_platform(&self) -> bool {
+		cfg!(any(all(target_os = "linux", any(target_os = "aarch64", target_os = "x86_64")), all(target_os = "windows", target_arch = "x86_64")))
+	}
+
 	#[allow(unused, unreachable_code)]
 	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "cuda"))]

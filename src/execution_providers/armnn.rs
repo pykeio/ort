@@ -33,6 +33,10 @@ impl ExecutionProvider for ArmNNExecutionProvider {
 		"ArmNNExecutionProvider"
 	}
 
+	fn supported_by_platform(&self) -> bool {
+		cfg!(all(target_arch = "aarch64", any(target_os = "linux", target_os = "android")))
+	}
+
 	#[allow(unused, unreachable_code)]
 	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "armnn"))]

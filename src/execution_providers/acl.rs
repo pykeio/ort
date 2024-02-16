@@ -33,6 +33,10 @@ impl ExecutionProvider for ACLExecutionProvider {
 		"AclExecutionProvider"
 	}
 
+	fn supported_by_platform(&self) -> bool {
+		cfg!(target_arch = "aarch64")
+	}
+
 	#[allow(unused, unreachable_code)]
 	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "acl"))]

@@ -18,8 +18,6 @@ use std::{
 #[cfg(feature = "fetch-models")]
 use std::{path::PathBuf, time::Duration};
 
-use compact_str::CompactString;
-
 #[cfg(feature = "fetch-models")]
 use super::error::FetchModelError;
 use super::{
@@ -39,7 +37,10 @@ use crate::{environment::Environment, operator::OperatorDomain, MemoryInfo};
 
 pub(crate) mod input;
 pub(crate) mod output;
-pub use self::{input::SessionInputs, output::SessionOutputs};
+pub use self::{
+	input::{SessionInputKey, SessionInputs},
+	output::SessionOutputs
+};
 
 /// Type used to create a session using the _builder pattern_. Once created with [`Session::builder`], you can use the
 /// different methods to configure the session.
@@ -647,32 +648,13 @@ impl Session {
 	pub fn run<'s, 'i, const N: usize>(&'s self, input_values: impl Into<SessionInputs<'i, N>>) -> Result<SessionOutputs<'s>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
-				let outputs = self.run_inner(
-					&self
-						.inputs
-						.iter()
-						.map(|input| CompactString::new(input.name.as_str()))
-						.collect::<Vec<_>>(),
-					input_values,
-					None
-				)?;
-				Ok(outputs)
+				self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values.iter(), None)
 			}
 			SessionInputs::ValueArray(input_values) => {
-				let outputs = self.run_inner(
-					&self
-						.inputs
-						.iter()
-						.map(|input| CompactString::new(input.name.as_str()))
-						.collect::<Vec<_>>(),
-					&input_values,
-					None
-				)?;
-				Ok(outputs)
+				self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values.iter(), None)
 			}
 			SessionInputs::ValueMap(input_values) => {
-				let (input_names, values): (Vec<CompactString>, Vec<Value>) = input_values.into_iter().unzip();
-				self.run_inner(&input_names, &values, None)
+				self.run_inner(&input_values.iter().map(|(k, _)| k.as_str()).collect::<Vec<_>>(), input_values.iter().map(|(_, v)| v), None)
 			}
 		}
 	}
@@ -685,37 +667,23 @@ impl Session {
 	) -> Result<SessionOutputs<'s>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
-				let outputs = self.run_inner(
-					&self
-						.inputs
-						.iter()
-						.map(|input| CompactString::new(input.name.as_str()))
-						.collect::<Vec<_>>(),
-					input_values,
-					Some(run_options)
-				)?;
-				Ok(outputs)
+				self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values.iter(), Some(run_options))
 			}
 			SessionInputs::ValueArray(input_values) => {
-				let outputs = self.run_inner(
-					&self
-						.inputs
-						.iter()
-						.map(|input| CompactString::new(input.name.as_str()))
-						.collect::<Vec<_>>(),
-					&input_values,
-					Some(run_options)
-				)?;
-				Ok(outputs)
+				self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values.iter(), Some(run_options))
 			}
 			SessionInputs::ValueMap(input_values) => {
-				let (input_names, values): (Vec<CompactString>, Vec<Value>) = input_values.into_iter().unzip();
-				self.run_inner(&input_names, &values, Some(run_options))
+				self.run_inner(&input_values.iter().map(|(k, _)| k.as_str()).collect::<Vec<_>>(), input_values.iter().map(|(_, v)| v), Some(run_options))
 			}
 		}
 	}
 
-	fn run_inner(&self, input_names: &[CompactString], input_values: &[Value], run_options: Option<Arc<RunOptions>>) -> Result<SessionOutputs<'_>> {
+	fn run_inner<'v>(
+		&self,
+		input_names: &[&str],
+		input_values: impl Iterator<Item = &'v Value>,
+		run_options: Option<Arc<RunOptions>>
+	) -> Result<SessionOutputs<'_>> {
 		let input_names_ptr: Vec<*const c_char> = input_names
 			.iter()
 			.map(|n| CString::new(n.as_bytes()).unwrap())
@@ -731,7 +699,7 @@ impl Session {
 		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![std::ptr::null_mut(); self.outputs.len()];
 
 		// The C API expects pointers for the arrays (pointers to C-arrays)
-		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.iter().map(|input_array_ort| input_array_ort.ptr() as *const _).collect();
+		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.map(|input_array_ort| input_array_ort.ptr() as *const _).collect();
 
 		let run_options_ptr = if let Some(run_options) = &run_options {
 			run_options.run_options_ptr

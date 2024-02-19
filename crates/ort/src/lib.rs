@@ -54,7 +54,7 @@ pub use self::operator::{
 	kernel::{Kernel, KernelAttributes, KernelContext},
 	InferShapeFn, Operator, OperatorDomain
 };
-pub use self::session::{InMemorySession, RunOptions, Session, SessionBuilder, SessionInputs, SessionOutputs, SharedSessionInner};
+pub use self::session::{InMemorySession, RunOptions, Session, SessionBuilder, SessionInputKey, SessionInputs, SessionOutputs, SharedSessionInner};
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 pub use self::tensor::{ArrayExtensions, ArrayViewHolder, Tensor, TensorData};

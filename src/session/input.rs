@@ -1,18 +1,47 @@
 use std::collections::HashMap;
 
-use compact_str::CompactString;
-
 use crate::Value;
 
+pub enum SessionInputKey<'i> {
+	Borrowed(&'i str),
+	Owned(String)
+}
+
+impl<'i> From<&'i str> for SessionInputKey<'i> {
+	fn from(value: &'i str) -> Self {
+		Self::Borrowed(value)
+	}
+}
+impl<'i> From<String> for SessionInputKey<'i> {
+	fn from(value: String) -> Self {
+		Self::Owned(value)
+	}
+}
+
+impl<'i> SessionInputKey<'i> {
+	pub fn as_str(&self) -> &str {
+		match self {
+			Self::Borrowed(s) => s,
+			Self::Owned(s) => s.as_str()
+		}
+	}
+}
+
 pub enum SessionInputs<'i, const N: usize = 0> {
-	ValueMap(HashMap<CompactString, Value>),
+	ValueMap(Vec<(SessionInputKey<'i>, Value)>),
 	ValueSlice(&'i [Value]),
 	ValueArray([Value; N])
 }
 
-impl<'i, K: Into<CompactString>> From<HashMap<K, Value>> for SessionInputs<'i> {
+impl<'i, K: Into<SessionInputKey<'i>>> From<HashMap<K, Value>> for SessionInputs<'i> {
 	fn from(val: HashMap<K, Value>) -> Self {
-		SessionInputs::ValueMap(val.into_iter().map(|c| (c.0.into(), c.1)).collect())
+		SessionInputs::ValueMap(val.into_iter().map(|(k, v)| (k.into(), v)).collect())
+	}
+}
+
+impl<'i> From<Vec<(SessionInputKey<'i>, Value)>> for SessionInputs<'i> {
+	fn from(val: Vec<(SessionInputKey<'i>, Value)>) -> Self {
+		SessionInputs::ValueMap(val)
 	}
 }
 
@@ -72,9 +101,42 @@ macro_rules! inputs {
 			Ok([$(::std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::Error::from)?,)+])
 		})()
 	);
-	($($n:expr => $v:expr),+ $(,)?) => {{
-		[$(::std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::Error::from).map(|v| ($n, v)),)+]
-			.into_iter()
-			.collect::<$crate::Result<::std::collections::HashMap::<_, $crate::Value>>>()
-	}};
+	($($n:expr => $v:expr),+ $(,)?) => (
+		(|| -> $crate::Result<_> {
+			Ok(vec![$(::std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::Error::from).map(|v| ($crate::SessionInputKey::from($n), v))?,)+])
+		})()
+	);
+}
+
+#[cfg(test)]
+mod tests {
+	use std::collections::HashMap;
+
+	use crate::*;
+
+	#[test]
+	fn test_hashmap_static_keys() -> crate::Result<()> {
+		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
+		let arc = Arc::new(v.clone().into_boxed_slice());
+		let shape = vec![v.len() as i64];
+
+		let mut inputs = HashMap::new();
+		inputs.insert("test", (shape, arc).try_into()?);
+		let _ = SessionInputs::from(inputs);
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_hashmap_string_keys() -> crate::Result<()> {
+		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
+		let arc = Arc::new(v.clone().into_boxed_slice());
+		let shape = vec![v.len() as i64];
+
+		let mut inputs = HashMap::new();
+		inputs.insert("test".to_string(), (shape, arc).try_into()?);
+		let _ = SessionInputs::from(inputs);
+
+		Ok(())
+	}
 }

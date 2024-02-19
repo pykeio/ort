@@ -168,10 +168,8 @@ impl SessionBuilder {
 	///
 	/// For configuring the number of threads used when the session execution mode is set to `Parallel`, see
 	/// [`SessionBuilder::with_inter_threads()`].
-	pub fn with_intra_threads(self, num_threads: i16) -> Result<Self> {
-		// We use a u16 in the builder to cover the 16-bits positive values of a i32.
-		let num_threads = num_threads as i32;
-		ortsys![unsafe SetIntraOpNumThreads(self.session_options_ptr, num_threads) -> Error::CreateSessionOptions];
+	pub fn with_intra_threads(self, num_threads: usize) -> Result<Self> {
+		ortsys![unsafe SetIntraOpNumThreads(self.session_options_ptr, num_threads as _) -> Error::CreateSessionOptions];
 		Ok(self)
 	}
 
@@ -191,10 +189,8 @@ impl SessionBuilder {
 	///
 	/// For configuring the number of threads used to parallelize the execution within nodes, see
 	/// [`SessionBuilder::with_intra_threads()`].
-	pub fn with_inter_threads(self, num_threads: i16) -> Result<Self> {
-		// We use a u16 in the builder to cover the 16-bits positive values of a i32.
-		let num_threads = num_threads as i32;
-		ortsys![unsafe SetInterOpNumThreads(self.session_options_ptr, num_threads) -> Error::CreateSessionOptions];
+	pub fn with_inter_threads(self, num_threads: usize) -> Result<Self> {
+		ortsys![unsafe SetInterOpNumThreads(self.session_options_ptr, num_threads as _) -> Error::CreateSessionOptions];
 		Ok(self)
 	}
 

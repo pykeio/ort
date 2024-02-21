@@ -46,6 +46,7 @@ pub struct TVMExecutionProvider {
 }
 
 impl TVMExecutionProvider {
+	#[must_use]
 	pub fn build(self) -> ExecutionProviderDispatch {
 		self.into()
 	}
@@ -109,7 +110,7 @@ impl ExecutionProvider for TVMExecutionProvider {
 			}
 			let options_string = std::ffi::CString::new(option_string.join(",")).unwrap();
 			return crate::error::status_to_result(unsafe {
-				OrtSessionOptionsAppendExecutionProvider_Tvm(session_builder.session_options_ptr, options_string.as_ptr())
+				OrtSessionOptionsAppendExecutionProvider_Tvm(session_builder.session_options_ptr.as_ptr(), options_string.as_ptr())
 			})
 			.map_err(Error::ExecutionProvider);
 		}

@@ -38,56 +38,67 @@ impl Default for ROCmExecutionProvider {
 }
 
 impl ROCmExecutionProvider {
+	#[must_use]
 	pub fn with_device_id(mut self, device_id: i32) -> Self {
 		self.device_id = device_id;
 		self
 	}
 
+	#[must_use]
 	pub fn with_exhaustive_conv_search(mut self) -> Self {
 		self.miopen_conv_exhaustive_search = true;
 		self
 	}
 
+	#[must_use]
 	pub fn with_mem_limit(mut self, limit: usize) -> Self {
 		self.gpu_mem_limit = limit as _;
 		self
 	}
 
+	#[must_use]
 	pub fn with_arena_extend_strategy(mut self, strategy: ArenaExtendStrategy) -> Self {
 		self.arena_extend_strategy = strategy;
 		self
 	}
 
+	#[must_use]
 	pub fn with_copy_in_default_stream(mut self, enable: bool) -> Self {
 		self.do_copy_in_default_stream = enable;
 		self
 	}
 
+	#[must_use]
 	pub fn with_compute_stream(mut self, ptr: *mut c_void) -> Self {
 		self.user_compute_stream = Some(ptr);
 		self
 	}
 
+	#[must_use]
 	pub fn with_default_memory_arena_cfg(mut self, cfg: *mut ort_sys::OrtArenaCfg) -> Self {
 		self.default_memory_arena_cfg = Some(cfg);
 		self
 	}
 
+	#[must_use]
 	pub fn with_tunable_op(mut self, enable: bool) -> Self {
 		self.tunable_op_enable = enable;
 		self
 	}
 
+	#[must_use]
 	pub fn with_tuning(mut self, enable: bool) -> Self {
 		self.tunable_op_tuning_enable = enable;
 		self
 	}
 
+	#[must_use]
 	pub fn with_max_tuning_duration(mut self, ms: i32) -> Self {
 		self.tunable_op_max_tuning_duration_ms = ms;
 		self
 	}
 
+	#[must_use]
 	pub fn build(self) -> ExecutionProviderDispatch {
 		self.into()
 	}
@@ -129,7 +140,7 @@ impl ExecutionProvider for ROCmExecutionProvider {
 				tunable_op_max_tuning_duration_ms: self.tunable_op_max_tuning_duration_ms
 			};
 			return crate::error::status_to_result(
-				crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(session_builder.session_options_ptr, &rocm_options as *const _)]
+				crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(session_builder.session_options_ptr.as_ptr(), std::ptr::addr_of!(rocm_options))]
 			)
 			.map_err(Error::ExecutionProvider);
 		}

@@ -18,12 +18,12 @@
 mod ndarray;
 mod types;
 
-use std::{fmt::Debug, ptr};
+use std::fmt::Debug;
 
 #[cfg(feature = "ndarray")]
 use ::ndarray::{ArrayView, IxDyn};
 
-pub use self::types::{ExtractTensorData, IntoTensorElementType, TensorElementType, Utf8Data};
+pub use self::types::{ExtractTensorData, ExtractTensorDataView, IntoTensorElementType, TensorElementType, Utf8Data};
 #[cfg(feature = "ndarray")]
 pub use self::{ndarray::ArrayExtensions, types::TensorData};
 use crate::ortsys;
@@ -32,14 +32,8 @@ use crate::{Error, Result};
 
 /// Tensor containing data owned by the ONNX Runtime C library, used to return values from inference.
 ///
-/// This tensor type is returned by the [`Session::run()`](../session/struct.Session.html#method.run) method.
-/// It is not meant to be created directly.
-///
-/// The tensor hosts an [`ndarray::ArrayView`](https://docs.rs/ndarray/latest/ndarray/type.ArrayView.html)
-/// of the data on the C side. This allows manipulation on the Rust side using `ndarray` without copying the data.
-///
-/// `OrtOwnedTensor` implements the [`std::deref::Deref`](#impl-Deref) trait for ergonomic access to
-/// the underlying [`ndarray::ArrayView`](https://docs.rs/ndarray/latest/ndarray/type.ArrayView.html).
+/// This type hosts an [`ndarray::ArrayView`] of the data on the C side. This allows manipulation on the Rust side
+/// using `ndarray` without copying the data.
 #[derive(Debug)]
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
@@ -56,6 +50,7 @@ where
 	T: ExtractTensorData
 {
 	/// Produce an [`ArrayViewHolder`] for the underlying data.
+	#[must_use]
 	pub fn view<'s>(&'s self) -> ArrayViewHolder<'s, T>
 	where
 		't: 's // tensor ptr can outlive the TensorData
@@ -111,24 +106,5 @@ where
 
 	fn deref(&self) -> &Self::Target {
 		&self.array_view
-	}
-}
-
-/// Holds on to a tensor pointer until dropped.
-///
-/// This allows for creating an [`OrtOwnedTensor`] from a [`DynOrtTensor`] without consuming `self`, which would prevent
-/// retrying extraction and avoids awkward interaction with the outputs `Vec`. It also avoids requiring `OrtOwnedTensor`
-/// to keep a reference to `DynOrtTensor`, which would be inconvenient.
-#[derive(Debug)]
-pub struct TensorPointerHolder {
-	pub(crate) tensor_ptr: *mut ort_sys::OrtValue
-}
-
-impl Drop for TensorPointerHolder {
-	#[tracing::instrument]
-	fn drop(&mut self) {
-		ortsys![unsafe ReleaseValue(self.tensor_ptr)];
-
-		self.tensor_ptr = ptr::null_mut();
 	}
 }

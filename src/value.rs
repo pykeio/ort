@@ -1,4 +1,14 @@
-use std::{any::Any, collections::HashMap, ffi, fmt::Debug, hash::Hash, marker::PhantomData, ops::Deref, ptr, sync::Arc};
+use std::{
+	any::Any,
+	collections::HashMap,
+	ffi,
+	fmt::Debug,
+	hash::Hash,
+	marker::PhantomData,
+	ops::Deref,
+	ptr::{self, NonNull},
+	sync::Arc
+};
 
 #[cfg(feature = "ndarray")]
 use ndarray::{ArcArray, Array, ArrayView, CowArray, Dimension, IxDyn};
@@ -11,105 +21,143 @@ use crate::{
 	ortsys,
 	session::SharedSessionInner,
 	tensor::{ExtractTensorData, IntoTensorElementType, TensorElementType, Utf8Data},
-	AllocatorType, Error, MemoryType, Result
+	AllocatorType, Error, ExtractTensorDataView, MemoryType, Result
 };
 
+/// The type of a [`Value`], or a session input/output.
+///
+/// ```
+/// # use std::sync::Arc;
+/// # use ort::{Session, Value, ValueType, TensorElementType};
+/// # fn main() -> ort::Result<()> {
+/// # 	let session = Session::builder()?.with_model_from_file("tests/data/upsample.onnx")?;
+/// // `ValueType`s can be obtained from session inputs/outputs:
+/// let input = &session.inputs[0];
+/// assert_eq!(
+/// 	input.input_type,
+/// 	ValueType::Tensor {
+/// 		ty: TensorElementType::Float32,
+/// 		// Our model has 3 dynamic dimensions, represented by -1
+/// 		dimensions: vec![-1, -1, -1, 3]
+/// 	}
+/// );
+///
+/// // Or by `Value`s created in Rust or output by a session.
+/// let value = Value::from_array((vec![5], Arc::new(vec![1_i64, 2, 3, 4, 5].into_boxed_slice())))?;
+/// assert_eq!(
+/// 	value.dtype()?,
+/// 	ValueType::Tensor {
+/// 		ty: TensorElementType::Int64,
+/// 		dimensions: vec![5]
+/// 	}
+/// );
+/// # 	Ok(())
+/// # }
+/// ```
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ValueType {
-	Tensor { ty: TensorElementType, dimensions: Vec<i64> },
+	/// Value is a tensor/multi-dimensional array.
+	Tensor {
+		/// Element type of the tensor.
+		ty: TensorElementType,
+		/// Dimensions of the tensor. If an exact dimension is not known (i.e. a dynamic dimension as part of an
+		/// [`crate::Input`]/[`crate::Output`]), the dimension will be `-1`.
+		///
+		/// Actual tensor values, which have a known dimension, will always have positive (>1) dimensions.
+		dimensions: Vec<i64>
+	},
+	/// A sequence (vector) of other `Value`s.
+	///
+	/// [Per ONNX spec](https://onnx.ai/onnx/intro/concepts.html#other-types), only sequences of tensors and maps are allowed.
 	Sequence(Box<ValueType>),
-	Map { key: TensorElementType, value: TensorElementType }
+	/// A map/dictionary from one element type to another.
+	Map {
+		/// The map key type. Allowed types are:
+		/// - [`TensorElementType::Int8`]
+		/// - [`TensorElementType::Int16`]
+		/// - [`TensorElementType::Int32`]
+		/// - [`TensorElementType::Int64`]
+		/// - [`TensorElementType::Uint8`]
+		/// - [`TensorElementType::Uint16`]
+		/// - [`TensorElementType::Uint32`]
+		/// - [`TensorElementType::Uint64`]
+		/// - [`TensorElementType::String`]
+		key: TensorElementType,
+		/// The map value type.
+		value: TensorElementType
+	}
 }
 
 impl ValueType {
-	/// Returns the dimensions of this data type if it is a tensor, or `None` if it is a sequence or map.
+	/// Returns the dimensions of this value type if it is a tensor, or `None` if it is a sequence or map.
+	///
+	/// ```
+	/// # use std::sync::Arc;
+	/// # use ort::{Value, ValueType, TensorElementType};
+	/// # fn main() -> ort::Result<()> {
+	/// let value = Value::from_array((vec![5], Arc::new(vec![1_i64, 2, 3, 4, 5].into_boxed_slice())))?;
+	/// assert_eq!(value.dtype()?.tensor_dimensions(), Some(&vec![5]));
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	#[must_use]
 	pub fn tensor_dimensions(&self) -> Option<&Vec<i64>> {
 		match self {
 			ValueType::Tensor { dimensions, .. } => Some(dimensions),
 			_ => None
 		}
 	}
-}
 
-#[doc(hidden)]
-#[derive(Debug)]
-#[cfg(feature = "ndarray")]
-#[cfg_attr(docsrs, doc(cfg(feature = "fetch-models")))]
-pub enum DynArrayRef<'v> {
-	Float(CowArray<'v, f32, IxDyn>),
-	#[cfg(feature = "half")]
-	#[cfg_attr(docsrs, doc(cfg(feature = "half")))]
-	Float16(CowArray<'v, half::f16, IxDyn>),
-	#[cfg(feature = "half")]
-	#[cfg_attr(docsrs, doc(cfg(feature = "half")))]
-	Bfloat16(CowArray<'v, half::bf16, IxDyn>),
-	Uint8(CowArray<'v, u8, IxDyn>),
-	Int8(CowArray<'v, i8, IxDyn>),
-	Uint16(CowArray<'v, u16, IxDyn>),
-	Int16(CowArray<'v, i16, IxDyn>),
-	Int32(CowArray<'v, i32, IxDyn>),
-	Int64(CowArray<'v, i64, IxDyn>),
-	Bool(CowArray<'v, bool, IxDyn>),
-	Double(CowArray<'v, f64, IxDyn>),
-	Uint32(CowArray<'v, u32, IxDyn>),
-	Uint64(CowArray<'v, u64, IxDyn>),
-	String(CowArray<'v, String, IxDyn>)
-}
+	/// Returns the element type of this value type if it is a tensor, or `None` if it is a sequence or map.
+	///
+	/// ```
+	/// # use std::sync::Arc;
+	/// # use ort::{Value, ValueType, TensorElementType};
+	/// # fn main() -> ort::Result<()> {
+	/// let value = Value::from_array((vec![5], Arc::new(vec![1_i64, 2, 3, 4, 5].into_boxed_slice())))?;
+	/// assert_eq!(value.dtype()?.tensor_type(), Some(TensorElementType::Int64));
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	#[must_use]
+	pub fn tensor_type(&self) -> Option<TensorElementType> {
+		match self {
+			ValueType::Tensor { ty, .. } => Some(*ty),
+			_ => None
+		}
+	}
 
-macro_rules! impl_convert_trait {
-	($type_:ty, $variant:expr) => {
-		#[cfg(feature = "ndarray")]
-		#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-		impl<'v, D: Dimension> From<ArrayView<'v, $type_, D>> for DynArrayRef<'v> {
-			fn from(array: ArrayView<'v, $type_, D>) -> DynArrayRef<'v> {
-				$variant(CowArray::from(array.into_dyn()))
-			}
-		}
-		#[cfg(feature = "ndarray")]
-		#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-		impl<'v, D: Dimension> From<Array<$type_, D>> for DynArrayRef<'v> {
-			fn from(array: Array<$type_, D>) -> DynArrayRef<'v> {
-				$variant(CowArray::from(array.into_dyn()))
-			}
-		}
-		#[cfg(feature = "ndarray")]
-		#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-		impl<'v, D: Dimension> From<CowArray<'v, $type_, D>> for DynArrayRef<'v> {
-			fn from(array: CowArray<'v, $type_, D>) -> DynArrayRef<'v> {
-				$variant(array.into_dyn())
-			}
-		}
-	};
-}
+	/// Returns `true` if this value type is a tensor.
+	#[inline]
+	#[must_use]
+	pub fn is_tensor(&self) -> bool {
+		matches!(self, ValueType::Tensor { .. })
+	}
 
-impl_convert_trait!(f32, DynArrayRef::Float);
-#[cfg(feature = "half")]
-#[cfg_attr(docsrs, doc(cfg(feature = "half")))]
-impl_convert_trait!(half::f16, DynArrayRef::Float16);
-#[cfg(feature = "half")]
-#[cfg_attr(docsrs, doc(cfg(feature = "half")))]
-impl_convert_trait!(half::bf16, DynArrayRef::Bfloat16);
-impl_convert_trait!(u8, DynArrayRef::Uint8);
-impl_convert_trait!(i8, DynArrayRef::Int8);
-impl_convert_trait!(u16, DynArrayRef::Uint16);
-impl_convert_trait!(i16, DynArrayRef::Int16);
-impl_convert_trait!(i32, DynArrayRef::Int32);
-impl_convert_trait!(i64, DynArrayRef::Int64);
-impl_convert_trait!(f64, DynArrayRef::Double);
-impl_convert_trait!(u32, DynArrayRef::Uint32);
-impl_convert_trait!(u64, DynArrayRef::Uint64);
-impl_convert_trait!(bool, DynArrayRef::Bool);
-impl_convert_trait!(String, DynArrayRef::String);
+	/// Returns `true` if this value type is a sequence.
+	#[inline]
+	#[must_use]
+	pub fn is_sequence(&self) -> bool {
+		matches!(self, ValueType::Sequence { .. })
+	}
+
+	/// Returns `true` if this value type is a map.
+	#[inline]
+	#[must_use]
+	pub fn is_map(&self) -> bool {
+		matches!(self, ValueType::Map { .. })
+	}
+}
 
 #[derive(Debug)]
 pub(crate) enum ValueInner {
 	RustOwned {
-		ptr: *mut ort_sys::OrtValue,
+		ptr: NonNull<ort_sys::OrtValue>,
 		_array: Box<dyn Any>,
 		_memory_info: MemoryInfo
 	},
 	CppOwned {
-		ptr: *mut ort_sys::OrtValue,
+		ptr: NonNull<ort_sys::OrtValue>,
 		/// Hold [`SharedSessionInner`] to ensure that the value can stay alive after the main session is dropped.
 		_session: Arc<SharedSessionInner>
 	},
@@ -119,7 +167,7 @@ pub(crate) enum ValueInner {
 	/// We forego holding onto an `Arc<SharedSessionInner>` here because:
 	/// - a map value can be created independently of a session, and thus we wouldn't have anything to hold on to;
 	/// - this is only ever used by `ValueRef`s, whos owner value (which *is* holding the session Arc) will outlive it.
-	CppOwnedRef { ptr: *mut ort_sys::OrtValue }
+	CppOwnedRef { ptr: NonNull<ort_sys::OrtValue> }
 }
 
 /// A temporary version of [`Value`] with a lifetime specifier.
@@ -139,8 +187,35 @@ impl<'v> Deref for ValueRef<'v> {
 	}
 }
 
-/// A [`Value`] contains data for inputs/outputs in ONNX Runtime graphs. [`Value`]s can hold a tensor, sequence (array),
-/// or map.
+/// A [`Value`] contains data for inputs/outputs in ONNX Runtime graphs. [`Value`]s can hold a tensor, sequence
+/// (array/vector), or map.
+///
+/// ## Creation
+/// `Value`s can be created via methods like [`Value::from_array`], or as the output from running a [`crate::Session`].
+///
+/// ```
+/// # use std::sync::Arc;
+/// # use ort::{Session, Value, ValueType, TensorElementType};
+/// # fn main() -> ort::Result<()> {
+/// # 	let upsample = Session::builder()?.with_model_from_file("tests/data/upsample.onnx")?;
+/// // Create a value from a raw data vector
+/// let value = Value::from_array((vec![1, 1, 1, 3], Arc::new(vec![1.0_f32, 2.0, 3.0].into_boxed_slice())))?;
+///
+/// // Create a value from an `ndarray::Array`
+/// #[cfg(feature = "ndarray")]
+/// let value = Value::from_array(ndarray::Array4::<f32>::zeros((1, 16, 16, 3)))?;
+///
+/// // Get a value from a session's output
+/// let value = &upsample.run(ort::inputs![value]?)?[0];
+/// # 	Ok(())
+/// # }
+/// ```
+///
+/// See [`Value::from_array`] for more details on what tensor values are accepted.
+///
+/// ## Usage
+/// You can access the data in a `Value` by using the relevant `extract` methods: [`Value::extract_tensor`] &
+/// [`Value::extract_raw_tensor`], [`Value::extract_sequence`], and [`Value::extract_map`].
 #[derive(Debug)]
 pub struct Value {
 	inner: ValueInner
@@ -149,34 +224,7 @@ pub struct Value {
 unsafe impl Send for Value {}
 
 impl Value {
-	/// Construct a [`Value`] from a C++ [`ort_sys::OrtValue`] pointer.
-	///
-	/// # Safety
-	///
-	/// - `ptr` must not be null.
-	pub unsafe fn from_raw(ptr: *mut ort_sys::OrtValue, session: Arc<SharedSessionInner>) -> Value {
-		Value {
-			inner: ValueInner::CppOwned { ptr, _session: session }
-		}
-	}
-
-	unsafe fn from_raw_ref(ptr: *mut ort_sys::OrtValue) -> Value {
-		Value {
-			inner: ValueInner::CppOwnedRef { ptr }
-		}
-	}
-
-	pub fn tensor_element_type(&self) -> Result<TensorElementType> {
-		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
-
-		let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-		ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
-		assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
-
-		Ok(type_sys.into())
-	}
-
+	/// Returns the data type of this [`Value`].
 	pub fn dtype(&self) -> Result<ValueType> {
 		let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
 		ortsys![unsafe GetTypeInfo(self.ptr(), &mut typeinfo_ptr) -> Error::GetTypeInfo; nonNull(typeinfo_ptr)];
@@ -209,7 +257,18 @@ impl Value {
 
 	/// Attempt to extract the underlying data into a Rust `ndarray`.
 	///
-	/// The resulting array will be wrapped within a [`Tensor`].
+	/// ```
+	/// # use std::sync::Arc;
+	/// # use ort::{Session, Value, ValueType, TensorElementType};
+	/// # fn main() -> ort::Result<()> {
+	/// let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
+	/// let value = Value::from_array(array.view())?;
+	///
+	/// let extracted = value.extract_tensor::<f32>()?;
+	/// assert_eq!(array.view().into_dyn(), *extracted.view());
+	/// # 	Ok(())
+	/// # }
+	/// ```
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn extract_tensor<T>(&self) -> Result<Tensor<'_, T>>
@@ -231,12 +290,7 @@ impl Value {
 			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
 			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 			let data_type: TensorElementType = type_sys.into();
-			if data_type != T::tensor_element_type() {
-				Err(Error::DataTypeMismatch {
-					actual: data_type,
-					requested: T::tensor_element_type()
-				})
-			} else {
+			if data_type == T::tensor_element_type() {
 				// Note: Both tensor and array will point to the same data, nothing is copied.
 				// As such, there is no need to free the pointer used to create the ArrayView.
 				assert_ne!(self.ptr(), ptr::null_mut());
@@ -250,15 +304,36 @@ impl Value {
 
 				let data = T::extract_tensor_array(shape, len as _, self.ptr())?;
 				Ok(Tensor { data })
+			} else {
+				Err(Error::DataTypeMismatch {
+					actual: data_type,
+					requested: T::tensor_element_type()
+				})
 			}
 		};
 		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
 		res
 	}
 
+	/// Attempt to extract the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and a view
+	/// into its data.
+	///
+	/// ```
+	/// # use std::sync::Arc;
+	/// # use ort::{Session, Value, ValueType, TensorElementType};
+	/// # fn main() -> ort::Result<()> {
+	/// let array = vec![1_i64, 2, 3, 4, 5];
+	/// let value = Value::from_array((vec![5], Arc::new(array.clone().into_boxed_slice())))?;
+	///
+	/// let (extracted_shape, extracted_data) = value.extract_raw_tensor::<i64>()?;
+	/// assert_eq!(extracted_data, &array);
+	/// assert_eq!(extracted_shape, [5]);
+	/// # 	Ok(())
+	/// # }
+	/// ```
 	pub fn extract_raw_tensor<T>(&self) -> Result<(Vec<i64>, &[T])>
 	where
-		T: ExtractTensorData + Clone + Debug
+		T: ExtractTensorDataView + Clone + Debug
 	{
 		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
 		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
@@ -274,12 +349,7 @@ impl Value {
 			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
 			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 			let data_type: TensorElementType = type_sys.into();
-			if data_type != T::tensor_element_type() {
-				Err(Error::DataTypeMismatch {
-					actual: data_type,
-					requested: T::tensor_element_type()
-				})
-			} else {
+			if data_type == T::tensor_element_type() {
 				// Note: Both tensor and array will point to the same data, nothing is copied.
 				// As such, there is no need to free the pointer used to create the slice.
 				assert_ne!(self.ptr(), ptr::null_mut());
@@ -290,13 +360,18 @@ impl Value {
 
 				let mut output_array_ptr: *mut T = ptr::null_mut();
 				let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
-				let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr as *mut *mut std::ffi::c_void;
+				let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
 				ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
 
 				let mut len = 0;
 				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
 
 				Ok((node_dims, unsafe { std::slice::from_raw_parts(output_array_ptr, len as _) }))
+			} else {
+				Err(Error::DataTypeMismatch {
+					actual: data_type,
+					requested: T::tensor_element_type()
+				})
 			}
 		};
 		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
@@ -312,10 +387,10 @@ impl Value {
 				let mut vec = Vec::with_capacity(len as usize);
 				for i in 0..len {
 					let mut value_ptr = ptr::null_mut();
-					ortsys![unsafe GetValue(self.ptr(), i as _, allocator.ptr, &mut value_ptr) -> Error::ExtractSequence; nonNull(value_ptr)];
+					ortsys![unsafe GetValue(self.ptr(), i as _, allocator.ptr.as_ptr(), &mut value_ptr) -> Error::ExtractSequence; nonNull(value_ptr)];
 
 					vec.push(ValueRef {
-						inner: unsafe { Value::from_raw_ref(value_ptr) },
+						inner: unsafe { Value::from_ptr(NonNull::new_unchecked(value_ptr), None) },
 						lifetime: PhantomData
 					});
 				}
@@ -325,7 +400,7 @@ impl Value {
 		}
 	}
 
-	pub fn extract_map<K: ExtractTensorData + Clone + Hash + Eq, V: ExtractTensorData + Clone>(&self, allocator: &Allocator) -> Result<HashMap<K, V>> {
+	pub fn extract_map<K: ExtractTensorDataView + Clone + Hash + Eq, V: ExtractTensorDataView + Clone>(&self, allocator: &Allocator) -> Result<HashMap<K, V>> {
 		match self.dtype()? {
 			ValueType::Map { key, value } => {
 				let k_type = K::tensor_element_type();
@@ -338,13 +413,13 @@ impl Value {
 				}
 
 				let mut key_tensor_ptr = ptr::null_mut();
-				ortsys![unsafe GetValue(self.ptr(), 0, allocator.ptr, &mut key_tensor_ptr) -> Error::ExtractMap; nonNull(key_tensor_ptr)];
-				let key_value = unsafe { Value::from_raw_ref(key_tensor_ptr) };
+				ortsys![unsafe GetValue(self.ptr(), 0, allocator.ptr.as_ptr(), &mut key_tensor_ptr) -> Error::ExtractMap; nonNull(key_tensor_ptr)];
+				let key_value = unsafe { Value::from_ptr(NonNull::new_unchecked(key_tensor_ptr), None) };
 				let (key_tensor_shape, key_tensor) = key_value.extract_raw_tensor::<K>()?;
 
 				let mut value_tensor_ptr = ptr::null_mut();
-				ortsys![unsafe GetValue(self.ptr(), 1, allocator.ptr, &mut value_tensor_ptr) -> Error::ExtractMap; nonNull(value_tensor_ptr)];
-				let value_value = unsafe { Value::from_raw_ref(value_tensor_ptr) };
+				ortsys![unsafe GetValue(self.ptr(), 1, allocator.ptr.as_ptr(), &mut value_tensor_ptr) -> Error::ExtractMap; nonNull(value_tensor_ptr)];
+				let value_value = unsafe { Value::from_ptr(NonNull::new_unchecked(value_tensor_ptr), None) };
 				let (value_tensor_shape, value_tensor) = value_value.extract_raw_tensor::<V>()?;
 
 				assert_eq!(key_tensor_shape.len(), 1);
@@ -360,6 +435,28 @@ impl Value {
 			t => Err(Error::NotMap(t))
 		}
 	}
+
+	/// Construct a [`Value`] from a C++ [`ort_sys::OrtValue`] pointer.
+	///
+	/// If the value belongs to a session (i.e. if it is returned from [`crate::Session::run`] or
+	/// [`crate::IoBinding::run`]), you must provide the [`SharedSessionInner`] (acquired from
+	/// [`crate::Session::inner`]). This ensures the session is not dropped until the value is.
+	///
+	/// # Safety
+	///
+	/// - `ptr` must be a valid pointer to an [`ort_sys::OrtValue`].
+	/// - `session` must be `Some` for values returned from a session.
+	#[must_use]
+	pub unsafe fn from_ptr(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value {
+		match session {
+			Some(session) => Value {
+				inner: ValueInner::CppOwned { ptr, _session: session }
+			},
+			None => Value {
+				inner: ValueInner::CppOwnedRef { ptr }
+			}
+		}
+	}
 }
 
 pub trait OrtInput {
@@ -370,9 +467,41 @@ pub trait OrtInput {
 }
 
 impl Value {
-	/// Construct a [`Value`] from a Rust-owned array.
+	/// Construct a tensor [`Value`] from an array of data.
 	///
-	/// `allocator` is required to be `Some` when converting a String tensor. See [`crate::Session::allocator`].
+	/// Tensor `Value`s can be created from:
+	/// - (with feature `ndarray`) a shared reference to a [`ndarray::CowArray`] (`&CowArray<'_, T, D>`);
+	/// - (with feature `ndarray`) a mutable/exclusive reference to an [`ndarray::ArcArray`] (`&mut ArcArray<T, D>`);
+	/// - (with feature `ndarray`) an owned [`ndarray::Array`];
+	/// - (with feature `ndarray`) a borrowed view of another array, as an [`ndarray::ArrayView`] (`ArrayView<'_, T,
+	///   D>`);
+	/// - a tuple of `(dimensions, data)` where `dimensions` is a `Vec<i64>` and `data` is an `Arc<Box<[T]>>` (referred
+	///   to as "raw data").
+	///
+	/// ```
+	/// # use std::sync::Arc;
+	/// # use ort::Value;
+	/// # fn main() -> ort::Result<()> {
+	/// // Create a tensor from a raw data vector
+	/// let value =
+	/// 	Value::from_array((vec![1, 2, 3], Arc::new(vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0].into_boxed_slice())))?;
+	///
+	/// // Create a tensor from an `ndarray::Array`
+	/// #[cfg(feature = "ndarray")]
+	/// let value = Value::from_array(ndarray::Array4::<f32>::zeros((1, 16, 16, 3)))?;
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	///
+	/// Creating string tensors requires a separate method; see [`Value::from_string_array`].
+	///
+	/// Note that data provided in an `ndarray` may be copied in some circumstances:
+	/// - `&CowArray<'_, T, D>` will always be copied regardless of whether it is uniquely owned or borrowed.
+	/// - `&mut ArcArray<T, D>` and `Array<T, D>` will be copied only if the data is not in a contiguous layout (which
+	///   is the case after most reshape operations)
+	/// - `ArrayView<'_, T, D>` will always be copied.
+	///
+	/// Raw data will never be copied. The data is expected to be in standard, contigous layout.
 	pub fn from_array<T: IntoTensorElementType + Debug + Clone + 'static>(input: impl OrtInput<Item = T>) -> Result<Value> {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemoryType::Default)?;
 
@@ -396,12 +525,12 @@ impl Value {
 				let shape_ptr: *const i64 = shape.as_ptr();
 				let shape_len = shape.len();
 
-				let tensor_values_ptr: *mut std::ffi::c_void = ptr as *mut std::ffi::c_void;
+				let tensor_values_ptr: *mut std::ffi::c_void = ptr.cast();
 				assert_non_null_pointer(tensor_values_ptr, "TensorValues")?;
 
 				ortsys![
 					unsafe CreateTensorWithDataAsOrtValue(
-						memory_info.ptr,
+						memory_info.ptr.as_ptr(),
 						tensor_values_ptr,
 						(ptr_len * std::mem::size_of::<T>()) as _,
 						shape_ptr,
@@ -424,12 +553,12 @@ impl Value {
 				let shape_ptr: *const i64 = shape.as_ptr();
 				let shape_len = shape.len();
 
-				let tensor_values_ptr: *mut std::ffi::c_void = ptr as *mut std::ffi::c_void;
+				let tensor_values_ptr: *mut std::ffi::c_void = ptr.cast();
 				assert_non_null_pointer(tensor_values_ptr, "TensorValues")?;
 
 				ortsys![
 					unsafe CreateTensorWithDataAsOrtValue(
-						memory_info.ptr,
+						memory_info.ptr.as_ptr(),
 						tensor_values_ptr,
 						(ptr_len * std::mem::size_of::<T>()) as _,
 						shape_ptr,
@@ -452,14 +581,46 @@ impl Value {
 
 		Ok(Value {
 			inner: ValueInner::RustOwned {
-				ptr: value_ptr,
+				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
 				_array: guard,
 				_memory_info: memory_info
 			}
 		})
 	}
 
-	/// Construct a [`Value`] from a Rust-owned array.
+	/// Construct a [`Value`] from an array of strings.
+	///
+	/// Just like numeric tensors, string tensor `Value`s can be created from:
+	/// - (with feature `ndarray`) a shared reference to a [`ndarray::CowArray`] (`&CowArray<'_, T, D>`);
+	/// - (with feature `ndarray`) a mutable/exclusive reference to an [`ndarray::ArcArray`] (`&mut ArcArray<T, D>`);
+	/// - (with feature `ndarray`) an owned [`ndarray::Array`];
+	/// - (with feature `ndarray`) a borrowed view of another array, as an [`ndarray::ArrayView`] (`ArrayView<'_, T,
+	///   D>`);
+	/// - a tuple of `(dimensions, data)` where `dimensions` is a `Vec<i64>` and `data` is an `Arc<Box<[T]>>` (referred
+	///   to as "raw data").
+	///
+	/// ```
+	/// # use std::sync::Arc;
+	/// # use ort::{Session, Value};
+	/// # fn main() -> ort::Result<()> {
+	/// # 	let session = Session::builder()?.with_model_from_file("tests/data/vectorizer.onnx")?;
+	/// // You'll need to obtain an `Allocator` from a session in order to create string tensors.
+	/// let allocator = session.allocator();
+	///
+	/// // Create a string tensor from a raw data vector
+	/// let value = Value::from_string_array(allocator, (vec![2], Arc::new(vec!["hello", "world"].into_boxed_slice())))?;
+	///
+	/// // Create a string tensor from an `ndarray::Array`
+	/// #[cfg(feature = "ndarray")]
+	/// let value = Value::from_string_array(
+	/// 	allocator,
+	/// 	ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap()
+	/// )?;
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	///
+	/// Note that string data will always be copied, no matter what data is provided.
 	pub fn from_string_array<T: Utf8Data + Debug + Clone + 'static>(allocator: &Allocator, input: impl OrtInput<Item = T>) -> Result<Value> {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemoryType::Default)?;
 
@@ -471,7 +632,7 @@ impl Value {
 
 		// create tensor without data -- data is filled in later
 		ortsys![
-			unsafe CreateTensorAsOrtValue(allocator.ptr, shape_ptr, shape_len as _, TensorElementType::String.into(), &mut value_ptr)
+			unsafe CreateTensorAsOrtValue(allocator.ptr.as_ptr(), shape_ptr, shape_len as _, TensorElementType::String.into(), &mut value_ptr)
 				-> Error::CreateTensor;
 			nonNull(value_ptr)
 		];
@@ -494,7 +655,7 @@ impl Value {
 
 		Ok(Value {
 			inner: ValueInner::RustOwned {
-				ptr: value_ptr,
+				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
 				_array: Box::new(()),
 				_memory_info: memory_info
 			}
@@ -503,13 +664,22 @@ impl Value {
 
 	pub(crate) fn ptr(&self) -> *mut ort_sys::OrtValue {
 		match &self.inner {
-			ValueInner::CppOwnedRef { ptr } => *ptr,
-			ValueInner::CppOwned { ptr, .. } => *ptr,
-			ValueInner::RustOwned { ptr, .. } => *ptr
+			ValueInner::CppOwnedRef { ptr } | ValueInner::CppOwned { ptr, .. } | ValueInner::RustOwned { ptr, .. } => ptr.as_ptr()
 		}
 	}
 
-	/// Returns `true` if this value is a tensor, or false if it is another type (sequence, map)
+	/// Returns `true` if this value is a tensor, or `false` if it is another type (sequence, map).
+	///
+	/// ```
+	/// # use std::sync::Arc;
+	/// # use ort::Value;
+	/// # fn main() -> ort::Result<()> {
+	/// // Create a tensor from a raw data vector
+	/// let tensor_value = Value::from_array((vec![3], Arc::new(vec![1.0_f32, 2.0, 3.0].into_boxed_slice())))?;
+	/// assert!(tensor_value.is_tensor()?);
+	/// # 	Ok(())
+	/// # }
+	/// ```
 	pub fn is_tensor(&self) -> Result<bool> {
 		let mut result = 0;
 		ortsys![unsafe IsTensor(self.ptr(), &mut result) -> Error::GetTensorElementType];
@@ -630,7 +800,7 @@ impl<T: Clone + Debug + 'static> OrtInput for (Vec<i64>, Arc<Box<[T]>>) {
 
 	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
 		let shape = self.0.clone();
-		let data = self.1.deref();
+		let data = &*self.1;
 		(shape, data)
 	}
 
@@ -690,7 +860,6 @@ impl<T: IntoTensorElementType + Debug + Clone + 'static> TryFrom<(Vec<i64>, Arc<
 }
 
 impl Drop for Value {
-	#[tracing::instrument]
 	fn drop(&mut self) {
 		let ptr = self.ptr();
 		tracing::trace!(
@@ -779,7 +948,7 @@ mod tests {
 		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
 		let value = Value::from_array(Array1::from_vec(v.clone()))?;
 		assert!(value.is_tensor()?);
-		assert_eq!(value.tensor_element_type()?, TensorElementType::Float32);
+		assert_eq!(value.dtype()?.tensor_type(), Some(TensorElementType::Float32));
 		assert_eq!(
 			value.dtype()?,
 			ValueType::Tensor {
@@ -828,6 +997,19 @@ mod tests {
 		let value = Value::from_array((shape, Arc::clone(&arc)))?;
 		drop(arc);
 		assert_eq!(value.extract_raw_tensor::<f32>()?.1, &v);
+
+		Ok(())
+	}
+
+	#[test]
+	#[cfg(feature = "ndarray")]
+	fn test_string_tensor() -> crate::Result<()> {
+		let allocator = Allocator::default();
+		let v = Array1::from_vec(vec!["hello world".to_string(), "こんにちは世界".to_string()]);
+
+		let value = Value::from_string_array(&allocator, v.view())?;
+		let extracted = value.extract_tensor::<String>()?;
+		assert_eq!(*extracted.view(), v.into_dyn().view());
 
 		Ok(())
 	}

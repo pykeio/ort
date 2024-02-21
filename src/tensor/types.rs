@@ -1,6 +1,6 @@
 use std::fmt::{self, Debug};
 #[cfg(feature = "ndarray")]
-use std::{ffi, ptr, result, string};
+use std::{ptr, result, string};
 
 #[cfg(feature = "ndarray")]
 use super::{ortsys, Error, Result};
@@ -169,6 +169,10 @@ pub trait ExtractTensorData: Sized + fmt::Debug + Clone {
 		D: ndarray::Dimension;
 }
 
+/// Marker type to specify that a type has the same representation in Rust as in C (which is true for every type except
+/// strings), and thus a tensor value's data can be safely reinterpreted as a slice from a pointer of values.
+pub trait ExtractTensorDataView: ExtractTensorData {}
+
 /// Represents the possible ways tensor data can be accessed.
 ///
 /// This should only be used internally.
@@ -210,6 +214,8 @@ macro_rules! impl_prim_type_from_ort_trait {
 				extract_primitive_array(shape, tensor_ptr).map(|v| TensorData::PrimitiveView { ptr: tensor_ptr, array_view: v })
 			}
 		}
+
+		impl ExtractTensorDataView for $type_ {}
 	};
 }
 
@@ -225,7 +231,7 @@ where
 	// Get pointer to output tensor values
 	let mut output_array_ptr: *mut T = ptr::null_mut();
 	let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
-	let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr as *mut *mut std::ffi::c_void;
+	let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
 	ortsys![unsafe GetTensorMutableData(tensor, output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
 
 	let array_view = unsafe { ndarray::ArrayView::from_shape_ptr(shape, output_array_ptr) }.into_dyn();
@@ -276,7 +282,7 @@ impl ExtractTensorData for String {
 		// length calculations easy
 		let mut offsets = vec![0; tensor_element_len + 1];
 
-		ortsys![unsafe GetStringTensorContent(tensor_ptr, string_contents.as_mut_ptr() as *mut ffi::c_void, total_length as _, offsets.as_mut_ptr(), tensor_element_len as _) -> Error::GetStringTensorContent];
+		ortsys![unsafe GetStringTensorContent(tensor_ptr, string_contents.as_mut_ptr().cast(), total_length as _, offsets.as_mut_ptr(), tensor_element_len as _) -> Error::GetStringTensorContent];
 
 		// final offset = overall length so that per-string length calculations work for the last string
 		debug_assert_eq!(0, offsets[tensor_element_len]);

@@ -16,12 +16,14 @@ pub struct CoreMLExecutionProvider {
 impl CoreMLExecutionProvider {
 	/// Limit CoreML to running on CPU only. This may decrease the performance but will provide reference output value
 	/// without precision loss, which is useful for validation.
+	#[must_use]
 	pub fn with_cpu_only(mut self) -> Self {
 		self.use_cpu_only = true;
 		self
 	}
 
 	/// Enable CoreML EP to run on a subgraph in the body of a control flow operator (i.e. a Loop, Scan or If operator).
+	#[must_use]
 	pub fn with_subgraphs(mut self) -> Self {
 		self.enable_on_subgraph = true;
 		self
@@ -30,11 +32,13 @@ impl CoreMLExecutionProvider {
 	/// By default the CoreML EP will be enabled for all compatible Apple devices. Setting this option will only enable
 	/// CoreML EP for Apple devices with a compatible Apple Neural Engine (ANE). Note, enabling this option does not
 	/// guarantee the entire model to be executed using ANE only.
+	#[must_use]
 	pub fn with_ane_only(mut self) -> Self {
 		self.only_enable_device_with_ane = true;
 		self
 	}
 
+	#[must_use]
 	pub fn build(self) -> ExecutionProviderDispatch {
 		self.into()
 	}
@@ -70,8 +74,10 @@ impl ExecutionProvider for CoreMLExecutionProvider {
 			if self.only_enable_device_with_ane {
 				flags |= 0x004;
 			}
-			return crate::error::status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_CoreML(session_builder.session_options_ptr, flags) })
-				.map_err(Error::ExecutionProvider);
+			return crate::error::status_to_result(unsafe {
+				OrtSessionOptionsAppendExecutionProvider_CoreML(session_builder.session_options_ptr.as_ptr(), flags)
+			})
+			.map_err(Error::ExecutionProvider);
 		}
 
 		Err(Error::ExecutionProviderNotRegistered(self.as_str()))

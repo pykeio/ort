@@ -36,10 +36,7 @@ use crate::{environment::Environment, operator::OperatorDomain, MemoryInfo};
 
 pub(crate) mod input;
 pub(crate) mod output;
-pub use self::{
-	input::{SessionInputKey, SessionInputs},
-	output::SessionOutputs
-};
+pub use self::{input::SessionInputs, output::SessionOutputs};
 
 /// Creates a session using the builder pattern.
 ///

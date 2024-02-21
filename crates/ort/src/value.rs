@@ -412,12 +412,7 @@ impl Value {
 			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
 			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 			let data_type: TensorElementType = type_sys.into();
-			if data_type != T::tensor_element_type() {
-				Err(Error::DataTypeMismatch {
-					actual: data_type,
-					requested: T::tensor_element_type()
-				})
-			} else {
+			if data_type == T::tensor_element_type() {
 				// Note: Both tensor and array will point to the same data, nothing is copied.
 				// As such, there is no need to free the pointer used to create the slice.
 				assert_ne!(self.ptr(), ptr::null_mut());
@@ -428,13 +423,18 @@ impl Value {
 
 				let mut output_array_ptr: *mut T = ptr::null_mut();
 				let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
-				let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr as *mut *mut std::ffi::c_void;
+				let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
 				ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
 
 				let mut len = 0;
 				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
 
 				Ok((node_dims, unsafe { std::slice::from_raw_parts_mut(output_array_ptr, len as _) }))
+			} else {
+				Err(Error::DataTypeMismatch {
+					actual: data_type,
+					requested: T::tensor_element_type()
+				})
 			}
 		};
 		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];

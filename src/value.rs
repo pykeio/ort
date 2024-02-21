@@ -767,6 +767,8 @@ pub(crate) unsafe fn extract_data_type_from_map_info(info_ptr: *const ort_sys::O
 
 #[cfg(test)]
 mod tests {
+	use std::sync::Arc;
+
 	use ndarray::{ArcArray1, Array1, CowArray};
 
 	use crate::*;

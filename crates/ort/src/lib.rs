@@ -22,14 +22,14 @@ pub(crate) mod tensor;
 pub(crate) mod value;
 
 #[cfg(feature = "load-dynamic")]
-use std::sync::MutexGuard;
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::{
 	ffi::{self, CStr},
 	os::raw::c_char,
 	ptr,
 	sync::{
 		atomic::{AtomicPtr, Ordering},
-		Arc, Mutex, OnceLock
+		OnceLock
 	}
 };
 

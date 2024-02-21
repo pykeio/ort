@@ -15,6 +15,7 @@ pub enum QNNExecutionProviderPerformanceMode {
 }
 
 impl QNNExecutionProviderPerformanceMode {
+	#[must_use]
 	pub fn as_str(&self) -> &'static str {
 		match self {
 			QNNExecutionProviderPerformanceMode::Default => "default",
@@ -60,6 +61,7 @@ pub struct QNNExecutionProvider {
 impl QNNExecutionProvider {
 	/// The file path to QNN backend library. On Linux/Android, this is `libQnnCpu.so` to use the CPU backend,
 	/// or `libQnnHtp.so` to use the accelerated backend.
+	#[must_use]
 	pub fn with_backend_path(mut self, path: impl ToString) -> Self {
 		self.backend_path = Some(path.to_string());
 		self
@@ -67,6 +69,7 @@ impl QNNExecutionProvider {
 
 	/// Configure whether to enable QNN graph creation from a cached QNN context file. If enabled, the QNN EP
 	/// will load from the cached QNN context binary if it exists, or create one if it does not exist.
+	#[must_use]
 	pub fn with_enable_context_cache(mut self, enable: bool) -> Self {
 		self.qnn_context_cache_enable = Some(enable);
 		self
@@ -74,27 +77,32 @@ impl QNNExecutionProvider {
 
 	/// Explicitly provide the QNN context cache file (see [`QNNExecutionProvider::with_enable_context_cache`]).
 	/// Defaults to `model_file.onnx.bin` if not provided.
+	#[must_use]
 	pub fn with_context_cache_path(mut self, path: impl ToString) -> Self {
 		self.qnn_context_cache_path = Some(path.to_string());
 		self
 	}
 
+	#[must_use]
 	pub fn with_profiling(mut self, level: QNNExecutionProviderProfilingLevel) -> Self {
 		self.profiling_level = Some(level);
 		self
 	}
 
 	/// Allows client to set up RPC control latency in microseconds.
+	#[must_use]
 	pub fn with_rpc_control_latency(mut self, latency: u32) -> Self {
 		self.rpc_control_latency = Some(latency);
 		self
 	}
 
+	#[must_use]
 	pub fn with_performance_mode(mut self, mode: QNNExecutionProviderPerformanceMode) -> Self {
 		self.htp_performance_mode = Some(mode);
 		self
 	}
 
+	#[must_use]
 	pub fn build(self) -> ExecutionProviderDispatch {
 		self.into()
 	}
@@ -121,15 +129,15 @@ impl ExecutionProvider for QNNExecutionProvider {
 		{
 			let (key_ptrs, value_ptrs, len, _keys, _values) = super::map_keys! {
 				backend_path = self.backend_path.clone(),
-				profiling_level = self.profiling_level.as_ref().map(|v| v.as_str()),
+				profiling_level = self.profiling_level.as_ref().map(QNNExecutionProviderProfilingLevel::as_str),
 				qnn_context_cache_enable = self.qnn_context_cache_enable.map(<bool as Into<i32>>::into),
 				qnn_context_cache_path = self.qnn_context_cache_path.clone(),
-				htp_performance_mode = self.htp_performance_mode.as_ref().map(|v| v.as_str()),
+				htp_performance_mode = self.htp_performance_mode.as_ref().map(QNNExecutionProviderPerformanceMode::as_str),
 				rpc_control_latency = self.rpc_control_latency
 			};
 			let ep_name = std::ffi::CString::new("QNN").unwrap();
 			return crate::error::status_to_result(crate::ortsys![unsafe SessionOptionsAppendExecutionProvider(
-				session_builder.session_options_ptr,
+				session_builder.session_options_ptr.as_ptr(),
 				ep_name.as_ptr(),
 				key_ptrs.as_ptr(),
 				value_ptrs.as_ptr(),

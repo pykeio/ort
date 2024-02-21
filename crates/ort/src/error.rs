@@ -139,6 +139,9 @@ pub enum Error {
 	/// Error occurred when unterminating run options.
 	#[error("Failed to unterminate run options: {0}")]
 	RunOptionsUnsetTerminate(ErrorInternal),
+	/// Error occurred when setting run tag.
+	#[error("Failed to set run tag: {0}")]
+	RunOptionsSetTag(ErrorInternal),
 	/// Error occurred when converting data to a String
 	#[error("Data was not UTF-8: {0}")]
 	StringFromUtf8Error(#[from] string::FromUtf8Error),
@@ -172,10 +175,10 @@ pub enum Error {
 	WideFfiStringNull(#[from] widestring::error::ContainsNul<u16>),
 	#[error("`{0}` should be a null pointer")]
 	/// ORT pointer should have been null
-	PointerShouldBeNull(String),
+	PointerShouldBeNull(&'static str),
 	/// ORT pointer should not have been null
 	#[error("`{0}` should not be a null pointer")]
-	PointerShouldNotBeNull(String),
+	PointerShouldNotBeNull(&'static str),
 	/// The runtime type was undefined.
 	#[error("Undefined tensor element type")]
 	UndefinedTensorElementType,
@@ -286,6 +289,16 @@ pub enum ErrorInternal {
 	IntoStringError(std::ffi::IntoStringError)
 }
 
+impl ErrorInternal {
+	#[must_use]
+	pub fn as_str(&self) -> Option<&str> {
+		match self {
+			ErrorInternal::Msg(msg) => Some(msg.as_str()),
+			ErrorInternal::IntoStringError(_) => None
+		}
+	}
+}
+
 /// Error from downloading pre-trained model from the [ONNX Model Zoo](https://github.com/onnx/models).
 #[non_exhaustive]
 #[derive(Error, Debug)]
@@ -322,14 +335,12 @@ impl From<*mut ort_sys::OrtStatus> for OrtStatusWrapper {
 	}
 }
 
-pub(crate) fn assert_null_pointer<T>(ptr: *const T, name: &str) -> Result<()> {
-	ptr.is_null().then_some(()).ok_or_else(|| Error::PointerShouldBeNull(name.to_owned()))
+pub(crate) fn assert_null_pointer<T>(ptr: *const T, name: &'static str) -> Result<()> {
+	ptr.is_null().then_some(()).ok_or_else(|| Error::PointerShouldBeNull(name))
 }
 
-pub(crate) fn assert_non_null_pointer<T>(ptr: *const T, name: &str) -> Result<()> {
-	(!ptr.is_null())
-		.then_some(())
-		.ok_or_else(|| Error::PointerShouldNotBeNull(name.to_owned()))
+pub(crate) fn assert_non_null_pointer<T>(ptr: *const T, name: &'static str) -> Result<()> {
+	(!ptr.is_null()).then_some(()).ok_or_else(|| Error::PointerShouldNotBeNull(name))
 }
 
 impl From<OrtStatusWrapper> for Result<(), ErrorInternal> {

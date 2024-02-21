@@ -1,46 +1,22 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 use crate::Value;
 
-pub enum SessionInputKey<'i> {
-	Borrowed(&'i str),
-	Owned(String)
-}
-
-impl<'i> From<&'i str> for SessionInputKey<'i> {
-	fn from(value: &'i str) -> Self {
-		Self::Borrowed(value)
-	}
-}
-impl<'i> From<String> for SessionInputKey<'i> {
-	fn from(value: String) -> Self {
-		Self::Owned(value)
-	}
-}
-
-impl<'i> SessionInputKey<'i> {
-	pub fn as_str(&self) -> &str {
-		match self {
-			Self::Borrowed(s) => s,
-			Self::Owned(s) => s.as_str()
-		}
-	}
-}
-
+/// The inputs to a [`crate::Session::run`] call.
 pub enum SessionInputs<'i, const N: usize = 0> {
-	ValueMap(Vec<(SessionInputKey<'i>, Value)>),
+	ValueMap(Vec<(Cow<'i, str>, Value)>),
 	ValueSlice(&'i [Value]),
 	ValueArray([Value; N])
 }
 
-impl<'i, K: Into<SessionInputKey<'i>>> From<HashMap<K, Value>> for SessionInputs<'i> {
+impl<'i, K: Into<Cow<'i, str>>> From<HashMap<K, Value>> for SessionInputs<'i> {
 	fn from(val: HashMap<K, Value>) -> Self {
 		SessionInputs::ValueMap(val.into_iter().map(|(k, v)| (k.into(), v)).collect())
 	}
 }
 
-impl<'i> From<Vec<(SessionInputKey<'i>, Value)>> for SessionInputs<'i> {
-	fn from(val: Vec<(SessionInputKey<'i>, Value)>) -> Self {
+impl<'i> From<Vec<(Cow<'i, str>, Value)>> for SessionInputs<'i> {
+	fn from(val: Vec<(Cow<'i, str>, Value)>) -> Self {
 		SessionInputs::ValueMap(val)
 	}
 }
@@ -57,13 +33,12 @@ impl<'i, const N: usize> From<[Value; N]> for SessionInputs<'i, N> {
 	}
 }
 
-/// Construct the inputs to a session from an array or map of values.
+/// Construct the inputs to a session from an array or named map of values.
 ///
-/// The result of this macro is an `Result<SessionInputs, OrtError>`, so make sure you `?` on the result.
+/// See [`Value::from_array`] for details on what types a tensor can be created from.
 ///
-/// For tensors, note that using certain array structures can have performance implications.
-/// - `&CowArray`, `ArrayView` will **always** be copied.
-/// - `Array`, `&mut ArcArray` will only be copied **if the tensor is not contiguous** (i.e. has been reshaped).
+/// Note that the output of this macro is a `Result<SessionInputs, OrtError>`, so make sure to handle any potential
+/// errors.
 ///
 /// # Example
 ///
@@ -74,9 +49,23 @@ impl<'i, const N: usize> From<[Value; N]> for SessionInputs<'i, N> {
 /// # use ndarray::Array1;
 /// # use ort::{GraphOptimizationLevel, Session};
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// let mut session = Session::builder()?.with_model_from_file("model.onnx")?;
+/// # 	let mut session = Session::builder()?.with_model_from_file("model.onnx")?;
 /// let _ = session.run(ort::inputs![Array1::from_vec(vec![1, 2, 3, 4, 5])]?);
-/// # Ok(())
+/// # 	Ok(())
+/// # }
+/// ```
+///
+/// Note that string tensors must be created manually with [`Value::from_string_array`].
+///
+/// ```no_run
+/// # use std::{error::Error, sync::Arc};
+/// # use ndarray::Array1;
+/// # use ort::{GraphOptimizationLevel, Session, Value};
+/// # fn main() -> Result<(), Box<dyn Error>> {
+/// # 	let mut session = Session::builder()?.with_model_from_file("model.onnx")?;
+/// let _ = session
+/// 	.run(ort::inputs![Value::from_string_array(session.allocator(), Array1::from_vec(vec!["hello", "world"]))?]?);
+/// # 	Ok(())
 /// # }
 /// ```
 ///
@@ -87,11 +76,11 @@ impl<'i, const N: usize> From<[Value; N]> for SessionInputs<'i, N> {
 /// # use ndarray::Array1;
 /// # use ort::{GraphOptimizationLevel, Session};
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// let mut session = Session::builder()?.with_model_from_file("model.onnx")?;
+/// # 	let mut session = Session::builder()?.with_model_from_file("model.onnx")?;
 /// let _ = session.run(ort::inputs! {
 /// 	"tokens" => Array1::from_vec(vec![1, 2, 3, 4, 5])
 /// }?);
-/// # Ok(())
+/// # 	Ok(())
 /// # }
 /// ```
 #[macro_export]
@@ -103,7 +92,7 @@ macro_rules! inputs {
 	);
 	($($n:expr => $v:expr),+ $(,)?) => (
 		(|| -> $crate::Result<_> {
-			Ok(vec![$(::std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::Error::from).map(|v| ($crate::SessionInputKey::from($n), v))?,)+])
+			Ok(vec![$(::std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::Error::from).map(|v| (($n).into(), v))?,)+])
 		})()
 	);
 }

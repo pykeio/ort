@@ -9,11 +9,13 @@ pub struct XNNPACKExecutionProvider {
 }
 
 impl XNNPACKExecutionProvider {
+	#[must_use]
 	pub fn with_intra_op_num_threads(mut self, num_threads: NonZeroUsize) -> Self {
 		self.intra_op_num_threads = Some(num_threads);
 		self
 	}
 
+	#[must_use]
 	pub fn build(self) -> ExecutionProviderDispatch {
 		self.into()
 	}
@@ -48,7 +50,7 @@ impl ExecutionProvider for XNNPACKExecutionProvider {
 			};
 			let ep_name = std::ffi::CString::new("XNNPACK").unwrap();
 			return crate::error::status_to_result(crate::ortsys![unsafe SessionOptionsAppendExecutionProvider(
-				session_builder.session_options_ptr,
+				session_builder.session_options_ptr.as_ptr(),
 				ep_name.as_ptr(),
 				key_ptrs.as_ptr(),
 				value_ptrs.as_ptr(),

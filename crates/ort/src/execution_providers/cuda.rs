@@ -51,6 +51,7 @@ pub struct CUDAExecutionProvider {
 }
 
 impl CUDAExecutionProvider {
+	#[must_use]
 	pub fn with_device_id(mut self, device_id: i32) -> Self {
 		self.device_id = Some(device_id);
 		self
@@ -58,12 +59,14 @@ impl CUDAExecutionProvider {
 
 	/// Configure the size limit of the device memory arena in bytes. This size limit is only for the execution
 	/// provider’s arena. The total device memory usage may be higher.
+	#[must_use]
 	pub fn with_memory_limit(mut self, limit: usize) -> Self {
 		self.gpu_mem_limit = Some(limit as _);
 		self
 	}
 
 	/// Confiure the strategy for extending the device's memory arena.
+	#[must_use]
 	pub fn with_arena_extend_strategy(mut self, strategy: ArenaExtendStrategy) -> Self {
 		self.arena_extend_strategy = Some(strategy);
 		self
@@ -73,6 +76,7 @@ impl CUDAExecutionProvider {
 	/// “optimal” convolution algorithm to use while performing the convolution operation for the given input
 	/// configuration (input shape, filter shape, etc.) in each `Conv` node. This option controlls the type of search
 	/// done for cuDNN convolution algorithms. See [`CUDAExecutionProviderCuDNNConvAlgoSearch`] for more info.
+	#[must_use]
 	pub fn with_conv_algorithm_search(mut self, search: CUDAExecutionProviderCuDNNConvAlgoSearch) -> Self {
 		self.cudnn_conv_algo_search = Some(search);
 		self
@@ -80,6 +84,7 @@ impl CUDAExecutionProvider {
 
 	/// Whether to do copies in the default stream or use separate streams. The recommended setting is true. If false,
 	/// there are race conditions and possibly better performance.
+	#[must_use]
 	pub fn with_copy_in_default_stream(mut self, enable: bool) -> Self {
 		self.do_copy_in_default_stream = Some(enable);
 		self
@@ -93,6 +98,7 @@ impl CUDAExecutionProvider {
 	///
 	/// When `with_conv_max_workspace` is set to false, ORT will clamp the workspace size to 32 MB, which may lead to
 	/// cuDNN selecting a suboptimal convolution algorithm. The recommended (and default) value is `true`.
+	#[must_use]
 	pub fn with_conv_max_workspace(mut self, enable: bool) -> Self {
 		self.cudnn_conv_use_max_workspace = Some(enable);
 		self
@@ -104,6 +110,7 @@ impl CUDAExecutionProvider {
 	/// the same output, the performance may differ because different convolution algorithms are selected,
 	/// especially on some devices such as A100. By default, the input is padded to `[N, C, D, 1]`. Set this option to
 	/// true to instead use `[N, C, 1, D]`.
+	#[must_use]
 	pub fn with_conv1d_pad_to_nc1d(mut self, enable: bool) -> Self {
 		self.cudnn_conv1d_pad_to_nc1d = Some(enable);
 		self
@@ -132,6 +139,7 @@ impl CUDAExecutionProvider {
 	/// > allocations, capturing the CUDA graph for the model, and then performing a graph replay to ensure that the
 	/// > graph runs. Due to this, the latency associated with the first `run()` is bound to be high. Subsequent
 	/// > `run()`s only perform graph replays of the graph captured and cached in the first `run()`.
+	#[must_use]
 	pub fn with_cuda_graph(mut self) -> Self {
 		self.enable_cuda_graph = Some(true);
 		self
@@ -139,11 +147,13 @@ impl CUDAExecutionProvider {
 
 	/// Whether to use strict mode in the `SkipLayerNormalization` implementation. The default and recommanded setting
 	/// is `false`. If enabled, accuracy may improve slightly, but performance may decrease.
+	#[must_use]
 	pub fn with_skip_layer_norm_strict_mode(mut self) -> Self {
 		self.enable_skip_layer_norm_strict_mode = Some(true);
 		self
 	}
 
+	#[must_use]
 	pub fn build(self) -> ExecutionProviderDispatch {
 		self.into()
 	}
@@ -197,7 +207,7 @@ impl ExecutionProvider for CUDAExecutionProvider {
 				return Err(e);
 			}
 
-			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(session_builder.session_options_ptr, cuda_options)];
+			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(session_builder.session_options_ptr.as_ptr(), cuda_options)];
 			crate::ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
 			std::mem::drop((keys, values));
 			return crate::error::status_to_result(status).map_err(Error::ExecutionProvider);

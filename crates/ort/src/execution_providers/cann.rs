@@ -36,6 +36,7 @@ pub struct CANNExecutionProvider {
 }
 
 impl CANNExecutionProvider {
+	#[must_use]
 	pub fn with_device_id(mut self, device_id: i32) -> Self {
 		self.device_id = Some(device_id);
 		self
@@ -43,12 +44,14 @@ impl CANNExecutionProvider {
 
 	/// Configure the size limit of the device memory arena in bytes. This size limit is only for the execution
 	/// provider’s arena. The total device memory usage may be higher.
+	#[must_use]
 	pub fn with_memory_limit(mut self, limit: usize) -> Self {
 		self.npu_mem_limit = Some(limit);
 		self
 	}
 
 	/// Configure the strategy for extending the device's memory arena.
+	#[must_use]
 	pub fn with_arena_extend_strategy(mut self, strategy: ArenaExtendStrategy) -> Self {
 		self.arena_extend_strategy = Some(strategy);
 		self
@@ -56,18 +59,21 @@ impl CANNExecutionProvider {
 
 	/// Configure whether to use the graph inference engine to speed up performance. The recommended and default setting
 	/// is true. If false, it will fall back to the single-operator inference engine.
+	#[must_use]
 	pub fn with_cann_graph(mut self, enable: bool) -> Self {
 		self.enable_cann_graph = Some(enable);
 		self
 	}
 
 	/// Configure whether to dump the subgraph into ONNX format for analysis of subgraph segmentation.
+	#[must_use]
 	pub fn with_dump_graphs(mut self) -> Self {
 		self.dump_graphs = Some(true);
 		self
 	}
 
 	/// Set the precision mode of the operator. See [`CANNExecutionProviderPrecisionMode`].
+	#[must_use]
 	pub fn with_precision_mode(mut self, mode: CANNExecutionProviderPrecisionMode) -> Self {
 		self.precision_mode = Some(mode);
 		self
@@ -75,6 +81,7 @@ impl CANNExecutionProvider {
 
 	/// Configure the implementation mode for operators. Some CANN operators can have both high-precision and
 	/// high-performance implementations.
+	#[must_use]
 	pub fn with_implementation_mode(mut self, mode: CANNExecutionProviderImplementationMode) -> Self {
 		self.op_select_impl_mode = Some(mode);
 		self
@@ -88,11 +95,13 @@ impl CANNExecutionProvider {
 	/// - `SoftmaxV2`
 	/// - `LRN`
 	/// - `ROIAlign`
+	#[must_use]
 	pub fn with_implementation_mode_oplist(mut self, list: impl ToString) -> Self {
 		self.optypelist_for_impl_mode = Some(list.to_string());
 		self
 	}
 
+	#[must_use]
 	pub fn build(self) -> ExecutionProviderDispatch {
 		self.into()
 	}
@@ -150,7 +159,7 @@ impl ExecutionProvider for CANNExecutionProvider {
 				return Err(e);
 			}
 
-			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_CANN(session_builder.session_options_ptr, cann_options)];
+			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_CANN(session_builder.session_options_ptr.as_ptr(), cann_options)];
 			crate::ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
 			std::mem::drop((keys, values));
 			return crate::error::status_to_result(status).map_err(Error::ExecutionProvider);

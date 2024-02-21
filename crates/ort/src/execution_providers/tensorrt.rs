@@ -34,146 +34,175 @@ pub struct TensorRTExecutionProvider {
 }
 
 impl TensorRTExecutionProvider {
+	#[must_use]
 	pub fn with_device_id(mut self, device_id: i32) -> Self {
 		self.device_id = Some(device_id);
 		self
 	}
 
+	#[must_use]
 	pub fn with_max_workspace_size(mut self, max_size: usize) -> Self {
 		self.max_workspace_size = Some(max_size);
 		self
 	}
 
+	#[must_use]
 	pub fn with_min_subgraph_size(mut self, min_size: usize) -> Self {
 		self.min_subgraph_size = Some(min_size);
 		self
 	}
 
+	#[must_use]
 	pub fn with_max_partition_iterations(mut self, iterations: u32) -> Self {
 		self.max_partition_iterations = Some(iterations);
 		self
 	}
 
+	#[must_use]
 	pub fn with_fp16(mut self, enable: bool) -> Self {
 		self.fp16_enable = Some(enable);
 		self
 	}
 
+	#[must_use]
 	pub fn with_int8(mut self, enable: bool) -> Self {
 		self.int8_enable = Some(enable);
 		self
 	}
 
+	#[must_use]
 	pub fn with_dla(mut self, enable: bool) -> Self {
 		self.dla_enable = Some(enable);
 		self
 	}
 
+	#[must_use]
 	pub fn with_dla_core(mut self, core: u32) -> Self {
 		self.dla_core = Some(core);
 		self
 	}
 
+	#[must_use]
 	pub fn with_int8_calibration_table_name(mut self, name: impl ToString) -> Self {
 		self.int8_calibration_table_name = Some(name.to_string());
 		self
 	}
 
+	#[must_use]
 	pub fn with_int8_use_native_calibration_table(mut self, enable: bool) -> Self {
 		self.int8_use_native_calibration_table = Some(enable);
 		self
 	}
 
+	#[must_use]
 	pub fn with_engine_cache(mut self, enable: bool) -> Self {
 		self.engine_cache_enable = Some(enable);
 		self
 	}
 
+	#[must_use]
 	pub fn with_engine_cache_path(mut self, path: impl ToString) -> Self {
 		self.engine_cache_path = Some(path.to_string());
 		self
 	}
 
+	#[must_use]
 	pub fn with_dump_subgraphs(mut self, enable: bool) -> Self {
 		self.dump_subgraphs = Some(enable);
 		self
 	}
 
+	#[must_use]
 	pub fn with_force_sequential_engine_build(mut self, enable: bool) -> Self {
 		self.force_sequential_engine_build = Some(enable);
 		self
 	}
 
+	#[must_use]
 	pub fn with_context_memory_sharing(mut self, enable: bool) -> Self {
 		self.enable_context_memory_sharing = Some(enable);
 		self
 	}
 
+	#[must_use]
 	pub fn with_layer_norm_fp32_fallback(mut self, enable: bool) -> Self {
 		self.layer_norm_fp32_fallback = Some(enable);
 		self
 	}
 
+	#[must_use]
 	pub fn with_timing_cache(mut self, enable: bool) -> Self {
 		self.timing_cache_enable = Some(enable);
 		self
 	}
 
+	#[must_use]
 	pub fn with_force_timing_cache(mut self, enable: bool) -> Self {
 		self.force_timing_cache = Some(enable);
 		self
 	}
 
+	#[must_use]
 	pub fn with_detailed_build_log(mut self, enable: bool) -> Self {
 		self.detailed_build_log = Some(enable);
 		self
 	}
 
+	#[must_use]
 	pub fn with_build_heuristics(mut self, enable: bool) -> Self {
 		self.enable_build_heuristics = Some(enable);
 		self
 	}
 
+	#[must_use]
 	pub fn with_sparsity(mut self, enable: bool) -> Self {
 		self.enable_sparsity = Some(enable);
 		self
 	}
 
+	#[must_use]
 	pub fn with_builder_optimization_level(mut self, level: u8) -> Self {
 		self.builder_optimization_level = Some(level);
 		self
 	}
 
+	#[must_use]
 	pub fn with_auxiliary_streams(mut self, streams: i8) -> Self {
 		self.auxiliary_streams = Some(streams);
 		self
 	}
 
+	#[must_use]
 	pub fn with_tactic_sources(mut self, sources: impl ToString) -> Self {
 		self.tactic_sources = Some(sources.to_string());
 		self
 	}
 
+	#[must_use]
 	pub fn with_extra_plugin_lib_paths(mut self, paths: impl ToString) -> Self {
 		self.extra_plugin_lib_paths = Some(paths.to_string());
 		self
 	}
 
+	#[must_use]
 	pub fn with_profile_min_shapes(mut self, shapes: impl ToString) -> Self {
 		self.profile_min_shapes = Some(shapes.to_string());
 		self
 	}
 
+	#[must_use]
 	pub fn with_profile_max_shapes(mut self, shapes: impl ToString) -> Self {
 		self.profile_max_shapes = Some(shapes.to_string());
 		self
 	}
 
+	#[must_use]
 	pub fn with_profile_opt_shapes(mut self, shapes: impl ToString) -> Self {
 		self.profile_opt_shapes = Some(shapes.to_string());
 		self
 	}
 
+	#[must_use]
 	pub fn build(self) -> ExecutionProviderDispatch {
 		self.into()
 	}
@@ -241,7 +270,7 @@ impl ExecutionProvider for TensorRTExecutionProvider {
 				return Err(e);
 			}
 
-			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_TensorRT_V2(session_builder.session_options_ptr, trt_options)];
+			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_TensorRT_V2(session_builder.session_options_ptr.as_ptr(), trt_options)];
 			crate::ortsys![unsafe ReleaseTensorRTProviderOptions(trt_options)];
 			std::mem::drop((keys, values));
 			return crate::error::status_to_result(status).map_err(Error::ExecutionProvider);

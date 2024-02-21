@@ -55,7 +55,7 @@ pub struct KernelContext {
 impl KernelContext {
 	pub(crate) fn new(ctx: *mut ort_sys::OrtKernelContext) -> Self {
 		Self {
-			ptr: NonNull::from(unsafe { &mut *ctx })
+			ptr: unsafe { NonNull::new_unchecked(ctx) }
 		}
 	}
 
@@ -63,7 +63,7 @@ impl KernelContext {
 		let mut value_ptr: *const ort_sys::OrtValue = ptr::null();
 		status_to_result(ortsys![unsafe KernelContext_GetInput(self.ptr.as_ptr(), idx as ort_sys::size_t, &mut value_ptr)]).ok()?;
 		Some(ValueView {
-			inner: unsafe { Value::from_raw_ref_dropless(value_ptr.cast_mut()) }
+			inner: unsafe { Value::from_raw_ref_dropless(NonNull::new_unchecked(value_ptr.cast_mut())) }
 		})
 	}
 
@@ -73,6 +73,6 @@ impl KernelContext {
 		status_to_result(ortsys![unsafe KernelContext_GetOutput(self.ptr.as_ptr(), idx as ort_sys::size_t, shape.as_ptr(), shape.len() as _, &mut value_ptr)])
 			.ok()?;
 		assert!(!value_ptr.is_null());
-		Some(unsafe { Value::from_raw_ref_dropless(value_ptr) })
+		Some(unsafe { Value::from_raw_ref_dropless(NonNull::new_unchecked(value_ptr)) })
 	}
 }

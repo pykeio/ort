@@ -152,7 +152,7 @@ mod unix {
 		#[cfg(not(any(target_os = "android", target_os = "ios", target_os = "emscripten")))]
 		unsafe fn fallback() -> Option<OsString> {
 			let amt = match sysconf(SC_GETPW_R_SIZE_MAX) {
-				n if n < 0 => 512 as usize,
+				n if n < 0 => 512,
 				n => n as usize
 			};
 			let mut buf = Vec::with_capacity(amt);

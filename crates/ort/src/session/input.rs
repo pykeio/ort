@@ -110,7 +110,7 @@ macro_rules! inputs {
 
 #[cfg(test)]
 mod tests {
-	use std::collections::HashMap;
+	use std::{collections::HashMap, sync::Arc};
 
 	use crate::*;
 

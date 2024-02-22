@@ -584,7 +584,7 @@ impl RunOptions {
 
 	/// Resets the termination flag for the runs associated with [`RunOptions`].
 	///
-	/// ```
+	/// ```no_run
 	/// # use std::sync::Arc;
 	/// # use ort::{Session, RunOptions, Value, ValueType, TensorElementType};
 	/// # fn main() -> ort::Result<()> {

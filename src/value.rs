@@ -887,6 +887,57 @@ impl<'v, T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for ArrayVi
 	}
 }
 
+impl<T: Clone + Debug + 'static> IntoValueTensor for (Vec<i64>, &[T]) {
+	type Item = T;
+
+	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
+		let shape = self.0.clone();
+		(shape, self.1)
+	}
+
+	fn into_parts(self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
+		let shape = self.0.clone();
+		let mut data = self.1.to_vec();
+		let ptr = data.as_mut_ptr();
+		let ptr_len: usize = data.len();
+		(shape, ptr, ptr_len, Box::new(data))
+	}
+}
+
+impl<T: Clone + Debug + 'static> IntoValueTensor for (Vec<i64>, Vec<T>) {
+	type Item = T;
+
+	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
+		let shape = self.0.clone();
+		let data = &*self.1;
+		(shape, data)
+	}
+
+	fn into_parts(mut self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
+		let shape = self.0.clone();
+		let ptr = self.1.as_mut_ptr();
+		let ptr_len: usize = self.1.len();
+		(shape, ptr, ptr_len, Box::new(self.1))
+	}
+}
+
+impl<T: Clone + Debug + 'static> IntoValueTensor for (Vec<i64>, Box<[T]>) {
+	type Item = T;
+
+	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
+		let shape = self.0.clone();
+		let data = &*self.1;
+		(shape, data)
+	}
+
+	fn into_parts(mut self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
+		let shape = self.0.clone();
+		let ptr = self.1.as_mut_ptr();
+		let ptr_len: usize = self.1.len();
+		(shape, ptr, ptr_len, Box::new(self.1))
+	}
+}
+
 impl<T: Clone + Debug + 'static> IntoValueTensor for (Vec<i64>, Arc<Box<[T]>>) {
 	type Item = T;
 
@@ -1111,10 +1162,28 @@ mod tests {
 		let allocator = Allocator::default();
 		let v = vec!["hello world".to_string(), "こんにちは世界".to_string()];
 
-		let value = Value::from_string_array(&allocator, (vec![v.len() as i64], Arc::new(v.clone().into_boxed_slice())))?;
+		let value = Value::from_string_array(&allocator, (vec![v.len() as i64], v.clone().into_boxed_slice()))?;
 		let (extracted_shape, extracted_view) = value.extract_raw_string_tensor()?;
 		assert_eq!(extracted_shape, [v.len() as i64]);
 		assert_eq!(extracted_view, v);
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_tensor_raw_inputs() -> crate::Result<()> {
+		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
+
+		let shape = vec![v.len() as i64];
+		let value_arc_box = Value::from_array((shape.clone(), Arc::new(v.clone().into_boxed_slice())))?;
+		let value_box = Value::from_array((shape.clone(), v.clone().into_boxed_slice()))?;
+		let value_vec = Value::from_array((shape.clone(), v.clone()))?;
+		let value_slice = Value::from_array((shape, &v[..]))?;
+
+		assert_eq!(value_arc_box.extract_raw_tensor::<f32>()?.1, &v);
+		assert_eq!(value_box.extract_raw_tensor::<f32>()?.1, &v);
+		assert_eq!(value_vec.extract_raw_tensor::<f32>()?.1, &v);
+		assert_eq!(value_slice.extract_raw_tensor::<f32>()?.1, &v);
 
 		Ok(())
 	}

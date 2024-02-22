@@ -6,7 +6,9 @@ use std::{
 	hash::Hash,
 	marker::PhantomData,
 	ops::Deref,
+	os::raw::c_char,
 	ptr::{self, NonNull},
+	string::FromUtf8Error,
 	sync::Arc
 };
 
@@ -378,6 +380,96 @@ impl Value {
 		res
 	}
 
+	/// Attempt to extract the underlying string data into a "raw" data tuple, consisting of the tensor's dimensions and
+	/// an owned `Vec` of its data.
+	///
+	/// ```
+	/// # use std::sync::Arc;
+	/// # use ort::{Allocator, Session, Value, ValueType, TensorElementType};
+	/// # fn main() -> ort::Result<()> {
+	/// # 	let allocator = Allocator::default();
+	/// let array = vec!["hello", "world"];
+	/// let value = Value::from_string_array(&allocator, (vec![2], Arc::new(array.clone().into_boxed_slice())))?;
+	///
+	/// let (extracted_shape, extracted_data) = value.extract_raw_string_tensor()?;
+	/// assert_eq!(extracted_data, array);
+	/// assert_eq!(extracted_shape, [2]);
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	pub fn extract_raw_string_tensor(&self) -> Result<(Vec<i64>, Vec<String>)> {
+		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
+
+		let res = {
+			let mut num_dims = 0;
+			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
+
+			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
+			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
+
+			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
+			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
+			let data_type: TensorElementType = type_sys.into();
+			if data_type == TensorElementType::String {
+				// Note: Both tensor and array will point to the same data, nothing is copied.
+				// As such, there is no need to free the pointer used to create the slice.
+				assert_ne!(self.ptr(), ptr::null_mut());
+
+				let mut is_tensor = 0;
+				ortsys![unsafe IsTensor(self.ptr(), &mut is_tensor) -> Error::FailedTensorCheck];
+				assert_eq!(is_tensor, 1);
+
+				let mut output_array_ptr: *mut c_char = ptr::null_mut();
+				let output_array_ptr_ptr: *mut *mut c_char = &mut output_array_ptr;
+				let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
+				ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
+
+				let mut len: ort_sys::size_t = 0;
+				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
+				// Total length of string data, not including \0 suffix
+				let mut total_length = 0;
+				ortsys![unsafe GetStringTensorDataLength(self.ptr(), &mut total_length) -> Error::GetStringTensorDataLength];
+
+				// In the JNI impl of this, tensor_element_len was included in addition to total_length,
+				// but that seems contrary to the docs of GetStringTensorDataLength, and those extra bytes
+				// don't seem to be written to in practice either.
+				// If the string data actually did go farther, it would panic below when using the offset
+				// data to get slices for each string.
+				let mut string_contents = vec![0u8; total_length as _];
+				// one extra slot so that the total length can go in the last one, making all per-string
+				// length calculations easy
+				let mut offsets = vec![0; len as usize + 1];
+
+				ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length as _, offsets.as_mut_ptr(), len as _) -> Error::GetStringTensorContent];
+
+				// final offset = overall length so that per-string length calculations work for the last string
+				debug_assert_eq!(0, offsets[len as usize]);
+				offsets[len as usize] = total_length;
+
+				let strings = offsets
+					// offsets has 1 extra offset past the end so that all windows work
+					.windows(2)
+					.map(|w| {
+						let slice = &string_contents[w[0] as _..w[1] as _];
+						String::from_utf8(slice.into())
+					})
+					.collect::<Result<Vec<String>, FromUtf8Error>>()
+					.map_err(Error::StringFromUtf8Error)?;
+
+				Ok((node_dims, strings))
+			} else {
+				Err(Error::DataTypeMismatch {
+					actual: data_type,
+					requested: TensorElementType::String
+				})
+			}
+		};
+		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
+		res
+	}
+
 	pub fn extract_sequence<'s>(&'s self, allocator: &Allocator) -> Result<Vec<ValueRef<'s>>> {
 		match self.dtype()? {
 			ValueType::Sequence(_) => {
@@ -459,7 +551,7 @@ impl Value {
 	}
 }
 
-pub trait OrtInput {
+pub trait IntoValueTensor {
 	type Item;
 
 	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]);
@@ -502,7 +594,7 @@ impl Value {
 	/// - `ArrayView<'_, T, D>` will always be copied.
 	///
 	/// Raw data will never be copied. The data is expected to be in standard, contigous layout.
-	pub fn from_array<T: IntoTensorElementType + Debug + Clone + 'static>(input: impl OrtInput<Item = T>) -> Result<Value> {
+	pub fn from_array<T: IntoTensorElementType + Debug + Clone + 'static>(input: impl IntoValueTensor<Item = T>) -> Result<Value> {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemoryType::Default)?;
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
@@ -621,7 +713,7 @@ impl Value {
 	/// ```
 	///
 	/// Note that string data will always be copied, no matter what data is provided.
-	pub fn from_string_array<T: Utf8Data + Debug + Clone + 'static>(allocator: &Allocator, input: impl OrtInput<Item = T>) -> Result<Value> {
+	pub fn from_string_array<T: Utf8Data + Debug + Clone + 'static>(allocator: &Allocator, input: impl IntoValueTensor<Item = T>) -> Result<Value> {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemoryType::Default)?;
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
@@ -689,7 +781,7 @@ impl Value {
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'i, 'v, T: Clone + 'static, D: Dimension + 'static> OrtInput for &'i CowArray<'v, T, D>
+impl<'i, 'v, T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for &'i CowArray<'v, T, D>
 where
 	'i: 'v
 {
@@ -714,7 +806,7 @@ where
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<T: Clone + 'static, D: Dimension + 'static> OrtInput for &mut ArcArray<T, D> {
+impl<T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for &mut ArcArray<T, D> {
 	type Item = T;
 
 	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
@@ -745,7 +837,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> OrtInput for &mut ArcArray<T, D
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<T: Clone + 'static, D: Dimension + 'static> OrtInput for Array<T, D> {
+impl<T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for Array<T, D> {
 	type Item = T;
 
 	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
@@ -775,7 +867,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> OrtInput for Array<T, D> {
 }
 
 #[cfg(feature = "ndarray")]
-impl<'v, T: Clone + 'static, D: Dimension + 'static> OrtInput for ArrayView<'v, T, D> {
+impl<'v, T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for ArrayView<'v, T, D> {
 	type Item = T;
 
 	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
@@ -795,7 +887,7 @@ impl<'v, T: Clone + 'static, D: Dimension + 'static> OrtInput for ArrayView<'v, 
 	}
 }
 
-impl<T: Clone + Debug + 'static> OrtInput for (Vec<i64>, Arc<Box<[T]>>) {
+impl<T: Clone + Debug + 'static> IntoValueTensor for (Vec<i64>, Arc<Box<[T]>>) {
 	type Item = T;
 
 	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
@@ -1003,13 +1095,26 @@ mod tests {
 
 	#[test]
 	#[cfg(feature = "ndarray")]
-	fn test_string_tensor() -> crate::Result<()> {
+	fn test_string_tensor_ndarray() -> crate::Result<()> {
 		let allocator = Allocator::default();
 		let v = Array1::from_vec(vec!["hello world".to_string(), "こんにちは世界".to_string()]);
 
 		let value = Value::from_string_array(&allocator, v.view())?;
 		let extracted = value.extract_tensor::<String>()?;
 		assert_eq!(*extracted.view(), v.into_dyn().view());
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_string_tensor_raw() -> crate::Result<()> {
+		let allocator = Allocator::default();
+		let v = vec!["hello world".to_string(), "こんにちは世界".to_string()];
+
+		let value = Value::from_string_array(&allocator, (vec![v.len() as i64], Arc::new(v.clone().into_boxed_slice())))?;
+		let (extracted_shape, extracted_view) = value.extract_raw_string_tensor()?;
+		assert_eq!(extracted_shape, [v.len() as i64]);
+		assert_eq!(extracted_view, v);
 
 		Ok(())
 	}

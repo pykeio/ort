@@ -46,32 +46,34 @@ jobs:
       - name: Run tests
         run: |
           cargo test -p ort --verbose --features fetch-models -- --test-threads 1
-  cross-compile:
-    name: Cross-platform compile
-    runs-on: ${{ matrix.platform.os }}
-    needs: [test]
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
-            command: test
-    steps:
-      - uses: actions/checkout@v4
-      - name: Fix ring dependency for Windows ARM64
-        if: matrix.platform.target == 'aarch64-pc-windows-msvc'
-        shell: pwsh
-        run: |
-          @('', '[patch.crates-io]',
-          'ring = { git = "https://github.com/awakecoding/ring", branch = "0.16.20_alpha" }') | % {
-            Add-Content -Path "Cargo.toml" -Value $_
-          }
-          $VSINSTALLDIR = $(vswhere.exe -latest -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath)
-          $VCINSTALLDIR = Join-Path $VSINSTALLDIR "VC"
-          $LLVM_ROOT = Join-Path $VCINSTALLDIR "Tools\Llvm\x64"
-          echo "PATH=$Env:PATH;${LLVM_ROOT}\bin" >> $Env:GITHUB_ENV
-      - name: Build/test
-        run: |
-          cargo install cross --git https://github.com/cross-rs/cross
-          cross test -p ort --features fetch-models --target aarch64-unknown-linux-gnu -v
+  # Disable cross-compile until cross updates aarch64-unknown-linux-gnu to Ubuntu 22.04
+  # ref https://github.com/cross-rs/cross/pull/973
+  #cross-compile:
+  #  name: Cross-platform compile
+  #  runs-on: ${{ matrix.platform.os }}
+  #  needs: [test]
+  #  strategy:
+  #    fail-fast: false
+  #    matrix:
+  #      platform:
+  #        - target: aarch64-unknown-linux-gnu
+  #          os: ubuntu-latest
+  #          command: test
+  #  steps:
+  #    - uses: actions/checkout@v4
+  #    - name: Fix ring dependency for Windows ARM64
+  #      if: matrix.platform.target == 'aarch64-pc-windows-msvc'
+  #      shell: pwsh
+  #      run: |
+  #        @('', '[patch.crates-io]',
+  #        'ring = { git = "https://github.com/awakecoding/ring", branch = "0.16.20_alpha" }') | % {
+  #          Add-Content -Path "Cargo.toml" -Value $_
+  #        }
+  #        $VSINSTALLDIR = $(vswhere.exe -latest -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath)
+  #        $VCINSTALLDIR = Join-Path $VSINSTALLDIR "VC"
+  #        $LLVM_ROOT = Join-Path $VCINSTALLDIR "Tools\Llvm\x64"
+  #        echo "PATH=$Env:PATH;${LLVM_ROOT}\bin" >> $Env:GITHUB_ENV
+  #    - name: Build/test
+  #      run: |
+  #        cargo install cross --git https://github.com/cross-rs/cross
+  #        cross test -p ort --features fetch-models --target aarch64-unknown-linux-gnu -v

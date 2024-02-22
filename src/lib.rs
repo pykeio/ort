@@ -72,6 +72,9 @@ macro_rules! extern_system_fn {
 
 pub(crate) use extern_system_fn;
 
+/// The minor version of ONNX Runtime used by this version of `ort`.
+pub const MINOR_VERSION: u32 = ort_sys::ORT_API_VERSION;
+
 #[cfg(feature = "load-dynamic")]
 pub(crate) static G_ORT_DYLIB_PATH: OnceLock<Arc<String>> = OnceLock::new();
 #[cfg(feature = "load-dynamic")]
@@ -140,16 +143,16 @@ pub fn api() -> NonNull<ort_sys::OrtApi> {
 							(*base).GetVersionString.expect("`GetVersionString` must be present in `OrtApiBase`");
 						let version_string = get_version_string();
 						let version_string = CStr::from_ptr(version_string).to_string_lossy();
-						tracing::info!("Using ONNX Runtime version '{version_string}'");
+						tracing::info!("Loaded ONNX Runtime dylib with version '{version_string}'");
 
 						let lib_minor_version = version_string.split('.').nth(1).map_or(0, |x| x.parse::<u32>().unwrap_or(0));
-						match lib_minor_version.cmp(&17) {
+						match lib_minor_version.cmp(&MINOR_VERSION) {
 							std::cmp::Ordering::Less => panic!(
-								"ort 2.0 is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.17.x', but got '{version_string}'",
+								"ort 2.0 is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
 								dylib_path()
 							),
 							std::cmp::Ordering::Greater => tracing::warn!(
-								"ort 2.0 may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.17.x', but got '{version_string}'",
+								"ort 2.0 may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
 								dylib_path()
 							),
 							std::cmp::Ordering::Equal => {}

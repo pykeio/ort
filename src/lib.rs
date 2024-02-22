@@ -39,7 +39,7 @@ use tracing::Level;
 
 #[cfg(feature = "load-dynamic")]
 pub use self::environment::init_from;
-pub use self::environment::{init, EnvironmentBuilder, EnvironmentGlobalThreadPoolOptions};
+pub use self::environment::{get_environment, init, Environment, EnvironmentBuilder, EnvironmentGlobalThreadPoolOptions};
 #[cfg(feature = "fetch-models")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fetch-models")))]
 pub use self::error::FetchModelError;

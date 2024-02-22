@@ -449,6 +449,13 @@ pub struct SharedSessionInner {
 	_environment: Arc<Environment>
 }
 
+impl SharedSessionInner {
+	/// Returns the underlying [`ort_sys::OrtSession`] pointer.
+	pub fn ptr(&self) -> *mut ort_sys::OrtSession {
+		self.session_ptr.as_ptr()
+	}
+}
+
 unsafe impl Send for SharedSessionInner {}
 unsafe impl Sync for SharedSessionInner {}
 
@@ -626,7 +633,12 @@ impl Session {
 		IoBinding::new(self)
 	}
 
-	/// Get an shared ([`Arc`]'d) reference to the underlying [`SharedSessionInner`], which holds the
+	/// Returns the underlying [`ort_sys::OrtSession`] pointer.
+	pub fn ptr(&self) -> *mut ort_sys::OrtSession {
+		self.inner.ptr()
+	}
+
+	/// Get a shared ([`Arc`]'d) reference to the underlying [`SharedSessionInner`], which holds the
 	/// [`ort_sys::OrtSession`] pointer and the session allocator.
 	#[must_use]
 	pub fn inner(&self) -> Arc<SharedSessionInner> {

@@ -269,7 +269,8 @@ impl Value {
 		}
 	}
 
-	pub(crate) fn ptr(&self) -> *mut ort_sys::OrtValue {
+	/// Returns the underlying [`ort_sys::OrtValue`] pointer.
+	pub fn ptr(&self) -> *mut ort_sys::OrtValue {
 		match &self.inner {
 			ValueInner::CppOwnedRef { ptr } | ValueInner::CppOwned { ptr, .. } | ValueInner::RustOwned { ptr, .. } => ptr.as_ptr()
 		}

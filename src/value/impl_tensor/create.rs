@@ -27,16 +27,15 @@ impl Value {
 	/// - (with feature `ndarray`) an owned [`ndarray::Array`];
 	/// - (with feature `ndarray`) a borrowed view of another array, as an [`ndarray::ArrayView`] (`ArrayView<'_, T,
 	///   D>`);
-	/// - a tuple of `(dimensions, data)` where `dimensions` is a `Vec<i64>` and `data` is an `Arc<Box<[T]>>` (referred
-	///   to as "raw data").
+	/// - a tuple of `(dimensions, data)` where:
+	///   * `dimensions` is one of `Vec<I>`, `[I]` or `&[I]`, where `I` is `i64` or `usize`;
+	///   * and `data` is one of `Vec<T>`, `Box<[T]>`, `Arc<Box<[T]>>`, or `&[T]`.
 	///
 	/// ```
-	/// # use std::sync::Arc;
 	/// # use ort::Value;
 	/// # fn main() -> ort::Result<()> {
 	/// // Create a tensor from a raw data vector
-	/// let value =
-	/// 	Value::from_array((vec![1, 2, 3], Arc::new(vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0].into_boxed_slice())))?;
+	/// let value = Value::from_array(([1usize, 2, 3], vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0].into_boxed_slice()))?;
 	///
 	/// // Create a tensor from an `ndarray::Array`
 	/// #[cfg(feature = "ndarray")]
@@ -53,7 +52,8 @@ impl Value {
 	///   is the case after most reshape operations)
 	/// - `ArrayView<'_, T, D>` will always be copied.
 	///
-	/// Raw data will never be copied. The data is expected to be in standard, contigous layout.
+	/// Raw data provided as a `Arc<Box<[T]>>`, `Box<[T]>`, or `Vec<T>` will never be copied. Raw data is expected to be
+	/// in standard, contigous layout.
 	pub fn from_array<T: IntoTensorElementType + Debug + Clone + 'static>(input: impl IntoValueTensor<Item = T>) -> Result<Value> {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemoryType::Default)?;
 
@@ -73,7 +73,7 @@ impl Value {
 			| TensorElementType::Bool => {
 				// primitive data is already suitably laid out in memory; provide it to
 				// onnxruntime as is
-				let (shape, ptr, ptr_len, guard) = input.into_parts();
+				let (shape, ptr, ptr_len, guard) = input.into_parts()?;
 				let shape_ptr: *const i64 = shape.as_ptr();
 				let shape_len = shape.len();
 
@@ -101,7 +101,7 @@ impl Value {
 			#[cfg(feature = "half")]
 			TensorElementType::Bfloat16 | TensorElementType::Float16 => {
 				// f16 and bf16 are repr(transparent) to u16, so memory layout should be identical to onnxruntime
-				let (shape, ptr, ptr_len, guard) = input.into_parts();
+				let (shape, ptr, ptr_len, guard) = input.into_parts()?;
 				let shape_ptr: *const i64 = shape.as_ptr();
 				let shape_len = shape.len();
 
@@ -148,11 +148,11 @@ impl Value {
 	/// - (with feature `ndarray`) an owned [`ndarray::Array`];
 	/// - (with feature `ndarray`) a borrowed view of another array, as an [`ndarray::ArrayView`] (`ArrayView<'_, T,
 	///   D>`);
-	/// - a tuple of `(dimensions, data)` where `dimensions` is a `Vec<i64>` and `data` is an `Arc<Box<[T]>>` (referred
-	///   to as "raw data").
+	/// - a tuple of `(dimensions, data)` where:
+	///   * `dimensions` is one of `Vec<I>`, `[I]` or `&[I]`, where `I` is `i64` or `usize`;
+	///   * and `data` is one of `Vec<T>`, `Box<[T]>`, `Arc<Box<[T]>>`, or `&[T]`.
 	///
 	/// ```
-	/// # use std::sync::Arc;
 	/// # use ort::{Session, Value};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let session = Session::builder()?.with_model_from_file("tests/data/vectorizer.onnx")?;
@@ -160,7 +160,8 @@ impl Value {
 	/// let allocator = session.allocator();
 	///
 	/// // Create a string tensor from a raw data vector
-	/// let value = Value::from_string_array(allocator, (vec![2], Arc::new(vec!["hello", "world"].into_boxed_slice())))?;
+	/// let data = vec!["hello", "world"];
+	/// let value = Value::from_string_array(allocator, ([data.len()], data.into_boxed_slice()))?;
 	///
 	/// // Create a string tensor from an `ndarray::Array`
 	/// #[cfg(feature = "ndarray")]
@@ -178,7 +179,7 @@ impl Value {
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 
-		let (shape, data) = input.ref_parts();
+		let (shape, data) = input.ref_parts()?;
 		let shape_ptr: *const i64 = shape.as_ptr();
 		let shape_len = shape.len();
 
@@ -218,8 +219,132 @@ impl Value {
 pub trait IntoValueTensor {
 	type Item;
 
-	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]);
-	fn into_parts(self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>);
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])>;
+	fn into_parts(self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)>;
+}
+
+pub trait ToDimensions {
+	fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>>;
+}
+
+impl<const N: usize> ToDimensions for [usize; N] {
+	fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>> {
+		let v: Vec<i64> = self
+			.iter()
+			.enumerate()
+			.map(|(i, c)| if *c >= 1 { Ok(*c as i64) } else { Err(Error::InvalidDimension(i)) })
+			.collect::<Result<_>>()?;
+		let sum = v.iter().product::<i64>() as usize;
+		if sum != expected_size {
+			Err(Error::TensorShapeMismatch {
+				input: v,
+				total: sum,
+				expected: expected_size
+			})
+		} else {
+			Ok(v)
+		}
+	}
+}
+
+impl<const N: usize> ToDimensions for [i64; N] {
+	fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>> {
+		let v: Vec<i64> = self
+			.iter()
+			.enumerate()
+			.map(|(i, c)| if *c >= 1 { Ok(*c) } else { Err(Error::InvalidDimension(i)) })
+			.collect::<Result<_>>()?;
+		let sum = v.iter().product::<i64>() as usize;
+		if sum != expected_size {
+			Err(Error::TensorShapeMismatch {
+				input: v,
+				total: sum,
+				expected: expected_size
+			})
+		} else {
+			Ok(v)
+		}
+	}
+}
+
+impl ToDimensions for &[usize] {
+	fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>> {
+		let v: Vec<i64> = self
+			.iter()
+			.enumerate()
+			.map(|(i, c)| if *c >= 1 { Ok(*c as i64) } else { Err(Error::InvalidDimension(i)) })
+			.collect::<Result<_>>()?;
+		let sum = v.iter().product::<i64>() as usize;
+		if sum != expected_size {
+			Err(Error::TensorShapeMismatch {
+				input: v,
+				total: sum,
+				expected: expected_size
+			})
+		} else {
+			Ok(v)
+		}
+	}
+}
+
+impl ToDimensions for &[i64] {
+	fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>> {
+		let v: Vec<i64> = self
+			.iter()
+			.enumerate()
+			.map(|(i, c)| if *c >= 1 { Ok(*c) } else { Err(Error::InvalidDimension(i)) })
+			.collect::<Result<_>>()?;
+		let sum = v.iter().product::<i64>() as usize;
+		if sum != expected_size {
+			Err(Error::TensorShapeMismatch {
+				input: v,
+				total: sum,
+				expected: expected_size
+			})
+		} else {
+			Ok(v)
+		}
+	}
+}
+
+impl ToDimensions for Vec<usize> {
+	fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>> {
+		let v: Vec<i64> = self
+			.iter()
+			.enumerate()
+			.map(|(i, c)| if *c >= 1 { Ok(*c as i64) } else { Err(Error::InvalidDimension(i)) })
+			.collect::<Result<_>>()?;
+		let sum = v.iter().product::<i64>() as usize;
+		if sum != expected_size {
+			Err(Error::TensorShapeMismatch {
+				input: v,
+				total: sum,
+				expected: expected_size
+			})
+		} else {
+			Ok(v)
+		}
+	}
+}
+
+impl ToDimensions for Vec<i64> {
+	fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>> {
+		let v: Vec<i64> = self
+			.iter()
+			.enumerate()
+			.map(|(i, c)| if *c >= 1 { Ok(*c) } else { Err(Error::InvalidDimension(i)) })
+			.collect::<Result<_>>()?;
+		let sum = v.iter().product::<i64>() as usize;
+		if sum != expected_size {
+			Err(Error::TensorShapeMismatch {
+				input: v,
+				total: sum,
+				expected: expected_size
+			})
+		} else {
+			Ok(v)
+		}
+	}
 }
 
 #[cfg(feature = "ndarray")]
@@ -230,20 +355,20 @@ where
 {
 	type Item = T;
 
-	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
 		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
-		let data = self.as_slice().expect("tensor should be contiguous");
-		(shape, data)
+		let data = self.as_slice().ok_or(Error::TensorDataNotContiguous)?;
+		Ok((shape, data))
 	}
 
-	fn into_parts(self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
+	fn into_parts(self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
 		// This will result in a copy in either form of the CowArray
 		let mut contiguous_array = self.as_standard_layout().into_owned();
 		let shape: Vec<i64> = contiguous_array.shape().iter().map(|d| *d as i64).collect();
 		let ptr = contiguous_array.as_mut_ptr();
 		let ptr_len = contiguous_array.len();
 		let guard = Box::new(contiguous_array);
-		(shape, ptr, ptr_len, guard)
+		Ok((shape, ptr, ptr_len, guard))
 	}
 }
 
@@ -252,20 +377,20 @@ where
 impl<T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for &mut ArcArray<T, D> {
 	type Item = T;
 
-	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
 		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
-		let data = self.as_slice().expect("tensor should be contiguous");
-		(shape, data)
+		let data = self.as_slice().ok_or(Error::TensorDataNotContiguous)?;
+		Ok((shape, data))
 	}
 
-	fn into_parts(self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
+	fn into_parts(self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
 		if self.is_standard_layout() {
 			// We can avoid the copy here and use the data as is
 			let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
 			let ptr = self.as_mut_ptr();
 			let ptr_len = self.len();
 			let guard = Box::new(self.clone());
-			(shape, ptr, ptr_len, guard)
+			Ok((shape, ptr, ptr_len, guard))
 		} else {
 			// Need to do a copy here to get data in to standard layout
 			let mut contiguous_array = self.as_standard_layout().into_owned();
@@ -273,7 +398,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for &mut ArcArr
 			let ptr = contiguous_array.as_mut_ptr();
 			let ptr_len: usize = contiguous_array.len();
 			let guard = Box::new(contiguous_array);
-			(shape, ptr, ptr_len, guard)
+			Ok((shape, ptr, ptr_len, guard))
 		}
 	}
 }
@@ -283,20 +408,20 @@ impl<T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for &mut ArcArr
 impl<T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for Array<T, D> {
 	type Item = T;
 
-	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
 		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
-		let data = self.as_slice().expect("tensor should be contiguous");
-		(shape, data)
+		let data = self.as_slice().ok_or(Error::TensorDataNotContiguous)?;
+		Ok((shape, data))
 	}
 
-	fn into_parts(self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
+	fn into_parts(self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
 		if self.is_standard_layout() {
 			// We can avoid the copy here and use the data as is
 			let mut guard = Box::new(self);
 			let shape: Vec<i64> = guard.shape().iter().map(|d| *d as i64).collect();
 			let ptr = guard.as_mut_ptr();
 			let ptr_len = guard.len();
-			(shape, ptr, ptr_len, guard)
+			Ok((shape, ptr, ptr_len, guard))
 		} else {
 			// Need to do a copy here to get data in to standard layout
 			let mut contiguous_array = self.as_standard_layout().into_owned();
@@ -304,7 +429,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for Array<T, D>
 			let ptr = contiguous_array.as_mut_ptr();
 			let ptr_len: usize = contiguous_array.len();
 			let guard = Box::new(contiguous_array);
-			(shape, ptr, ptr_len, guard)
+			Ok((shape, ptr, ptr_len, guard))
 		}
 	}
 }
@@ -313,88 +438,88 @@ impl<T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for Array<T, D>
 impl<'v, T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for ArrayView<'v, T, D> {
 	type Item = T;
 
-	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
 		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
-		let data = self.as_slice().expect("tensor should be contiguous");
-		(shape, data)
+		let data = self.as_slice().ok_or(Error::TensorDataNotContiguous)?;
+		Ok((shape, data))
 	}
 
-	fn into_parts(self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
+	fn into_parts(self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
 		// This will result in a copy in either form of the ArrayView
 		let mut contiguous_array = self.as_standard_layout().into_owned();
 		let shape: Vec<i64> = contiguous_array.shape().iter().map(|d| *d as i64).collect();
 		let ptr = contiguous_array.as_mut_ptr();
 		let ptr_len = contiguous_array.len();
 		let guard = Box::new(contiguous_array);
-		(shape, ptr, ptr_len, guard)
+		Ok((shape, ptr, ptr_len, guard))
 	}
 }
 
-impl<T: Clone + Debug + 'static> IntoValueTensor for (Vec<i64>, &[T]) {
+impl<T: Clone + Debug + 'static, D: ToDimensions> IntoValueTensor for (D, &[T]) {
 	type Item = T;
 
-	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
-		let shape = self.0.clone();
-		(shape, self.1)
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
+		let shape = self.0.to_dimensions(self.1.len())?;
+		Ok((shape, self.1))
 	}
 
-	fn into_parts(self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
-		let shape = self.0.clone();
+	fn into_parts(self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
+		let shape = self.0.to_dimensions(self.1.len())?;
 		let mut data = self.1.to_vec();
 		let ptr = data.as_mut_ptr();
 		let ptr_len: usize = data.len();
-		(shape, ptr, ptr_len, Box::new(data))
+		Ok((shape, ptr, ptr_len, Box::new(data)))
 	}
 }
 
-impl<T: Clone + Debug + 'static> IntoValueTensor for (Vec<i64>, Vec<T>) {
+impl<T: Clone + Debug + 'static, D: ToDimensions> IntoValueTensor for (D, Vec<T>) {
 	type Item = T;
 
-	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
-		let shape = self.0.clone();
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
+		let shape = self.0.to_dimensions(self.1.len())?;
 		let data = &*self.1;
-		(shape, data)
+		Ok((shape, data))
 	}
 
-	fn into_parts(mut self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
-		let shape = self.0.clone();
+	fn into_parts(mut self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
+		let shape = self.0.to_dimensions(self.1.len())?;
 		let ptr = self.1.as_mut_ptr();
 		let ptr_len: usize = self.1.len();
-		(shape, ptr, ptr_len, Box::new(self.1))
+		Ok((shape, ptr, ptr_len, Box::new(self.1)))
 	}
 }
 
-impl<T: Clone + Debug + 'static> IntoValueTensor for (Vec<i64>, Box<[T]>) {
+impl<T: Clone + Debug + 'static, D: ToDimensions> IntoValueTensor for (D, Box<[T]>) {
 	type Item = T;
 
-	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
-		let shape = self.0.clone();
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
+		let shape = self.0.to_dimensions(self.1.len())?;
 		let data = &*self.1;
-		(shape, data)
+		Ok((shape, data))
 	}
 
-	fn into_parts(mut self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
-		let shape = self.0.clone();
+	fn into_parts(mut self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
+		let shape = self.0.to_dimensions(self.1.len())?;
 		let ptr = self.1.as_mut_ptr();
 		let ptr_len: usize = self.1.len();
-		(shape, ptr, ptr_len, Box::new(self.1))
+		Ok((shape, ptr, ptr_len, Box::new(self.1)))
 	}
 }
 
-impl<T: Clone + Debug + 'static> IntoValueTensor for (Vec<i64>, Arc<Box<[T]>>) {
+impl<T: Clone + Debug + 'static, D: ToDimensions> IntoValueTensor for (D, Arc<Box<[T]>>) {
 	type Item = T;
 
-	fn ref_parts(&self) -> (Vec<i64>, &[Self::Item]) {
-		let shape = self.0.clone();
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
+		let shape = self.0.to_dimensions(self.1.len())?;
 		let data = &*self.1;
-		(shape, data)
+		Ok((shape, data))
 	}
 
-	fn into_parts(mut self) -> (Vec<i64>, *mut Self::Item, usize, Box<dyn Any>) {
-		let shape = self.0.clone();
+	fn into_parts(mut self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
+		let shape = self.0.to_dimensions(self.1.len())?;
 		let ptr = std::sync::Arc::<std::boxed::Box<[T]>>::make_mut(&mut self.1).as_mut_ptr();
 		let ptr_len: usize = self.1.len();
 		let guard = Box::new(Arc::clone(&self.1));
-		(shape, ptr, ptr_len, guard)
+		Ok((shape, ptr, ptr_len, guard))
 	}
 }

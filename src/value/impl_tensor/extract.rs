@@ -76,11 +76,10 @@ impl Value {
 	/// into its data.
 	///
 	/// ```
-	/// # use std::sync::Arc;
 	/// # use ort::{Session, Value, ValueType, TensorElementType};
 	/// # fn main() -> ort::Result<()> {
 	/// let array = vec![1_i64, 2, 3, 4, 5];
-	/// let value = Value::from_array((vec![5], Arc::new(array.clone().into_boxed_slice())))?;
+	/// let value = Value::from_array(([array.len()], array.clone().into_boxed_slice()))?;
 	///
 	/// let (extracted_shape, extracted_data) = value.extract_raw_tensor::<i64>()?;
 	/// assert_eq!(extracted_data, &array);
@@ -139,12 +138,11 @@ impl Value {
 	/// an owned `Vec` of its data.
 	///
 	/// ```
-	/// # use std::sync::Arc;
 	/// # use ort::{Allocator, Session, Value, ValueType, TensorElementType};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let allocator = Allocator::default();
 	/// let array = vec!["hello", "world"];
-	/// let value = Value::from_string_array(&allocator, (vec![2], Arc::new(array.clone().into_boxed_slice())))?;
+	/// let value = Value::from_string_array(&allocator, ([array.len()], array.clone().into_boxed_slice()))?;
 	///
 	/// let (extracted_shape, extracted_data) = value.extract_raw_string_tensor()?;
 	/// assert_eq!(extracted_data, array);

@@ -1,6 +1,8 @@
 mod create;
 mod extract;
 
+pub use self::create::ToDimensions;
+
 #[cfg(test)]
 mod tests {
 	use std::sync::Arc;
@@ -98,10 +100,10 @@ mod tests {
 	fn test_tensor_raw_inputs() -> crate::Result<()> {
 		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
 
-		let shape = vec![v.len() as i64];
-		let value_arc_box = Value::from_array((shape.clone(), Arc::new(v.clone().into_boxed_slice())))?;
-		let value_box = Value::from_array((shape.clone(), v.clone().into_boxed_slice()))?;
-		let value_vec = Value::from_array((shape.clone(), v.clone()))?;
+		let shape = [v.len()];
+		let value_arc_box = Value::from_array((shape, Arc::new(v.clone().into_boxed_slice())))?;
+		let value_box = Value::from_array((shape, v.clone().into_boxed_slice()))?;
+		let value_vec = Value::from_array((shape, v.clone()))?;
 		let value_slice = Value::from_array((shape, &v[..]))?;
 
 		assert_eq!(value_arc_box.extract_raw_tensor::<f32>()?.1, &v);

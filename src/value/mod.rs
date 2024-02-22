@@ -16,6 +16,8 @@ mod impl_map;
 mod impl_sequence;
 mod impl_tensor;
 
+use self::impl_tensor::ToDimensions;
+
 /// The type of a [`Value`], or a session input/output.
 ///
 /// ```
@@ -35,7 +37,7 @@ mod impl_tensor;
 /// );
 ///
 /// // Or by `Value`s created in Rust or output by a session.
-/// let value = Value::from_array((vec![5], Arc::new(vec![1_i64, 2, 3, 4, 5].into_boxed_slice())))?;
+/// let value = Value::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
 /// assert_eq!(
 /// 	value.dtype()?,
 /// 	ValueType::Tensor {
@@ -84,10 +86,9 @@ impl ValueType {
 	/// Returns the dimensions of this value type if it is a tensor, or `None` if it is a sequence or map.
 	///
 	/// ```
-	/// # use std::sync::Arc;
 	/// # use ort::{Value, ValueType, TensorElementType};
 	/// # fn main() -> ort::Result<()> {
-	/// let value = Value::from_array((vec![5], Arc::new(vec![1_i64, 2, 3, 4, 5].into_boxed_slice())))?;
+	/// let value = Value::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
 	/// assert_eq!(value.dtype()?.tensor_dimensions(), Some(&vec![5]));
 	/// # 	Ok(())
 	/// # }
@@ -103,10 +104,9 @@ impl ValueType {
 	/// Returns the element type of this value type if it is a tensor, or `None` if it is a sequence or map.
 	///
 	/// ```
-	/// # use std::sync::Arc;
 	/// # use ort::{Value, ValueType, TensorElementType};
 	/// # fn main() -> ort::Result<()> {
-	/// let value = Value::from_array((vec![5], Arc::new(vec![1_i64, 2, 3, 4, 5].into_boxed_slice())))?;
+	/// let value = Value::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
 	/// assert_eq!(value.dtype()?.tensor_type(), Some(TensorElementType::Int64));
 	/// # 	Ok(())
 	/// # }
@@ -186,12 +186,11 @@ impl<'v> Deref for ValueRef<'v> {
 /// `Value`s can be created via methods like [`Value::from_array`], or as the output from running a [`crate::Session`].
 ///
 /// ```
-/// # use std::sync::Arc;
 /// # use ort::{Session, Value, ValueType, TensorElementType};
 /// # fn main() -> ort::Result<()> {
 /// # 	let upsample = Session::builder()?.with_model_from_file("tests/data/upsample.onnx")?;
 /// // Create a value from a raw data vector
-/// let value = Value::from_array((vec![1, 1, 1, 3], Arc::new(vec![1.0_f32, 2.0, 3.0].into_boxed_slice())))?;
+/// let value = Value::from_array(([1usize, 1, 1, 3], vec![1.0_f32, 2.0, 3.0].into_boxed_slice()))?;
 ///
 /// // Create a value from an `ndarray::Array`
 /// #[cfg(feature = "ndarray")]
@@ -279,11 +278,10 @@ impl Value {
 	/// Returns `true` if this value is a tensor, or `false` if it is another type (sequence, map).
 	///
 	/// ```
-	/// # use std::sync::Arc;
 	/// # use ort::Value;
 	/// # fn main() -> ort::Result<()> {
 	/// // Create a tensor from a raw data vector
-	/// let tensor_value = Value::from_array((vec![3], Arc::new(vec![1.0_f32, 2.0, 3.0].into_boxed_slice())))?;
+	/// let tensor_value = Value::from_array(([3usize], vec![1.0_f32, 2.0, 3.0].into_boxed_slice()))?;
 	/// assert!(tensor_value.is_tensor()?);
 	/// # 	Ok(())
 	/// # }
@@ -317,9 +315,9 @@ impl<'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'sta
 }
 
 macro_rules! impl_try_from {
-	(@T $($t:ty),+) => {
+	(@T,I $($t:ty),+) => {
 		$(
-			impl<T: IntoTensorElementType + Debug + Clone + 'static> TryFrom<$t> for Value {
+			impl<T: IntoTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for Value {
 				type Error = Error;
 				fn try_from(value: $t) -> Result<Self, Self::Error> {
 					Value::from_array(value)
@@ -342,7 +340,7 @@ macro_rules! impl_try_from {
 
 #[cfg(feature = "ndarray")]
 impl_try_from!(@T,D &mut ArcArray<T, D>, Array<T, D>);
-impl_try_from!(@T (Vec<i64>, Arc<Box<[T]>>), (Vec<i64>, Vec<T>), (Vec<i64>, Box<[T]>), (Vec<i64>, &[T]));
+impl_try_from!(@T,I (I, Arc<Box<[T]>>), (I, Vec<T>), (I, Box<[T]>), (I, &[T]));
 
 impl Drop for Value {
 	fn drop(&mut self) {

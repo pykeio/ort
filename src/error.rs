@@ -87,6 +87,15 @@ pub enum Error {
 	/// Error occurred when creating ONNX tensor with specific data
 	#[error("Failed to create tensor with data: {0}")]
 	CreateTensorWithData(ErrorInternal),
+	/// Invalid dimension when creating tensor from raw data
+	#[error("Invalid dimension at {0}; all dimensions must be >= 1 when creating a tensor from raw data")]
+	InvalidDimension(usize),
+	/// Shape does not match data length when creating tensor from raw data
+	#[error("Cannot create a tensor from raw data; shape {input:?} ({total}) is larger than the length of the data provided ({expected})")]
+	TensorShapeMismatch { input: Vec<i64>, total: usize, expected: usize },
+	/// Cannot create a tensor from non-contiguous array
+	#[error("Cannot create this type of tensor from an array that is not in contiguous standard layout")]
+	TensorDataNotContiguous,
 	/// Error occurred when filling a tensor with string data
 	#[error("Failed to fill string tensor: {0}")]
 	FillStringTensor(ErrorInternal),

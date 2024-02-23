@@ -7,10 +7,7 @@ use std::{
 use crate::{memory::Allocator, ortsys, Error, IntoTensorElementType, Result, Value, ValueType};
 
 impl Value {
-	pub fn extract_map<K: IntoTensorElementType + Clone + Hash + Eq, V: IntoTensorElementType + Clone>(
-		&self,
-		allocator: &Allocator
-	) -> Result<HashMap<K, V>> {
+	pub fn extract_map<K: IntoTensorElementType + Clone + Hash + Eq, V: IntoTensorElementType + Clone>(&self, allocator: &Allocator) -> Result<HashMap<K, V>> {
 		match self.dtype()? {
 			ValueType::Map { key, value } => {
 				let k_type = K::into_tensor_element_type();

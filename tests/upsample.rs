@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use image::RgbImage;
-use ndarray::{Array, CowArray, Ix4};
-use ort::{inputs, GraphOptimizationLevel, Session, Tensor};
+use ndarray::{Array, ArrayViewD, CowArray, Ix4};
+use ort::{inputs, GraphOptimizationLevel, Session};
 use test_log::test;
 
 fn load_input_image<P: AsRef<Path>>(name: P) -> RgbImage {
@@ -69,10 +69,10 @@ fn upsample() -> ort::Result<()> {
 	let outputs = session.run(inputs![&array]?)?;
 
 	assert_eq!(outputs.len(), 1);
-	let output: Tensor<f32> = outputs[0].extract_tensor()?;
+	let output: ArrayViewD<f32> = outputs[0].extract_tensor()?;
 
 	// The image should have doubled in size
-	assert_eq!(output.view().shape(), [1, 448, 448, 3]);
+	assert_eq!(output.shape(), [1, 448, 448, 3]);
 
 	Ok(())
 }
@@ -106,10 +106,10 @@ fn upsample_with_ort_model() -> ort::Result<()> {
 	let outputs = session.run(inputs![&array]?)?;
 
 	assert_eq!(outputs.len(), 1);
-	let output: Tensor<f32> = outputs[0].extract_tensor()?;
+	let output: ArrayViewD<f32> = outputs[0].extract_tensor()?;
 
 	// The image should have doubled in size
-	assert_eq!(output.view().shape(), [1, 448, 448, 3]);
+	assert_eq!(output.shape(), [1, 448, 448, 3]);
 
 	Ok(())
 }

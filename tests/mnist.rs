@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use image::{imageops::FilterType, ImageBuffer, Luma, Pixel};
-use ort::{inputs, ArrayExtensions, GraphOptimizationLevel, Session, Tensor};
+use ort::{inputs, ArrayExtensions, GraphOptimizationLevel, Session};
 use test_log::test;
 
 #[test]
@@ -43,8 +43,13 @@ fn mnist_5() -> ort::Result<()> {
 	// Perform the inference
 	let outputs = session.run(inputs![array]?)?;
 
-	let output: Tensor<_> = outputs[0].extract_tensor()?;
-	let mut probabilities: Vec<(usize, f32)> = output.view().softmax(ndarray::Axis(1)).iter().copied().enumerate().collect::<Vec<_>>();
+	let mut probabilities: Vec<(usize, f32)> = outputs[0]
+		.extract_tensor()?
+		.softmax(ndarray::Axis(1))
+		.iter()
+		.copied()
+		.enumerate()
+		.collect::<Vec<_>>();
 
 	// Sort probabilities so highest is at beginning of vector.
 	probabilities.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap());

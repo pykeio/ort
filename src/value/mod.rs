@@ -1,4 +1,11 @@
-use std::{any::Any, fmt::Debug, marker::PhantomData, ops::Deref, ptr::NonNull, sync::Arc};
+use std::{
+	any::Any,
+	fmt::Debug,
+	marker::PhantomData,
+	ops::{Deref, DerefMut},
+	ptr::NonNull,
+	sync::Arc
+};
 
 #[cfg(feature = "ndarray")]
 use ndarray::{ArcArray, Array, ArrayView, CowArray, Dimension};
@@ -150,25 +157,30 @@ pub(crate) enum ValueInner {
 	},
 	CppOwned {
 		ptr: NonNull<ort_sys::OrtValue>,
+		/// Whether to release the value pointer on drop.
+		drop: bool,
 		/// Hold [`SharedSessionInner`] to ensure that the value can stay alive after the main session is dropped.
-		_session: Arc<SharedSessionInner>
-	},
-	/// A version of `CppOwned` that does not belong to a session. Used exclusively in [`ValueRef`]s which are returned
-	/// by `extract_sequence` and used temporarily in `extract_map`.
-	///
-	/// We forego holding onto an `Arc<SharedSessionInner>` here because:
-	/// - a map value can be created independently of a session, and thus we wouldn't have anything to hold on to;
-	/// - this is only ever used by `ValueRef`s, whos owner value (which *is* holding the session Arc) will outlive it.
-	CppOwnedRef { ptr: NonNull<ort_sys::OrtValue> }
+		///
+		/// This may be `None` if the value is created outside of a session or if the value does not need to hold onto
+		/// the session reference. In the case of sequence/map values, we forego this because:
+		/// - a map value can be created independently of a session, and thus we wouldn't have anything to hold on to;
+		/// - this is only ever used by `ValueRef`s, whos owner value (which *is* holding the session Arc) will outlive
+		///   it.
+		_session: Option<Arc<SharedSessionInner>>
+	}
 }
 
 /// A temporary version of [`Value`] with a lifetime specifier.
-///
-/// This is used exclusively by [`Value::extract_sequence`] to ensure the sequence value outlives its child elements.
 #[derive(Debug)]
 pub struct ValueRef<'v> {
 	inner: Value,
 	lifetime: PhantomData<&'v ()>
+}
+
+impl<'v> ValueRef<'v> {
+	pub(crate) fn new(inner: Value) -> Self {
+		ValueRef { inner, lifetime: PhantomData }
+	}
 }
 
 impl<'v> Deref for ValueRef<'v> {
@@ -176,6 +188,33 @@ impl<'v> Deref for ValueRef<'v> {
 
 	fn deref(&self) -> &Self::Target {
 		&self.inner
+	}
+}
+
+/// A mutable temporary version of [`Value`] with a lifetime specifier.
+#[derive(Debug)]
+pub struct ValueRefMut<'v> {
+	inner: Value,
+	lifetime: PhantomData<&'v ()>
+}
+
+impl<'v> ValueRefMut<'v> {
+	pub(crate) fn new(inner: Value) -> Self {
+		ValueRefMut { inner, lifetime: PhantomData }
+	}
+}
+
+impl<'v> Deref for ValueRefMut<'v> {
+	type Target = Value;
+
+	fn deref(&self) -> &Self::Target {
+		&self.inner
+	}
+}
+
+impl<'v> DerefMut for ValueRefMut<'v> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.inner
 	}
 }
 
@@ -258,20 +297,24 @@ impl Value {
 	/// - `session` must be `Some` for values returned from a session.
 	#[must_use]
 	pub unsafe fn from_ptr(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value {
-		match session {
-			Some(session) => Value {
-				inner: ValueInner::CppOwned { ptr, _session: session }
-			},
-			None => Value {
-				inner: ValueInner::CppOwnedRef { ptr }
-			}
+		Value {
+			inner: ValueInner::CppOwned { ptr, drop: true, _session: session }
+		}
+	}
+
+	/// A variant of [`Value::from_ptr`] that does not release the value upon dropping. Used in operator kernel
+	/// contexts.
+	#[must_use]
+	pub(crate) unsafe fn from_ptr_nodrop(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value {
+		Value {
+			inner: ValueInner::CppOwned { ptr, drop: false, _session: session }
 		}
 	}
 
 	/// Returns the underlying [`ort_sys::OrtValue`] pointer.
 	pub fn ptr(&self) -> *mut ort_sys::OrtValue {
 		match &self.inner {
-			ValueInner::CppOwnedRef { ptr } | ValueInner::CppOwned { ptr, .. } | ValueInner::RustOwned { ptr, .. } => ptr.as_ptr()
+			ValueInner::CppOwned { ptr, .. } | ValueInner::RustOwned { ptr, .. } => ptr.as_ptr()
 		}
 	}
 
@@ -290,6 +333,22 @@ impl Value {
 		let mut result = 0;
 		ortsys![unsafe IsTensor(self.ptr(), &mut result) -> Error::GetTensorElementType];
 		Ok(result == 1)
+	}
+}
+
+impl Drop for Value {
+	fn drop(&mut self) {
+		let ptr = self.ptr();
+		tracing::trace!(
+			"dropping {} value at {ptr:p}",
+			match &self.inner {
+				ValueInner::RustOwned { .. } => "rust-owned",
+				ValueInner::CppOwned { .. } => "cpp-owned"
+			}
+		);
+		if !matches!(&self.inner, ValueInner::CppOwned { drop: false, .. }) {
+			ortsys![unsafe ReleaseValue(ptr)];
+		}
 	}
 }
 
@@ -341,20 +400,6 @@ macro_rules! impl_try_from {
 #[cfg(feature = "ndarray")]
 impl_try_from!(@T,D &mut ArcArray<T, D>, Array<T, D>);
 impl_try_from!(@T,I (I, Arc<Box<[T]>>), (I, Vec<T>), (I, Box<[T]>), (I, &[T]));
-
-impl Drop for Value {
-	fn drop(&mut self) {
-		let ptr = self.ptr();
-		tracing::trace!(
-			"dropping {} value at {ptr:p}",
-			match &self.inner {
-				ValueInner::RustOwned { .. } => "rust-owned",
-				ValueInner::CppOwned { .. } | ValueInner::CppOwnedRef { .. } => "cpp-owned"
-			}
-		);
-		ortsys![unsafe ReleaseValue(ptr)];
-	}
-}
 
 pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo) -> Result<ValueType> {
 	let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;

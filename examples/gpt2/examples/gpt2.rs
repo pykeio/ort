@@ -3,8 +3,8 @@ use std::{
 	path::Path
 };
 
-use ndarray::{array, concatenate, s, Array1, Axis};
-use ort::{inputs, CUDAExecutionProvider, GraphOptimizationLevel, Session, Tensor};
+use ndarray::{array, concatenate, s, Array1, ArrayViewD, Axis};
+use ort::{inputs, CUDAExecutionProvider, GraphOptimizationLevel, Session};
 use rand::Rng;
 use tokenizers::Tokenizer;
 
@@ -51,8 +51,7 @@ fn main() -> ort::Result<()> {
 	for _ in 0..GEN_TOKENS {
 		let array = tokens.view().insert_axis(Axis(0)).insert_axis(Axis(1));
 		let outputs = session.run(inputs![array]?)?;
-		let generated_tokens: Tensor<f32> = outputs["output1"].extract_tensor()?;
-		let generated_tokens = generated_tokens.view();
+		let generated_tokens: ArrayViewD<f32> = outputs["output1"].extract_tensor()?;
 
 		// Collect and sort logits
 		let probabilities = &mut generated_tokens

@@ -63,7 +63,7 @@ fn main() -> ort::Result<()> {
 
 	// Run YOLOv8 inference
 	let outputs: SessionOutputs = model.run(inputs!["images" => input.view()]?)?;
-	let output = outputs["output0"].extract_tensor::<f32>().unwrap().view().t().into_owned();
+	let output = outputs["output0"].extract_tensor::<f32>()?.t().into_owned();
 
 	let mut boxes = Vec::new();
 	let output = output.slice(s![.., .., 0]);

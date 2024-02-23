@@ -76,9 +76,7 @@ Users of `ort` appreciate its ease of use and ergonomic API. `ort` is also battl
 
         // Postprocessing
         let output = outputs["output0"]
-            .extract_tensor::<f32>()
-            .unwrap()
-            .view()
+            .extract_tensor::<f32>()?
             .t()
             .slice(s![.., .., 0])
             .into_owned();

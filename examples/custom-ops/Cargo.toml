@@ -1,0 +1,13 @@
+[package]
+publish = false
+name = "example-custom-ops"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+ort = { path = "../../", features = [ "fetch-models" ] }
+ndarray = "0.15"
+
+[features]
+load-dynamic = [ "ort/load-dynamic" ]
+cuda = [ "ort/cuda" ]

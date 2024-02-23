@@ -77,8 +77,8 @@ mod tests {
 		let v = Array1::from_vec(vec!["hello world".to_string(), "こんにちは世界".to_string()]);
 
 		let value = Value::from_string_array(&allocator, v.view())?;
-		let extracted = value.extract_tensor::<String>()?;
-		assert_eq!(*extracted.view(), v.into_dyn().view());
+		let extracted = value.extract_string_tensor()?;
+		assert_eq!(extracted, v.into_dyn());
 
 		Ok(())
 	}

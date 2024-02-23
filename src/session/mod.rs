@@ -32,7 +32,7 @@ use super::{
 	value::{Value, ValueType},
 	GraphOptimizationLevel
 };
-use crate::{environment::Environment, MemoryInfo};
+use crate::{environment::Environment, MemoryInfo, OperatorDomain};
 
 pub(crate) mod input;
 pub(crate) mod output;
@@ -56,8 +56,9 @@ pub use self::{input::SessionInputs, output::SessionOutputs};
 pub struct SessionBuilder {
 	pub(crate) session_options_ptr: NonNull<ort_sys::OrtSessionOptions>,
 	memory_info: Option<Rc<MemoryInfo>>,
-	#[cfg(feature = "custom-ops")]
+	#[cfg(feature = "operator-libraries")]
 	custom_runtime_handles: Vec<*mut std::os::raw::c_void>,
+	operator_domains: Vec<Arc<OperatorDomain>>,
 	execution_providers: Vec<ExecutionProviderDispatch>
 }
 
@@ -70,8 +71,9 @@ impl Clone for SessionBuilder {
 		Self {
 			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },
 			memory_info: self.memory_info.clone(),
-			#[cfg(feature = "custom-ops")]
+			#[cfg(feature = "operator-libraries")]
 			custom_runtime_handles: self.custom_runtime_handles.clone(),
+			operator_domains: self.operator_domains.clone(),
 			execution_providers: self.execution_providers.clone()
 		}
 	}
@@ -79,7 +81,7 @@ impl Clone for SessionBuilder {
 
 impl Drop for SessionBuilder {
 	fn drop(&mut self) {
-		#[cfg(feature = "custom-ops")]
+		#[cfg(feature = "operator-libraries")]
 		for &handle in &self.custom_runtime_handles {
 			close_lib_handle(handle);
 		}
@@ -108,8 +110,9 @@ impl SessionBuilder {
 		Ok(Self {
 			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },
 			memory_info: None,
-			#[cfg(feature = "custom-ops")]
+			#[cfg(feature = "operator-libraries")]
 			custom_runtime_handles: Vec::new(),
+			operator_domains: Vec::new(),
 			execution_providers: Vec::new()
 		})
 	}
@@ -217,10 +220,10 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
-	/// Registers a custom operator library with the given library path in the session.
-	#[cfg(feature = "custom-ops")]
-	#[cfg_attr(docsrs, doc(cfg(feature = "custom-ops")))]
-	pub fn with_custom_ops_lib(mut self, lib_path: impl AsRef<str>) -> Result<Self> {
+	/// Registers a custom operator library at the given library path.
+	#[cfg(feature = "operator-libraries")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "operator-libraries")))]
+	pub fn with_operator_library(mut self, lib_path: impl AsRef<str>) -> Result<Self> {
 		let path_cstr = CString::new(lib_path.as_ref())?;
 
 		let mut handle: *mut ::std::os::raw::c_void = std::ptr::null_mut();
@@ -243,12 +246,17 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
-	/// Enable custom operators. See onnxruntime-extensions: <https://github.com/microsoft/onnxruntime-extensions>
-	#[cfg(feature = "custom-ops")]
-	#[cfg_attr(docsrs, doc(cfg(feature = "custom-ops")))]
-	pub fn with_enable_custom_ops(self) -> Result<Self> {
+	/// Enables [`onnxruntime-extensions`](https://github.com/microsoft/onnxruntime-extensions) custom operators.
+	pub fn with_extensions(self) -> Result<Self> {
 		let status = ortsys![unsafe EnableOrtCustomOps(self.session_options_ptr.as_ptr())];
 		status_to_result(status).map_err(Error::CreateSessionOptions)?;
+		Ok(self)
+	}
+
+	pub fn with_operators(mut self, domain: impl Into<Arc<OperatorDomain>>) -> Result<Self> {
+		let domain = domain.into();
+		ortsys![unsafe AddCustomOpDomain(self.session_options_ptr.as_ptr(), domain.ptr()) -> Error::AddCustomOperatorDomain];
+		self.operator_domains.push(domain);
 		Ok(self)
 	}
 
@@ -810,12 +818,12 @@ unsafe impl Send for Session {}
 // temporary bug in ONNX Runtime or a wontfix. Maybe this impl should be removed just to be safe?
 unsafe impl Sync for Session {}
 
-#[cfg(all(unix, feature = "custom-ops"))]
+#[cfg(all(unix, feature = "operator-libraries"))]
 fn close_lib_handle(handle: *mut std::os::raw::c_void) {
 	unsafe { libc::dlclose(handle) };
 }
 
-#[cfg(all(windows, feature = "custom-ops"))]
+#[cfg(all(windows, feature = "operator-libraries"))]
 fn close_lib_handle(handle: *mut std::os::raw::c_void) {
 	unsafe { winapi::um::libloaderapi::FreeLibrary(handle as winapi::shared::minwindef::HINSTANCE) };
 }

@@ -4,17 +4,20 @@ use std::{
 	ptr::{self, NonNull}
 };
 
-use crate::{memory::Allocator, ortsys, Error, ExtractTensorDataView, Result, Value, ValueType};
+use crate::{memory::Allocator, ortsys, Error, IntoTensorElementType, Result, Value, ValueType};
 
 impl Value {
-	pub fn extract_map<K: ExtractTensorDataView + Clone + Hash + Eq, V: ExtractTensorDataView + Clone>(&self, allocator: &Allocator) -> Result<HashMap<K, V>> {
+	pub fn extract_map<K: IntoTensorElementType + Clone + Hash + Eq, V: IntoTensorElementType + Clone>(
+		&self,
+		allocator: &Allocator
+	) -> Result<HashMap<K, V>> {
 		match self.dtype()? {
 			ValueType::Map { key, value } => {
-				let k_type = K::tensor_element_type();
+				let k_type = K::into_tensor_element_type();
 				if k_type != key {
 					return Err(Error::InvalidMapKeyType { expected: k_type, actual: key });
 				}
-				let v_type = V::tensor_element_type();
+				let v_type = V::into_tensor_element_type();
 				if v_type != value {
 					return Err(Error::InvalidMapValueType { expected: v_type, actual: value });
 				}

@@ -1,6 +1,7 @@
 [workspace]
 members = [
 	'ort-sys',
+	'examples/custom-ops',
 	'examples/gpt2',
 	'examples/model-info',
 	'examples/yolov8',
@@ -8,6 +9,7 @@ members = [
 ]
 default-members = [
 	'.',
+	'examples/custom-ops',
 	'examples/gpt2',
 	'examples/model-info',
 	'examples/yolov8',
@@ -39,14 +41,14 @@ strip = true
 codegen-units = 1
 
 [package.metadata.docs.rs]
-features = [ "ndarray", "half", "profiling", "custom-ops", "fetch-models", "copy-dylibs" ]
+features = [ "ndarray", "half", "profiling", "operator-libraries", "fetch-models", "copy-dylibs" ]
 rustdoc-args = [ "--cfg", "docsrs" ]
 
 [features]
 default = [ "ndarray", "half", "download-binaries", "copy-dylibs" ]
 
 profiling = [ "widestring" ]
-custom-ops = [ "libc", "winapi" ]
+operator-libraries = [ "libc", "winapi" ]
 
 fetch-models = [ "ureq" ]
 download-binaries = [ "ort-sys/download-binaries" ]

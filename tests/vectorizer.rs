@@ -26,12 +26,7 @@ fn vectorizer() -> ort::Result<()> {
 
 	// Perform the inference
 	let outputs = session.run(input_tensor_values)?;
-	assert_eq!(
-		*outputs[0].extract_tensor::<f32>()?.view(),
-		ArrayD::from_shape_vec(IxDyn(&[1, 9]), vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-			.unwrap()
-			.view()
-	);
+	assert_eq!(outputs[0].extract_tensor::<f32>()?, ArrayD::from_shape_vec(IxDyn(&[1, 9]), vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]).unwrap());
 
 	Ok(())
 }

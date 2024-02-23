@@ -19,6 +19,7 @@ pub(crate) mod execution_providers;
 pub(crate) mod io_binding;
 pub(crate) mod memory;
 pub(crate) mod metadata;
+pub(crate) mod operator;
 pub(crate) mod session;
 pub(crate) mod tensor;
 pub(crate) mod value;
@@ -48,11 +49,16 @@ pub use self::execution_providers::*;
 pub use self::io_binding::IoBinding;
 pub use self::memory::{AllocationDevice, Allocator, MemoryInfo};
 pub use self::metadata::ModelMetadata;
+pub use self::operator::{
+	io::{OperatorInput, OperatorOutput},
+	kernel::{Kernel, KernelAttributes, KernelContext},
+	InferShapeFn, Operator, OperatorDomain
+};
 pub use self::session::{InMemorySession, RunOptions, Session, SessionBuilder, SessionInputs, SessionOutputs, SharedSessionInner};
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-pub use self::tensor::{ArrayExtensions, ArrayViewHolder, Tensor};
-pub use self::tensor::{ExtractTensorData, ExtractTensorDataView, IntoTensorElementType, TensorElementType};
+pub use self::tensor::ArrayExtensions;
+pub use self::tensor::{IntoTensorElementType, TensorElementType};
 pub use self::value::{Value, ValueRef, ValueType};
 
 #[cfg(not(all(target_arch = "x86", target_os = "windows")))]

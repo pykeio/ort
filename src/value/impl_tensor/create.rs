@@ -54,7 +54,7 @@ impl Value {
 	///
 	/// Raw data provided as a `Arc<Box<[T]>>`, `Box<[T]>`, or `Vec<T>` will never be copied. Raw data is expected to be
 	/// in standard, contigous layout.
-	pub fn from_array<T: IntoTensorElementType + Debug + Clone + 'static>(input: impl IntoValueTensor<Item = T>) -> Result<Value> {
+	pub fn from_array<T: IntoTensorElementType>(input: impl IntoValueTensor<Item = T>) -> Result<Value> {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemoryType::Default)?;
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
@@ -174,7 +174,7 @@ impl Value {
 	/// ```
 	///
 	/// Note that string data will always be copied, no matter what data is provided.
-	pub fn from_string_array<T: Utf8Data + Debug + Clone + 'static>(allocator: &Allocator, input: impl IntoValueTensor<Item = T>) -> Result<Value> {
+	pub fn from_string_array<T: Utf8Data>(allocator: &Allocator, input: impl IntoValueTensor<Item = T>) -> Result<Value> {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemoryType::Default)?;
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();

@@ -334,7 +334,7 @@ impl SessionBuilder {
             .collect();
 
 		let env = get_environment()?;
-		apply_execution_providers(&self, self.execution_providers.iter().cloned());
+		apply_execution_providers(&self, env.execution_providers.iter().cloned());
 
 		let env_ptr = env.env_ptr.load(Ordering::Relaxed);
 

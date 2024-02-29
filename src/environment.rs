@@ -28,7 +28,8 @@ static G_ENV: EnvironmentSingleton = EnvironmentSingleton { cell: UnsafeCell::ne
 #[derive(Debug)]
 pub struct Environment {
 	pub(crate) execution_providers: Vec<ExecutionProviderDispatch>,
-	pub(crate) env_ptr: AtomicPtr<ort_sys::OrtEnv>
+	pub(crate) env_ptr: AtomicPtr<ort_sys::OrtEnv>,
+	pub(crate) has_global_threadpool: bool
 }
 
 impl Environment {
@@ -129,7 +130,7 @@ impl EnvironmentBuilder {
 			drop(env_arc);
 		}
 
-		let env_ptr = if let Some(global_thread_pool) = self.global_thread_pool_options {
+		let (env_ptr, has_global_threadpool) = if let Some(global_thread_pool) = self.global_thread_pool_options {
 			let mut env_ptr: *mut ort_sys::OrtEnv = std::ptr::null_mut();
 			let logging_function: ort_sys::OrtLoggingFunction = Some(custom_logger);
 			let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
@@ -160,7 +161,7 @@ impl EnvironmentBuilder {
 					&mut env_ptr
 				) -> Error::CreateEnvironment; nonNull(env_ptr)];
 			ortsys![unsafe ReleaseThreadingOptions(thread_options)];
-			env_ptr
+			(env_ptr, true)
 		} else {
 			let mut env_ptr: *mut ort_sys::OrtEnv = std::ptr::null_mut();
 			let logging_function: ort_sys::OrtLoggingFunction = Some(custom_logger);
@@ -174,14 +175,15 @@ impl EnvironmentBuilder {
 					cname.as_ptr(),
 					&mut env_ptr
 				) -> Error::CreateEnvironment; nonNull(env_ptr)];
-			env_ptr
+			(env_ptr, false)
 		};
 		debug!(env_ptr = format!("{env_ptr:?}").as_str(), "Environment created");
 
 		unsafe {
 			*G_ENV.cell.get() = Some(Arc::new(Environment {
 				execution_providers: self.execution_providers,
-				env_ptr: AtomicPtr::new(env_ptr)
+				env_ptr: AtomicPtr::new(env_ptr),
+				has_global_threadpool
 			}));
 		};
 

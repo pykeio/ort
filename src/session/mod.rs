@@ -146,15 +146,6 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
-	/// Configure the session to disable per-session thread pool, instead using the environment's global thread pool.
-	/// This must be used with an environment created with
-	/// [`EnvironmentBuilder::with_global_thread_pool`](crate::environment::EnvironmentBuilder::with_global_thread_pool)
-	/// enabled.
-	pub fn with_disable_per_session_threads(self) -> Result<Self> {
-		ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr.as_ptr()) -> Error::CreateSessionOptions];
-		Ok(self)
-	}
-
 	/// Configure the session to use a number of threads to parallelize the execution of the graph. If nodes can be run
 	/// in parallel, this sets the maximum number of threads to use to run them in parallel.
 	///
@@ -336,6 +327,10 @@ impl SessionBuilder {
 		let env = get_environment()?;
 		apply_execution_providers(&self, env.execution_providers.iter().cloned());
 
+		if env.has_global_threadpool {
+			ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr.as_ptr()) -> Error::CreateSessionOptions];
+		}
+
 		let env_ptr = env.env_ptr.load(Ordering::Relaxed);
 
 		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
@@ -402,6 +397,10 @@ impl SessionBuilder {
 
 		let env = get_environment()?;
 		apply_execution_providers(&self, env.execution_providers.iter().cloned());
+
+		if env.has_global_threadpool {
+			ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr.as_ptr()) -> Error::CreateSessionOptions];
+		}
 
 		let env_ptr = env.env_ptr.load(Ordering::Relaxed);
 

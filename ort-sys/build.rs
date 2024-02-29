@@ -100,7 +100,7 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 		#[cfg(target_os = "linux")]
 		{
 			let main_dy = lib_dir.join("libonnxruntime.so");
-			let versioned_dy = out_dir.join("libonnxruntime.so.1.17.0");
+			let versioned_dy = out_dir.join("libonnxruntime.so.1.17.1");
 			if main_dy.exists() && !versioned_dy.exists() {
 				if versioned_dy.is_symlink() {
 					fs::remove_file(&versioned_dy).unwrap();
@@ -283,48 +283,48 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 			let target = env::var("TARGET").unwrap().to_string();
 			let (prebuilt_url, prebuilt_hash) = match target.as_str() {
 				"aarch64-apple-darwin" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.0/ortrs-msort_static-v1.17.0-aarch64-apple-darwin.tgz",
-					"71C2D65E05AA3E3CE7DACC87E4918D92E48DCE0E8B0123A839590A6513137E99"
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_static-v1.17.1-aarch64-apple-darwin.tgz",
+					"041D1DD6005B29F4EAB74EF0E0B491FE9932004ADEE740FE9BA037D7BC52DBFC"
 				),
 				"aarch64-pc-windows-msvc" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.0/ortrs-msort_static-v1.17.0-aarch64-pc-windows-msvc.tgz",
-					"27DDC61E1416E3F1BC6137C8365B563F73BA5A6CE8D7008E5CD4E36B4F037FDA"
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_static-v1.17.1-aarch64-pc-windows-msvc.tgz",
+					"5AA68F5DB1BA1A5084E00E3C60AB4FA6BDEECA05104DACA8B88D6DBCC178EBF5"
 				),
 				"aarch64-unknown-linux-gnu" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.0/ortrs-msort_static-v1.17.0-aarch64-unknown-linux-gnu.tgz",
-					"5DA93D6C54475A2D4413B9C592930BF6B2426BD8D281717006C9FF248D8AC592"
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_static-v1.17.1-aarch64-unknown-linux-gnu.tgz",
+					"73A569FF807D655FD6258816FBC9660667370AEB4A47C6754746BCBF07C280F9"
 				),
 				"wasm32-unknown-emscripten" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.0/ortrs-msort_static-v1.17.0-wasm32-unknown-emscripten.tgz",
-					"E1ADBF06922649A59AB9D0459E9D5985B002C3AE830B512B7AED030BDA859C55"
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_static-v1.17.1-wasm32-unknown-emscripten.tgz",
+					"58EAD204FE53A488489287FFD97113E89A2CCA91876D3186CDBCA10A4F5A3287"
 				),
 				"x86_64-apple-darwin" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.0/ortrs-msort_static-v1.17.0-x86_64-apple-darwin.tgz",
-					"0786B8D4029EFB43AFAA4C4D012B5D83F53893F9AFADE677A4FDD1C7BA3697B8"
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_static-v1.17.1-x86_64-apple-darwin.tgz",
+					"BB4320E2B4FB86D785B7CBB4D0CBDCCCD95253E70588410A4B2F27BCE9E917F8"
 				),
 				"x86_64-pc-windows-msvc" => {
 					if cfg!(any(feature = "cuda", feature = "tensorrt")) {
 						(
-							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.0/ortrs-msort_dylib_cuda-v1.17.0-x86_64-pc-windows-msvc.tgz",
-							"802C5EB4E34B5382CB5BB4205FA770FC1465EBBD14AE34C4257EDDF13A924FD7"
+							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_dylib_cuda-v1.17.1-x86_64-pc-windows-msvc.tgz",
+							"020A5E0F4DE81DDAAFB7A7928112E57A7153C3B43C7548EA1A3C570A6AFB6F00"
 						)
 					} else {
 						(
-							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.0/ortrs-msort_static-v1.17.0-x86_64-pc-windows-msvc.tgz",
-							"C01AAEED3BC2E6E0BAF13371E7147CCC8D037549C77E35AC3EBB45C4187C81A5"
+							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_static-v1.17.1-x86_64-pc-windows-msvc.tgz",
+							"1388EABC74F1FA0E0695896C0BBFADCCE3E16B6DA489392D790DCAC642DEF6AE"
 						)
 					}
 				}
 				"x86_64-unknown-linux-gnu" => {
 					if cfg!(any(feature = "cuda", feature = "tensorrt")) {
 						(
-							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.0/ortrs-msort_dylib_cuda-v1.17.0-x86_64-unknown-linux-gnu.tgz",
-							"869FB84B50AECD9E0F41464ACC0C621B4162BD338AFD5208F6B8EA77FB7F6C22"
+							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_dylib_cuda-v1.17.1-x86_64-unknown-linux-gnu.tgz",
+							"3000FAC7DB9AD3292AA9F0D887F85F2CDF8F522A9920B60D803648ED0E00FA13"
 						)
 					} else {
 						(
-							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.0/ortrs-msort_static-v1.17.0-x86_64-unknown-linux-gnu.tgz",
-							"6EA7424A0DFC4E5EE200EF8D2564DB9591CA4A2AA1A1D69234B4408CFE849382"
+							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_static-v1.17.1-x86_64-unknown-linux-gnu.tgz",
+							"14AFEC12219C8D587396F4EF3AB471CE5B64DFB5BB0CFD4C21C22B85BE5E519F"
 						)
 					}
 				}

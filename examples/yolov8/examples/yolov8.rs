@@ -59,7 +59,7 @@ fn main() -> ort::Result<()> {
 		input[[0, 2, y, x]] = (b as f32) / 255.;
 	}
 
-	let model = Session::builder()?.with_model_downloaded(YOLOV8M_URL)?;
+	let model = Session::builder()?.commit_from_url(YOLOV8M_URL)?;
 
 	// Run YOLOv8 inference
 	let outputs: SessionOutputs = model.run(inputs!["images" => input.view()]?)?;

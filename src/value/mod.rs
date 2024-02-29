@@ -31,7 +31,7 @@ use self::impl_tensor::ToDimensions;
 /// # use std::sync::Arc;
 /// # use ort::{Session, Value, ValueType, TensorElementType};
 /// # fn main() -> ort::Result<()> {
-/// # 	let session = Session::builder()?.with_model_from_file("tests/data/upsample.onnx")?;
+/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// // `ValueType`s can be obtained from session inputs/outputs:
 /// let input = &session.inputs[0];
 /// assert_eq!(
@@ -227,7 +227,7 @@ impl<'v> DerefMut for ValueRefMut<'v> {
 /// ```
 /// # use ort::{Session, Value, ValueType, TensorElementType};
 /// # fn main() -> ort::Result<()> {
-/// # 	let upsample = Session::builder()?.with_model_from_file("tests/data/upsample.onnx")?;
+/// # 	let upsample = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// // Create a value from a raw data vector
 /// let value = Value::from_array(([1usize, 1, 1, 3], vec![1.0_f32, 2.0, 3.0].into_boxed_slice()))?;
 ///

@@ -106,23 +106,21 @@ pub(crate) fn dylib_path() -> &'static String {
 pub(crate) fn lib_handle() -> MutexGuard<'static, libloading::Library> {
 	G_ORT_LIB
 		.get_or_init(|| {
-			unsafe {
-				// resolve path relative to executable
-				let path: std::path::PathBuf = dylib_path().into();
-				let absolute_path = if path.is_absolute() {
-					path
-				} else {
-					let relative = std::env::current_exe()
-						.expect("could not get current executable path")
-						.parent()
-						.unwrap()
-						.join(&path);
-					if relative.exists() { relative } else { path }
-				};
-				let lib = libloading::Library::new(&absolute_path)
-					.unwrap_or_else(|e| panic!("An error occurred while attempting to load the ONNX Runtime binary at `{}`: {e}", absolute_path.display()));
-				Arc::new(Mutex::new(lib))
-			}
+			// resolve path relative to executable
+			let path: std::path::PathBuf = dylib_path().into();
+			let absolute_path = if path.is_absolute() {
+				path
+			} else {
+				let relative = std::env::current_exe()
+					.expect("could not get current executable path")
+					.parent()
+					.unwrap()
+					.join(&path);
+				if relative.exists() { relative } else { path }
+			};
+			let lib = unsafe { libloading::Library::new(&absolute_path) }
+				.unwrap_or_else(|e| panic!("An error occurred while attempting to load the ONNX Runtime binary at `{}`: {e}", absolute_path.display()));
+			Arc::new(Mutex::new(lib))
 		})
 		.lock()
 		.expect("failed to acquire ONNX Runtime dylib lock; another thread panicked?")

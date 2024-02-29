@@ -35,11 +35,6 @@ pub enum TensorElementType {
 	Uint32,
 	/// Unsigned 64-bit integer, equivalent to Rust's `u64`.
 	Uint64,
-	// /// Complex 64-bit floating point number, equivalent to Rust's `num_complex::Complex<f64>`.
-	// Complex64,
-	// TODO: `num_complex` crate doesn't support i128 provided by the `decimal` crate.
-	// /// Complex 128-bit floating point number, equivalent to Rust's `num_complex::Complex<f128>`.
-	// Complex128,
 	/// Brain 16-bit floating point number, equivalent to [`half::bf16`] (requires the `half` feature).
 	#[cfg(feature = "half")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "half")))]
@@ -63,8 +58,6 @@ impl From<TensorElementType> for ort_sys::ONNXTensorElementDataType {
 			TensorElementType::Float64 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE,
 			TensorElementType::Uint32 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32,
 			TensorElementType::Uint64 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64,
-			// TensorElementDataType::Complex64 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX64,
-			// TensorElementDataType::Complex128 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX128,
 			#[cfg(feature = "half")]
 			TensorElementType::Bfloat16 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16
 		}
@@ -87,8 +80,6 @@ impl From<ort_sys::ONNXTensorElementDataType> for TensorElementType {
 			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE => TensorElementType::Float64,
 			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32 => TensorElementType::Uint32,
 			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64 => TensorElementType::Uint64,
-			// ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX64 => TensorElementDataType::Complex64,
-			// ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX128 => TensorElementDataType::Complex128,
 			#[cfg(feature = "half")]
 			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16 => TensorElementType::Bfloat16,
 			_ => panic!("Invalid ONNXTensorElementDataType value")
@@ -126,18 +117,11 @@ impl_type_trait!(half::f16, Float16);
 impl_type_trait!(f64, Float64);
 impl_type_trait!(u32, Uint32);
 impl_type_trait!(u64, Uint64);
-// impl_type_trait!(num_complex::Complex<f64>, Complex64);
-// impl_type_trait!(num_complex::Complex<f128>, Complex128);
 #[cfg(feature = "half")]
 #[cfg_attr(docsrs, doc(cfg(feature = "half")))]
 impl_type_trait!(half::bf16, Bfloat16);
 
 /// Adapter for common Rust string types to ONNX strings.
-///
-/// It should be easy to use both [`String`] and `&str` as [`TensorElementDataType::String`] data, but
-/// we can't define an automatic implementation for anything that implements [`AsRef<str>`] as it
-/// would conflict with the implementations of [`IntoTensorElementDataType`] for primitive numeric
-/// types (which might implement [`AsRef<str>`] at some point in the future).
 pub trait Utf8Data {
 	/// Returns the contents of this value as a slice of UTF-8 bytes.
 	fn as_utf8_bytes(&self) -> &[u8];

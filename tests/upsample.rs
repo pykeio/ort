@@ -51,7 +51,7 @@ fn upsample() -> ort::Result<()> {
 	let session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
-		.with_model_from_memory(&session_data)
+		.commit_from_memory(&session_data)
 		.expect("Could not read model from memory");
 
 	let metadata = session.metadata()?;
@@ -92,7 +92,7 @@ fn upsample_with_ort_model() -> ort::Result<()> {
 	let session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
-		.with_model_from_memory_directly(&session_data) // Zero-copy.
+		.commit_from_memory_directly(&session_data) // Zero-copy.
 		.expect("Could not read model from memory");
 
 	assert_eq!(session.inputs[0].input_type.tensor_dimensions().expect("input0 to be a tensor type"), &[-1, -1, -1, 3]);

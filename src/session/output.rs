@@ -13,7 +13,7 @@ use crate::{Allocator, Value};
 /// ```
 /// # use ort::{GraphOptimizationLevel, Session};
 /// # fn main() -> ort::Result<()> {
-/// let session = Session::builder()?.with_model_from_file("tests/data/upsample.onnx")?;
+/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 /// let outputs = session.run(ort::inputs![input]?)?;
 ///

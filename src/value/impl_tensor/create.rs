@@ -155,7 +155,7 @@ impl Value {
 	/// ```
 	/// # use ort::{Session, Value};
 	/// # fn main() -> ort::Result<()> {
-	/// # 	let session = Session::builder()?.with_model_from_file("tests/data/vectorizer.onnx")?;
+	/// # 	let session = Session::builder()?.commit_from_file("tests/data/vectorizer.onnx")?;
 	/// // You'll need to obtain an `Allocator` from a session in order to create string tensors.
 	/// let allocator = session.allocator();
 	///
@@ -173,7 +173,7 @@ impl Value {
 	/// # }
 	/// ```
 	///
-	/// Note that string data will always be copied, no matter what data is provided.
+	/// Note that string data will *always* be copied, no matter what form the data is provided in.
 	pub fn from_string_array<T: Utf8Data>(allocator: &Allocator, input: impl IntoValueTensor<Item = T>) -> Result<Value> {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemoryType::Default)?;
 

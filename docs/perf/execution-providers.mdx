@@ -50,7 +50,7 @@ use ort::{CUDAExecutionProvider, Session};
 fn main() -> anyhow::Result<()> {
     let session = Session::builder()?
         .with_execution_providers([CUDAExecutionProvider::default().build()])?
-        .with_model_from_file("model.onnx")?;
+        .commit_from_file("model.onnx")?;
 
     Ok(())
 }
@@ -72,7 +72,7 @@ fn main() -> anyhow::Result<()> {
             // Or use ANE on Apple platforms
             CoreMLExecutionProvider::default().build()
         ])?
-        .with_model_from_file("model.onnx")?;
+        .commit_from_file("model.onnx")?;
 
     Ok(())
 }
@@ -94,7 +94,7 @@ fn main() -> anyhow::Result<()> {
                 .with_ane_only()
                 .build()
         ])?
-        .with_model_from_file("model.onnx")?;
+        .commit_from_file("model.onnx")?;
 
     Ok(())
 }
@@ -117,7 +117,7 @@ fn main() -> anyhow::Result<()> {
         std::process::exit(1);
     }
 
-    let session = builder.with_model_from_file("model.onnx")?;
+    let session = builder.commit_from_file("model.onnx")?;
 
     Ok(())
 }
@@ -137,7 +137,7 @@ fn main() -> anyhow::Result<()> {
         std::process::exit(1);
     }
 
-    let session = builder.with_model_from_file("model.onnx")?;
+    let session = builder.commit_from_file("model.onnx")?;
 
     Ok(())
 }
@@ -154,7 +154,7 @@ fn main() -> anyhow::Result<()> {
         .with_execution_providers([CUDAExecutionProvider::default().build()])
         .commit()?;
 
-    let session = Session::builder()?.with_model_from_file("model.onnx")?;
+    let session = Session::builder()?.commit_from_file("model.onnx")?;
     // The session will attempt to register the CUDA EP
     // since we configured the environment default.
 

@@ -23,8 +23,16 @@ ort::init()
 -// v1.x
 -let session = SessionBuilder::new(&environment)?.with_model_from_file("model.onnx")?;
 +// v2
-+let session = Session::builder()?.with_model_from_file("model.onnx")?;
++let session = Session::builder()?.commit_from_file("model.onnx")?;
 ```
+
+### `SessionBuilder::with_model_*` -> `SessionBuilder::commit_*`
+The final `SessionBuilder` methods have been renamed for clarity.
+
+- `SessionBuilder::with_model_from_file` -> `SessionBuilder::commit_from_file`
+- `SessionBuilder::with_model_from_memory` -> `SessionBuilder::commit_from_memory`
+- `SessionBuilder::with_model_from_memory_directly` -> `SessionBuilder::commit_from_memory_directly`
+- `SessionBuilder::with_model_downloaded` -> `SessionBuilder::commit_from_url`
 
 ## Session inputs
 
@@ -147,7 +155,7 @@ The dependency on `ndarray` is now declared optional. If you use `ort` with `def
 ## Model Zoo structs have been removed
 ONNX pushed a new Model Zoo structure that adds hundreds of different models. This is impractical to maintain, so the built-in structs have been removed.
 
-You can still use `Session::with_model_downloaded`, it just now takes a URL string instead of a struct.
+You can still use `Session::commit_from_url`, it just now takes a URL string instead of a struct.
 
 ## Changes to logging
 Environment-level logging configuration (i.e. `EnvironmentBuilder::with_log_level`) has been removed because it could cause unnecessary confusion with our `tracing` integration.

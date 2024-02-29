@@ -40,7 +40,7 @@ pub use self::{input::SessionInputs, output::SessionOutputs};
 
 /// Creates a session using the builder pattern.
 ///
-/// Once configured, use the [`SessionBuilder::with_model_from_file`](crate::SessionBuilder::with_model_from_file)
+/// Once configured, use the [`SessionBuilder::commit_from_file`](crate::SessionBuilder::commit_from_file)
 /// method to 'commit' the builder configuration into a [`Session`].
 ///
 /// ```
@@ -49,7 +49,7 @@ pub use self::{input::SessionInputs, output::SessionOutputs};
 /// let session = Session::builder()?
 /// 	.with_optimization_level(GraphOptimizationLevel::Level1)?
 /// 	.with_intra_threads(1)?
-/// 	.with_model_from_file("tests/data/upsample.onnx")?;
+/// 	.commit_from_file("tests/data/upsample.onnx")?;
 /// # Ok(())
 /// # }
 /// ```
@@ -99,7 +99,7 @@ impl SessionBuilder {
 	/// let session = Session::builder()?
 	/// 	.with_optimization_level(GraphOptimizationLevel::Level1)?
 	/// 	.with_intra_threads(1)?
-	/// 	.with_model_from_file("tests/data/upsample.onnx")?;
+	/// 	.commit_from_file("tests/data/upsample.onnx")?;
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -254,7 +254,7 @@ impl SessionBuilder {
 	/// Downloads a pre-trained ONNX model from the given URL and builds the session.
 	#[cfg(feature = "fetch-models")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "fetch-models")))]
-	pub fn with_model_downloaded(self, model_url: impl AsRef<str>) -> Result<Session> {
+	pub fn commit_from_url(self, model_url: impl AsRef<str>) -> Result<Session> {
 		let mut download_dir = ort_sys::internal::dirs::cache_dir()
 			.expect("could not determine cache directory")
 			.join("models");
@@ -294,11 +294,11 @@ impl SessionBuilder {
 			}
 		};
 
-		self.with_model_from_file(downloaded_path)
+		self.commit_from_file(downloaded_path)
 	}
 
 	/// Loads an ONNX model from a file and builds the session.
-	pub fn with_model_from_file<P>(self, model_filepath_ref: P) -> Result<Session>
+	pub fn commit_from_file<P>(self, model_filepath_ref: P) -> Result<Session>
 	where
 		P: AsRef<Path>
 	{
@@ -374,7 +374,7 @@ impl SessionBuilder {
 	///
 	/// If you wish to store the model bytes and the [`InMemorySession`] in the same struct, look for crates that
 	/// facilitate creating self-referential structs, such as [`ouroboros`](https://github.com/joshua-maros/ouroboros).
-	pub fn with_model_from_memory_directly(self, model_bytes: &[u8]) -> Result<InMemorySession<'_>> {
+	pub fn commit_from_memory_directly(self, model_bytes: &[u8]) -> Result<InMemorySession<'_>> {
 		let str_to_char = |s: &str| {
 			s.as_bytes()
 				.iter()
@@ -386,13 +386,13 @@ impl SessionBuilder {
 		ortsys![unsafe AddSessionConfigEntry(self.session_options_ptr.as_ptr(), str_to_char("session.use_ort_model_bytes_directly").as_ptr(), str_to_char("1").as_ptr())];
 		ortsys![unsafe AddSessionConfigEntry(self.session_options_ptr.as_ptr(), str_to_char("session.use_ort_model_bytes_for_initializers").as_ptr(), str_to_char("1").as_ptr())];
 
-		let session = self.with_model_from_memory(model_bytes)?;
+		let session = self.commit_from_memory(model_bytes)?;
 
 		Ok(InMemorySession { session, phantom: PhantomData })
 	}
 
 	/// Load an ONNX graph from memory and commit the session.
-	pub fn with_model_from_memory(self, model_bytes: &[u8]) -> Result<Session> {
+	pub fn commit_from_memory(self, model_bytes: &[u8]) -> Result<Session> {
 		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
 
 		let env = get_environment()?;
@@ -479,7 +479,7 @@ impl Drop for SharedSessionInner {
 /// ```
 /// # use ort::{GraphOptimizationLevel, Session};
 /// # fn main() -> ort::Result<()> {
-/// let session = Session::builder()?.with_model_from_file("tests/data/upsample.onnx")?;
+/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 /// let outputs = session.run(ort::inputs![input]?)?;
 /// # 	Ok(())
@@ -566,7 +566,7 @@ impl RunOptions {
 	/// # use std::sync::Arc;
 	/// # use ort::{Session, RunOptions, Value, ValueType, TensorElementType};
 	/// # fn main() -> ort::Result<()> {
-	/// # 	let session = Session::builder()?.with_model_from_file("tests/data/upsample.onnx")?;
+	/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
 	/// let run_options = Arc::new(RunOptions::new()?);
 	///
@@ -595,7 +595,7 @@ impl RunOptions {
 	/// # use std::sync::Arc;
 	/// # use ort::{Session, RunOptions, Value, ValueType, TensorElementType};
 	/// # fn main() -> ort::Result<()> {
-	/// # 	let session = Session::builder()?.with_model_from_file("tests/data/upsample.onnx")?;
+	/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
 	/// let run_options = Arc::new(RunOptions::new()?);
 	///
@@ -662,7 +662,7 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{Session, RunOptions, Value, ValueType, TensorElementType};
 	/// # fn main() -> ort::Result<()> {
-	/// let session = Session::builder()?.with_model_from_file("tests/data/upsample.onnx")?;
+	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 	/// let outputs = session.run(ort::inputs![input]?)?;
 	/// # 	Ok(())
@@ -690,7 +690,7 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{Session, RunOptions, Value, ValueType, TensorElementType};
 	/// # fn main() -> ort::Result<()> {
-	/// # 	let session = Session::builder()?.with_model_from_file("tests/data/upsample.onnx")?;
+	/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
 	/// let run_options = Arc::new(RunOptions::new()?);
 	///
@@ -829,7 +829,7 @@ fn close_lib_handle(handle: *mut std::os::raw::c_void) {
 
 /// This module contains dangerous functions working on raw pointers.
 /// Those functions are only to be used from inside the
-/// `SessionBuilder::with_model_from_file()` method.
+/// `SessionBuilder::commit_from_file()` method.
 mod dangerous {
 	use super::*;
 	use crate::value::{extract_data_type_from_map_info, extract_data_type_from_sequence_info, extract_data_type_from_tensor_info};

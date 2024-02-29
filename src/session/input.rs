@@ -49,7 +49,7 @@ impl<'i, const N: usize> From<[Value; N]> for SessionInputs<'i, N> {
 /// # use ndarray::Array1;
 /// # use ort::{GraphOptimizationLevel, Session};
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// # 	let mut session = Session::builder()?.with_model_from_file("model.onnx")?;
+/// # 	let mut session = Session::builder()?.commit_from_file("model.onnx")?;
 /// let _ = session.run(ort::inputs![Array1::from_vec(vec![1, 2, 3, 4, 5])]?);
 /// # 	Ok(())
 /// # }
@@ -62,7 +62,7 @@ impl<'i, const N: usize> From<[Value; N]> for SessionInputs<'i, N> {
 /// # use ndarray::Array1;
 /// # use ort::{GraphOptimizationLevel, Session, Value};
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// # 	let mut session = Session::builder()?.with_model_from_file("model.onnx")?;
+/// # 	let mut session = Session::builder()?.commit_from_file("model.onnx")?;
 /// let _ = session
 /// 	.run(ort::inputs![Value::from_string_array(session.allocator(), Array1::from_vec(vec!["hello", "world"]))?]?);
 /// # 	Ok(())
@@ -76,7 +76,7 @@ impl<'i, const N: usize> From<[Value; N]> for SessionInputs<'i, N> {
 /// # use ndarray::Array1;
 /// # use ort::{GraphOptimizationLevel, Session};
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// # 	let mut session = Session::builder()?.with_model_from_file("model.onnx")?;
+/// # 	let mut session = Session::builder()?.commit_from_file("model.onnx")?;
 /// let _ = session.run(ort::inputs! {
 /// 	"tokens" => Array1::from_vec(vec![1, 2, 3, 4, 5])
 /// }?);

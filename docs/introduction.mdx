@@ -65,7 +65,7 @@ Users of `ort` appreciate its ease of use and ergonomic API. `ort` is also battl
         let model = Session::builder()?
             .with_optimization_level(GraphOptimizationLevel::Level3)?
             .with_intra_threads(4)?
-            .with_model_from_file("yolov8m.onnx")?;
+            .commit_from_file("yolov8m.onnx")?;
         ```
     </Step>
     <Step title="Perform inference">

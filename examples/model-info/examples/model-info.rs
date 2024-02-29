@@ -45,7 +45,7 @@ fn main() -> ort::Result<()> {
 		process::exit(0);
 	};
 
-	let session = Session::builder()?.with_model_from_file(path)?;
+	let session = Session::builder()?.commit_from_file(path)?;
 
 	let meta = session.metadata()?;
 	if let Ok(x) = meta.name() {

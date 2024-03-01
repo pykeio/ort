@@ -14,7 +14,10 @@ use self::dirs::cache_dir;
 
 #[cfg(feature = "download-binaries")]
 fn fetch_file(source_url: &str) -> Vec<u8> {
-	let resp = ureq::get(source_url)
+	let resp = ureq::AgentBuilder::new()
+		.try_proxy_from_env(true)
+		.build()
+		.get(source_url)
 		.timeout(std::time::Duration::from_secs(1800))
 		.call()
 		.unwrap_or_else(|err| panic!("Failed to GET `{source_url}`: {err}"));

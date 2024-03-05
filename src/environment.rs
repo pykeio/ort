@@ -114,9 +114,6 @@ impl EnvironmentBuilder {
 	}
 
 	/// Enables the global thread pool for this environment.
-	///
-	/// Sessions will only use the global thread pool if they are created with
-	/// [`SessionBuilder::with_disable_per_session_threads`](crate::SessionBuilder::with_disable_per_session_threads).
 	#[must_use]
 	pub fn with_global_thread_pool(mut self, options: EnvironmentGlobalThreadPoolOptions) -> Self {
 		self.global_thread_pool_options = Some(options);

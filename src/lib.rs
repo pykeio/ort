@@ -54,7 +54,7 @@ pub use self::operator::{
 	kernel::{Kernel, KernelAttributes, KernelContext},
 	InferShapeFn, Operator, OperatorDomain
 };
-pub use self::session::{InMemorySession, RunOptions, Session, SessionBuilder, SessionInputs, SessionOutputs, SharedSessionInner};
+pub use self::session::{InMemorySession, Input, Output, RunOptions, Session, SessionBuilder, SessionInputs, SessionOutputs, SharedSessionInner};
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 pub use self::tensor::ArrayExtensions;
@@ -129,6 +129,11 @@ pub(crate) fn lib_handle() -> MutexGuard<'static, libloading::Library> {
 pub(crate) static G_ORT_API: OnceLock<AtomicPtr<ort_sys::OrtApi>> = OnceLock::new();
 
 /// Returns a pointer to the global [`ort_sys::OrtApi`] object.
+///
+/// # Panics
+/// May panic if:
+/// - Getting the `OrtApi` struct fails, due to `ort` loading an unsupported version of ONNX Runtime.
+/// - Loading the ONNX Runtime dynamic library fails if the `load-dynamic` feature is enabled.
 pub fn api() -> NonNull<ort_sys::OrtApi> {
 	unsafe {
 		NonNull::new_unchecked(

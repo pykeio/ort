@@ -41,13 +41,12 @@ strip = true
 codegen-units = 1
 
 [package.metadata.docs.rs]
-features = [ "ndarray", "half", "profiling", "operator-libraries", "fetch-models", "copy-dylibs" ]
+features = [ "ndarray", "half", "operator-libraries", "fetch-models", "load-dynamic", "copy-dylibs" ]
 rustdoc-args = [ "--cfg", "docsrs" ]
 
 [features]
 default = [ "ndarray", "half", "download-binaries", "copy-dylibs" ]
 
-profiling = [ "widestring" ]
 operator-libraries = [ "libc", "winapi" ]
 
 fetch-models = [ "ureq" ]
@@ -88,7 +87,6 @@ libc = { version = "0.2", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", optional = true, features = [ "std", "libloaderapi" ] }
-widestring = { version = "1.0", optional = true }
 
 [dev-dependencies]
 anyhow = "1.0"

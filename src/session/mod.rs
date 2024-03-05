@@ -182,11 +182,9 @@ impl SessionBuilder {
 
 	/// Enables profiling. Profile information will be writen to `profiling_file` after profiling completes.
 	/// See [`Session::end_profiling`].
-	#[cfg(feature = "profiling")]
-	#[cfg_attr(docsrs, doc(cfg(feature = "profiling")))]
 	pub fn with_profiling<S: AsRef<str>>(self, profiling_file: S) -> Result<Self> {
 		#[cfg(windows)]
-		let profiling_file = widestring::WideCString::from_str(profiling_file.as_ref())?;
+		let profiling_file = profiling_file.as_ref().encode_utf16().collect::<Vec<_>>();
 		#[cfg(not(windows))]
 		let profiling_file = CString::new(profiling_file.as_ref())?;
 		ortsys![unsafe EnableProfiling(self.session_options_ptr.as_ptr(), profiling_file.as_ptr()) -> Error::CreateSessionOptions];
@@ -654,7 +652,7 @@ impl Session {
 
 	/// Run input data through the ONNX graph, performing inference.
 	///
-	/// See [`ort::inputs`] for a convenient macro which will help you create your session inputs from `ndarray`s or
+	/// See [`crate::inputs!`] for a convenient macro which will help you create your session inputs from `ndarray`s or
 	/// other data. You can also provide a `Vec`, array, or `HashMap` of [`Value`]s if you create your inputs
 	/// dynamically.
 	///
@@ -800,8 +798,6 @@ impl Session {
 	/// Ends profiling for this session.
 	///
 	/// Note that this must be explicitly called at the end of profiling, otherwise the profiling file will be empty.
-	#[cfg(feature = "profiling")]
-	#[cfg_attr(docsrs, doc(cfg(feature = "profiling")))]
 	pub fn end_profiling(&self) -> Result<String> {
 		let mut profiling_name: *mut c_char = std::ptr::null_mut();
 

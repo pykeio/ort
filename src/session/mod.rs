@@ -180,6 +180,19 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
+	/// After performing optimization (configurable with [`SessionBuilder::with_optimization_level`]), serializes the
+	/// newly optimized model to the given path (for 'offline' graph optimization).
+	///
+	/// Note that the file will only be created after the model is committed.
+	pub fn with_optimized_model_path<S: AsRef<str>>(self, path: S) -> Result<Self> {
+		#[cfg(windows)]
+		let path = path.as_ref().encode_utf16().chain([0]).collect::<Vec<_>>();
+		#[cfg(not(windows))]
+		let path = CString::new(path.as_ref())?;
+		ortsys![unsafe SetOptimizedModelFilePath(self.session_options_ptr.as_ptr(), path.as_ptr()) -> Error::CreateSessionOptions];
+		Ok(self)
+	}
+
 	/// Enables profiling. Profile information will be writen to `profiling_file` after profiling completes.
 	/// See [`Session::end_profiling`].
 	pub fn with_profiling<S: AsRef<str>>(self, profiling_file: S) -> Result<Self> {

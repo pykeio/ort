@@ -1,34 +1,60 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, ops::Deref};
 
-use crate::Value;
+use crate::{Value, ValueRef};
+
+pub enum SessionInputValue<'v> {
+	View(ValueRef<'v>),
+	Owned(Value)
+}
+
+impl<'v> Deref for SessionInputValue<'v> {
+	type Target = Value;
+	fn deref(&self) -> &Self::Target {
+		match self {
+			SessionInputValue::View(v) => v,
+			SessionInputValue::Owned(v) => v
+		}
+	}
+}
+
+impl<'v> From<ValueRef<'v>> for SessionInputValue<'v> {
+	fn from(value: ValueRef<'v>) -> Self {
+		SessionInputValue::View(value)
+	}
+}
+impl<'v> From<Value> for SessionInputValue<'v> {
+	fn from(value: Value) -> Self {
+		SessionInputValue::Owned(value)
+	}
+}
 
 /// The inputs to a [`crate::Session::run`] call.
-pub enum SessionInputs<'i, const N: usize = 0> {
-	ValueMap(Vec<(Cow<'i, str>, Value)>),
-	ValueSlice(&'i [Value]),
-	ValueArray([Value; N])
+pub enum SessionInputs<'i, 'v, const N: usize = 0> {
+	ValueMap(Vec<(Cow<'i, str>, SessionInputValue<'v>)>),
+	ValueSlice(&'i [SessionInputValue<'v>]),
+	ValueArray([SessionInputValue<'v>; N])
 }
 
-impl<'i, K: Into<Cow<'i, str>>> From<HashMap<K, Value>> for SessionInputs<'i> {
-	fn from(val: HashMap<K, Value>) -> Self {
-		SessionInputs::ValueMap(val.into_iter().map(|(k, v)| (k.into(), v)).collect())
+impl<'i, 'v, K: Into<Cow<'i, str>>, V: Into<SessionInputValue<'v>>> From<HashMap<K, V>> for SessionInputs<'i, 'v> {
+	fn from(val: HashMap<K, V>) -> Self {
+		SessionInputs::ValueMap(val.into_iter().map(|(k, v)| (k.into(), v.into())).collect())
 	}
 }
 
-impl<'i> From<Vec<(Cow<'i, str>, Value)>> for SessionInputs<'i> {
-	fn from(val: Vec<(Cow<'i, str>, Value)>) -> Self {
-		SessionInputs::ValueMap(val)
+impl<'i, 'v, K: Into<Cow<'i, str>>, V: Into<SessionInputValue<'v>>> From<Vec<(K, V)>> for SessionInputs<'i, 'v> {
+	fn from(val: Vec<(K, V)>) -> Self {
+		SessionInputs::ValueMap(val.into_iter().map(|(k, v)| (k.into(), v.into())).collect())
 	}
 }
 
-impl<'i> From<&'i [Value]> for SessionInputs<'i> {
-	fn from(val: &'i [Value]) -> Self {
+impl<'i, 'v> From<&'i [SessionInputValue<'v>]> for SessionInputs<'i, 'v> {
+	fn from(val: &'i [SessionInputValue<'v>]) -> Self {
 		SessionInputs::ValueSlice(val)
 	}
 }
 
-impl<'i, const N: usize> From<[Value; N]> for SessionInputs<'i, N> {
-	fn from(val: [Value; N]) -> Self {
+impl<'i, 'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'i, 'v, N> {
+	fn from(val: [SessionInputValue<'v>; N]) -> Self {
 		SessionInputs::ValueArray(val)
 	}
 }
@@ -87,12 +113,15 @@ impl<'i, const N: usize> From<[Value; N]> for SessionInputs<'i, N> {
 macro_rules! inputs {
 	($($v:expr),+ $(,)?) => (
 		(|| -> $crate::Result<_> {
-			Ok([$(::std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::Error::from)?,)+])
+			Ok([$(::std::convert::Into::<$crate::SessionInputValue<'_>>::into(::std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::Error::from)?)),+])
 		})()
 	);
 	($($n:expr => $v:expr),+ $(,)?) => (
 		(|| -> $crate::Result<_> {
-			Ok(vec![$(::std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::Error::from).map(|v| (($n).into(), v))?,)+])
+			Ok(vec![$(
+				::std::convert::TryInto::<$crate::Value>::try_into($v)
+					.map_err($crate::Error::from)
+					.map(|v| (::std::borrow::Cow::<str>::from($n), $crate::SessionInputValue::from(v)))?,)+])
 		})()
 	);
 }
@@ -109,7 +138,7 @@ mod tests {
 		let arc = Arc::new(v.clone().into_boxed_slice());
 		let shape = vec![v.len() as i64];
 
-		let mut inputs = HashMap::new();
+		let mut inputs: HashMap<&str, Value> = HashMap::new();
 		inputs.insert("test", (shape, arc).try_into()?);
 		let _ = SessionInputs::from(inputs);
 
@@ -122,7 +151,7 @@ mod tests {
 		let arc = Arc::new(v.clone().into_boxed_slice());
 		let shape = vec![v.len() as i64];
 
-		let mut inputs = HashMap::new();
+		let mut inputs: HashMap<String, Value> = HashMap::new();
 		inputs.insert("test".to_string(), (shape, arc).try_into()?);
 		let _ = SessionInputs::from(inputs);
 

@@ -36,7 +36,10 @@ use crate::{environment::Environment, MemoryInfo, OperatorDomain};
 
 pub(crate) mod input;
 pub(crate) mod output;
-pub use self::{input::SessionInputs, output::SessionOutputs};
+pub use self::{
+	input::{SessionInputValue, SessionInputs},
+	output::SessionOutputs
+};
 
 /// Creates a session using the builder pattern.
 ///
@@ -679,7 +682,7 @@ impl Session {
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn run<'s, 'i, const N: usize>(&'s self, input_values: impl Into<SessionInputs<'i, N>>) -> Result<SessionOutputs<'s>> {
+	pub fn run<'s, 'i, 'v: 'i, const N: usize>(&'s self, input_values: impl Into<SessionInputs<'i, 'v, N>>) -> Result<SessionOutputs<'s>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
 				self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values.iter(), None)
@@ -719,9 +722,9 @@ impl Session {
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn run_with_options<'s, 'i, const N: usize>(
+	pub fn run_with_options<'s, 'i, 'v: 'i, const N: usize>(
 		&'s self,
-		input_values: impl Into<SessionInputs<'i, N>>,
+		input_values: impl Into<SessionInputs<'i, 'v, N>>,
 		run_options: Arc<RunOptions>
 	) -> Result<SessionOutputs<'s>> {
 		match input_values.into() {
@@ -737,10 +740,10 @@ impl Session {
 		}
 	}
 
-	fn run_inner<'v>(
+	fn run_inner<'i, 'v: 'i>(
 		&self,
 		input_names: &[&str],
-		input_values: impl Iterator<Item = &'v Value>,
+		input_values: impl Iterator<Item = &'i SessionInputValue<'v>>,
 		run_options: Option<Arc<RunOptions>>
 	) -> Result<SessionOutputs<'_>> {
 		let input_names_ptr: Vec<*const c_char> = input_names

@@ -318,6 +318,16 @@ impl Value {
 		}
 	}
 
+	/// Create a view of this value's data.
+	pub fn view(&self) -> ValueRef<'_> {
+		ValueRef::new(unsafe {
+			Value::from_ptr_nodrop(
+				NonNull::new_unchecked(self.ptr()),
+				if let ValueInner::CppOwned { _session, .. } = &self.inner { _session.clone() } else { None }
+			)
+		})
+	}
+
 	/// Returns `true` if this value is a tensor, or `false` if it is another type (sequence, map).
 	///
 	/// ```

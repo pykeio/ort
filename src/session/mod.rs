@@ -184,7 +184,7 @@ impl SessionBuilder {
 	/// See [`Session::end_profiling`].
 	pub fn with_profiling<S: AsRef<str>>(self, profiling_file: S) -> Result<Self> {
 		#[cfg(windows)]
-		let profiling_file = profiling_file.as_ref().encode_utf16().collect::<Vec<_>>();
+		let profiling_file = profiling_file.as_ref().encode_utf16().chain([0]).collect::<Vec<_>>();
 		#[cfg(not(windows))]
 		let profiling_file = CString::new(profiling_file.as_ref())?;
 		ortsys![unsafe EnableProfiling(self.session_options_ptr.as_ptr(), profiling_file.as_ptr()) -> Error::CreateSessionOptions];

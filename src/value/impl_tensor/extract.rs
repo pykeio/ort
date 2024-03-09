@@ -33,25 +33,17 @@ impl Value {
 		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
 
 		let res = {
-			let mut num_dims = 0;
-			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
-
-			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
-			let shape = IxDyn(&node_dims.iter().map(|&n| n as usize).collect::<Vec<_>>());
-
 			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
 			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
 			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 			let data_type: TensorElementType = type_sys.into();
 			if data_type == T::into_tensor_element_type() {
-				// Note: Both tensor and array will point to the same data, nothing is copied.
-				// As such, there is no need to free the pointer used to create the ArrayView.
-				assert_ne!(self.ptr(), ptr::null_mut());
+				let mut num_dims = 0;
+				ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
 
-				let mut is_tensor = 0;
-				ortsys![unsafe IsTensor(self.ptr(), &mut is_tensor) -> Error::FailedTensorCheck];
-				assert_eq!(is_tensor, 1);
+				let mut node_dims: Vec<i64> = vec![0; num_dims as _];
+				ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
+				let shape = IxDyn(&node_dims.iter().map(|&n| n as usize).collect::<Vec<_>>());
 
 				let mut len = 0;
 				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
@@ -94,25 +86,17 @@ impl Value {
 		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
 
 		let res = {
-			let mut num_dims = 0;
-			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
-
-			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
-			let shape = IxDyn(&node_dims.iter().map(|&n| n as usize).collect::<Vec<_>>());
-
 			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
 			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
 			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 			let data_type: TensorElementType = type_sys.into();
 			if data_type == T::into_tensor_element_type() {
-				// Note: Both tensor and array will point to the same data, nothing is copied.
-				// As such, there is no need to free the pointer used to create the ArrayView.
-				assert_ne!(self.ptr(), ptr::null_mut());
+				let mut num_dims = 0;
+				ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
 
-				let mut is_tensor = 0;
-				ortsys![unsafe IsTensor(self.ptr(), &mut is_tensor) -> Error::FailedTensorCheck];
-				assert_eq!(is_tensor, 1);
+				let mut node_dims: Vec<i64> = vec![0; num_dims as _];
+				ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
+				let shape = IxDyn(&node_dims.iter().map(|&n| n as usize).collect::<Vec<_>>());
 
 				let mut len = 0;
 				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
@@ -149,24 +133,16 @@ impl Value {
 		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
 
 		let res = {
-			let mut num_dims = 0;
-			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
-
-			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
-
 			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
 			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
 			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 			let data_type: TensorElementType = type_sys.into();
 			if data_type == T::into_tensor_element_type() {
-				// Note: Both tensor and array will point to the same data, nothing is copied.
-				// As such, there is no need to free the pointer used to create the slice.
-				assert_ne!(self.ptr(), ptr::null_mut());
+				let mut num_dims = 0;
+				ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
 
-				let mut is_tensor = 0;
-				ortsys![unsafe IsTensor(self.ptr(), &mut is_tensor) -> Error::FailedTensorCheck];
-				assert_eq!(is_tensor, 1);
+				let mut node_dims: Vec<i64> = vec![0; num_dims as _];
+				ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
 
 				let mut output_array_ptr: *mut T = ptr::null_mut();
 				let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
@@ -208,24 +184,16 @@ impl Value {
 		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
 
 		let res = {
-			let mut num_dims = 0;
-			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
-
-			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
-
 			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
 			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
 			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 			let data_type: TensorElementType = type_sys.into();
 			if data_type == T::into_tensor_element_type() {
-				// Note: Both tensor and array will point to the same data, nothing is copied.
-				// As such, there is no need to free the pointer used to create the slice.
-				assert_ne!(self.ptr(), ptr::null_mut());
+				let mut num_dims = 0;
+				ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
 
-				let mut is_tensor = 0;
-				ortsys![unsafe IsTensor(self.ptr(), &mut is_tensor) -> Error::FailedTensorCheck];
-				assert_eq!(is_tensor, 1);
+				let mut node_dims: Vec<i64> = vec![0; num_dims as _];
+				ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
 
 				let mut output_array_ptr: *mut T = ptr::null_mut();
 				let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
@@ -268,25 +236,17 @@ impl Value {
 		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
 
 		let res = {
-			let mut num_dims = 0;
-			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
-
-			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
-			let shape = IxDyn(&node_dims.iter().map(|&n| n as usize).collect::<Vec<_>>());
-
 			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
 			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
 			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 			let data_type: TensorElementType = type_sys.into();
 			if data_type == TensorElementType::String {
-				// Note: Both tensor and array will point to the same data, nothing is copied.
-				// As such, there is no need to free the pointer used to create the ArrayView.
-				assert_ne!(self.ptr(), ptr::null_mut());
+				let mut num_dims = 0;
+				ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
 
-				let mut is_tensor = 0;
-				ortsys![unsafe IsTensor(self.ptr(), &mut is_tensor) -> Error::FailedTensorCheck];
-				assert_eq!(is_tensor, 1);
+				let mut node_dims: Vec<i64> = vec![0; num_dims as _];
+				ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
+				let shape = IxDyn(&node_dims.iter().map(|&n| n as usize).collect::<Vec<_>>());
 
 				let mut len = 0;
 				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
@@ -356,24 +316,16 @@ impl Value {
 		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
 
 		let res = {
-			let mut num_dims = 0;
-			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
-
-			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
-
 			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
 			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
 			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 			let data_type: TensorElementType = type_sys.into();
 			if data_type == TensorElementType::String {
-				// Note: Both tensor and array will point to the same data, nothing is copied.
-				// As such, there is no need to free the pointer used to create the slice.
-				assert_ne!(self.ptr(), ptr::null_mut());
+				let mut num_dims = 0;
+				ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
 
-				let mut is_tensor = 0;
-				ortsys![unsafe IsTensor(self.ptr(), &mut is_tensor) -> Error::FailedTensorCheck];
-				assert_eq!(is_tensor, 1);
+				let mut node_dims: Vec<i64> = vec![0; num_dims as _];
+				ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
 
 				let mut output_array_ptr: *mut c_char = ptr::null_mut();
 				let output_array_ptr_ptr: *mut *mut c_char = &mut output_array_ptr;

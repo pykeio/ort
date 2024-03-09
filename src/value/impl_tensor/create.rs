@@ -55,12 +55,6 @@ impl Value {
 			nonNull(value_ptr)
 		];
 
-		let mut is_tensor = 0;
-		ortsys![unsafe IsTensor(value_ptr, &mut is_tensor) -> Error::FailedTensorCheck];
-		assert_eq!(is_tensor, 1);
-
-		assert_non_null_pointer(value_ptr, "Value")?;
-
 		Ok(Value {
 			inner: ValueInner::RustOwned {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
@@ -110,77 +104,26 @@ impl Value {
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 
-		let guard = match T::into_tensor_element_type() {
-			TensorElementType::Float32
-			| TensorElementType::Uint8
-			| TensorElementType::Int8
-			| TensorElementType::Uint16
-			| TensorElementType::Int16
-			| TensorElementType::Int32
-			| TensorElementType::Int64
-			| TensorElementType::Float64
-			| TensorElementType::Uint32
-			| TensorElementType::Uint64
-			| TensorElementType::Bool => {
-				// primitive data is already suitably laid out in memory; provide it to
-				// onnxruntime as is
-				let (shape, ptr, ptr_len, guard) = input.into_parts()?;
-				let shape_ptr: *const i64 = shape.as_ptr();
-				let shape_len = shape.len();
+		// f16 and bf16 are repr(transparent) to u16, so memory layout should be identical to onnxruntime
+		let (shape, ptr, ptr_len, guard) = input.into_parts()?;
+		let shape_ptr: *const i64 = shape.as_ptr();
+		let shape_len = shape.len();
 
-				let tensor_values_ptr: *mut std::ffi::c_void = ptr.cast();
-				assert_non_null_pointer(tensor_values_ptr, "TensorValues")?;
+		let tensor_values_ptr: *mut std::ffi::c_void = ptr.cast();
+		assert_non_null_pointer(tensor_values_ptr, "TensorValues")?;
 
-				ortsys![
-					unsafe CreateTensorWithDataAsOrtValue(
-						memory_info.ptr.as_ptr(),
-						tensor_values_ptr,
-						(ptr_len * std::mem::size_of::<T>()) as _,
-						shape_ptr,
-						shape_len as _,
-						T::into_tensor_element_type().into(),
-						&mut value_ptr
-					) -> Error::CreateTensorWithData;
-					nonNull(value_ptr)
-				];
-
-				let mut is_tensor = 0;
-				ortsys![unsafe IsTensor(value_ptr, &mut is_tensor) -> Error::FailedTensorCheck];
-				assert_eq!(is_tensor, 1);
-				guard
-			}
-			#[cfg(feature = "half")]
-			TensorElementType::Bfloat16 | TensorElementType::Float16 => {
-				// f16 and bf16 are repr(transparent) to u16, so memory layout should be identical to onnxruntime
-				let (shape, ptr, ptr_len, guard) = input.into_parts()?;
-				let shape_ptr: *const i64 = shape.as_ptr();
-				let shape_len = shape.len();
-
-				let tensor_values_ptr: *mut std::ffi::c_void = ptr.cast();
-				assert_non_null_pointer(tensor_values_ptr, "TensorValues")?;
-
-				ortsys![
-					unsafe CreateTensorWithDataAsOrtValue(
-						memory_info.ptr.as_ptr(),
-						tensor_values_ptr,
-						(ptr_len * std::mem::size_of::<T>()) as _,
-						shape_ptr,
-						shape_len as _,
-						T::into_tensor_element_type().into(),
-						&mut value_ptr
-					) -> Error::CreateTensorWithData;
-					nonNull(value_ptr)
-				];
-
-				let mut is_tensor = 0;
-				ortsys![unsafe IsTensor(value_ptr, &mut is_tensor) -> Error::FailedTensorCheck];
-				assert_eq!(is_tensor, 1);
-				guard
-			}
-			TensorElementType::String => unreachable!()
-		};
-
-		assert_non_null_pointer(value_ptr, "Value")?;
+		ortsys![
+			unsafe CreateTensorWithDataAsOrtValue(
+				memory_info.ptr.as_ptr(),
+				tensor_values_ptr,
+				(ptr_len * std::mem::size_of::<T>()) as _,
+				shape_ptr,
+				shape_len as _,
+				T::into_tensor_element_type().into(),
+				&mut value_ptr
+			) -> Error::CreateTensorWithData;
+			nonNull(value_ptr)
+		];
 
 		Ok(Value {
 			inner: ValueInner::RustOwned {
@@ -252,8 +195,6 @@ impl Value {
 		let string_pointers = null_terminated_copies.iter().map(|cstring| cstring.as_ptr()).collect::<Vec<_>>();
 
 		ortsys![unsafe FillStringTensor(value_ptr, string_pointers.as_ptr(), string_pointers.len() as _) -> Error::FillStringTensor];
-
-		assert_non_null_pointer(value_ptr, "Value")?;
 
 		Ok(Value {
 			inner: ValueInner::RustOwned {

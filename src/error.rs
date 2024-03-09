@@ -115,8 +115,8 @@ pub enum Error {
 	/// Error occurred when filling a tensor with string data
 	#[error("Failed to fill string tensor: {0}")]
 	FillStringTensor(ErrorInternal),
-	/// Error occurred when checking if ONNX tensor was properly initialized
-	#[error("Failed to check if tensor is a tensor or was properly initialized: {0}")]
+	/// Error occurred when checking if a value is a tensor
+	#[error("Failed to check if value is a tensor: {0}")]
 	FailedTensorCheck(ErrorInternal),
 	/// Error occurred when getting tensor type and shape
 	#[error("Failed to get tensor type and shape: {0}")]

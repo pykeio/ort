@@ -36,8 +36,6 @@ use std::{
 	}
 };
 
-use tracing::Level;
-
 #[cfg(feature = "load-dynamic")]
 pub use self::environment::init_from;
 pub use self::environment::{get_environment, init, Environment, EnvironmentBuilder, EnvironmentGlobalThreadPoolOptions};
@@ -55,7 +53,8 @@ pub use self::operator::{
 	InferShapeFn, Operator, OperatorDomain
 };
 pub use self::session::{
-	InMemorySession, Input, Output, RunOptions, Session, SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs, SharedSessionInner
+	GraphOptimizationLevel, InMemorySession, Input, Output, RunOptions, Session, SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs,
+	SharedSessionInner
 };
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
@@ -218,7 +217,7 @@ macro_rules! ortsys {
 		$crate::error::status_to_result(unsafe { $crate::api().as_ref().$method.unwrap()($($n),+) }).map_err($err)?;
 	};
 	($method:ident($($n:expr),+ $(,)?) -> $err:expr; nonNull($($check:expr),+ $(,)?)$(;)?) => {
-		$crate::error::status_to_result($crate::ap.as_ref()i().$method.unwrap()($($n),+)).map_err($err)?;
+		$crate::error::status_to_result($crate::api().as_ref().$method.unwrap()($($n),+)).map_err($err)?;
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?) -> $err:expr; nonNull($($check:expr),+ $(,)?)$(;)?) => {{
@@ -236,148 +235,6 @@ pub(crate) fn char_p_to_string(raw: *const c_char) -> Result<String> {
 		Err(e) => Err(ErrorInternal::IntoStringError(e))
 	}
 	.map_err(Error::FfiStringConversion)
-}
-
-/// ONNX's logger sends the code location where the log occurred, which will be parsed into this struct.
-#[derive(Debug)]
-struct CodeLocation<'a> {
-	file: &'a str,
-	line: &'a str,
-	function: &'a str
-}
-
-impl<'a> From<&'a str> for CodeLocation<'a> {
-	fn from(code_location: &'a str) -> Self {
-		let mut splitter = code_location.split(' ');
-		let file_and_line = splitter.next().unwrap_or("<unknown file>:<unknown line>");
-		let function = splitter.next().unwrap_or("<unknown function>");
-		let mut file_and_line_splitter = file_and_line.split(':');
-		let file = file_and_line_splitter.next().unwrap_or("<unknown file>");
-		let line = file_and_line_splitter.next().unwrap_or("<unknown line>");
-
-		CodeLocation { file, line, function }
-	}
-}
-
-extern_system_fn! {
-	/// Callback from C that will handle ONNX logging, forwarding ONNX's logs to the `tracing` crate.
-	pub(crate) fn custom_logger(_params: *mut ffi::c_void, severity: ort_sys::OrtLoggingLevel, category: *const c_char, _: *const c_char, code_location: *const c_char, message: *const c_char) {
-		assert_ne!(category, ptr::null());
-		let category = unsafe { CStr::from_ptr(category) };
-		assert_ne!(code_location, ptr::null());
-		let code_location_str = unsafe { CStr::from_ptr(code_location) }.to_str().unwrap();
-		assert_ne!(message, ptr::null());
-		let message = unsafe { CStr::from_ptr(message) }.to_str().unwrap();
-
-		let code_location = CodeLocation::from(code_location_str);
-		let span = tracing::span!(
-			Level::TRACE,
-			"ort",
-			category = category.to_str().unwrap_or("<unknown>"),
-			file = code_location.file,
-			line = code_location.line,
-			function = code_location.function
-		);
-
-		match severity {
-			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE => tracing::event!(parent: &span, Level::TRACE, "{message}"),
-			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_INFO => tracing::event!(parent: &span, Level::DEBUG, "{message}"),
-			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING => tracing::event!(parent: &span, Level::INFO, "{message}"),
-			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_ERROR => tracing::event!(parent: &span, Level::WARN, "{message}"),
-			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_FATAL=> tracing::event!(parent: &span, Level::ERROR, "{message}")
-		}
-	}
-}
-
-/// ONNX Runtime provides various graph optimizations to improve performance. Graph optimizations are essentially
-/// graph-level transformations, ranging from small graph simplifications and node eliminations to more complex node
-/// fusions and layout optimizations.
-///
-/// Graph optimizations are divided in several categories (or levels) based on their complexity and functionality. They
-/// can be performed either online or offline. In online mode, the optimizations are done before performing the
-/// inference, while in offline mode, the runtime saves the optimized graph to disk (most commonly used when converting
-/// an ONNX model to an ONNX Runtime model).
-///
-/// The optimizations belonging to one level are performed after the optimizations of the previous level have been
-/// applied (e.g., extended optimizations are applied after basic optimizations have been applied).
-///
-/// **All optimizations (i.e. [`GraphOptimizationLevel::Level3`]) are enabled by default.**
-///
-/// # Online/offline mode
-/// All optimizations can be performed either online or offline. In online mode, when initializing an inference session,
-/// we also apply all enabled graph optimizations before performing model inference. Applying all optimizations each
-/// time we initiate a session can add overhead to the model startup time (especially for complex models), which can be
-/// critical in production scenarios. This is where the offline mode can bring a lot of benefit. In offline mode, after
-/// performing graph optimizations, ONNX Runtime serializes the resulting model to disk. Subsequently, we can reduce
-/// startup time by using the already optimized model and disabling all optimizations.
-///
-/// ## Notes:
-/// - When running in offline mode, make sure to use the exact same options (e.g., execution providers, optimization
-///   level) and hardware as the target machine that the model inference will run on (e.g., you cannot run a model
-///   pre-optimized for a GPU execution provider on a machine that is equipped only with CPU).
-/// - When layout optimizations are enabled, the offline mode can only be used on compatible hardware to the environment
-///   when the offline model is saved. For example, if model has layout optimized for AVX2, the offline model would
-///   require CPUs that support AVX2.
-#[derive(Debug)]
-pub enum GraphOptimizationLevel {
-	/// Disables all graph optimizations.
-	Disable,
-	/// Level 1 includes semantics-preserving graph rewrites which remove redundant nodes and redundant computation.
-	/// They run before graph partitioning and thus apply to all the execution providers. Available basic/level 1 graph
-	/// optimizations are as follows:
-	///
-	/// - Constant Folding: Statically computes parts of the graph that rely only on constant initializers. This
-	///   eliminates the need to compute them during runtime.
-	/// - Redundant node eliminations: Remove all redundant nodes without changing the graph structure. The following
-	///   such optimizations are currently supported:
-	///   * Identity Elimination
-	///   * Slice Elimination
-	///   * Unsqueeze Elimination
-	///   * Dropout Elimination
-	/// - Semantics-preserving node fusions : Fuse/fold multiple nodes into a single node. For example, Conv Add fusion
-	///   folds the Add operator as the bias of the Conv operator. The following such optimizations are currently
-	///   supported:
-	///   * Conv Add Fusion
-	///   * Conv Mul Fusion
-	///   * Conv BatchNorm Fusion
-	///   * Relu Clip Fusion
-	///   * Reshape Fusion
-	Level1,
-	#[rustfmt::skip]
-	/// Level 2 optimizations include complex node fusions. They are run after graph partitioning and are only applied to
-	/// the nodes assigned to the CPU or CUDA execution provider. Available extended/level 2 graph optimizations are as follows:
-	///
-	/// | Optimization                    | EPs       | Comments                                                                       |
-	/// |:------------------------------- |:--------- |:------------------------------------------------------------------------------ |
-	/// | GEMM Activation Fusion          | CPU       |                                                                                |
-	/// | Matmul Add Fusion               | CPU       |                                                                                |
-	/// | Conv Activation Fusion          | CPU       |                                                                                |
-	/// | GELU Fusion                     | CPU, CUDA |                                                                                |
-	/// | Layer Normalization Fusion      | CPU, CUDA |                                                                                |
-	/// | BERT Embedding Layer Fusion     | CPU, CUDA | Fuses BERT embedding layers, layer normalization, & attention mask length      |
-	/// | Attention Fusion*               | CPU, CUDA |                                                                                |
-	/// | Skip Layer Normalization Fusion | CPU, CUDA | Fuse bias of fully connected layers, skip connections, and layer normalization |
-	/// | Bias GELU Fusion                | CPU, CUDA | Fuse bias of fully connected layers & GELU activation                          |
-	/// | GELU Approximation*             | CUDA      | Disabled by default; enable with `OrtSessionOptions::EnableGeluApproximation`  |
-	///
-	/// > **NOTE**: To optimize performance of the BERT model, approximation is used in GELU Approximation and Attention
-	/// Fusion for the CUDA execution provider. The impact on accuracy is negligible based on our evaluation; F1 score
-	/// for a BERT model on SQuAD v1.1 is almost the same (87.05 vs 87.03).
-	Level2,
-	/// Level 3 optimizations include memory layout optimizations, which may optimize the graph to use the NCHWc memory
-	/// layout rather than NCHW to improve spatial locality for some targets.
-	Level3
-}
-
-impl From<GraphOptimizationLevel> for ort_sys::GraphOptimizationLevel {
-	fn from(val: GraphOptimizationLevel) -> Self {
-		match val {
-			GraphOptimizationLevel::Disable => ort_sys::GraphOptimizationLevel::ORT_DISABLE_ALL,
-			GraphOptimizationLevel::Level1 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_BASIC,
-			GraphOptimizationLevel::Level2 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_EXTENDED,
-			GraphOptimizationLevel::Level3 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_ALL
-		}
-	}
 }
 
 #[cfg(test)]

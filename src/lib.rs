@@ -47,7 +47,7 @@ pub use self::error::FetchModelError;
 pub use self::error::{Error, ErrorInternal, Result};
 pub use self::execution_providers::*;
 pub use self::io_binding::IoBinding;
-pub use self::memory::{AllocationDevice, Allocator, MemoryInfo};
+pub use self::memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType};
 pub use self::metadata::ModelMetadata;
 pub use self::operator::{
 	io::{OperatorInput, OperatorOutput},
@@ -376,51 +376,6 @@ impl From<GraphOptimizationLevel> for ort_sys::GraphOptimizationLevel {
 			GraphOptimizationLevel::Level1 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_BASIC,
 			GraphOptimizationLevel::Level2 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_EXTENDED,
 			GraphOptimizationLevel::Level3 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_ALL
-		}
-	}
-}
-
-/// Execution provider allocator type.
-#[derive(Debug, Copy, Clone)]
-pub enum AllocatorType {
-	/// Default device-specific allocator.
-	Device,
-	/// Arena allocator.
-	Arena
-}
-
-impl From<AllocatorType> for ort_sys::OrtAllocatorType {
-	fn from(val: AllocatorType) -> Self {
-		match val {
-			AllocatorType::Device => ort_sys::OrtAllocatorType::OrtDeviceAllocator,
-			AllocatorType::Arena => ort_sys::OrtAllocatorType::OrtArenaAllocator
-		}
-	}
-}
-
-/// Memory types for allocated memory.
-#[derive(Default, Debug, Copy, Clone)]
-pub enum MemoryType {
-	/// Any CPU memory used by non-CPU execution provider.
-	CPUInput,
-	/// CPU accessible memory outputted by non-CPU execution provider, i.e. CUDA_PINNED.
-	CPUOutput,
-	/// The default allocator for an execution provider.
-	#[default]
-	Default
-}
-
-impl MemoryType {
-	/// Temporary CPU accessible memory allocated by non-CPU execution provider, i.e. `CUDA_PINNED`.
-	pub const CPU: MemoryType = MemoryType::CPUOutput;
-}
-
-impl From<MemoryType> for ort_sys::OrtMemType {
-	fn from(val: MemoryType) -> Self {
-		match val {
-			MemoryType::CPUInput => ort_sys::OrtMemType::OrtMemTypeCPUInput,
-			MemoryType::CPUOutput => ort_sys::OrtMemType::OrtMemTypeCPUOutput,
-			MemoryType::Default => ort_sys::OrtMemType::OrtMemTypeDefault
 		}
 	}
 }

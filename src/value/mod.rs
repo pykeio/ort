@@ -153,7 +153,8 @@ pub(crate) enum ValueInner {
 	RustOwned {
 		ptr: NonNull<ort_sys::OrtValue>,
 		_array: Box<dyn Any>,
-		_memory_info: MemoryInfo
+		/// Hold onto the `MemoryInfo` that we create in `Value::from_array`.
+		_memory_info: Option<MemoryInfo>
 	},
 	CppOwned {
 		ptr: NonNull<ort_sys::OrtValue>,

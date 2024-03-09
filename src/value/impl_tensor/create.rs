@@ -19,6 +19,57 @@ use crate::{
 };
 
 impl Value {
+	/// Construct a tensor [`Value`] in a given allocator with a given shape and datatype. The data contained in the
+	/// value will be zero-allocated on the allocation device.
+	///
+	/// This can be used to create a tensor with data on a certain device. For example, to create a tensor with pinned
+	/// (CPU) memory for use with CUDA:
+	/// ```no_run
+	/// # use ort::{Allocator, Session, Value, MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
+	/// # fn main() -> ort::Result<()> {
+	/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// let allocator = Allocator::new(
+	/// 	&session,
+	/// 	MemoryInfo::new(AllocationDevice::CUDAPinned, 0, AllocatorType::Device, MemoryType::CPUInput)?
+	/// )?;
+	///
+	/// let mut img_input = Value::new_tensor::<f32>(&allocator, [1, 128, 128, 3])?;
+	/// # Ok(())
+	/// # }
+	/// ```
+	pub fn new_tensor<T: IntoTensorElementType>(allocator: &Allocator, shape: impl ToDimensions) -> Result<Value> {
+		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
+
+		let shape = shape.to_dimensions(None)?;
+		let shape_ptr: *const i64 = shape.as_ptr();
+		let shape_len = shape.len();
+
+		ortsys![
+			unsafe CreateTensorAsOrtValue(
+				allocator.ptr.as_ptr(),
+				shape_ptr,
+				shape_len as _,
+				T::into_tensor_element_type().into(),
+				&mut value_ptr
+			) -> Error::CreateTensorWithData;
+			nonNull(value_ptr)
+		];
+
+		let mut is_tensor = 0;
+		ortsys![unsafe IsTensor(value_ptr, &mut is_tensor) -> Error::FailedTensorCheck];
+		assert_eq!(is_tensor, 1);
+
+		assert_non_null_pointer(value_ptr, "Value")?;
+
+		Ok(Value {
+			inner: ValueInner::RustOwned {
+				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
+				_array: Box::new(()),
+				_memory_info: None
+			}
+		})
+	}
+
 	/// Construct a tensor [`Value`] from an array of data.
 	///
 	/// Tensor `Value`s can be created from:
@@ -135,7 +186,7 @@ impl Value {
 			inner: ValueInner::RustOwned {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
 				_array: guard,
-				_memory_info: memory_info
+				_memory_info: Some(memory_info)
 			}
 		})
 	}
@@ -175,8 +226,6 @@ impl Value {
 	///
 	/// Note that string data will *always* be copied, no matter what form the data is provided in.
 	pub fn from_string_array<T: Utf8Data>(allocator: &Allocator, input: impl IntoValueTensor<Item = T>) -> Result<Value> {
-		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemoryType::Default)?;
-
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 
 		let (shape, data) = input.ref_parts()?;
@@ -210,7 +259,7 @@ impl Value {
 			inner: ValueInner::RustOwned {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
 				_array: Box::new(()),
-				_memory_info: memory_info
+				_memory_info: None
 			}
 		})
 	}
@@ -224,24 +273,28 @@ pub trait IntoValueTensor {
 }
 
 pub trait ToDimensions {
-	fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>>;
+	fn to_dimensions(&self, expected_size: Option<usize>) -> Result<Vec<i64>>;
 }
 
 macro_rules! impl_to_dimensions {
 	(@inner) => {
-		fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>> {
+		fn to_dimensions(&self, expected_size: Option<usize>) -> Result<Vec<i64>> {
 			let v: Vec<i64> = self
 				.iter()
 				.enumerate()
 				.map(|(i, c)| if *c >= 1 { Ok(*c as i64) } else { Err(Error::InvalidDimension(i)) })
 				.collect::<Result<_>>()?;
 			let sum = v.iter().product::<i64>() as usize;
-			if sum != expected_size {
-				Err(Error::TensorShapeMismatch {
-					input: v,
-					total: sum,
-					expected: expected_size
-				})
+			if let Some(expected_size) = expected_size {
+				if sum != expected_size {
+					Err(Error::TensorShapeMismatch {
+						input: v,
+						total: sum,
+						expected: expected_size
+					})
+				} else {
+					Ok(v)
+				}
 			} else {
 				Ok(v)
 			}
@@ -374,12 +427,12 @@ impl<T: Clone + Debug + 'static, D: ToDimensions> IntoValueTensor for (D, &[T]) 
 	type Item = T;
 
 	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
-		let shape = self.0.to_dimensions(self.1.len())?;
+		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		Ok((shape, self.1))
 	}
 
 	fn into_parts(self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
-		let shape = self.0.to_dimensions(self.1.len())?;
+		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		let mut data = self.1.to_vec();
 		let ptr = data.as_mut_ptr();
 		let ptr_len: usize = data.len();
@@ -391,13 +444,13 @@ impl<T: Clone + Debug + 'static, D: ToDimensions> IntoValueTensor for (D, Vec<T>
 	type Item = T;
 
 	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
-		let shape = self.0.to_dimensions(self.1.len())?;
+		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		let data = &*self.1;
 		Ok((shape, data))
 	}
 
 	fn into_parts(mut self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
-		let shape = self.0.to_dimensions(self.1.len())?;
+		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		let ptr = self.1.as_mut_ptr();
 		let ptr_len: usize = self.1.len();
 		Ok((shape, ptr, ptr_len, Box::new(self.1)))
@@ -408,13 +461,13 @@ impl<T: Clone + Debug + 'static, D: ToDimensions> IntoValueTensor for (D, Box<[T
 	type Item = T;
 
 	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
-		let shape = self.0.to_dimensions(self.1.len())?;
+		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		let data = &*self.1;
 		Ok((shape, data))
 	}
 
 	fn into_parts(mut self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
-		let shape = self.0.to_dimensions(self.1.len())?;
+		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		let ptr = self.1.as_mut_ptr();
 		let ptr_len: usize = self.1.len();
 		Ok((shape, ptr, ptr_len, Box::new(self.1)))
@@ -425,13 +478,13 @@ impl<T: Clone + Debug + 'static, D: ToDimensions> IntoValueTensor for (D, Arc<Bo
 	type Item = T;
 
 	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
-		let shape = self.0.to_dimensions(self.1.len())?;
+		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		let data = &*self.1;
 		Ok((shape, data))
 	}
 
 	fn into_parts(mut self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
-		let shape = self.0.to_dimensions(self.1.len())?;
+		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		let ptr = std::sync::Arc::<std::boxed::Box<[T]>>::make_mut(&mut self.1).as_mut_ptr();
 		let ptr_len: usize = self.1.len();
 		let guard = Box::new(Arc::clone(&self.1));

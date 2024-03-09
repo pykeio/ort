@@ -249,7 +249,11 @@ pub enum Error {
 	#[error("{0}")]
 	CustomError(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
 	#[error("String tensors cannot be borrowed as mutable")]
-	StringTensorNotMutable
+	StringTensorNotMutable,
+	#[error("Could't get `MemoryInfo` from allocator: {0}")]
+	AllocatorGetInfo(ErrorInternal),
+	#[error("Could't get `MemoryType` from memory info: {0}")]
+	GetMemoryType(ErrorInternal)
 }
 
 impl From<Infallible> for Error {

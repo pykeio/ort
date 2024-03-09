@@ -328,6 +328,16 @@ impl Value {
 		})
 	}
 
+	/// Create a view of this value's data.
+	pub fn view_mut(&mut self) -> ValueRefMut<'_> {
+		ValueRefMut::new(unsafe {
+			Value::from_ptr_nodrop(
+				NonNull::new_unchecked(self.ptr()),
+				if let ValueInner::CppOwned { _session, .. } = &self.inner { _session.clone() } else { None }
+			)
+		})
+	}
+
 	/// Returns `true` if this value is a tensor, or `false` if it is another type (sequence, map).
 	///
 	/// ```

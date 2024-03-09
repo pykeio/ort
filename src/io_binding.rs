@@ -9,7 +9,7 @@ use crate::{
 	memory::MemoryInfo,
 	ortsys,
 	session::{output::SessionOutputs, RunOptions},
-	value::Value,
+	value::{Value, ValueRefMut},
 	Error, Result, Session
 };
 
@@ -26,7 +26,6 @@ use crate::{
 pub struct IoBinding<'s> {
 	pub(crate) ptr: NonNull<ort_sys::OrtIoBinding>,
 	session: &'s Session,
-	input_values: Vec<Value>,
 	output_names: Vec<String>
 }
 
@@ -37,27 +36,25 @@ impl<'s> IoBinding<'s> {
 		Ok(Self {
 			ptr: unsafe { NonNull::new_unchecked(ptr) },
 			session,
-			input_values: Vec::new(),
 			output_names: Vec::new()
 		})
 	}
 
 	/// Bind a [`Value`] to a session input.
-	pub fn bind_input<S: AsRef<str>>(&mut self, name: S, ort_value: Value) -> Result<&mut Value> {
+	pub fn bind_input<'i: 's, S: AsRef<str>>(&mut self, name: S, ort_value: &'i mut Value) -> Result<ValueRefMut<'i>> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
 		ortsys![unsafe BindInput(self.ptr.as_ptr(), cname.as_ptr(), ort_value.ptr()) -> Error::BindInput];
-		self.input_values.push(ort_value);
-		Ok(self.input_values.last_mut().unwrap())
+		Ok(ort_value.view_mut())
 	}
 
 	/// Bind a session output to a pre-allocated [`Value`].
-	pub fn bind_output<'o: 's, S: AsRef<str>>(&mut self, name: S, ort_value: &'o mut Value) -> Result<()> {
+	pub fn bind_output<'o: 's, S: AsRef<str>>(&mut self, name: S, ort_value: &'o mut Value) -> Result<ValueRefMut<'o>> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
 		ortsys![unsafe BindOutput(self.ptr.as_ptr(), cname.as_ptr(), ort_value.ptr()) -> Error::BindOutput];
 		self.output_names.push(name.to_string());
-		Ok(())
+		Ok(ort_value.view_mut())
 	}
 
 	/// Bind a session output to a device which is specified by `mem_info`.

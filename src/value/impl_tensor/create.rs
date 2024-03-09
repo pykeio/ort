@@ -227,125 +227,40 @@ pub trait ToDimensions {
 	fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>>;
 }
 
-impl<const N: usize> ToDimensions for [usize; N] {
-	fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>> {
-		let v: Vec<i64> = self
-			.iter()
-			.enumerate()
-			.map(|(i, c)| if *c >= 1 { Ok(*c as i64) } else { Err(Error::InvalidDimension(i)) })
-			.collect::<Result<_>>()?;
-		let sum = v.iter().product::<i64>() as usize;
-		if sum != expected_size {
-			Err(Error::TensorShapeMismatch {
-				input: v,
-				total: sum,
-				expected: expected_size
-			})
-		} else {
-			Ok(v)
+macro_rules! impl_to_dimensions {
+	(@inner) => {
+		fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>> {
+			let v: Vec<i64> = self
+				.iter()
+				.enumerate()
+				.map(|(i, c)| if *c >= 1 { Ok(*c as i64) } else { Err(Error::InvalidDimension(i)) })
+				.collect::<Result<_>>()?;
+			let sum = v.iter().product::<i64>() as usize;
+			if sum != expected_size {
+				Err(Error::TensorShapeMismatch {
+					input: v,
+					total: sum,
+					expected: expected_size
+				})
+			} else {
+				Ok(v)
+			}
 		}
-	}
+	};
+	($(for $t:ty),+) => {
+		$(impl ToDimensions for $t {
+			impl_to_dimensions!(@inner);
+		})+
+	};
+	(<N> $(for $t:ty),+) => {
+		$(impl<const N: usize> ToDimensions for $t {
+			impl_to_dimensions!(@inner);
+		})+
+	};
 }
 
-impl<const N: usize> ToDimensions for [i64; N] {
-	fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>> {
-		let v: Vec<i64> = self
-			.iter()
-			.enumerate()
-			.map(|(i, c)| if *c >= 1 { Ok(*c) } else { Err(Error::InvalidDimension(i)) })
-			.collect::<Result<_>>()?;
-		let sum = v.iter().product::<i64>() as usize;
-		if sum != expected_size {
-			Err(Error::TensorShapeMismatch {
-				input: v,
-				total: sum,
-				expected: expected_size
-			})
-		} else {
-			Ok(v)
-		}
-	}
-}
-
-impl ToDimensions for &[usize] {
-	fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>> {
-		let v: Vec<i64> = self
-			.iter()
-			.enumerate()
-			.map(|(i, c)| if *c >= 1 { Ok(*c as i64) } else { Err(Error::InvalidDimension(i)) })
-			.collect::<Result<_>>()?;
-		let sum = v.iter().product::<i64>() as usize;
-		if sum != expected_size {
-			Err(Error::TensorShapeMismatch {
-				input: v,
-				total: sum,
-				expected: expected_size
-			})
-		} else {
-			Ok(v)
-		}
-	}
-}
-
-impl ToDimensions for &[i64] {
-	fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>> {
-		let v: Vec<i64> = self
-			.iter()
-			.enumerate()
-			.map(|(i, c)| if *c >= 1 { Ok(*c) } else { Err(Error::InvalidDimension(i)) })
-			.collect::<Result<_>>()?;
-		let sum = v.iter().product::<i64>() as usize;
-		if sum != expected_size {
-			Err(Error::TensorShapeMismatch {
-				input: v,
-				total: sum,
-				expected: expected_size
-			})
-		} else {
-			Ok(v)
-		}
-	}
-}
-
-impl ToDimensions for Vec<usize> {
-	fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>> {
-		let v: Vec<i64> = self
-			.iter()
-			.enumerate()
-			.map(|(i, c)| if *c >= 1 { Ok(*c as i64) } else { Err(Error::InvalidDimension(i)) })
-			.collect::<Result<_>>()?;
-		let sum = v.iter().product::<i64>() as usize;
-		if sum != expected_size {
-			Err(Error::TensorShapeMismatch {
-				input: v,
-				total: sum,
-				expected: expected_size
-			})
-		} else {
-			Ok(v)
-		}
-	}
-}
-
-impl ToDimensions for Vec<i64> {
-	fn to_dimensions(&self, expected_size: usize) -> Result<Vec<i64>> {
-		let v: Vec<i64> = self
-			.iter()
-			.enumerate()
-			.map(|(i, c)| if *c >= 1 { Ok(*c) } else { Err(Error::InvalidDimension(i)) })
-			.collect::<Result<_>>()?;
-		let sum = v.iter().product::<i64>() as usize;
-		if sum != expected_size {
-			Err(Error::TensorShapeMismatch {
-				input: v,
-				total: sum,
-				expected: expected_size
-			})
-		} else {
-			Ok(v)
-		}
-	}
-}
+impl_to_dimensions!(for &[usize], for &[i32], for &[i64], for Vec<usize>, for Vec<i32>, for Vec<i64>);
+impl_to_dimensions!(<N> for [usize; N], for [i32; N], for [i64; N]);
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]

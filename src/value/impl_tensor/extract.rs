@@ -248,11 +248,11 @@ impl Value {
 				ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
 				let shape = IxDyn(&node_dims.iter().map(|&n| n as usize).collect::<Vec<_>>());
 
-				let mut len = 0;
+				let mut len: ort_sys::size_t = 0;
 				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
 
 				// Total length of string data, not including \0 suffix
-				let mut total_length = 0;
+				let mut total_length: ort_sys::size_t = 0;
 				ortsys![unsafe GetStringTensorDataLength(self.ptr(), &mut total_length) -> Error::GetStringTensorDataLength];
 
 				// In the JNI impl of this, tensor_element_len was included in addition to total_length,
@@ -263,13 +263,13 @@ impl Value {
 				let mut string_contents = vec![0u8; total_length as _];
 				// one extra slot so that the total length can go in the last one, making all per-string
 				// length calculations easy
-				let mut offsets = vec![0; len + 1];
+				let mut offsets = vec![0; (len + 1) as _];
 
-				ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length as _, offsets.as_mut_ptr(), len as _) -> Error::GetStringTensorContent];
+				ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len) -> Error::GetStringTensorContent];
 
 				// final offset = overall length so that per-string length calculations work for the last string
-				debug_assert_eq!(0, offsets[len]);
-				offsets[len] = total_length;
+				debug_assert_eq!(0, offsets[len as usize]);
+				offsets[len as usize] = total_length;
 
 				let strings = offsets
 					// offsets has 1 extra offset past the end so that all windows work

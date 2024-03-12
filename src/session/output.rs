@@ -1,5 +1,5 @@
 use std::{
-	collections::HashMap,
+	collections::BTreeMap,
 	ffi::c_void,
 	ops::{Deref, DerefMut, Index}
 };
@@ -26,7 +26,7 @@ use crate::{Allocator, Value};
 /// ```
 #[derive(Debug)]
 pub struct SessionOutputs<'s> {
-	map: HashMap<&'s str, Value>,
+	map: BTreeMap<&'s str, Value>,
 	idxs: Vec<&'s str>,
 	backing_ptr: Option<(&'s Allocator, *mut c_void)>
 }
@@ -59,7 +59,7 @@ impl<'s> SessionOutputs<'s> {
 
 	pub(crate) fn new_empty() -> Self {
 		Self {
-			map: HashMap::new(),
+			map: BTreeMap::new(),
 			idxs: Vec::new(),
 			backing_ptr: None
 		}
@@ -75,7 +75,7 @@ impl<'s> Drop for SessionOutputs<'s> {
 }
 
 impl<'s> Deref for SessionOutputs<'s> {
-	type Target = HashMap<&'s str, Value>;
+	type Target = BTreeMap<&'s str, Value>;
 
 	fn deref(&self) -> &Self::Target {
 		&self.map

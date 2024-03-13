@@ -1,6 +1,7 @@
 [workspace]
 members = [
 	'ort-sys',
+	'examples/async-gpt2-api',
 	'examples/custom-ops',
 	'examples/gpt2',
 	'examples/model-info',
@@ -9,6 +10,7 @@ members = [
 ]
 default-members = [
 	'.',
+	'examples/async-gpt2-api',
 	'examples/custom-ops',
 	'examples/gpt2',
 	'examples/model-info',
@@ -91,10 +93,12 @@ winapi = { version = "0.3", optional = true, features = [ "std", "libloaderapi" 
 [dev-dependencies]
 anyhow = "1.0"
 ureq = "2.1"
-image = "0.24"
+image = "0.25"
 test-log = { version = "0.2", default-features = false, features = [ "trace" ] }
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
 glassbench = "0.4"
+tokio = { version = "1.36", features = [ "test-util" ] }
+tokio-test = "0.4.3"
 
 [[bench]]
 name = "squeezenet"

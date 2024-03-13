@@ -14,7 +14,7 @@ use std::{
 
 use ort_sys::{c_void, OrtStatus};
 
-use crate::{error::assert_non_null_pointer, Error, Result, SessionInputValue, SessionOutputs, SharedSessionInner, Value};
+use crate::{error::assert_non_null_pointer, Error, Result, RunOptions, SessionInputValue, SessionOutputs, SharedSessionInner, Value};
 
 pub(crate) enum InnerValue<T> {
 	Present(T),
@@ -87,12 +87,17 @@ unsafe impl<'s> Sync for InferenceFutInner<'s> {}
 
 pub struct InferenceFut<'s> {
 	inner: Arc<InferenceFutInner<'s>>,
+	run_options: Arc<RunOptions>,
 	did_receive: bool
 }
 
 impl<'s> InferenceFut<'s> {
-	pub(crate) fn new(inner: Arc<InferenceFutInner<'s>>) -> Self {
-		Self { inner, did_receive: false }
+	pub(crate) fn new(inner: Arc<InferenceFutInner<'s>>, run_options: Arc<RunOptions>) -> Self {
+		Self {
+			inner,
+			run_options,
+			did_receive: false
+		}
 	}
 }
 
@@ -120,6 +125,7 @@ impl<'s> Future for InferenceFut<'s> {
 impl<'s> Drop for InferenceFut<'s> {
 	fn drop(&mut self) {
 		if !self.did_receive && self.inner.close() {
+			let _ = self.run_options.terminate();
 			self.inner.set_waker(None);
 		}
 	}

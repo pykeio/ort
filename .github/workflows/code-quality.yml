@@ -56,7 +56,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.74
+        uses: dtolnay/rust-toolchain@stable
       - name: Get Rust version
         id: rust-version
         run: echo "::set-output name=version::$(cargo --version | cut -d ' ' -f 2)"
@@ -71,7 +71,7 @@ jobs:
         run: cargo install cargo-tarpaulin
       - name: Generate code coverage
         run: |
-          cargo tarpaulin -p ort --features fetch-models --verbose --timeout 120 --out xml --doc --lib --tests --engine llvm
+          cargo tarpaulin -p ort --features fetch-models --verbose --timeout 120 --out xml
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v3
         with:

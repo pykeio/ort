@@ -388,7 +388,7 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{Session, RunOptions, Value, ValueType, TensorElementType};
 	/// # fn main() -> ort::Result<()> { tokio_test::block_on(async {
-	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// let session = Session::builder()?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 	/// let outputs = session.run_async(ort::inputs![input]?)?.await?;
 	/// # 	Ok(())
@@ -420,7 +420,7 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{Session, RunOptions, Value, ValueType, TensorElementType};
 	/// # fn main() -> ort::Result<()> { tokio_test::block_on(async {
-	/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// # 	let session = Session::builder()?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
 	/// let run_options = Arc::new(RunOptions::new()?);
 	///

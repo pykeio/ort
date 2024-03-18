@@ -22,8 +22,8 @@ pub(crate) enum InnerValue<T> {
 	Closed
 }
 
-const VALUE_PRESENT_BIT: usize = 1;
-const CLOSED_BIT: usize = 2;
+const VALUE_PRESENT: usize = 1 << 0;
+const CHANNEL_CLOSED: usize = 1 << 1;
 
 #[derive(Debug)]
 pub(crate) struct InferenceFutInner<'s> {
@@ -42,9 +42,9 @@ impl<'s> InferenceFutInner<'s> {
 	}
 
 	pub(crate) fn try_take(&self) -> InnerValue<Result<SessionOutputs<'s>>> {
-		let state_snapshot = self.presence.fetch_and(!(1 << VALUE_PRESENT_BIT), Ordering::Acquire);
-		if state_snapshot & (1 << VALUE_PRESENT_BIT) == 0 {
-			if self.presence.load(Ordering::Acquire) & (1 << CLOSED_BIT) != 0 {
+		let state_snapshot = self.presence.fetch_and(!VALUE_PRESENT, Ordering::Acquire);
+		if state_snapshot & VALUE_PRESENT == 0 {
+			if self.presence.load(Ordering::Acquire) & CHANNEL_CLOSED != 0 {
 				InnerValue::Closed
 			} else {
 				InnerValue::Pending
@@ -56,7 +56,7 @@ impl<'s> InferenceFutInner<'s> {
 
 	pub(crate) fn emplace_value(&self, value: Result<SessionOutputs<'s>>) {
 		unsafe { (*self.value.get()).write(value) };
-		self.presence.fetch_or(1 << VALUE_PRESENT_BIT, Ordering::Release);
+		self.presence.fetch_or(VALUE_PRESENT, Ordering::Release);
 	}
 
 	pub(crate) fn set_waker(&self, waker: Option<&Waker>) {
@@ -70,13 +70,13 @@ impl<'s> InferenceFutInner<'s> {
 	}
 
 	pub(crate) fn close(&self) -> bool {
-		self.presence.fetch_or(1 << CLOSED_BIT, Ordering::Acquire) & (1 << CLOSED_BIT) == 0
+		self.presence.fetch_or(CHANNEL_CLOSED, Ordering::Acquire) & CHANNEL_CLOSED == 0
 	}
 }
 
 impl<'s> Drop for InferenceFutInner<'s> {
 	fn drop(&mut self) {
-		if self.presence.load(Ordering::Acquire) & (1 << VALUE_PRESENT_BIT) != 0 {
+		if self.presence.load(Ordering::Acquire) & VALUE_PRESENT != 0 {
 			unsafe { (*self.value.get()).assume_init_drop() };
 		}
 	}
@@ -137,7 +137,7 @@ pub(crate) struct AsyncInferenceContext<'s> {
 	pub(crate) input_ort_values: Vec<*const ort_sys::OrtValue>,
 	pub(crate) input_name_ptrs: Vec<*const c_char>,
 	pub(crate) output_name_ptrs: Vec<*const c_char>,
-	pub(crate) session_inner: Arc<SharedSessionInner>,
+	pub(crate) session_inner: &'s Arc<SharedSessionInner>,
 	pub(crate) output_names: Vec<&'s str>,
 	pub(crate) output_value_ptrs: Vec<*mut ort_sys::OrtValue>
 }
@@ -168,7 +168,7 @@ crate::extern_system_fn! {
 			.output_value_ptrs
 			.into_iter()
 			.map(|tensor_ptr| unsafe {
-				Value::from_ptr(NonNull::new(tensor_ptr).expect("OrtValue ptr returned from session Run should not be null"), Some(Arc::clone(&ctx.session_inner)))
+				Value::from_ptr(NonNull::new(tensor_ptr).expect("OrtValue ptr returned from session Run should not be null"), Some(Arc::clone(ctx.session_inner)))
 			})
 			.collect();
 

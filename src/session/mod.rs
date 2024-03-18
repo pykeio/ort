@@ -373,8 +373,8 @@ impl Session {
 
 	/// Asynchronously run input data through the ONNX graph, performing inference.
 	///
-	/// **The session must have been configured to have multiple intra-op threads; see
-	/// [`SessionBuilder::with_intra_threads`].**
+	/// Inference will be performed on a thread in the session's thread pool. **Thus, the session must have been
+	/// configured to have multiple intra-op threads**; see [`SessionBuilder::with_intra_threads`].
 	///
 	/// See [`crate::inputs!`] for a convenient macro which will help you create your session inputs from `ndarray`s or
 	/// other data. You can also provide a `Vec`, array, or `HashMap` of [`Value`]s if you create your inputs
@@ -403,6 +403,8 @@ impl Session {
 	}
 
 	fn run_inner_async<'s, 'v: 's>(&'s self, input_names: &[String], input_values: impl Iterator<Item = SessionInputValue<'v>>) -> Result<InferenceFut<'s>> {
+		// create a `RunOptions` to pass to the future so that when it drops, it terminates inference - crucial
+		// (performance-wise) for routines involving `tokio::select!` or timeouts
 		let run_options = Arc::new(RunOptions::new()?);
 
 		let input_name_ptrs: Vec<*const c_char> = input_names
@@ -429,12 +431,14 @@ impl Session {
 		let ctx = Box::leak(Box::new(AsyncInferenceContext {
 			inner: Arc::clone(&async_inner),
 			_input_values: input_values,
+			// everything allocated within `run_inner_async` needs to be kept alive until we are certain inference has completed and ONNX Runtime no longer
+			// needs the data - i.e. when `async_callback` is called. `async_callback` will free all of this data just like we do in `run_inner`
 			input_ort_values,
 			input_name_ptrs,
 			output_name_ptrs,
 			output_names: self.outputs.iter().map(|o| o.name.as_str()).collect::<Vec<_>>(),
 			output_value_ptrs: output_tensor_ptrs,
-			session_inner: self.inner()
+			session_inner: &self.inner
 		}));
 
 		ortsys![

@@ -1,0 +1,25 @@
+[package]
+publish = false
+name = "example-async-gpt2-api"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+ort = { path = "../../", features = [ "fetch-models" ] }
+ndarray = "0.15"
+tokenizers = { version = ">=0.13.4", default-features = false, features = [ "onig" ] }
+rand = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
+futures = "0.3"
+headers = "0.4"
+axum = { version = "0.7", features = [ "json" ] }
+tokio = { version = "1.36", features = [ "full" ] }
+tokio-stream = "0.1"
+tower-http = { version = "0.5", features = ["fs", "trace"] }
+anyhow = "1.0"
+async-stream = "0.3"
+
+[features]
+load-dynamic = [ "ort/load-dynamic" ]
+cuda = [ "ort/cuda" ]

@@ -14,10 +14,13 @@ use super::{
 	value::{Value, ValueType}
 };
 
+mod r#async;
 pub(crate) mod builder;
 pub(crate) mod input;
 pub(crate) mod output;
+use self::r#async::{AsyncInferenceContext, InferenceFutInner};
 pub use self::{
+	r#async::InferenceFut,
 	builder::{GraphOptimizationLevel, SessionBuilder},
 	input::{SessionInputValue, SessionInputs},
 	output::SessionOutputs
@@ -366,6 +369,94 @@ impl Session {
 		);
 
 		Ok(SessionOutputs::new(self.outputs.iter().map(|o| o.name.as_str()), outputs))
+	}
+
+	/// Asynchronously run input data through the ONNX graph, performing inference.
+	///
+	/// Inference will be performed on a thread in the session's thread pool. **Thus, the session must have been
+	/// configured to have multiple intra-op threads**; see [`SessionBuilder::with_intra_threads`].
+	///
+	/// See [`crate::inputs!`] for a convenient macro which will help you create your session inputs from `ndarray`s or
+	/// other data. You can also provide a `Vec`, array, or `HashMap` of [`Value`]s if you create your inputs
+	/// dynamically.
+	///
+	/// ```
+	/// # use std::sync::Arc;
+	/// # use ort::{Session, RunOptions, Value, ValueType, TensorElementType};
+	/// # fn main() -> ort::Result<()> { tokio_test::block_on(async {
+	/// let session = Session::builder()?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
+	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
+	/// let outputs = session.run_async(ort::inputs![input]?)?.await?;
+	/// # 	Ok(())
+	/// # }) }
+	/// ```
+	pub fn run_async<'s, 'i, 'v: 'i + 's, const N: usize>(&'s self, input_values: impl Into<SessionInputs<'i, 'v, N>> + 'static) -> Result<InferenceFut<'s>> {
+		match input_values.into() {
+			SessionInputs::ValueSlice(_) => unimplemented!("slices cannot be used in `run_async`"),
+			SessionInputs::ValueArray(input_values) => {
+				self.run_inner_async(&self.inputs.iter().map(|input| input.name.to_string()).collect::<Vec<_>>(), input_values.into_iter())
+			}
+			SessionInputs::ValueMap(input_values) => {
+				self.run_inner_async(&input_values.iter().map(|(k, _)| k.to_string()).collect::<Vec<_>>(), input_values.into_iter().map(|(_, v)| v))
+			}
+		}
+	}
+
+	fn run_inner_async<'s, 'v: 's>(&'s self, input_names: &[String], input_values: impl Iterator<Item = SessionInputValue<'v>>) -> Result<InferenceFut<'s>> {
+		// create a `RunOptions` to pass to the future so that when it drops, it terminates inference - crucial
+		// (performance-wise) for routines involving `tokio::select!` or timeouts
+		let run_options = Arc::new(RunOptions::new()?);
+
+		let input_name_ptrs: Vec<*const c_char> = input_names
+			.iter()
+			.map(|n| CString::new(n.as_bytes()).unwrap())
+			.map(|n| n.into_raw().cast_const())
+			.collect();
+		let output_name_ptrs: Vec<*const c_char> = self
+			.outputs
+			.iter()
+			.map(|output| CString::new(output.name.as_str()).unwrap())
+			.map(|n| n.into_raw().cast_const())
+			.collect();
+
+		let output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![std::ptr::null_mut(); self.outputs.len()];
+
+		let input_values: Vec<_> = input_values.collect();
+		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.iter().map(|input_array_ort| input_array_ort.ptr().cast_const()).collect();
+
+		let run_options_ptr = run_options.run_options_ptr.as_ptr();
+
+		let async_inner = Arc::new(InferenceFutInner::new());
+
+		let ctx = Box::leak(Box::new(AsyncInferenceContext {
+			inner: Arc::clone(&async_inner),
+			_input_values: input_values,
+			// everything allocated within `run_inner_async` needs to be kept alive until we are certain inference has completed and ONNX Runtime no longer
+			// needs the data - i.e. when `async_callback` is called. `async_callback` will free all of this data just like we do in `run_inner`
+			input_ort_values,
+			input_name_ptrs,
+			output_name_ptrs,
+			output_names: self.outputs.iter().map(|o| o.name.as_str()).collect::<Vec<_>>(),
+			output_value_ptrs: output_tensor_ptrs,
+			session_inner: &self.inner
+		}));
+
+		ortsys![
+			unsafe RunAsync(
+				self.inner.session_ptr.as_ptr(),
+				run_options_ptr,
+				ctx.input_name_ptrs.as_ptr(),
+				ctx.input_ort_values.as_ptr(),
+				ctx.input_ort_values.len() as _,
+				ctx.output_name_ptrs.as_ptr(),
+				ctx.output_name_ptrs.len() as _,
+				ctx.output_value_ptrs.as_mut_ptr(),
+				Some(self::r#async::async_callback),
+				ctx as *mut _ as *mut ort_sys::c_void
+			) -> Error::SessionRun
+		];
+
+		Ok(InferenceFut::new(async_inner, run_options))
 	}
 
 	/// Gets the session model metadata. See [`ModelMetadata`] for more info.

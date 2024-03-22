@@ -1,14 +1,18 @@
 use std::{borrow::Cow, collections::HashMap, ops::Deref};
 
-use crate::{Value, ValueRef};
+use crate::{
+	value::{DynValueTypeMarker, ValueTypeMarker},
+	Value, ValueRef
+};
 
 pub enum SessionInputValue<'v> {
-	View(ValueRef<'v>),
-	Owned(Value)
+	View(ValueRef<'v, DynValueTypeMarker>),
+	Owned(Value<DynValueTypeMarker>)
 }
 
 impl<'v> Deref for SessionInputValue<'v> {
 	type Target = Value;
+
 	fn deref(&self) -> &Self::Target {
 		match self {
 			SessionInputValue::View(v) => v,
@@ -17,14 +21,14 @@ impl<'v> Deref for SessionInputValue<'v> {
 	}
 }
 
-impl<'v> From<ValueRef<'v>> for SessionInputValue<'v> {
-	fn from(value: ValueRef<'v>) -> Self {
-		SessionInputValue::View(value)
+impl<'v, T: ValueTypeMarker + ?Sized> From<ValueRef<'v, T>> for SessionInputValue<'v> {
+	fn from(value: ValueRef<'v, T>) -> Self {
+		SessionInputValue::View(value.into_dyn())
 	}
 }
-impl<'v> From<Value> for SessionInputValue<'v> {
-	fn from(value: Value) -> Self {
-		SessionInputValue::Owned(value)
+impl<'v, T: ValueTypeMarker + ?Sized> From<Value<T>> for SessionInputValue<'v> {
+	fn from(value: Value<T>) -> Self {
+		SessionInputValue::Owned(value.into_dyn())
 	}
 }
 
@@ -113,13 +117,13 @@ impl<'i, 'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<
 macro_rules! inputs {
 	($($v:expr),+ $(,)?) => (
 		(|| -> $crate::Result<_> {
-			Ok([$(::std::convert::Into::<$crate::SessionInputValue<'_>>::into(::std::convert::TryInto::<$crate::Value>::try_into($v).map_err($crate::Error::from)?)),+])
+			Ok([$(::std::convert::Into::<$crate::SessionInputValue<'_>>::into(::std::convert::TryInto::<$crate::DynValue>::try_into($v).map_err($crate::Error::from)?)),+])
 		})()
 	);
 	($($n:expr => $v:expr),+ $(,)?) => (
 		(|| -> $crate::Result<_> {
 			Ok(vec![$(
-				::std::convert::TryInto::<$crate::Value>::try_into($v)
+				::std::convert::TryInto::<$crate::DynValue>::try_into($v)
 					.map_err($crate::Error::from)
 					.map(|v| (::std::borrow::Cow::<str>::from($n), $crate::SessionInputValue::from(v)))?,)+])
 		})()
@@ -128,7 +132,7 @@ macro_rules! inputs {
 
 #[cfg(test)]
 mod tests {
-	use std::{collections::HashMap, sync::Arc};
+	use std::collections::HashMap;
 
 	use crate::*;
 
@@ -138,7 +142,7 @@ mod tests {
 		let arc = Arc::new(v.clone().into_boxed_slice());
 		let shape = vec![v.len() as i64];
 
-		let mut inputs: HashMap<&str, Value> = HashMap::new();
+		let mut inputs: HashMap<&str, DynTensor> = HashMap::new();
 		inputs.insert("test", (shape, arc).try_into()?);
 		let _ = SessionInputs::from(inputs);
 
@@ -151,7 +155,7 @@ mod tests {
 		let arc = Arc::new(v.clone().into_boxed_slice());
 		let shape = vec![v.len() as i64];
 
-		let mut inputs: HashMap<String, Value> = HashMap::new();
+		let mut inputs: HashMap<String, DynTensor> = HashMap::new();
 		inputs.insert("test".to_string(), (shape, arc).try_into()?);
 		let _ = SessionInputs::from(inputs);
 

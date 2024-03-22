@@ -67,7 +67,7 @@ fn generate_stream(tokenizer: Arc<Tokenizer>, session: Arc<Session>, tokens: Vec
 		for _ in 0..gen_tokens {
 			let array = tokens.view().insert_axis(Axis(0)).insert_axis(Axis(1));
 			let outputs = session.run_async(inputs![array]?)?.await?;
-			let generated_tokens: ArrayViewD<f32> = outputs["output1"].extract_tensor()?;
+			let generated_tokens: ArrayViewD<f32> = outputs["output1"].try_extract_tensor()?;
 
 			// Collect and sort logits
 			let probabilities = &mut generated_tokens

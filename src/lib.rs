@@ -25,7 +25,7 @@ pub(crate) mod tensor;
 pub(crate) mod value;
 
 #[cfg(feature = "load-dynamic")]
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::Arc;
 use std::{
 	ffi::{self, CStr},
 	os::raw::c_char,
@@ -60,7 +60,10 @@ pub use self::session::{
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 pub use self::tensor::ArrayExtensions;
 pub use self::tensor::{IntoTensorElementType, TensorElementType};
-pub use self::value::{Value, ValueRef, ValueType};
+pub use self::value::{
+	DynTensor, DynTensorValueType, DynValue, DynValueTypeMarker, Map, MapValueType, MapValueTypeMarker, Sequence, SequenceValueType, SequenceValueTypeMarker,
+	Tensor, TensorValueTypeMarker, Value, ValueRef, ValueRefMut, ValueType, ValueTypeMarker, TensorRef
+};
 
 #[cfg(not(all(target_arch = "x86", target_os = "windows")))]
 macro_rules! extern_system_fn {
@@ -197,6 +200,12 @@ macro_rules! ortsys {
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?)) => {
 		unsafe { $crate::api().as_ref().$method.unwrap()($($n),+) }
+	};
+	($method:ident($($n:expr),+ $(,)?).unwrap()) => {
+		$crate::error::status_to_result($crate::api().as_ref().$method.unwrap()($($n),+)).unwrap()
+	};
+	(unsafe $method:ident($($n:expr),+ $(,)?).unwrap()) => {
+		$crate::error::status_to_result(unsafe { $crate::api().as_ref().$method.unwrap()($($n),+) }).unwrap()
 	};
 	($method:ident($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {
 		$crate::api().as_ref().$method.unwrap()($($n),+);

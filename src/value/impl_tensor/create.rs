@@ -2,6 +2,7 @@ use std::{
 	any::Any,
 	ffi,
 	fmt::Debug,
+	marker::PhantomData,
 	ptr::{self, NonNull},
 	sync::Arc
 };
@@ -9,23 +10,98 @@ use std::{
 #[cfg(feature = "ndarray")]
 use ndarray::{ArcArray, Array, ArrayView, CowArray, Dimension};
 
+use super::{DynTensor, Tensor};
 use crate::{
 	error::assert_non_null_pointer,
 	memory::{Allocator, MemoryInfo},
 	ortsys,
 	tensor::{IntoTensorElementType, TensorElementType, Utf8Data},
 	value::ValueInner,
-	AllocatorType, Error, MemoryType, Result, Value
+	AllocatorType, DynValue, Error, MemoryType, Result, Value
 };
 
-impl Value {
+impl DynTensor {
+	/// Construct a [`Value`] from an array of strings.
+	///
+	/// Just like numeric tensors, string tensor `Value`s can be created from:
+	/// - (with feature `ndarray`) a shared reference to a [`ndarray::CowArray`] (`&CowArray<'_, T, D>`);
+	/// - (with feature `ndarray`) a mutable/exclusive reference to an [`ndarray::ArcArray`] (`&mut ArcArray<T, D>`);
+	/// - (with feature `ndarray`) an owned [`ndarray::Array`];
+	/// - (with feature `ndarray`) a borrowed view of another array, as an [`ndarray::ArrayView`] (`ArrayView<'_, T,
+	///   D>`);
+	/// - a tuple of `(dimensions, data)` where:
+	///   * `dimensions` is one of `Vec<I>`, `[I]` or `&[I]`, where `I` is `i64` or `usize`;
+	///   * and `data` is one of `Vec<T>`, `Box<[T]>`, `Arc<Box<[T]>>`, or `&[T]`.
+	///
+	/// ```
+	/// # use ort::{Session, Value};
+	/// # fn main() -> ort::Result<()> {
+	/// # 	let session = Session::builder()?.commit_from_file("tests/data/vectorizer.onnx")?;
+	/// // You'll need to obtain an `Allocator` from a session in order to create string tensors.
+	/// let allocator = session.allocator();
+	///
+	/// // Create a string tensor from a raw data vector
+	/// let data = vec!["hello", "world"];
+	/// let value = Value::from_string_array(allocator, ([data.len()], data.into_boxed_slice()))?;
+	///
+	/// // Create a string tensor from an `ndarray::Array`
+	/// #[cfg(feature = "ndarray")]
+	/// let value = Value::from_string_array(
+	/// 	allocator,
+	/// 	ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap()
+	/// )?;
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	///
+	/// Note that string data will *always* be copied, no matter what form the data is provided in.
+	pub fn from_string_array<T: Utf8Data>(allocator: &Allocator, input: impl IntoValueTensor<Item = T>) -> Result<DynTensor> {
+		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
+
+		let (shape, data) = input.ref_parts()?;
+		let shape_ptr: *const i64 = shape.as_ptr();
+		let shape_len = shape.len();
+
+		// create tensor without data -- data is filled in later
+		ortsys![
+			unsafe CreateTensorAsOrtValue(allocator.ptr.as_ptr(), shape_ptr, shape_len as _, TensorElementType::String.into(), &mut value_ptr)
+				-> Error::CreateTensor;
+			nonNull(value_ptr)
+		];
+
+		// create null-terminated copies of each string, as per `FillStringTensor` docs
+		let null_terminated_copies: Vec<ffi::CString> = data
+			.iter()
+			.map(|elt| {
+				let slice = elt.as_utf8_bytes();
+				ffi::CString::new(slice)
+			})
+			.collect::<Result<Vec<_>, _>>()
+			.map_err(Error::FfiStringNull)?;
+
+		let string_pointers = null_terminated_copies.iter().map(|cstring| cstring.as_ptr()).collect::<Vec<_>>();
+
+		ortsys![unsafe FillStringTensor(value_ptr, string_pointers.as_ptr(), string_pointers.len() as _) -> Error::FillStringTensor];
+
+		Ok(Value {
+			inner: ValueInner::RustOwned {
+				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
+				_array: Box::new(()),
+				_memory_info: None
+			},
+			_markers: PhantomData
+		})
+	}
+}
+
+impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// Construct a tensor [`Value`] in a given allocator with a given shape and datatype. The data contained in the
 	/// value will be zero-allocated on the allocation device.
 	///
 	/// This can be used to create a tensor with data on a certain device. For example, to create a tensor with pinned
 	/// (CPU) memory for use with CUDA:
 	/// ```no_run
-	/// # use ort::{Allocator, Session, Value, MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
+	/// # use ort::{Allocator, Session, Tensor, MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
 	/// # fn main() -> ort::Result<()> {
 	/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let allocator = Allocator::new(
@@ -33,11 +109,11 @@ impl Value {
 	/// 	MemoryInfo::new(AllocationDevice::CUDAPinned, 0, AllocatorType::Device, MemoryType::CPUInput)?
 	/// )?;
 	///
-	/// let mut img_input = Value::new_tensor::<f32>(&allocator, [1, 128, 128, 3])?;
+	/// let mut img_input = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub fn new_tensor<T: IntoTensorElementType>(allocator: &Allocator, shape: impl ToDimensions) -> Result<Value> {
+	pub fn new(allocator: &Allocator, shape: impl ToDimensions) -> Result<Tensor<T>> {
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 
 		let shape = shape.to_dimensions(None)?;
@@ -60,7 +136,8 @@ impl Value {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
 				_array: Box::new(()),
 				_memory_info: None
-			}
+			},
+			_markers: PhantomData
 		})
 	}
 
@@ -99,7 +176,7 @@ impl Value {
 	///
 	/// Raw data provided as a `Arc<Box<[T]>>`, `Box<[T]>`, or `Vec<T>` will never be copied. Raw data is expected to be
 	/// in standard, contigous layout.
-	pub fn from_array<T: IntoTensorElementType>(input: impl IntoValueTensor<Item = T>) -> Result<Value> {
+	pub fn from_array(input: impl IntoValueTensor<Item = T>) -> Result<Tensor<T>> {
 		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemoryType::Default)?;
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
@@ -130,79 +207,13 @@ impl Value {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
 				_array: guard,
 				_memory_info: Some(memory_info)
-			}
+			},
+			_markers: PhantomData
 		})
 	}
 
-	/// Construct a [`Value`] from an array of strings.
-	///
-	/// Just like numeric tensors, string tensor `Value`s can be created from:
-	/// - (with feature `ndarray`) a shared reference to a [`ndarray::CowArray`] (`&CowArray<'_, T, D>`);
-	/// - (with feature `ndarray`) a mutable/exclusive reference to an [`ndarray::ArcArray`] (`&mut ArcArray<T, D>`);
-	/// - (with feature `ndarray`) an owned [`ndarray::Array`];
-	/// - (with feature `ndarray`) a borrowed view of another array, as an [`ndarray::ArrayView`] (`ArrayView<'_, T,
-	///   D>`);
-	/// - a tuple of `(dimensions, data)` where:
-	///   * `dimensions` is one of `Vec<I>`, `[I]` or `&[I]`, where `I` is `i64` or `usize`;
-	///   * and `data` is one of `Vec<T>`, `Box<[T]>`, `Arc<Box<[T]>>`, or `&[T]`.
-	///
-	/// ```
-	/// # use ort::{Session, Value};
-	/// # fn main() -> ort::Result<()> {
-	/// # 	let session = Session::builder()?.commit_from_file("tests/data/vectorizer.onnx")?;
-	/// // You'll need to obtain an `Allocator` from a session in order to create string tensors.
-	/// let allocator = session.allocator();
-	///
-	/// // Create a string tensor from a raw data vector
-	/// let data = vec!["hello", "world"];
-	/// let value = Value::from_string_array(allocator, ([data.len()], data.into_boxed_slice()))?;
-	///
-	/// // Create a string tensor from an `ndarray::Array`
-	/// #[cfg(feature = "ndarray")]
-	/// let value = Value::from_string_array(
-	/// 	allocator,
-	/// 	ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap()
-	/// )?;
-	/// # 	Ok(())
-	/// # }
-	/// ```
-	///
-	/// Note that string data will *always* be copied, no matter what form the data is provided in.
-	pub fn from_string_array<T: Utf8Data>(allocator: &Allocator, input: impl IntoValueTensor<Item = T>) -> Result<Value> {
-		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
-
-		let (shape, data) = input.ref_parts()?;
-		let shape_ptr: *const i64 = shape.as_ptr();
-		let shape_len = shape.len();
-
-		// create tensor without data -- data is filled in later
-		ortsys![
-			unsafe CreateTensorAsOrtValue(allocator.ptr.as_ptr(), shape_ptr, shape_len as _, TensorElementType::String.into(), &mut value_ptr)
-				-> Error::CreateTensor;
-			nonNull(value_ptr)
-		];
-
-		// create null-terminated copies of each string, as per `FillStringTensor` docs
-		let null_terminated_copies: Vec<ffi::CString> = data
-			.iter()
-			.map(|elt| {
-				let slice = elt.as_utf8_bytes();
-				ffi::CString::new(slice)
-			})
-			.collect::<Result<Vec<_>, _>>()
-			.map_err(Error::FfiStringNull)?;
-
-		let string_pointers = null_terminated_copies.iter().map(|cstring| cstring.as_ptr()).collect::<Vec<_>>();
-
-		ortsys![unsafe FillStringTensor(value_ptr, string_pointers.as_ptr(), string_pointers.len() as _) -> Error::FillStringTensor];
-
-		Ok(Value {
-			inner: ValueInner::RustOwned {
-				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
-				_array: Box::new(()),
-				_memory_info: None
-			}
-		})
+	pub fn downcast(self) -> DynTensor {
+		unsafe { std::mem::transmute(self) }
 	}
 }
 
@@ -210,6 +221,7 @@ pub trait IntoValueTensor {
 	type Item;
 
 	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])>;
+	#[allow(clippy::type_complexity)]
 	fn into_parts(self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)>;
 }
 
@@ -432,3 +444,120 @@ impl<T: Clone + Debug + 'static, D: ToDimensions> IntoValueTensor for (D, Arc<Bo
 		Ok((shape, ptr, ptr_len, guard))
 	}
 }
+
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+impl<'i, 'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for Tensor<T>
+where
+	'i: 'v
+{
+	type Error = Error;
+	fn try_from(arr: &'i CowArray<'v, T, D>) -> Result<Self, Self::Error> {
+		Tensor::from_array(arr)
+	}
+}
+
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+impl<'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for Tensor<T> {
+	type Error = Error;
+	fn try_from(arr: ArrayView<'v, T, D>) -> Result<Self, Self::Error> {
+		Tensor::from_array(arr)
+	}
+}
+
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+impl<'i, 'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for DynTensor
+where
+	'i: 'v
+{
+	type Error = Error;
+	fn try_from(arr: &'i CowArray<'v, T, D>) -> Result<Self, Self::Error> {
+		Tensor::from_array(arr).map(|c| c.downcast())
+	}
+}
+
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+impl<'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for DynTensor {
+	type Error = Error;
+	fn try_from(arr: ArrayView<'v, T, D>) -> Result<Self, Self::Error> {
+		Tensor::from_array(arr).map(|c| c.downcast())
+	}
+}
+
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+impl<'i, 'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for DynValue
+where
+	'i: 'v
+{
+	type Error = Error;
+	fn try_from(arr: &'i CowArray<'v, T, D>) -> Result<Self, Self::Error> {
+		Tensor::from_array(arr).map(|c| c.into_dyn())
+	}
+}
+
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+impl<'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for DynValue {
+	type Error = Error;
+	fn try_from(arr: ArrayView<'v, T, D>) -> Result<Self, Self::Error> {
+		Tensor::from_array(arr).map(|c| c.into_dyn())
+	}
+}
+
+macro_rules! impl_try_from {
+	(@T,I $($t:ty),+) => {
+		$(
+			impl<T: IntoTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for Tensor<T> {
+				type Error = Error;
+				fn try_from(value: $t) -> Result<Self, Self::Error> {
+					Tensor::from_array(value)
+				}
+			}
+			impl<T: IntoTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for DynTensor {
+				type Error = Error;
+				fn try_from(value: $t) -> Result<Self, Self::Error> {
+					Tensor::from_array(value).map(|c| c.downcast())
+				}
+			}
+			impl<T: IntoTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for crate::DynValue {
+				type Error = Error;
+				fn try_from(value: $t) -> Result<Self, Self::Error> {
+					Tensor::from_array(value).map(|c| c.into_dyn())
+				}
+			}
+		)+
+	};
+	(@T,D $($t:ty),+) => {
+		$(
+			#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+			impl<T: IntoTensorElementType + Debug + Clone + 'static, D: ndarray::Dimension + 'static> TryFrom<$t> for Tensor<T> {
+				type Error = Error;
+				fn try_from(value: $t) -> Result<Self, Self::Error> {
+					Tensor::from_array(value)
+				}
+			}
+			#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+			impl<T: IntoTensorElementType + Debug + Clone + 'static, D: ndarray::Dimension + 'static> TryFrom<$t> for DynTensor {
+				type Error = Error;
+				fn try_from(value: $t) -> Result<Self, Self::Error> {
+					Tensor::from_array(value).map(|c| c.downcast())
+				}
+			}
+			#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+			impl<T: IntoTensorElementType + Debug + Clone + 'static, D: ndarray::Dimension + 'static> TryFrom<$t> for crate::DynValue {
+				type Error = Error;
+				fn try_from(value: $t) -> Result<Self, Self::Error> {
+					Tensor::from_array(value).map(|c| c.into_dyn())
+				}
+			}
+		)+
+	};
+}
+
+#[cfg(feature = "ndarray")]
+impl_try_from!(@T,D &mut ArcArray<T, D>, Array<T, D>);
+impl_try_from!(@T,I (I, Arc<Box<[T]>>), (I, Vec<T>), (I, Box<[T]>), (I, &[T]));

@@ -1,34 +1,46 @@
-use std::{os::raw::c_char, ptr, string::FromUtf8Error};
+use std::{fmt::Debug, os::raw::c_char, ptr, string::FromUtf8Error};
 
 #[cfg(feature = "ndarray")]
 use ndarray::IxDyn;
 
+use super::TensorValueTypeMarker;
 #[cfg(feature = "ndarray")]
 use crate::tensor::{extract_primitive_array, extract_primitive_array_mut};
 use crate::{
 	ortsys,
 	tensor::{IntoTensorElementType, TensorElementType},
-	Error, Result, Value
+	Error, Result, Tensor, Value
 };
 
-impl Value {
-	/// Attempt to extract the underlying data into a Rust `ndarray`.
+impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
+	/// Attempt to extract the underlying data of type `T` into a read-only [`ndarray::ArrayView`].
+	///
+	/// See also:
+	/// - the mutable counterpart of this function, [`Tensor::try_extract_tensor_mut`].
+	/// - the infallible counterpart, [`Tensor::extract_tensor`], for typed [`Tensor<T>`]s.
+	/// - the alternative function for strings, [`Tensor::try_extract_string_tensor`].
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{Session, Value, ValueType, TensorElementType};
+	/// # use ort::{Session, Value};
 	/// # fn main() -> ort::Result<()> {
 	/// let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
 	/// let value = Value::from_array(array.view())?;
 	///
-	/// let extracted = value.extract_tensor::<f32>()?;
+	/// let extracted = value.try_extract_tensor::<f32>()?;
 	/// assert_eq!(array.into_dyn(), extracted);
 	/// # 	Ok(())
 	/// # }
 	/// ```
+	///
+	/// # Errors
+	/// May return an error if:
+	/// - This is a [`crate::DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the
+	///   infallible [`Tensor::extract_tensor`] instead)*
+	/// - The provided type `T` does not match the tensor's element type.
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-	pub fn extract_tensor<T: IntoTensorElementType>(&self) -> Result<ndarray::ArrayViewD<'_, T>> {
+	pub fn try_extract_tensor<T: IntoTensorElementType>(&self) -> Result<ndarray::ArrayViewD<'_, T>> {
 		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
 		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
 
@@ -60,16 +72,18 @@ impl Value {
 		res
 	}
 
-	/// Attempt to extract the underlying data into a mutable Rust `ndarray`.
+	/// Attempt to extract the underlying data of type `T` into a mutable read-only [`ndarray::ArrayViewMut`].
+	///
+	/// See also the infallible counterpart, [`Tensor::extract_tensor_mut`], for typed [`Tensor<T>`]s.
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{Session, Value, ValueType, TensorElementType};
+	/// # use ort::{Session, Value};
 	/// # fn main() -> ort::Result<()> {
 	/// let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
 	/// let mut value = Value::from_array(array.view())?;
 	///
-	/// let mut extracted = value.extract_tensor_mut::<f32>()?;
+	/// let mut extracted = value.try_extract_tensor_mut::<f32>()?;
 	/// extracted[[0, 0, 0, 1]] = 0.0;
 	///
 	/// let mut array = array.into_dyn();
@@ -79,9 +93,15 @@ impl Value {
 	/// # 	Ok(())
 	/// # }
 	/// ```
+	///
+	/// # Errors
+	/// May return an error if:
+	/// - This is a [`crate::DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the
+	///   infallible [`Tensor::extract_tensor_mut`] instead)*
+	/// - The provided type `T` does not match the tensor's element type.
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-	pub fn extract_tensor_mut<T: IntoTensorElementType>(&mut self) -> Result<ndarray::ArrayViewMutD<'_, T>> {
+	pub fn try_extract_tensor_mut<T: IntoTensorElementType>(&mut self) -> Result<ndarray::ArrayViewMutD<'_, T>> {
 		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
 		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
 
@@ -113,22 +133,33 @@ impl Value {
 		res
 	}
 
-	/// Attempt to extract the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and a view
-	/// into its data.
+	/// Attempt to extract the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and an
+	/// immutable view into its data.
+	///
+	/// See also:
+	/// - the mutable counterpart of this function, [`Tensor::try_extract_raw_tensor_mut`].
+	/// - the infallible counterpart, [`Tensor::extract_raw_tensor`], for typed [`Tensor<T>`]s.
+	/// - the alternative function for strings, [`Tensor::try_extract_raw_string_tensor`].
 	///
 	/// ```
-	/// # use ort::{Session, Value, ValueType, TensorElementType};
+	/// # use ort::{Session, Value};
 	/// # fn main() -> ort::Result<()> {
 	/// let array = vec![1_i64, 2, 3, 4, 5];
 	/// let value = Value::from_array(([array.len()], array.clone().into_boxed_slice()))?;
 	///
-	/// let (extracted_shape, extracted_data) = value.extract_raw_tensor::<i64>()?;
+	/// let (extracted_shape, extracted_data) = value.try_extract_raw_tensor::<i64>()?;
 	/// assert_eq!(extracted_data, &array);
 	/// assert_eq!(extracted_shape, [5]);
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn extract_raw_tensor<T: IntoTensorElementType>(&self) -> Result<(Vec<i64>, &[T])> {
+	///
+	/// # Errors
+	/// May return an error if:
+	/// - This is a [`crate::DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the
+	///   infallible [`Tensor::extract_raw_tensor`] instead)*
+	/// - The provided type `T` does not match the tensor's element type.
+	pub fn try_extract_raw_tensor<T: IntoTensorElementType>(&self) -> Result<(Vec<i64>, &[T])> {
 		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
 		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
 
@@ -164,22 +195,30 @@ impl Value {
 		res
 	}
 
-	/// Attempt to extract the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and a view
-	/// into its data.
+	/// Attempt to extract the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and a
+	/// mutable view into its data.
+	///
+	/// See also the infallible counterpart, [`Tensor::extract_raw_tensor_mut`], for typed [`Tensor<T>`]s.
 	///
 	/// ```
-	/// # use ort::{Session, Value, ValueType, TensorElementType};
+	/// # use ort::{Session, Value};
 	/// # fn main() -> ort::Result<()> {
 	/// let array = vec![1_i64, 2, 3, 4, 5];
-	/// let value = Value::from_array(([array.len()], array.clone().into_boxed_slice()))?;
+	/// let mut value = Value::from_array(([array.len()], array.clone().into_boxed_slice()))?;
 	///
-	/// let (extracted_shape, extracted_data) = value.extract_raw_tensor::<i64>()?;
+	/// let (extracted_shape, extracted_data) = value.try_extract_raw_tensor_mut::<i64>()?;
 	/// assert_eq!(extracted_data, &array);
 	/// assert_eq!(extracted_shape, [5]);
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn extract_raw_tensor_mut<T: IntoTensorElementType>(&mut self) -> Result<(Vec<i64>, &mut [T])> {
+	///
+	/// # Errors
+	/// May return an error if:
+	/// - This is a [`crate::DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the
+	///   infallible [`Tensor::extract_raw_tensor_mut`] instead)*
+	/// - The provided type `T` does not match the tensor's element type.
+	pub fn try_extract_raw_tensor_mut<T: IntoTensorElementType>(&mut self) -> Result<(Vec<i64>, &mut [T])> {
 		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
 		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
 
@@ -218,20 +257,20 @@ impl Value {
 	/// Attempt to extract the underlying data into a Rust `ndarray`.
 	///
 	/// ```
-	/// # use std::sync::Arc;
-	/// # use ort::{Session, Value, ValueType, TensorElementType};
+	/// # use ort::{Allocator, Session, DynTensor, TensorElementType};
 	/// # fn main() -> ort::Result<()> {
-	/// let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
-	/// let value = Value::from_array(array.view())?;
+	/// # 	let allocator = Allocator::default();
+	/// let array = ndarray::Array1::from_vec(vec!["hello", "world"]);
+	/// let tensor = DynTensor::from_string_array(&allocator, array.clone())?;
 	///
-	/// let extracted = value.extract_tensor::<f32>()?;
+	/// let extracted = tensor.try_extract_string_tensor()?;
 	/// assert_eq!(array.into_dyn(), extracted);
 	/// # 	Ok(())
 	/// # }
 	/// ```
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-	pub fn extract_string_tensor(&self) -> Result<ndarray::ArrayD<String>> {
+	pub fn try_extract_string_tensor(&self) -> Result<ndarray::ArrayD<String>> {
 		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
 		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
 
@@ -299,19 +338,19 @@ impl Value {
 	/// an owned `Vec` of its data.
 	///
 	/// ```
-	/// # use ort::{Allocator, Session, Value, ValueType, TensorElementType};
+	/// # use ort::{Allocator, Session, DynTensor, TensorElementType};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let allocator = Allocator::default();
 	/// let array = vec!["hello", "world"];
-	/// let value = Value::from_string_array(&allocator, ([array.len()], array.clone().into_boxed_slice()))?;
+	/// let tensor = DynTensor::from_string_array(&allocator, ([array.len()], array.clone().into_boxed_slice()))?;
 	///
-	/// let (extracted_shape, extracted_data) = value.extract_raw_string_tensor()?;
+	/// let (extracted_shape, extracted_data) = tensor.try_extract_raw_string_tensor()?;
 	/// assert_eq!(extracted_data, array);
 	/// assert_eq!(extracted_shape, [2]);
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn extract_raw_string_tensor(&self) -> Result<(Vec<i64>, Vec<String>)> {
+	pub fn try_extract_raw_string_tensor(&self) -> Result<(Vec<i64>, Vec<String>)> {
 		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
 		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
 
@@ -374,5 +413,90 @@ impl Value {
 		};
 		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
 		res
+	}
+}
+
+impl<T: IntoTensorElementType + Debug> Tensor<T> {
+	/// Extracts the underlying data into a read-only [`ndarray::ArrayView`].
+	///
+	/// ```
+	/// # use std::sync::Arc;
+	/// # use ort::{Session, Tensor, TensorElementType};
+	/// # fn main() -> ort::Result<()> {
+	/// let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
+	/// let tensor = Tensor::from_array(array.view())?;
+	///
+	/// let extracted = tensor.extract_tensor();
+	/// assert_eq!(array.into_dyn(), extracted);
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	#[cfg(feature = "ndarray")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+	pub fn extract_tensor(&self) -> ndarray::ArrayViewD<'_, T> {
+		self.try_extract_tensor().unwrap()
+	}
+
+	/// Extracts the underlying data into a mutable [`ndarray::ArrayViewMut`].
+	///
+	/// ```
+	/// # use std::sync::Arc;
+	/// # use ort::{Session, Tensor, TensorElementType};
+	/// # fn main() -> ort::Result<()> {
+	/// let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
+	/// let mut tensor = Tensor::from_array(array.view())?;
+	///
+	/// let mut extracted = tensor.extract_tensor_mut();
+	/// extracted[[0, 0, 0, 1]] = 0.0;
+	///
+	/// let mut array = array.into_dyn();
+	/// assert_ne!(array, extracted);
+	/// array[[0, 0, 0, 1]] = 0.0;
+	/// assert_eq!(array, extracted);
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	#[cfg(feature = "ndarray")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+	pub fn extract_tensor_mut(&mut self) -> ndarray::ArrayViewMutD<'_, T> {
+		self.try_extract_tensor_mut().unwrap()
+	}
+
+	/// Extracts the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and an immutable
+	/// view into its data.
+	///
+	/// ```
+	/// # use ort::{Session, Tensor, TensorElementType};
+	/// # fn main() -> ort::Result<()> {
+	/// let array = vec![1_i64, 2, 3, 4, 5];
+	/// let tensor = Tensor::from_array(([array.len()], array.clone().into_boxed_slice()))?;
+	///
+	/// let (extracted_shape, extracted_data) = tensor.extract_raw_tensor();
+	/// assert_eq!(extracted_data, &array);
+	/// assert_eq!(extracted_shape, [5]);
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	pub fn extract_raw_tensor(&self) -> (Vec<i64>, &[T]) {
+		self.try_extract_raw_tensor().unwrap()
+	}
+
+	/// Extracts the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and a mutable view
+	/// into its data.
+	///
+	/// ```
+	/// # use ort::{Session, Tensor, TensorElementType};
+	/// # fn main() -> ort::Result<()> {
+	/// let array = vec![1_i64, 2, 3, 4, 5];
+	/// let tensor = Tensor::from_array(([array.len()], array.clone().into_boxed_slice()))?;
+	///
+	/// let (extracted_shape, extracted_data) = tensor.extract_raw_tensor();
+	/// assert_eq!(extracted_data, &array);
+	/// assert_eq!(extracted_shape, [5]);
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	pub fn extract_raw_tensor_mut(&mut self) -> (Vec<i64>, &mut [T]) {
+		self.try_extract_raw_tensor_mut().unwrap()
 	}
 }

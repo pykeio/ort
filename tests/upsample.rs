@@ -69,7 +69,7 @@ fn upsample() -> ort::Result<()> {
 	let outputs = session.run(inputs![&array]?)?;
 
 	assert_eq!(outputs.len(), 1);
-	let output: ArrayViewD<f32> = outputs[0].extract_tensor()?;
+	let output: ArrayViewD<f32> = outputs[0].try_extract_tensor()?;
 
 	// The image should have doubled in size
 	assert_eq!(output.shape(), [1, 448, 448, 3]);
@@ -106,7 +106,7 @@ fn upsample_with_ort_model() -> ort::Result<()> {
 	let outputs = session.run(inputs![&array]?)?;
 
 	assert_eq!(outputs.len(), 1);
-	let output: ArrayViewD<f32> = outputs[0].extract_tensor()?;
+	let output: ArrayViewD<f32> = outputs[0].try_extract_tensor()?;
 
 	// The image should have doubled in size
 	assert_eq!(output.shape(), [1, 448, 448, 3]);

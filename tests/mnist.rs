@@ -44,7 +44,7 @@ fn mnist_5() -> ort::Result<()> {
 	let outputs = session.run(inputs![array]?)?;
 
 	let mut probabilities: Vec<(usize, f32)> = outputs[0]
-		.extract_tensor()?
+		.try_extract_tensor()?
 		.softmax(ndarray::Axis(1))
 		.iter()
 		.copied()

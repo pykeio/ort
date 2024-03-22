@@ -7,29 +7,22 @@ use std::{
 	sync::Arc
 };
 
-#[cfg(feature = "ndarray")]
-use ndarray::{ArcArray, Array, ArrayView, CowArray, Dimension};
-
-use crate::{
-	error::status_to_result,
-	memory::MemoryInfo,
-	ortsys,
-	session::SharedSessionInner,
-	tensor::{IntoTensorElementType, TensorElementType},
-	Error, Result
-};
-
 mod impl_map;
 mod impl_sequence;
 mod impl_tensor;
 
-use self::impl_tensor::ToDimensions;
+pub use self::{
+	impl_map::{Map, MapValueType, MapValueTypeMarker},
+	impl_sequence::{Sequence, SequenceValueType, SequenceValueTypeMarker},
+	impl_tensor::{DynTensor, DynTensorRef, DynTensorRefMut, DynTensorValueType, Tensor, TensorRef, TensorRefMut, TensorValueTypeMarker}
+};
+use crate::{error::status_to_result, memory::MemoryInfo, ortsys, session::SharedSessionInner, tensor::TensorElementType, Error, Result};
 
 /// The type of a [`Value`], or a session input/output.
 ///
 /// ```
 /// # use std::sync::Arc;
-/// # use ort::{Session, Value, ValueType, TensorElementType};
+/// # use ort::{Session, Tensor, ValueType, TensorElementType};
 /// # fn main() -> ort::Result<()> {
 /// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// // `ValueType`s can be obtained from session inputs/outputs:
@@ -44,7 +37,7 @@ use self::impl_tensor::ToDimensions;
 /// );
 ///
 /// // Or by `Value`s created in Rust or output by a session.
-/// let value = Value::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
+/// let value = Tensor::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
 /// assert_eq!(
 /// 	value.dtype()?,
 /// 	ValueType::Tensor {
@@ -171,98 +164,140 @@ pub(crate) enum ValueInner {
 	}
 }
 
-/// A temporary version of [`Value`] with a lifetime specifier.
+/// A temporary version of a [`Value`] with a lifetime specifier.
 #[derive(Debug)]
-pub struct ValueRef<'v> {
-	inner: Value,
+pub struct ValueRef<'v, Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
+	inner: Value<Type>,
 	lifetime: PhantomData<&'v ()>
 }
 
-impl<'v> ValueRef<'v> {
-	pub(crate) fn new(inner: Value) -> Self {
+impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
+	pub(crate) fn new(inner: Value<Type>) -> Self {
 		ValueRef { inner, lifetime: PhantomData }
 	}
+
+	pub fn into_dyn(self) -> ValueRef<'v, DynValueTypeMarker> {
+		unsafe { std::mem::transmute(self) }
+	}
 }
 
-impl<'v> Deref for ValueRef<'v> {
-	type Target = Value;
+impl<'v, Type: ValueTypeMarker + ?Sized> Deref for ValueRef<'v, Type> {
+	type Target = Value<Type>;
 
 	fn deref(&self) -> &Self::Target {
 		&self.inner
 	}
 }
 
-/// A mutable temporary version of [`Value`] with a lifetime specifier.
+/// A mutable temporary version of a [`Value`] with a lifetime specifier.
 #[derive(Debug)]
-pub struct ValueRefMut<'v> {
-	inner: Value,
+pub struct ValueRefMut<'v, Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
+	inner: Value<Type>,
 	lifetime: PhantomData<&'v ()>
 }
 
-impl<'v> ValueRefMut<'v> {
-	pub(crate) fn new(inner: Value) -> Self {
+impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
+	pub(crate) fn new(inner: Value<Type>) -> Self {
 		ValueRefMut { inner, lifetime: PhantomData }
+	}
+
+	pub fn into_dyn(self) -> ValueRefMut<'v, DynValueTypeMarker> {
+		unsafe { std::mem::transmute(self) }
 	}
 }
 
-impl<'v> Deref for ValueRefMut<'v> {
-	type Target = Value;
+impl<'v, Type: ValueTypeMarker + ?Sized> Deref for ValueRefMut<'v, Type> {
+	type Target = Value<Type>;
 
 	fn deref(&self) -> &Self::Target {
 		&self.inner
 	}
 }
 
-impl<'v> DerefMut for ValueRefMut<'v> {
+impl<'v, Type: ValueTypeMarker + ?Sized> DerefMut for ValueRefMut<'v, Type> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		&mut self.inner
 	}
 }
 
-/// A [`Value`] contains data for inputs/outputs in ONNX Runtime graphs. [`Value`]s can hold a tensor, sequence
-/// (array/vector), or map.
+/// A [`Value`] contains data for inputs/outputs in ONNX Runtime graphs. [`Value`]s can be a [`Tensor`], [`Sequence`]
+/// (aka array/vector), or [`Map`].
 ///
 /// ## Creation
-/// `Value`s can be created via methods like [`Value::from_array`], or as the output from running a [`crate::Session`].
+/// Values can be created via methods like [`Tensor::from_array`], or as the output from running a [`crate::Session`].
 ///
 /// ```
-/// # use ort::{Session, Value, ValueType, TensorElementType};
+/// # use ort::{Session, Tensor, ValueType, TensorElementType};
 /// # fn main() -> ort::Result<()> {
 /// # 	let upsample = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
-/// // Create a value from a raw data vector
-/// let value = Value::from_array(([1usize, 1, 1, 3], vec![1.0_f32, 2.0, 3.0].into_boxed_slice()))?;
+/// // Create a Tensor value from a raw data vector
+/// let value = Tensor::from_array(([1usize, 1, 1, 3], vec![1.0_f32, 2.0, 3.0].into_boxed_slice()))?;
 ///
-/// // Create a value from an `ndarray::Array`
+/// // Create a Tensor value from an `ndarray::Array`
 /// #[cfg(feature = "ndarray")]
-/// let value = Value::from_array(ndarray::Array4::<f32>::zeros((1, 16, 16, 3)))?;
+/// let value = Tensor::from_array(ndarray::Array4::<f32>::zeros((1, 16, 16, 3)))?;
 ///
-/// // Get a value from a session's output
+/// // Get a DynValue from a session's output
 /// let value = &upsample.run(ort::inputs![value]?)?[0];
 /// # 	Ok(())
 /// # }
 /// ```
 ///
-/// See [`Value::from_array`] for more details on what tensor values are accepted.
+/// See [`Tensor::from_array`] for more details on what tensor values are accepted.
 ///
 /// ## Usage
-/// You can access the data in a `Value` by using the relevant `extract` methods: [`Value::extract_tensor`] &
-/// [`Value::extract_raw_tensor`], [`Value::extract_sequence`], and [`Value::extract_map`].
+/// You can access the data contained in a `Value` by using the relevant `extract` methods.
+/// You can also use [`DynValue::upcast`] to attempt to convert from a [`DynValue`] to a more strongly typed value.
+///
+/// For dynamic values, where the type is not known at compile time, see the `try_extract_*` methods:
+/// - [`Tensor::try_extract_tensor`], [`Tensor::try_extract_raw_tensor`]
+/// - [`Sequence::try_extract_sequence`]
+/// - [`Map::try_extract_map`]
+///
+/// If the type was created from Rust (via a method like [`Tensor::from_array`] or via upcasting), you can directly
+/// extract the data using the infallible extract methods:
+/// - [`Tensor::extract_tensor`], [`Tensor::extract_raw_tensor`]
 #[derive(Debug)]
-pub struct Value {
-	inner: ValueInner
+pub struct Value<Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
+	inner: ValueInner,
+	_markers: PhantomData<Type>
 }
+
+/// A dynamic value, which could be a [`Tensor`], [`Sequence`], or [`Map`].
+///
+/// To attempt to convert a dynamic value to a strongly typed value, use [`DynValue::upcast`]. You can also attempt to
+/// extract data from dynamic values directly using `try_extract_*` methods; see [`Value`] for more information.
+pub type DynValue = Value<DynValueTypeMarker>;
+
+/// Marker trait used to determine what operations can and cannot be performed on a [`Value`] of a given type.
+///
+/// For example, [`Tensor::try_extract_tensor`] can only be used on [`Value`]s with the [`TensorValueTypeMarker`] (which
+/// inherits this trait), i.e. [`Tensor`]s, [`DynTensor`]s, and [`DynValue`]s.
+pub trait ValueTypeMarker: Debug {}
+
+/// Represents a type that a [`DynValue`] can be upcast to.
+pub trait UpcastableTarget: ValueTypeMarker {
+	fn can_upcast(dtype: &ValueType) -> bool;
+}
+
+/// The dynamic type marker, used for values which can be of any type.
+#[derive(Debug)]
+pub struct DynValueTypeMarker;
+impl ValueTypeMarker for DynValueTypeMarker {}
+impl MapValueTypeMarker for DynValueTypeMarker {}
+impl SequenceValueTypeMarker for DynValueTypeMarker {}
+impl TensorValueTypeMarker for DynValueTypeMarker {}
 
 unsafe impl Send for Value {}
 
-impl Value {
+impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	/// Returns the data type of this [`Value`].
 	pub fn dtype(&self) -> Result<ValueType> {
 		let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
 		ortsys![unsafe GetTypeInfo(self.ptr(), &mut typeinfo_ptr) -> Error::GetTypeInfo; nonNull(typeinfo_ptr)];
 
 		let mut ty: ort_sys::ONNXType = ort_sys::ONNXType::ONNX_TYPE_UNKNOWN;
-		let status = ortsys![unsafe GetOnnxTypeFromTypeInfo(typeinfo_ptr, &mut ty)];
-		status_to_result(status).map_err(Error::GetOnnxTypeFromTypeInfo)?;
+		ortsys![unsafe GetOnnxTypeFromTypeInfo(typeinfo_ptr, &mut ty) -> Error::GetOnnxTypeFromTypeInfo];
 		let io_type = match ty {
 			ort_sys::ONNXType::ONNX_TYPE_TENSOR | ort_sys::ONNXType::ONNX_TYPE_SPARSETENSOR => {
 				let mut info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
@@ -297,18 +332,20 @@ impl Value {
 	/// - `ptr` must be a valid pointer to an [`ort_sys::OrtValue`].
 	/// - `session` must be `Some` for values returned from a session.
 	#[must_use]
-	pub unsafe fn from_ptr(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value {
+	pub unsafe fn from_ptr(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value<Type> {
 		Value {
-			inner: ValueInner::CppOwned { ptr, drop: true, _session: session }
+			inner: ValueInner::CppOwned { ptr, drop: true, _session: session },
+			_markers: PhantomData
 		}
 	}
 
 	/// A variant of [`Value::from_ptr`] that does not release the value upon dropping. Used in operator kernel
 	/// contexts.
 	#[must_use]
-	pub(crate) unsafe fn from_ptr_nodrop(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value {
+	pub(crate) unsafe fn from_ptr_nodrop(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value<Type> {
 		Value {
-			inner: ValueInner::CppOwned { ptr, drop: false, _session: session }
+			inner: ValueInner::CppOwned { ptr, drop: false, _session: session },
+			_markers: PhantomData
 		}
 	}
 
@@ -320,7 +357,7 @@ impl Value {
 	}
 
 	/// Create a view of this value's data.
-	pub fn view(&self) -> ValueRef<'_> {
+	pub fn view(&self) -> ValueRef<'_, Type> {
 		ValueRef::new(unsafe {
 			Value::from_ptr_nodrop(
 				NonNull::new_unchecked(self.ptr()),
@@ -329,8 +366,8 @@ impl Value {
 		})
 	}
 
-	/// Create a view of this value's data.
-	pub fn view_mut(&mut self) -> ValueRefMut<'_> {
+	/// Create a mutable view of this value's data.
+	pub fn view_mut(&mut self) -> ValueRefMut<'_, Type> {
 		ValueRefMut::new(unsafe {
 			Value::from_ptr_nodrop(
 				NonNull::new_unchecked(self.ptr()),
@@ -355,9 +392,56 @@ impl Value {
 		ortsys![unsafe IsTensor(self.ptr(), &mut result) -> Error::GetTensorElementType];
 		Ok(result == 1)
 	}
+
+	/// Converts this value into a type-erased [`DynValue`].
+	pub fn into_dyn(self) -> DynValue {
+		unsafe { std::mem::transmute(self) }
+	}
+
+	/// Attempts to upcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed variant,
+	/// like [`Tensor<T>`].
+	#[inline]
+	pub fn upcast<OtherType: ValueTypeMarker + UpcastableTarget + Debug + ?Sized>(self) -> Result<Value<OtherType>> {
+		let dt = self.dtype()?;
+		if OtherType::can_upcast(&dt) { Ok(unsafe { std::mem::transmute(self) }) } else { panic!() }
+	}
+
+	/// Attempts to upcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed reference
+	/// variant, like [`TensorRef<T>`].
+	#[inline]
+	pub fn upcast_ref<OtherType: ValueTypeMarker + UpcastableTarget + Debug + ?Sized>(&self) -> Result<ValueRef<'_, OtherType>> {
+		let dt = self.dtype()?;
+		if OtherType::can_upcast(&dt) {
+			Ok(ValueRef::new(unsafe {
+				Value::from_ptr_nodrop(
+					NonNull::new_unchecked(self.ptr()),
+					if let ValueInner::CppOwned { _session, .. } = &self.inner { _session.clone() } else { None }
+				)
+			}))
+		} else {
+			panic!()
+		}
+	}
+
+	/// Attempts to upcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed
+	/// mutable-reference variant, like [`TensorRefMut<T>`].
+	#[inline]
+	pub fn upcast_mut<OtherType: ValueTypeMarker + UpcastableTarget + Debug + ?Sized>(&self) -> Result<ValueRefMut<'_, OtherType>> {
+		let dt = self.dtype()?;
+		if OtherType::can_upcast(&dt) {
+			Ok(ValueRefMut::new(unsafe {
+				Value::from_ptr_nodrop(
+					NonNull::new_unchecked(self.ptr()),
+					if let ValueInner::CppOwned { _session, .. } = &self.inner { _session.clone() } else { None }
+				)
+			}))
+		} else {
+			panic!()
+		}
+	}
 }
 
-impl Drop for Value {
+impl<Type: ValueTypeMarker + ?Sized> Drop for Value<Type> {
 	fn drop(&mut self) {
 		let ptr = self.ptr();
 		tracing::trace!(
@@ -372,55 +456,6 @@ impl Drop for Value {
 		}
 	}
 }
-
-#[cfg(feature = "ndarray")]
-#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'i, 'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for Value
-where
-	'i: 'v
-{
-	type Error = Error;
-	fn try_from(arr: &'i CowArray<'v, T, D>) -> Result<Self, Self::Error> {
-		Value::from_array(arr)
-	}
-}
-
-#[cfg(feature = "ndarray")]
-#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for Value {
-	type Error = Error;
-	fn try_from(arr: ArrayView<'v, T, D>) -> Result<Self, Self::Error> {
-		Value::from_array(arr)
-	}
-}
-
-macro_rules! impl_try_from {
-	(@T,I $($t:ty),+) => {
-		$(
-			impl<T: IntoTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for Value {
-				type Error = Error;
-				fn try_from(value: $t) -> Result<Self, Self::Error> {
-					Value::from_array(value)
-				}
-			}
-		)+
-	};
-	(@T,D $($t:ty),+) => {
-		$(
-			#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-			impl<T: IntoTensorElementType + Debug + Clone + 'static, D: ndarray::Dimension + 'static> TryFrom<$t> for Value {
-				type Error = Error;
-				fn try_from(value: $t) -> Result<Self, Self::Error> {
-					Value::from_array(value)
-				}
-			}
-		)+
-	};
-}
-
-#[cfg(feature = "ndarray")]
-impl_try_from!(@T,D &mut ArcArray<T, D>, Array<T, D>);
-impl_try_from!(@T,I (I, Arc<Box<[T]>>), (I, Vec<T>), (I, Box<[T]>), (I, &[T]));
 
 pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo) -> Result<ValueType> {
 	let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;

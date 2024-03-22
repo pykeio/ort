@@ -74,6 +74,8 @@ impl<T: IntoTensorElementType + Clone + Debug, const N: usize> IndexMut<[i64; N]
 
 #[cfg(test)]
 mod tests {
+	use std::sync::Arc;
+
 	use ndarray::{ArcArray1, Array1, CowArray};
 
 	use crate::*;

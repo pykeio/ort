@@ -85,7 +85,7 @@ pub const MINOR_VERSION: u32 = ort_sys::ORT_API_VERSION;
 #[cfg(feature = "load-dynamic")]
 pub(crate) static G_ORT_DYLIB_PATH: OnceLock<Arc<String>> = OnceLock::new();
 #[cfg(feature = "load-dynamic")]
-pub(crate) static G_ORT_LIB: OnceLock<Arc<Mutex<libloading::Library>>> = OnceLock::new();
+pub(crate) static G_ORT_LIB: OnceLock<Arc<libloading::Library>> = OnceLock::new();
 
 #[cfg(feature = "load-dynamic")]
 pub(crate) fn dylib_path() -> &'static String {
@@ -104,27 +104,24 @@ pub(crate) fn dylib_path() -> &'static String {
 }
 
 #[cfg(feature = "load-dynamic")]
-pub(crate) fn lib_handle() -> MutexGuard<'static, libloading::Library> {
-	G_ORT_LIB
-		.get_or_init(|| {
-			// resolve path relative to executable
-			let path: std::path::PathBuf = dylib_path().into();
-			let absolute_path = if path.is_absolute() {
-				path
-			} else {
-				let relative = std::env::current_exe()
-					.expect("could not get current executable path")
-					.parent()
-					.unwrap()
-					.join(&path);
-				if relative.exists() { relative } else { path }
-			};
-			let lib = unsafe { libloading::Library::new(&absolute_path) }
-				.unwrap_or_else(|e| panic!("An error occurred while attempting to load the ONNX Runtime binary at `{}`: {e}", absolute_path.display()));
-			Arc::new(Mutex::new(lib))
-		})
-		.lock()
-		.expect("failed to acquire ONNX Runtime dylib lock; another thread panicked?")
+pub(crate) fn lib_handle() -> &'static libloading::Library {
+	G_ORT_LIB.get_or_init(|| {
+		// resolve path relative to executable
+		let path: std::path::PathBuf = dylib_path().into();
+		let absolute_path = if path.is_absolute() {
+			path
+		} else {
+			let relative = std::env::current_exe()
+				.expect("could not get current executable path")
+				.parent()
+				.unwrap()
+				.join(&path);
+			if relative.exists() { relative } else { path }
+		};
+		let lib = unsafe { libloading::Library::new(&absolute_path) }
+			.unwrap_or_else(|e| panic!("An error occurred while attempting to load the ONNX Runtime binary at `{}`: {e}", absolute_path.display()));
+		Arc::new(lib)
+	})
 }
 
 pub(crate) static G_ORT_API: OnceLock<AtomicPtr<ort_sys::OrtApi>> = OnceLock::new();

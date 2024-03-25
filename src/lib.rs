@@ -61,8 +61,10 @@ pub use self::session::{
 pub use self::tensor::ArrayExtensions;
 pub use self::tensor::{IntoTensorElementType, TensorElementType};
 pub use self::value::{
-	DynTensor, DynTensorValueType, DynValue, DynValueTypeMarker, Map, MapValueType, MapValueTypeMarker, Sequence, SequenceValueType, SequenceValueTypeMarker,
-	Tensor, TensorValueTypeMarker, Value, ValueRef, ValueRefMut, ValueType, ValueTypeMarker, TensorRef
+	DynMap, DynMapRef, DynMapRefMut, DynMapValueType, DynSequence, DynSequenceRef, DynSequenceRefMut, DynSequenceValueType, DynTensor, DynTensorRef,
+	DynTensorRefMut, DynTensorValueType, DynValue, DynValueTypeMarker, Map, MapRef, MapRefMut, MapValueType, MapValueTypeMarker, Sequence, SequenceRef,
+	SequenceRefMut, SequenceValueType, SequenceValueTypeMarker, Tensor, TensorRef, TensorRefMut, TensorValueTypeMarker, UpcastableTarget, Value, ValueRef,
+	ValueRefMut, ValueType, ValueTypeMarker
 };
 
 #[cfg(not(all(target_arch = "x86", target_os = "windows")))]

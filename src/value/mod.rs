@@ -12,8 +12,10 @@ mod impl_sequence;
 mod impl_tensor;
 
 pub use self::{
-	impl_map::{Map, MapValueType, MapValueTypeMarker},
-	impl_sequence::{Sequence, SequenceValueType, SequenceValueTypeMarker},
+	impl_map::{DynMap, DynMapRef, DynMapRefMut, DynMapValueType, Map, MapRef, MapRefMut, MapValueType, MapValueTypeMarker},
+	impl_sequence::{
+		DynSequence, DynSequenceRef, DynSequenceRefMut, DynSequenceValueType, Sequence, SequenceRef, SequenceRefMut, SequenceValueType, SequenceValueTypeMarker
+	},
 	impl_tensor::{DynTensor, DynTensorRef, DynTensorRefMut, DynTensorValueType, Tensor, TensorRef, TensorRefMut, TensorValueTypeMarker}
 };
 use crate::{error::status_to_result, memory::MemoryInfo, ortsys, session::SharedSessionInner, tensor::TensorElementType, Error, Result};
@@ -278,6 +280,13 @@ pub trait ValueTypeMarker: Debug {}
 /// Represents a type that a [`DynValue`] can be upcast to.
 pub trait UpcastableTarget: ValueTypeMarker {
 	fn can_upcast(dtype: &ValueType) -> bool;
+}
+
+// this implementation is used in case we want to extract `DynValue`s from a [`Sequence`]; see `try_extract_sequence`
+impl UpcastableTarget for DynValueTypeMarker {
+	fn can_upcast(_: &ValueType) -> bool {
+		true
+	}
 }
 
 /// The dynamic type marker, used for values which can be of any type.

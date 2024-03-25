@@ -1,23 +1,39 @@
 use std::{
 	collections::HashMap,
+	fmt::Debug,
 	hash::Hash,
+	marker::PhantomData,
 	ptr::{self, NonNull}
 };
 
 use super::ValueTypeMarker;
-use crate::{memory::Allocator, ortsys, value::impl_tensor::DynTensor, Error, IntoTensorElementType, Result, Value, ValueType};
-
-#[derive(Debug)]
-pub struct MapValueType;
-impl ValueTypeMarker for MapValueType {}
-impl MapValueTypeMarker for MapValueType {}
+use crate::{memory::Allocator, ortsys, value::impl_tensor::DynTensor, Error, IntoTensorElementType, Result, Value, ValueRef, ValueRefMut, ValueType};
 
 pub trait MapValueTypeMarker: ValueTypeMarker {}
 
-pub type Map = Value<MapValueType>;
+#[derive(Debug)]
+pub struct DynMapValueType;
+impl ValueTypeMarker for DynMapValueType {}
+impl MapValueTypeMarker for DynMapValueType {}
+
+#[derive(Debug)]
+pub struct MapValueType<K: IntoTensorElementType + Clone + Hash + Eq, V: IntoTensorElementType + Clone + Hash + Eq>(PhantomData<(K, V)>);
+impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug + Clone + Hash + Eq> ValueTypeMarker for MapValueType<K, V> {}
+impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug + Clone + Hash + Eq> MapValueTypeMarker for MapValueType<K, V> {}
+
+pub type DynMap = Value<DynMapValueType>;
+pub type Map<K, V> = Value<MapValueType<K, V>>;
+
+pub type DynMapRef<'v> = ValueRef<'v, DynMapValueType>;
+pub type DynMapRefMut<'v> = ValueRefMut<'v, DynMapValueType>;
+pub type MapRef<'v, K, V> = ValueRef<'v, MapValueType<K, V>>;
+pub type MapRefMut<'v, K, V> = ValueRefMut<'v, MapValueType<K, V>>;
 
 impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
-	pub fn try_extract_map<K: IntoTensorElementType + Clone + Hash + Eq, V: IntoTensorElementType + Clone>(&self, allocator: &Allocator) -> Result<HashMap<K, V>> {
+	pub fn try_extract_map<K: IntoTensorElementType + Clone + Hash + Eq, V: IntoTensorElementType + Clone>(
+		&self,
+		allocator: &Allocator
+	) -> Result<HashMap<K, V>> {
 		match self.dtype()? {
 			ValueType::Map { key, value } => {
 				let k_type = K::into_tensor_element_type();
@@ -51,5 +67,11 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 			}
 			t => Err(Error::NotMap(t))
 		}
+	}
+}
+
+impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug + Clone + Hash + Eq> Value<MapValueType<K, V>> {
+	pub fn extract_map(&self, allocator: &Allocator) -> HashMap<K, V> {
+		self.try_extract_map(allocator).unwrap()
 	}
 }

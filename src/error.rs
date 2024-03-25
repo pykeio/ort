@@ -230,6 +230,8 @@ pub enum Error {
 	InvalidMapKeyType { expected: TensorElementType, actual: TensorElementType },
 	#[error("Tried to extract a map with a value type of {expected:?}, but the map has value type {actual:?}")]
 	InvalidMapValueType { expected: TensorElementType, actual: TensorElementType },
+	#[error("Tried to extract a sequence with a different element type than its actual type {actual:?}")]
+	InvalidSequenceElementType { actual: ValueType },
 	#[error("Error occurred while attempting to extract data from sequence value: {0}")]
 	ExtractSequence(ErrorInternal),
 	#[error("Error occurred while attempting to extract data from map value: {0}")]

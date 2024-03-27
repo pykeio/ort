@@ -11,7 +11,7 @@ use axum::{
 };
 use futures::Stream;
 use ndarray::{array, concatenate, s, Array1, ArrayViewD, Axis};
-use ort::{inputs, CUDAExecutionProvider, GraphOptimizationLevel, Session, Value};
+use ort::{inputs, CUDAExecutionProvider, GraphOptimizationLevel, Session};
 use rand::Rng;
 use tokenizers::Tokenizer;
 use tokio::net::TcpListener;

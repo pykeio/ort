@@ -4,7 +4,7 @@ use std::{
 	sync::Arc
 };
 
-use ort::{inputs, CUDAExecutionProvider, GraphOptimizationLevel, Session, Tensor};
+use ort::{inputs, CUDAExecutionProvider, GraphOptimizationLevel, Session};
 use rand::Rng;
 use tokenizers::Tokenizer;
 

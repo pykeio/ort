@@ -211,10 +211,6 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 			_markers: PhantomData
 		})
 	}
-
-	pub fn downcast(self) -> DynTensor {
-		unsafe { std::mem::transmute(self) }
-	}
 }
 
 pub trait IntoValueTensor {

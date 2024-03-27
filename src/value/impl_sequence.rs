@@ -4,7 +4,7 @@ use std::{
 	ptr::{self, NonNull}
 };
 
-use super::{UpcastableTarget, ValueTypeMarker};
+use super::{UpcastableTarget, ValueInner, ValueTypeMarker};
 use crate::{memory::Allocator, ortsys, Error, Result, Value, ValueRef, ValueRefMut, ValueType};
 
 pub trait SequenceValueTypeMarker: ValueTypeMarker {}
@@ -63,5 +63,33 @@ impl<Type: SequenceValueTypeMarker + ?Sized> Value<Type> {
 impl<T: ValueTypeMarker + UpcastableTarget + Debug + ?Sized> Value<SequenceValueType<T>> {
 	pub fn extract_sequence<'s>(&'s self, allocator: &Allocator) -> Vec<ValueRef<'s, T>> {
 		self.try_extract_sequence(allocator).unwrap()
+	}
+
+	/// Converts from a strongly-typed [`Sequence<T>`] to a type-erased [`DynSequence`].
+	#[inline]
+	pub fn downcast(self) -> DynSequence {
+		unsafe { std::mem::transmute(self) }
+	}
+
+	/// Converts from a strongly-typed [`Sequence<T>`] to a reference to a type-erased [`DynTensor`].
+	#[inline]
+	pub fn downcast_ref(&self) -> DynSequenceRef {
+		DynSequenceRef::new(unsafe {
+			Value::from_ptr_nodrop(
+				NonNull::new_unchecked(self.ptr()),
+				if let ValueInner::CppOwned { _session, .. } = &self.inner { _session.clone() } else { None }
+			)
+		})
+	}
+
+	/// Converts from a strongly-typed [`Sequence<T>`] to a mutable reference to a type-erased [`DynTensor`].
+	#[inline]
+	pub fn downcast_mut(&mut self) -> DynSequenceRefMut {
+		DynSequenceRefMut::new(unsafe {
+			Value::from_ptr_nodrop(
+				NonNull::new_unchecked(self.ptr()),
+				if let ValueInner::CppOwned { _session, .. } = &self.inner { _session.clone() } else { None }
+			)
+		})
 	}
 }

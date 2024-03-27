@@ -435,7 +435,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	/// Attempts to upcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed
 	/// mutable-reference variant, like [`TensorRefMut<T>`].
 	#[inline]
-	pub fn upcast_mut<OtherType: ValueTypeMarker + UpcastableTarget + Debug + ?Sized>(&self) -> Result<ValueRefMut<'_, OtherType>> {
+	pub fn upcast_mut<OtherType: ValueTypeMarker + UpcastableTarget + Debug + ?Sized>(&mut self) -> Result<ValueRefMut<'_, OtherType>> {
 		let dt = self.dtype()?;
 		if OtherType::can_upcast(&dt) {
 			Ok(ValueRefMut::new(unsafe {

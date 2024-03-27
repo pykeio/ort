@@ -6,7 +6,7 @@ use std::{
 	ptr::{self, NonNull}
 };
 
-use super::ValueTypeMarker;
+use super::{ValueInner, ValueTypeMarker};
 use crate::{memory::Allocator, ortsys, value::impl_tensor::DynTensor, Error, IntoTensorElementType, Result, Value, ValueRef, ValueRefMut, ValueType};
 
 pub trait MapValueTypeMarker: ValueTypeMarker {}
@@ -73,5 +73,33 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug + Clone + Hash + Eq> Value<MapValueType<K, V>> {
 	pub fn extract_map(&self, allocator: &Allocator) -> HashMap<K, V> {
 		self.try_extract_map(allocator).unwrap()
+	}
+
+	/// Converts from a strongly-typed [`Map<K, V>`] to a type-erased [`DynMap`].
+	#[inline]
+	pub fn downcast(self) -> DynMap {
+		unsafe { std::mem::transmute(self) }
+	}
+
+	/// Converts from a strongly-typed [`Map<K, V>`] to a reference to a type-erased [`DynMap`].
+	#[inline]
+	pub fn downcast_ref(&self) -> DynMapRef {
+		DynMapRef::new(unsafe {
+			Value::from_ptr_nodrop(
+				NonNull::new_unchecked(self.ptr()),
+				if let ValueInner::CppOwned { _session, .. } = &self.inner { _session.clone() } else { None }
+			)
+		})
+	}
+
+	/// Converts from a strongly-typed [`Map<K, V>`] to a mutable reference to a type-erased [`DynMap`].
+	#[inline]
+	pub fn downcast_mut(&mut self) -> DynMapRefMut {
+		DynMapRefMut::new(unsafe {
+			Value::from_ptr_nodrop(
+				NonNull::new_unchecked(self.ptr()),
+				if let ValueInner::CppOwned { _session, .. } = &self.inner { _session.clone() } else { None }
+			)
+		})
 	}
 }

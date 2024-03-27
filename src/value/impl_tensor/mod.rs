@@ -4,10 +4,11 @@ mod extract;
 use std::{
 	fmt::Debug,
 	marker::PhantomData,
-	ops::{Index, IndexMut}
+	ops::{Index, IndexMut},
+	ptr::NonNull
 };
 
-use super::{UpcastableTarget, Value, ValueTypeMarker};
+use super::{UpcastableTarget, Value, ValueInner, ValueTypeMarker};
 use crate::{ortsys, DynValue, IntoTensorElementType, ValueRef, ValueRefMut, ValueType};
 
 pub trait TensorValueTypeMarker: ValueTypeMarker {}
@@ -33,6 +34,36 @@ pub type TensorRefMut<'v, T> = ValueRefMut<'v, TensorValueType<T>>;
 impl UpcastableTarget for DynTensorValueType {
 	fn can_upcast(dtype: &ValueType) -> bool {
 		matches!(dtype, ValueType::Tensor { .. })
+	}
+}
+
+impl<T: IntoTensorElementType + Debug> Tensor<T> {
+	/// Converts from a strongly-typed [`Tensor<T>`] to a type-erased [`DynTensor`].
+	#[inline]
+	pub fn downcast(self) -> DynTensor {
+		unsafe { std::mem::transmute(self) }
+	}
+
+	/// Converts from a strongly-typed [`Tensor<T>`] to a reference to a type-erased [`DynTensor`].
+	#[inline]
+	pub fn downcast_ref(&self) -> DynTensorRef {
+		DynTensorRef::new(unsafe {
+			Value::from_ptr_nodrop(
+				NonNull::new_unchecked(self.ptr()),
+				if let ValueInner::CppOwned { _session, .. } = &self.inner { _session.clone() } else { None }
+			)
+		})
+	}
+
+	/// Converts from a strongly-typed [`Tensor<T>`] to a mutable reference to a type-erased [`DynTensor`].
+	#[inline]
+	pub fn downcast_mut(&mut self) -> DynTensorRefMut {
+		DynTensorRefMut::new(unsafe {
+			Value::from_ptr_nodrop(
+				NonNull::new_unchecked(self.ptr()),
+				if let ValueInner::CppOwned { _session, .. } = &self.inner { _session.clone() } else { None }
+			)
+		})
 	}
 }
 

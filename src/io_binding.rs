@@ -10,7 +10,7 @@ use crate::{
 	ortsys,
 	session::{output::SessionOutputs, RunOptions},
 	value::{Value, ValueRefMut},
-	Error, Result, Session
+	Error, Result, Session, ValueTypeMarker
 };
 
 /// Enables binding of session inputs and/or outputs to pre-allocated memory.
@@ -41,7 +41,7 @@ impl<'s> IoBinding<'s> {
 	}
 
 	/// Bind a [`Value`] to a session input.
-	pub fn bind_input<'i: 's, S: AsRef<str>>(&mut self, name: S, ort_value: &'i mut Value) -> Result<ValueRefMut<'i>> {
+	pub fn bind_input<'i: 's, T: ValueTypeMarker, S: AsRef<str>>(&mut self, name: S, ort_value: &'i mut Value<T>) -> Result<ValueRefMut<'i, T>> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
 		ortsys![unsafe BindInput(self.ptr.as_ptr(), cname.as_ptr(), ort_value.ptr()) -> Error::BindInput];
@@ -49,7 +49,7 @@ impl<'s> IoBinding<'s> {
 	}
 
 	/// Bind a session output to a pre-allocated [`Value`].
-	pub fn bind_output<'o: 's, S: AsRef<str>>(&mut self, name: S, ort_value: &'o mut Value) -> Result<ValueRefMut<'o>> {
+	pub fn bind_output<'o: 's, T: ValueTypeMarker, S: AsRef<str>>(&mut self, name: S, ort_value: &'o mut Value<T>) -> Result<ValueRefMut<'o, T>> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
 		ortsys![unsafe BindOutput(self.ptr.as_ptr(), cname.as_ptr(), ort_value.ptr()) -> Error::BindOutput];

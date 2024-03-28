@@ -1,7 +1,107 @@
 mod create;
 mod extract;
 
-pub use self::create::ToDimensions;
+use std::{
+	fmt::Debug,
+	marker::PhantomData,
+	ops::{Index, IndexMut},
+	ptr::NonNull
+};
+
+use super::{UpcastableTarget, Value, ValueInner, ValueTypeMarker};
+use crate::{ortsys, DynValue, IntoTensorElementType, ValueRef, ValueRefMut, ValueType};
+
+pub trait TensorValueTypeMarker: ValueTypeMarker {}
+
+#[derive(Debug)]
+pub struct DynTensorValueType;
+impl ValueTypeMarker for DynTensorValueType {}
+impl TensorValueTypeMarker for DynTensorValueType {}
+
+#[derive(Debug)]
+pub struct TensorValueType<T: IntoTensorElementType + Debug>(PhantomData<T>);
+impl<T: IntoTensorElementType + Debug> ValueTypeMarker for TensorValueType<T> {}
+impl<T: IntoTensorElementType + Debug> TensorValueTypeMarker for TensorValueType<T> {}
+
+pub type DynTensor = Value<DynTensorValueType>;
+pub type Tensor<T> = Value<TensorValueType<T>>;
+
+pub type DynTensorRef<'v> = ValueRef<'v, DynTensorValueType>;
+pub type DynTensorRefMut<'v> = ValueRefMut<'v, DynTensorValueType>;
+pub type TensorRef<'v, T> = ValueRef<'v, TensorValueType<T>>;
+pub type TensorRefMut<'v, T> = ValueRefMut<'v, TensorValueType<T>>;
+
+impl UpcastableTarget for DynTensorValueType {
+	fn can_upcast(dtype: &ValueType) -> bool {
+		matches!(dtype, ValueType::Tensor { .. })
+	}
+}
+
+impl<T: IntoTensorElementType + Debug> Tensor<T> {
+	/// Converts from a strongly-typed [`Tensor<T>`] to a type-erased [`DynTensor`].
+	#[inline]
+	pub fn downcast(self) -> DynTensor {
+		unsafe { std::mem::transmute(self) }
+	}
+
+	/// Converts from a strongly-typed [`Tensor<T>`] to a reference to a type-erased [`DynTensor`].
+	#[inline]
+	pub fn downcast_ref(&self) -> DynTensorRef {
+		DynTensorRef::new(unsafe {
+			Value::from_ptr_nodrop(
+				NonNull::new_unchecked(self.ptr()),
+				if let ValueInner::CppOwned { _session, .. } = &self.inner { _session.clone() } else { None }
+			)
+		})
+	}
+
+	/// Converts from a strongly-typed [`Tensor<T>`] to a mutable reference to a type-erased [`DynTensor`].
+	#[inline]
+	pub fn downcast_mut(&mut self) -> DynTensorRefMut {
+		DynTensorRefMut::new(unsafe {
+			Value::from_ptr_nodrop(
+				NonNull::new_unchecked(self.ptr()),
+				if let ValueInner::CppOwned { _session, .. } = &self.inner { _session.clone() } else { None }
+			)
+		})
+	}
+}
+
+impl<T: IntoTensorElementType + Debug> UpcastableTarget for TensorValueType<T> {
+	fn can_upcast(dtype: &ValueType) -> bool {
+		match dtype {
+			ValueType::Tensor { ty, .. } => *ty == T::into_tensor_element_type(),
+			_ => false
+		}
+	}
+}
+
+impl<T: IntoTensorElementType + Debug> From<Value<TensorValueType<T>>> for DynValue {
+	fn from(value: Value<TensorValueType<T>>) -> Self {
+		value.into_dyn()
+	}
+}
+impl From<Value<DynTensorValueType>> for DynValue {
+	fn from(value: Value<DynTensorValueType>) -> Self {
+		value.into_dyn()
+	}
+}
+
+impl<T: IntoTensorElementType + Clone + Debug, const N: usize> Index<[i64; N]> for Tensor<T> {
+	type Output = T;
+	fn index(&self, index: [i64; N]) -> &Self::Output {
+		let mut out: *mut ort_sys::c_void = std::ptr::null_mut();
+		ortsys![unsafe TensorAt(self.ptr(), index.as_ptr(), N as _, &mut out).unwrap()];
+		unsafe { &*out.cast::<T>() }
+	}
+}
+impl<T: IntoTensorElementType + Clone + Debug, const N: usize> IndexMut<[i64; N]> for Tensor<T> {
+	fn index_mut(&mut self, index: [i64; N]) -> &mut Self::Output {
+		let mut out: *mut ort_sys::c_void = std::ptr::null_mut();
+		ortsys![unsafe TensorAt(self.ptr(), index.as_ptr(), N as _, &mut out).unwrap()];
+		unsafe { &mut *out.cast::<T>() }
+	}
+}
 
 #[cfg(test)]
 mod tests {
@@ -26,7 +126,7 @@ mod tests {
 			}
 		);
 
-		let (shape, data) = value.extract_raw_tensor::<f32>()?;
+		let (shape, data) = value.extract_raw_tensor();
 		assert_eq!(shape, vec![v.len() as i64]);
 		assert_eq!(data, &v);
 
@@ -43,16 +143,16 @@ mod tests {
 		let value = Value::from_array(&mut arc2)?;
 		drop((arc1, arc2));
 
-		assert_eq!(value.extract_raw_tensor::<f32>()?.1, &v);
+		assert_eq!(value.extract_raw_tensor().1, &v);
 
 		let cow = CowArray::from(Array1::from_vec(v.clone()));
 		let value = Value::from_array(&cow)?;
-		assert_eq!(value.extract_raw_tensor::<f32>()?.1, &v);
+		assert_eq!(value.extract_raw_tensor().1, &v);
 
 		let owned = Array1::from_vec(v.clone());
 		let value = Value::from_array(owned.view())?;
 		drop(owned);
-		assert_eq!(value.extract_raw_tensor::<f32>()?.1, &v);
+		assert_eq!(value.extract_raw_tensor().1, &v);
 
 		Ok(())
 	}
@@ -65,7 +165,7 @@ mod tests {
 		let shape = vec![v.len() as i64];
 		let value = Value::from_array((shape, Arc::clone(&arc)))?;
 		drop(arc);
-		assert_eq!(value.extract_raw_tensor::<f32>()?.1, &v);
+		assert_eq!(value.try_extract_raw_tensor::<f32>()?.1, &v);
 
 		Ok(())
 	}
@@ -76,8 +176,8 @@ mod tests {
 		let allocator = Allocator::default();
 		let v = Array1::from_vec(vec!["hello world".to_string(), "こんにちは世界".to_string()]);
 
-		let value = Value::from_string_array(&allocator, v.view())?;
-		let extracted = value.extract_string_tensor()?;
+		let value = DynTensor::from_string_array(&allocator, v.view())?;
+		let extracted = value.try_extract_string_tensor()?;
 		assert_eq!(extracted, v.into_dyn());
 
 		Ok(())
@@ -88,8 +188,8 @@ mod tests {
 		let allocator = Allocator::default();
 		let v = vec!["hello world".to_string(), "こんにちは世界".to_string()];
 
-		let value = Value::from_string_array(&allocator, (vec![v.len() as i64], v.clone().into_boxed_slice()))?;
-		let (extracted_shape, extracted_view) = value.extract_raw_string_tensor()?;
+		let value = DynTensor::from_string_array(&allocator, (vec![v.len() as i64], v.clone().into_boxed_slice()))?;
+		let (extracted_shape, extracted_view) = value.try_extract_raw_string_tensor()?;
 		assert_eq!(extracted_shape, [v.len() as i64]);
 		assert_eq!(extracted_view, v);
 
@@ -106,10 +206,10 @@ mod tests {
 		let value_vec = Value::from_array((shape, v.clone()))?;
 		let value_slice = Value::from_array((shape, &v[..]))?;
 
-		assert_eq!(value_arc_box.extract_raw_tensor::<f32>()?.1, &v);
-		assert_eq!(value_box.extract_raw_tensor::<f32>()?.1, &v);
-		assert_eq!(value_vec.extract_raw_tensor::<f32>()?.1, &v);
-		assert_eq!(value_slice.extract_raw_tensor::<f32>()?.1, &v);
+		assert_eq!(value_arc_box.extract_raw_tensor().1, &v);
+		assert_eq!(value_box.extract_raw_tensor().1, &v);
+		assert_eq!(value_vec.extract_raw_tensor().1, &v);
+		assert_eq!(value_slice.extract_raw_tensor().1, &v);
 
 		Ok(())
 	}

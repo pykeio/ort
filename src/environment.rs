@@ -271,7 +271,7 @@ extern_system_fn! {
 
 #[cfg(test)]
 mod tests {
-	use std::sync::{atomic::Ordering, Arc, OnceLock, RwLock, RwLockWriteGuard};
+	use std::sync::{OnceLock, RwLock, RwLockWriteGuard};
 
 	use test_log::test;
 

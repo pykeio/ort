@@ -103,6 +103,12 @@ pub enum Error {
 	/// Error occurred when creating ONNX tensor with specific data
 	#[error("Failed to create tensor with data: {0}")]
 	CreateTensorWithData(ErrorInternal),
+	/// Error occurred when attempting to create a [`crate::Sequence`].
+	#[error("Failed to create sequence value: {0}")]
+	CreateSequence(ErrorInternal),
+	/// Error occurred when attempting to create a [`crate::Map`].
+	#[error("Failed to create map value: {0}")]
+	CreateMap(ErrorInternal),
 	/// Invalid dimension when creating tensor from raw data
 	#[error("Invalid dimension at {0}; all dimensions must be >= 1 when creating a tensor from raw data")]
 	InvalidDimension(usize),
@@ -230,6 +236,8 @@ pub enum Error {
 	InvalidMapKeyType { expected: TensorElementType, actual: TensorElementType },
 	#[error("Tried to extract a map with a value type of {expected:?}, but the map has value type {actual:?}")]
 	InvalidMapValueType { expected: TensorElementType, actual: TensorElementType },
+	#[error("Tried to extract a sequence with a different element type than its actual type {actual:?}")]
+	InvalidSequenceElementType { actual: ValueType },
 	#[error("Error occurred while attempting to extract data from sequence value: {0}")]
 	ExtractSequence(ErrorInternal),
 	#[error("Error occurred while attempting to extract data from map value: {0}")]

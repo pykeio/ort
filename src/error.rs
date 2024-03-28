@@ -103,6 +103,12 @@ pub enum Error {
 	/// Error occurred when creating ONNX tensor with specific data
 	#[error("Failed to create tensor with data: {0}")]
 	CreateTensorWithData(ErrorInternal),
+	/// Error occurred when attempting to create a [`crate::Sequence`].
+	#[error("Failed to create sequence value: {0}")]
+	CreateSequence(ErrorInternal),
+	/// Error occurred when attempting to create a [`crate::Map`].
+	#[error("Failed to create map value: {0}")]
+	CreateMap(ErrorInternal),
 	/// Invalid dimension when creating tensor from raw data
 	#[error("Invalid dimension at {0}; all dimensions must be >= 1 when creating a tensor from raw data")]
 	InvalidDimension(usize),

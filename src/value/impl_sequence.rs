@@ -27,8 +27,8 @@ pub type DynSequenceRefMut<'v> = ValueRefMut<'v, DynSequenceValueType>;
 pub type SequenceRef<'v, T> = ValueRef<'v, SequenceValueType<T>>;
 pub type SequenceRefMut<'v, T> = ValueRefMut<'v, SequenceValueType<T>>;
 
-impl<Type: SequenceValueTypeMarker + ?Sized> Value<Type> {
-	pub fn try_extract_sequence<'s, OtherType: ValueTypeMarker + UpcastableTarget + Debug + ?Sized>(
+impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
+	pub fn try_extract_sequence<'s, OtherType: ValueTypeMarker + UpcastableTarget + Debug + Sized>(
 		&'s self,
 		allocator: &Allocator
 	) -> Result<Vec<ValueRef<'s, OtherType>>> {
@@ -60,7 +60,46 @@ impl<Type: SequenceValueTypeMarker + ?Sized> Value<Type> {
 	}
 }
 
-impl<T: ValueTypeMarker + UpcastableTarget + Debug + ?Sized> Value<SequenceValueType<T>> {
+impl<T: ValueTypeMarker + UpcastableTarget + Debug + Sized + 'static> Value<SequenceValueType<T>> {
+	/// Creates a [`Sequence`] from an array of [`Value<T>`].
+	///
+	/// This `Value<T>` must be either a [`crate::Tensor`] or [`crate::Map`].
+	///
+	/// ```
+	/// # use ort::{Allocator, Sequence, Tensor};
+	/// # fn main() -> ort::Result<()> {
+	/// # 	let allocator = Allocator::default();
+	/// let tensor1 = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
+	/// let tensor2 = Tensor::<f32>::new(&allocator, [1, 224, 224, 3])?;
+	/// let value = Sequence::new([tensor1, tensor2])?;
+	///
+	/// for tensor in value.extract_sequence(&allocator) {
+	/// 	println!("{:?}", tensor.shape()?);
+	/// }
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	pub fn new(values: impl IntoIterator<Item = Value<T>>) -> Result<Self> {
+		let mut value_ptr = ptr::null_mut();
+		let values: Vec<Value<T>> = values.into_iter().collect();
+		let value_ptrs: Vec<*const ort_sys::OrtValue> = values.iter().map(|c| c.ptr().cast_const()).collect();
+		ortsys![
+			unsafe CreateValue(value_ptrs.as_ptr(), values.len() as _, ort_sys::ONNXType::ONNX_TYPE_SEQUENCE, &mut value_ptr)
+				-> Error::CreateSequence;
+			nonNull(value_ptr)
+		];
+		Ok(Value {
+			inner: ValueInner::RustOwned {
+				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
+				_array: Box::new(values),
+				_memory_info: None
+			},
+			_markers: PhantomData
+		})
+	}
+}
+
+impl<T: ValueTypeMarker + UpcastableTarget + Debug + Sized> Value<SequenceValueType<T>> {
 	pub fn extract_sequence<'s>(&'s self, allocator: &Allocator) -> Vec<ValueRef<'s, T>> {
 		self.try_extract_sequence(allocator).unwrap()
 	}

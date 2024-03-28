@@ -414,6 +414,35 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
 		res
 	}
+
+	/// Returns the shape of the tensor.
+	///
+	/// ```
+	/// # use ort::{Allocator, Sequence, Tensor};
+	/// # fn main() -> ort::Result<()> {
+	/// # 	let allocator = Allocator::default();
+	/// let tensor = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
+	///
+	/// assert_eq!(tensor.shape()?, &[1, 128, 128, 3]);
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	pub fn shape(&self) -> Result<Vec<i64>> {
+		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
+
+		let res = {
+			let mut num_dims = 0;
+			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
+
+			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
+			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
+
+			Ok(node_dims)
+		};
+		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
+		res
+	}
 }
 
 impl<T: IntoTensorElementType + Debug> Tensor<T> {

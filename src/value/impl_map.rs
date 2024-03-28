@@ -7,7 +7,9 @@ use std::{
 };
 
 use super::{ValueInner, ValueTypeMarker};
-use crate::{memory::Allocator, ortsys, value::impl_tensor::DynTensor, Error, IntoTensorElementType, Result, Value, ValueRef, ValueRefMut, ValueType};
+use crate::{
+	memory::Allocator, ortsys, value::impl_tensor::DynTensor, DynValue, Error, IntoTensorElementType, Result, Tensor, Value, ValueRef, ValueRefMut, ValueType
+};
 
 pub trait MapValueTypeMarker: ValueTypeMarker {}
 
@@ -17,9 +19,9 @@ impl ValueTypeMarker for DynMapValueType {}
 impl MapValueTypeMarker for DynMapValueType {}
 
 #[derive(Debug)]
-pub struct MapValueType<K: IntoTensorElementType + Clone + Hash + Eq, V: IntoTensorElementType + Clone + Hash + Eq>(PhantomData<(K, V)>);
-impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug + Clone + Hash + Eq> ValueTypeMarker for MapValueType<K, V> {}
-impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug + Clone + Hash + Eq> MapValueTypeMarker for MapValueType<K, V> {}
+pub struct MapValueType<K: IntoTensorElementType + Clone + Hash + Eq, V: IntoTensorElementType + Debug>(PhantomData<(K, V)>);
+impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug> ValueTypeMarker for MapValueType<K, V> {}
+impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug> MapValueTypeMarker for MapValueType<K, V> {}
 
 pub type DynMap = Value<DynMapValueType>;
 pub type Map<K, V> = Value<MapValueType<K, V>>;
@@ -70,7 +72,67 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 	}
 }
 
-impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug + Clone + Hash + Eq> Value<MapValueType<K, V>> {
+impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq + 'static, V: IntoTensorElementType + Debug + Clone + 'static> Value<MapValueType<K, V>> {
+	/// Creates a [`Map`] from an iterable emitting `K` and `V`.
+	///
+	/// ```
+	/// # use std::collections::HashMap;
+	/// # use ort::{Allocator, Map};
+	/// # fn main() -> ort::Result<()> {
+	/// # 	let allocator = Allocator::default();
+	/// let mut map = HashMap::<i64, f32>::new();
+	/// map.insert(0, 1.0);
+	/// map.insert(1, 2.0);
+	/// map.insert(2, 3.0);
+	///
+	/// let value = Map::new(map)?;
+	///
+	/// assert_eq!(*value.extract_map(&allocator).get(&0).unwrap(), 1.0);
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	pub fn new(data: impl IntoIterator<Item = (K, V)>) -> Result<Self> {
+		let (keys, values): (Vec<K>, Vec<V>) = data.into_iter().unzip();
+		Self::new_kv(Tensor::from_array((vec![keys.len()], keys))?, Tensor::from_array((vec![values.len()], values))?)
+	}
+
+	/// Creates a [`Map`] from two tensors of keys & values respectively.
+	///
+	/// ```
+	/// # use std::collections::HashMap;
+	/// # use ort::{Allocator, Map, Tensor};
+	/// # fn main() -> ort::Result<()> {
+	/// # 	let allocator = Allocator::default();
+	/// let keys = Tensor::<i64>::from_array(([4], vec![0, 1, 2, 3]))?;
+	/// let values = Tensor::<f32>::from_array(([4], vec![1., 2., 3., 4.]))?;
+	///
+	/// let value = Map::new_kv(keys, values)?;
+	///
+	/// assert_eq!(*value.extract_map(&allocator).get(&0).unwrap(), 1.0);
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	pub fn new_kv(keys: Tensor<K>, values: Tensor<V>) -> Result<Self> {
+		let mut value_ptr = ptr::null_mut();
+		let values: [DynValue; 2] = [keys.into_dyn(), values.into_dyn()];
+		let value_ptrs: Vec<*const ort_sys::OrtValue> = values.iter().map(|c| c.ptr().cast_const()).collect();
+		ortsys![
+			unsafe CreateValue(value_ptrs.as_ptr(), 2, ort_sys::ONNXType::ONNX_TYPE_MAP, &mut value_ptr)
+				-> Error::CreateMap;
+			nonNull(value_ptr)
+		];
+		Ok(Value {
+			inner: ValueInner::RustOwned {
+				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
+				_array: Box::new(values),
+				_memory_info: None
+			},
+			_markers: PhantomData
+		})
+	}
+}
+
+impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug + Clone> Value<MapValueType<K, V>> {
 	pub fn extract_map(&self, allocator: &Allocator) -> HashMap<K, V> {
 		self.try_extract_map(allocator).unwrap()
 	}

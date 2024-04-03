@@ -96,3 +96,9 @@ impl OperatorDomain {
 		Ok(self)
 	}
 }
+
+impl Drop for OperatorDomain {
+	fn drop(&mut self) {
+		ortsys![unsafe ReleaseCustomOpDomain(self.ptr.as_ptr())];
+	}
+}

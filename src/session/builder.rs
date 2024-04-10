@@ -1,4 +1,4 @@
-#[cfg(not(target_family = "windows"))]
+#[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 #[cfg(target_family = "windows")]
 use std::os::windows::ffi::OsStrExt;
@@ -312,7 +312,7 @@ impl SessionBuilder {
             .collect();
 		#[cfg(not(target_family = "windows"))]
 		let model_path: Vec<std::os::raw::c_char> = model_path
-            .as_bytes()
+            .as_encoded_bytes()
             .iter()
             .chain(std::iter::once(&b'\0')) // Make sure we have a null terminated string
             .map(|b| *b as std::os::raw::c_char)

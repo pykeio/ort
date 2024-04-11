@@ -1,0 +1,33 @@
+---
+title: Cargo features
+---
+
+> *✅ = default, ⚒️ = not default*
+
+- ✅ **`ndarray`**: Enables tensors to be created from/extracted to [`ndarray`](https://crates.io/crates/ndarray) multi-dimensional arrays. We highly recommend this feature if you need to do a lot of complex pre/post-processing requiring multi-dimensional array access, but for something like an LLM, omitting this feature won't require too much extra work but will save a fair amount of compile time.
+- ✅ **`download-binaries`**: Downloads prebuilt binaries from pyke's CDN service for supported platforms. Disabling this means you'll need to compile ONNX Runtime from source yourself, and [link `ort` to it](/setup/linking).
+- ✅ **`half`**: Enables support for float16 & bfloat16 tensors via the [`half`](https://crates.io/crates/half) crate. ONNX models that are converted to 16-bit precision will typically convert to/from 32-bit floats at the input/output, so you will likely never actually need to interact with a 16-bit tensor on the Rust side. Though, `half` isn't a heavy enough crate to worry about it affecting compile times.
+- ✅ **`copy-dylibs`**: In case dynamic libraries are used (like with the CUDA execution provider), creates a symlink to them in the relevant places in the `target` folder to make [compile-time dynamic linking](/setup/linking#compile-time-dynamic-linking) work.
+- ⚒️ **`load-dynamic`**: Enables [runtime dynamic linking](/setup/linking#runtime-loading-with-load-dynamic), which alleviates many of the troubles with compile-time dynamic linking and offers greater flexibility.
+- ⚒️ **`fetch-models`**: Enables the [`SessionBuilder::commit_from_url`](https://docs.rs/ort/2.0.0-rc.1/ort/struct.SessionBuilder.html#method.commit_from_url) method, allowing you to quickly download & run a model from a URL. This should only be used for quick testing.
+- ⚒️ **`operator-libraries`**: Allows for sessions to load custom operators from dynamic C++ libraries via [`SessionBuilder::with_operator_library`](https://docs.rs/ort/2.0.0-rc.1/ort/struct.SessionBuilder.html#method.with_operator_library). If possible, we recommend [writing your custom ops in Rust instead](/perf/custom-operators).
+
+## Execution providers
+Each [execution provider](/perf/execution-providers) is also gated behind a Cargo feature.
+- **NVIDIA CUDA**: `cuda`
+- **NVIDIA TensorRT**: `tensorrt`
+- **Microsoft DirectML**: `directml`
+- **Apple CoreML**: `coreml`
+- **AMD ROCm**: `rocm`
+- **Intel OpenVINO**: `openvino`
+- **Intel oneDNN**: `onednn`
+- **XNNPACK**: `xnnpack`
+- **Qualcomm QNN**: `qnn`
+- **Huawei CANN**: `cann`
+- **Android NNAPI**: `nnapi`
+- **Apache TVM**: `tvm`
+- **Arm ACL**: `acl`
+- **ArmNN**: `armnn`
+- **AMD MIGraphX**: `migraphx`
+- **AMD Vitis AI**: `vitis`
+- **Rockchip RKNPU**: `rknpu`

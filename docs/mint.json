@@ -22,7 +22,7 @@
 	"tabs": [
 		{
 			"name": "API Reference",
-			"url": "https://docs.rs/ort"
+			"url": "https://docs.rs/ort/2.0.0-rc.1/ort/"
 		}
 	],
 	"anchors": [
@@ -59,7 +59,6 @@
 			"pages": [
 				"setup/platforms",
 				"setup/linking",
-				"setup/compiling-onnxruntime",
 				"setup/cargo-features"
 			]
 		},

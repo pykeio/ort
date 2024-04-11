@@ -6,38 +6,25 @@ title: Introduction
     `ort` is an open-source Rust binding for [ONNX Runtime](https://onnxruntime.ai/).
 </p>
 
-`ort` makes it easy to deploy your machine learning models to production via [ONNX Runtime](https://onnxruntime.ai/), a hardware-accelerated inference engine. With `ort` + ONNX Runtime, you can run almost any ML model (including ResNet, YOLOv8, BERT, LLaMA) on almost any hardware, often far faster than PyTorch, and with the added bonus of Rust's efficiency.
-
 <Warning>
     These docs are for the latest alpha version of `ort`, `2.0.0-rc.1`. This version is production-ready (just not API stable) and we recommend new & existing projects use it.
 </Warning>
 
-# Why `ort`?
-There are a few other ONNX Runtime crates out there, so why use `ort`?
+`ort` makes it easy to deploy your machine learning models to production via [ONNX Runtime](https://onnxruntime.ai/), a hardware-accelerated inference engine. With `ort` + ONNX Runtime, you can run almost any ML model (including ResNet, YOLOv8, BERT, LLaMA) on almost any hardware, often far faster than PyTorch, and with the added bonus of Rust's efficiency.
 
-For one, `ort` simply supports more features:
+[ONNX](https://onnx.ai/) is an interoperable neural network specification. Your ML framework of choice -- PyTorch, TensorFlow, Keras, PaddlePaddle, etc. -- turns your model into an ONNX graph comprised of basic operations like `MatMul` or `Add`. This graph can then be converted into a model in another framework, or **inferenced directly with ONNX Runtime**.
 
-| Feature comparison        | **📕 ort** | **📗 [ors](https://github.com/HaoboGu/ors)** | **🪟 [onnxruntime-rs](https://github.com/microsoft/onnxruntime/tree/main/rust)** |
-|---------------------------|-----------|-----------|----------------------|
-| Upstream version          | **v1.17.1** | v1.12.0 | v1.8               |
-| `dlopen()`?               | ✅         | ✅         | ❌                    |
-| Execution providers?      | ✅         | ❌         | ❌                    |
-| I/O Binding?              | ✅         | ❌         | ❌                    |
-| String tensors?           | ✅         | ❌         | ⚠️ input only         |
-| Multiple output types?    | ✅         | ✅         | ❌                    |
-| Multiple input types?     | ✅         | ✅         | ❌                    |
-| In-memory session?        | ✅         | ✅         | ✅                    |
-| WebAssembly?              | ✅         | ❌         | ❌                    |
-| Provides static binaries? | ✅         | ❌         | ❌                    |
-| Sequence & map types?     | ✅         | ❌         | ❌                    |
+<img width="100%" src="/assets/sample-onnx-graph.png" alt="An example visual representation of an ONNX graph, showing how an input tensor flows through layers of convolution nodes." />
 
-Users of `ort` appreciate its ease of use and ergonomic API. `ort` is also battle tested in some pretty serious production scenarios.
-- [**Twitter**](https://twitter.com/) uses `ort` in part of their recommendations system, serving hundreds of millions of requests a day.
+Converting a neural network to a graph representation like ONNX opens the door to more optimizations and broader acceleration hardware support. ONNX Runtime can significantly improve the inference speed/latency of most models and enable acceleration with NVIDIA CUDA & TensorRT, Intel OpenVINO, Qualcomm QNN, Huawei CANN, and [much more](/perf/execution-providers).
+
+`ort` is the Rust gateway to ONNX Runtime, allowing you to infer your ONNX models via an easy-to-use and ergonomic API. Many commercial, open-source, & research projects use `ort` in some pretty serious production scenarios to boost inference performance:
+- [**Twitter**](https://twitter.com/) uses `ort` in [part of their recommendations system](https://github.com/twitter/the-algorithm/tree/main/navi), serving hundreds of millions of requests a day.
 - [**Bloop**](https://bloop.ai/)'s semantic code search feature is powered by `ort`.
-- [**SurrealDB**](https://surrealdb.com/) uses `ort` in their [`surrealml`](https://github.com/surrealdb/surrealml) package.
-- [**Numerical Elixir**](https://github.com/elixir-nx) uses `ort` to create ONNX Runtime bindings for the Elixir language.
+- [**SurrealDB**](https://surrealdb.com/)'s powerful SurrealQL query language supports calling ML models, including ONNX graphs through `ort`.
+- [**Google's Magika**](https://github.com/google/magika) file type detection library is powered by `ort`.
+- [**Wasmtime**](https://github.com/bytecodealliance/wasmtime), an open-source WebAssembly runtime, supports ONNX inference for the [WASI-NN standard](https://github.com/WebAssembly/wasi-nn) via `ort`.
 - [**`rust-bert`**](https://github.com/guillaume-be/rust-bert) implements many ready-to-use NLP pipelines in Rust à la Hugging Face Transformers with both [`tch`](https://crates.io/crates/tch) & `ort` backends.
-- [**`edge-transformers`**](https://github.com/npc-engine/edge-transformers) also implements Hugging Face Transformers pipelines in Rust using `ort`.
 
 # Getting started
 <Steps>
@@ -49,11 +36,11 @@ Users of `ort` appreciate its ease of use and ergonomic API. `ort` is also battl
         ```
     </Step>
     <Step title="Convert your model">
-        Your model will need to be converted to the [ONNX](https://onnx.ai/) format before you can use it.
+        Your model will need to be converted to an ONNX graph before you can use it.
         - The awesome folks at Hugging Face have [a guide](https://huggingface.co/docs/transformers/serialization) to export 🤗 Transformers models to ONNX with 🤗 Optimum.
-        - For other PyTorch models: [`torch.onnx`](https://pytorch.org/docs/stable/onnx.html)
-        - For `scikit-learn`: [`sklearn-onnx`](https://onnx.ai/sklearn-onnx/)
-        - For TensorFlow, Keras, TFlite, TensorFlow.js: [`tf2onnx`](https://github.com/onnx/tensorflow-onnx)
+        - For any PyTorch model: [`torch.onnx`](https://pytorch.org/docs/stable/onnx.html)
+        - For `scikit-learn` models: [`sklearn-onnx`](https://onnx.ai/sklearn-onnx/)
+        - For TensorFlow, Keras, TFlite, & TensorFlow.js: [`tf2onnx`](https://github.com/onnx/tensorflow-onnx)
         - For PaddlePaddle: [`Paddle2ONNX`](https://github.com/PaddlePaddle/Paddle2ONNX)
     </Step>
     <Step title="Load your model">
@@ -73,13 +60,7 @@ Users of `ort` appreciate its ease of use and ergonomic API. `ort` is also battl
 
         ```rust
         let outputs = model.run(ort::inputs!["image" => image]?)?;
-
-        // Postprocessing
-        let output = outputs["output0"]
-            .extract_tensor::<f32>()?
-            .t()
-            .slice(s![.., .., 0])
-            .into_owned();
+        let predictions = outputs["output0"].try_extract_tensor::<f32>()?;
         ...
         ```
 

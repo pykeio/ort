@@ -23,6 +23,8 @@ pub(crate) mod operator;
 pub(crate) mod session;
 pub(crate) mod tensor;
 pub(crate) mod value;
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;
 
 #[cfg(feature = "load-dynamic")]
 use std::sync::Arc;

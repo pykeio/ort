@@ -297,6 +297,10 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_static-v1.17.1-aarch64-unknown-linux-gnu.tgz",
 					"73A569FF807D655FD6258816FBC9660667370AEB4A47C6754746BCBF07C280F9"
 				),
+				"wasm32-wasi" | "wasm32-unknown-unknown" => (
+					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-pkort_static_b1-v1.17.1-wasm32-unknown-unknown.tgz",
+					"C22A794DDA22224FD77654B7D8278C3AB68C46B0AE3E89D0192704891A9E13F0"
+				),
 				"wasm32-unknown-emscripten" => (
 					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_static-v1.17.1-wasm32-unknown-emscripten.tgz",
 					"58EAD204FE53A488489287FFD97113E89A2CCA91876D3186CDBCA10A4F5A3287"

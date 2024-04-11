@@ -197,7 +197,7 @@ pub struct MemoryInfo {
 }
 
 impl MemoryInfo {
-	#[tracing::instrument]
+	// #[tracing::instrument]
 	pub fn new_cpu(allocator: AllocatorType, memory_type: MemoryType) -> Result<Self> {
 		let mut memory_info_ptr: *mut ort_sys::OrtMemoryInfo = std::ptr::null_mut();
 		ortsys![
@@ -210,7 +210,7 @@ impl MemoryInfo {
 		})
 	}
 
-	#[tracing::instrument]
+	// #[tracing::instrument]
 	pub fn new(allocation_device: AllocationDevice, device_id: c_int, allocator_type: AllocatorType, memory_type: MemoryType) -> Result<Self> {
 		let mut memory_info_ptr: *mut ort_sys::OrtMemoryInfo = std::ptr::null_mut();
 		let allocator_name = CString::new(allocation_device.as_str()).unwrap();
@@ -244,7 +244,7 @@ impl MemoryInfo {
 }
 
 impl Drop for MemoryInfo {
-	#[tracing::instrument]
+	// #[tracing::instrument]
 	fn drop(&mut self) {
 		if self.should_release {
 			ortsys![unsafe ReleaseMemoryInfo(self.ptr.as_ptr())];

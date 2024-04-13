@@ -39,7 +39,8 @@ fn run_test() {
 	use tracing_subscriber::fmt;
 	use tracing_subscriber_wasm::MakeConsoleWriter;
 
-	ort::wasm::_initialize();
+	#[cfg(target_arch = "wasm32")]
+	ort::wasm::initialize();
 
 	fmt()
 		.with_ansi(false)

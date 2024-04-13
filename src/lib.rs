@@ -24,6 +24,7 @@ pub(crate) mod session;
 pub(crate) mod tensor;
 pub(crate) mod value;
 #[cfg(target_arch = "wasm32")]
+#[doc(hidden)]
 pub mod wasm;
 
 #[cfg(feature = "load-dynamic")]

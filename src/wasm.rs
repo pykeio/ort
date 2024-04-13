@@ -5,10 +5,6 @@ use std::{
 	ptr, slice, str
 };
 
-macro_rules! console_log {
-    ($($t:tt)*) => (web_sys::console::log_1(&format_args!($($t)*).to_string().into()))
-}
-
 pub mod fmt_shims {
 	use super::*;
 
@@ -41,7 +37,6 @@ pub mod libc_shims {
 
 	unsafe fn alloc_inner(size: usize, align: usize) -> *mut u8 {
 		let align = align.max(8);
-		console_log!("allocating {size} bytes (align {align})");
 		let ptr = alloc::alloc_zeroed(Layout::from_size_align_unchecked(size + align, align));
 		ptr::copy_nonoverlapping(size.to_le_bytes().as_ptr(), ptr.add(align - 4), 4);
 		ptr::copy_nonoverlapping(align.to_le_bytes().as_ptr(), ptr.add(align - 8), 4);
@@ -49,9 +44,12 @@ pub mod libc_shims {
 	}
 
 	unsafe fn free_inner(ptr: *mut u8) {
+		if ptr.is_null() {
+			return;
+		}
+
 		let size = usize::from_le_bytes(slice::from_raw_parts_mut(ptr.sub(4), 4).try_into().unwrap_unchecked());
 		let align = usize::from_le_bytes(slice::from_raw_parts_mut(ptr.sub(8), 4).try_into().unwrap_unchecked());
-		console_log!("freeing {size} bytes (align {align})");
 		let layout = Layout::from_size_align_unchecked(size + align, align);
 		alloc::dealloc(ptr.sub(align), layout);
 	}
@@ -65,8 +63,8 @@ pub mod libc_shims {
 		alloc_inner(size, 32)
 	}
 	#[no_mangle]
-	pub unsafe extern "C" fn __libc_calloc(size: usize) -> *mut u8 {
-		alloc_inner(size, 32)
+	pub unsafe extern "C" fn __libc_calloc(n: usize, size: usize) -> *mut u8 {
+		alloc_inner(size * n, 32)
 	}
 	#[no_mangle]
 	pub unsafe extern "C" fn free(ptr: *mut u8) {
@@ -78,7 +76,7 @@ pub mod libc_shims {
 	}
 
 	#[no_mangle]
-	pub unsafe extern "C" fn posix_memalign(ptr: *mut *mut u8, size: usize, align: usize) -> i32 {
+	pub unsafe extern "C" fn posix_memalign(ptr: *mut *mut u8, align: usize, size: usize) -> i32 {
 		*ptr = alloc_inner(size, align);
 		0
 	}
@@ -87,7 +85,6 @@ pub mod libc_shims {
 	pub unsafe extern "C" fn realloc(ptr: *mut u8, newsize: usize) -> *mut u8 {
 		let size = usize::from_le_bytes(slice::from_raw_parts_mut(ptr.sub(4), 4).try_into().unwrap_unchecked());
 		let align = usize::from_le_bytes(slice::from_raw_parts_mut(ptr.sub(8), 4).try_into().unwrap_unchecked());
-		console_log!("reallocating {size} bytes -> {newsize} bytes (align {align})");
 		let layout = Layout::from_size_align_unchecked(size + align, align);
 		let ptr = alloc::realloc(ptr.sub(align), layout, newsize);
 		ptr::copy_nonoverlapping(size.to_le_bytes().as_ptr(), ptr.add(align - 4), 4);
@@ -174,7 +171,7 @@ pub mod emscripten_shims {
 
 #[no_mangle]
 #[export_name = "_initialize"]
-pub fn _initialize() {
+pub fn initialize() {
 	extern "C" {
 		fn __wasm_call_ctors();
 	}

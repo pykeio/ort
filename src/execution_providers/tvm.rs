@@ -108,7 +108,7 @@ impl ExecutionProvider for TVMExecutionProvider {
 			if let Some(to_nhwc) = self.to_nhwc {
 				option_string.push(format!("to_nhwc:{}", if to_nhwc { "True" } else { "False" }));
 			}
-			let options_string = std::ffi::CString::new(option_string.join(",")).unwrap();
+			let options_string = std::ffi::CString::new(option_string.join(",")).unwrap_or_else(|_| unreachable!());
 			return crate::error::status_to_result(unsafe {
 				OrtSessionOptionsAppendExecutionProvider_Tvm(session_builder.session_options_ptr.as_ptr(), options_string.as_ptr())
 			})

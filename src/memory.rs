@@ -27,7 +27,7 @@ impl Allocator {
 	}
 
 	pub(crate) unsafe fn free<T>(&self, ptr: *mut T) {
-		self.ptr.as_ref().Free.unwrap_unchecked()(self.ptr.as_ptr(), ptr.cast());
+		self.ptr.as_ref().Free.unwrap_or_else(|| unreachable!("Allocator method `Free` is null"))(self.ptr.as_ptr(), ptr.cast());
 	}
 
 	/// Creates a new [`Allocator`] for the given session, to allocate memory on the device described in the
@@ -59,7 +59,7 @@ impl Allocator {
 impl Default for Allocator {
 	fn default() -> Self {
 		let mut allocator_ptr: *mut ort_sys::OrtAllocator = std::ptr::null_mut();
-		status_to_result(ortsys![unsafe GetAllocatorWithDefaultOptions(&mut allocator_ptr); nonNull(allocator_ptr)]).unwrap();
+		status_to_result(ortsys![unsafe GetAllocatorWithDefaultOptions(&mut allocator_ptr); nonNull(allocator_ptr)]).expect("Failed to get default allocator");
 		Self {
 			ptr: unsafe { NonNull::new_unchecked(allocator_ptr) },
 			is_default: true,
@@ -197,6 +197,10 @@ pub struct MemoryInfo {
 }
 
 impl MemoryInfo {
+	pub(crate) fn from_raw(ptr: NonNull<ort_sys::OrtMemoryInfo>, should_release: bool) -> Self {
+		MemoryInfo { ptr, should_release }
+	}
+
 	#[tracing::instrument]
 	pub fn new_cpu(allocator: AllocatorType, memory_type: MemoryType) -> Result<Self> {
 		let mut memory_info_ptr: *mut ort_sys::OrtMemoryInfo = std::ptr::null_mut();
@@ -213,7 +217,7 @@ impl MemoryInfo {
 	#[tracing::instrument]
 	pub fn new(allocation_device: AllocationDevice, device_id: c_int, allocator_type: AllocatorType, memory_type: MemoryType) -> Result<Self> {
 		let mut memory_info_ptr: *mut ort_sys::OrtMemoryInfo = std::ptr::null_mut();
-		let allocator_name = CString::new(allocation_device.as_str()).unwrap();
+		let allocator_name = CString::new(allocation_device.as_str()).unwrap_or_else(|_| unreachable!());
 		ortsys![
 			unsafe CreateMemoryInfo(allocator_name.as_ptr(), allocator_type.into(), device_id, memory_type.into(), &mut memory_info_ptr)
 				-> Error::CreateMemoryInfo;
@@ -232,6 +236,17 @@ impl MemoryInfo {
 		Ok(MemoryType::from(raw_type))
 	}
 
+	/// Returns the [`AllocatorType`] described by this struct.
+	pub fn allocator_type(&self) -> Result<AllocatorType> {
+		let mut raw_type: ort_sys::OrtAllocatorType = ort_sys::OrtAllocatorType::OrtInvalidAllocator;
+		ortsys![unsafe MemoryInfoGetType(self.ptr.as_ptr(), &mut raw_type) -> Error::GetAllocatorType];
+		Ok(match raw_type {
+			ort_sys::OrtAllocatorType::OrtArenaAllocator => AllocatorType::Arena,
+			ort_sys::OrtAllocatorType::OrtDeviceAllocator => AllocatorType::Device,
+			_ => unreachable!()
+		})
+	}
+
 	/// Returns the [`AllocationDevice`] this struct was created with.
 	pub fn allocation_device(&self) -> Result<AllocationDevice> {
 		let mut name_ptr: *const c_char = std::ptr::null_mut();
@@ -240,6 +255,13 @@ impl MemoryInfo {
 
 		let name: String = char_p_to_string(name_ptr)?;
 		AllocationDevice::try_from(name).map_err(Error::UnknownAllocationDevice)
+	}
+
+	/// Returns the ID of the [`AllocationDevice`] described by this struct.
+	pub fn device_id(&self) -> Result<i32> {
+		let mut raw: ort_sys::c_int = 0;
+		ortsys![unsafe MemoryInfoGetId(self.ptr.as_ptr(), &mut raw) -> Error::GetDeviceId];
+		Ok(raw as _)
 	}
 }
 
@@ -259,8 +281,9 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn create_memory_info() {
-		let memory_info = MemoryInfo::new_cpu(AllocatorType::Device, MemoryType::Default).unwrap();
+	fn create_memory_info() -> crate::Result<()> {
+		let memory_info = MemoryInfo::new_cpu(AllocatorType::Device, MemoryType::Default)?;
 		std::mem::drop(memory_info);
+		Ok(())
 	}
 }

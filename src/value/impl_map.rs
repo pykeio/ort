@@ -134,7 +134,7 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq + 'static, V: IntoTens
 
 impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug + Clone> Value<MapValueType<K, V>> {
 	pub fn extract_map(&self, allocator: &Allocator) -> HashMap<K, V> {
-		self.try_extract_map(allocator).unwrap()
+		self.try_extract_map(allocator).expect("Failed to extract map")
 	}
 
 	/// Converts from a strongly-typed [`Map<K, V>`] to a type-erased [`DynMap`].

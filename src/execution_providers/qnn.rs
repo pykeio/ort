@@ -135,7 +135,7 @@ impl ExecutionProvider for QNNExecutionProvider {
 				htp_performance_mode = self.htp_performance_mode.as_ref().map(QNNExecutionProviderPerformanceMode::as_str),
 				rpc_control_latency = self.rpc_control_latency
 			};
-			let ep_name = std::ffi::CString::new("QNN").unwrap();
+			let ep_name = std::ffi::CString::new("QNN").unwrap_or_else(|_| unreachable!());
 			return crate::error::status_to_result(crate::ortsys![unsafe SessionOptionsAppendExecutionProvider(
 				session_builder.session_options_ptr.as_ptr(),
 				ep_name.as_ptr(),

@@ -31,7 +31,7 @@ impl KernelAttributes {
 	}
 }
 
-trait GetKernelAttribute {
+pub trait GetKernelAttribute {
 	fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
 	where
 		Self: Sized;

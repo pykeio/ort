@@ -463,7 +463,7 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn extract_tensor(&self) -> ndarray::ArrayViewD<'_, T> {
-		self.try_extract_tensor().unwrap()
+		self.try_extract_tensor().expect("Failed to extract tensor")
 	}
 
 	/// Extracts the underlying data into a mutable [`ndarray::ArrayViewMut`].
@@ -488,7 +488,7 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn extract_tensor_mut(&mut self) -> ndarray::ArrayViewMutD<'_, T> {
-		self.try_extract_tensor_mut().unwrap()
+		self.try_extract_tensor_mut().expect("Failed to extract tensor")
 	}
 
 	/// Extracts the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and an immutable
@@ -507,7 +507,7 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// # }
 	/// ```
 	pub fn extract_raw_tensor(&self) -> (Vec<i64>, &[T]) {
-		self.try_extract_raw_tensor().unwrap()
+		self.try_extract_raw_tensor().expect("Failed to extract tensor")
 	}
 
 	/// Extracts the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and a mutable view
@@ -526,6 +526,6 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// # }
 	/// ```
 	pub fn extract_raw_tensor_mut(&mut self) -> (Vec<i64>, &mut [T]) {
-		self.try_extract_raw_tensor_mut().unwrap()
+		self.try_extract_raw_tensor_mut().expect("Failed to extract tensor")
 	}
 }

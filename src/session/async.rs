@@ -60,11 +60,11 @@ impl<'s> InferenceFutInner<'s> {
 	}
 
 	pub(crate) fn set_waker(&self, waker: Option<&Waker>) {
-		*self.waker.lock().unwrap() = waker.map(|c| c.to_owned());
+		*self.waker.lock().expect("Poisoned waker mutex") = waker.map(|c| c.to_owned());
 	}
 
 	pub(crate) fn wake(&self) {
-		if let Some(waker) = self.waker.lock().unwrap().take() {
+		if let Some(waker) = self.waker.lock().expect("Poisoned waker mutex").take() {
 			waker.wake();
 		}
 	}
@@ -156,7 +156,7 @@ crate::extern_system_fn! {
 					unsafe { Ok(CString::from_raw(p.cast_mut().cast())) }
 				})
 				.collect::<Result<Vec<_>>>()
-				.unwrap()
+				.expect("Input name should not be null")
 		);
 
 		if let Err(e) = crate::error::status_to_result(status) {

@@ -318,13 +318,13 @@ impl Session {
 	) -> Result<SessionOutputs<'_>> {
 		let input_names_ptr: Vec<*const c_char> = input_names
 			.iter()
-			.map(|n| CString::new(n.as_bytes()).unwrap())
+			.map(|n| CString::new(n.as_bytes()).unwrap_or_else(|_| unreachable!()))
 			.map(|n| n.into_raw().cast_const())
 			.collect();
 		let output_names_ptr: Vec<*const c_char> = self
 			.outputs
 			.iter()
-			.map(|output| CString::new(output.name.as_str()).unwrap())
+			.map(|output| CString::new(output.name.as_str()).unwrap_or_else(|_| unreachable!()))
 			.map(|n| n.into_raw().cast_const())
 			.collect();
 
@@ -412,13 +412,13 @@ impl Session {
 
 		let input_name_ptrs: Vec<*const c_char> = input_names
 			.iter()
-			.map(|n| CString::new(n.as_bytes()).unwrap())
+			.map(|n| CString::new(n.as_bytes()).unwrap_or_else(|_| unreachable!()))
 			.map(|n| n.into_raw().cast_const())
 			.collect();
 		let output_name_ptrs: Vec<*const c_char> = self
 			.outputs
 			.iter()
-			.map(|output| CString::new(output.name.as_str()).unwrap())
+			.map(|output| CString::new(output.name.as_str()).unwrap_or_else(|_| unreachable!()))
 			.map(|n| n.into_raw().cast_const())
 			.collect();
 

@@ -2,10 +2,11 @@ use std::{borrow::Cow, collections::HashMap, ops::Deref};
 
 use crate::{
 	value::{DynValueTypeMarker, ValueTypeMarker},
-	Value, ValueRef
+	Value, ValueRef, ValueRefMut
 };
 
 pub enum SessionInputValue<'v> {
+	ViewMut(ValueRefMut<'v, DynValueTypeMarker>),
 	View(ValueRef<'v, DynValueTypeMarker>),
 	Owned(Value<DynValueTypeMarker>)
 }
@@ -15,12 +16,18 @@ impl<'v> Deref for SessionInputValue<'v> {
 
 	fn deref(&self) -> &Self::Target {
 		match self {
+			SessionInputValue::ViewMut(v) => v,
 			SessionInputValue::View(v) => v,
 			SessionInputValue::Owned(v) => v
 		}
 	}
 }
 
+impl<'v, T: ValueTypeMarker + ?Sized> From<ValueRefMut<'v, T>> for SessionInputValue<'v> {
+	fn from(value: ValueRefMut<'v, T>) -> Self {
+		SessionInputValue::ViewMut(value.into_dyn())
+	}
+}
 impl<'v, T: ValueTypeMarker + ?Sized> From<ValueRef<'v, T>> for SessionInputValue<'v> {
 	fn from(value: ValueRef<'v, T>) -> Self {
 		SessionInputValue::View(value.into_dyn())
@@ -134,7 +141,7 @@ macro_rules! inputs {
 mod tests {
 	use std::{collections::HashMap, sync::Arc};
 
-	use crate::*;
+	use crate::{DynTensor, SessionInputs};
 
 	#[test]
 	fn test_hashmap_static_keys() -> crate::Result<()> {

@@ -18,6 +18,7 @@ default-members = [
 	'examples/yolov8',
 	'examples/modnet'
 ]
+exclude = [ 'examples/cudarc' ]
 
 [package]
 name = "ort"

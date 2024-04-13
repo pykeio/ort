@@ -5,7 +5,7 @@ description: Learn how to enable execution providers to leverage hardware accele
 
 Execution providers (EPs) enable ONNX Runtime to execute ONNX graphs with hardware acceleration. If you have specialized hardware like a GPU or NPU, execution providers can provide a massive performance boost to your `ort` applications. For more information on the intricacies of execution providers, see the [ONNX Runtime docs](https://onnxruntime.ai/docs/execution-providers/).
 
-ONNX Runtime must be compiled with support for each execution provider. pyke provides precompiled binaries for some of the most common EPs. Below is a table showing available EPs, their support in `ort`, and their binary availability status.
+ONNX Runtime must be compiled with support for each execution provider. pyke provides precompiled binaries for some of the most common EPs, so you won't need to compile ONNX Runtime from source. Below is a table showing available EPs, their support in `ort`, and their binary availability status.
 
 | EP | Supported | Binaries | Static linking
 |:-------- |:------- |:------ |:------ |
@@ -28,7 +28,9 @@ ONNX Runtime must be compiled with support for each execution provider. pyke pro
 | Microsoft Azure | ❌ | ❌ | ❓ |
 | Rockchip RKNPU | ❌ | ❌ | ❓ |
 
-Some EPs supported by ONNX Runtime are not supported by `ort` due to a lack of hardware for testing. If your preferred EP is missing support and you've got the hardware, please [open an issue](https://github.com/pykeio/ort/issues/new)!
+<Note>
+    Some EPs supported by ONNX Runtime are not supported by `ort` due to a lack of hardware for testing. If your preferred EP is missing support and you've got the hardware, please [open an issue](https://github.com/pykeio/ort/issues/new)!
+</Note>
 
 ## Registering execution providers
 <Info>
@@ -42,7 +44,7 @@ Some EPs supported by ONNX Runtime are not supported by `ort` due to a lack of h
     See [Cargo features](/setup/cargo-features) for the full list of features.
 </Info>
 
-In order to configure sessions to use a certain execution provider, you must **register** it before creating an environment or session. You can do this via the `SessionBuilder::with_execution_providers` method. For example, to register the CUDA execution provider:
+In order to configure sessions to use certain execution providers, you must **register** them when creating an environment or session. You can do this via the `SessionBuilder::with_execution_providers` method. For example, to register the CUDA execution provider for a session:
 
 ```rust
 use ort::{CUDAExecutionProvider, Session};
@@ -56,7 +58,7 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-You can, of course, specify multiple execution providers. `ort` will register all EPs specified, in order. If registration of an EP succeeds, `ort` will still continue to register the rest of the EPs so that ONNX Runtime can fallback to other EPs in case an EP does not support a certain operator.
+You can, of course, specify multiple execution providers. `ort` will register all EPs specified, in order. If an EP does not support a certain operator in a graph, it will fall back to the next successfully registered EP, or to the CPU if all else fails.
 
 ```rust
 use ort::{CoreMLExecutionProvider, CUDAExecutionProvider, DirectMLExecutionProvider, TensorRTExecutionProvider, Session};
@@ -103,7 +105,7 @@ fn main() -> anyhow::Result<()> {
 ## Fallback behavior
 `ort` will silently fail and fall back to executing on the CPU if all execution providers fail to register. In many cases, though, you'll want to show the user an error message when an EP fails to register, or outright abort the process.
 
-If you need to know the status of an EP registration, use `ExecutionProvider::register` on a `SessionBuilder`.
+To receive these registration errors, instead use `ExecutionProvider::register` to register an execution provider:
 
 ```rust
 use ort::{CUDAExecutionProvider, ExecutionProvider, Session};
@@ -137,6 +139,9 @@ fn main() -> anyhow::Result<()> {
         std::process::exit(1);
     }
 
+    // Note that even though ONNX Runtime was compiled with CoreML, registration could still fail!
+    coreml.register(&builder)?;
+
     let session = builder.commit_from_file("model.onnx")?;
 
     Ok(())
@@ -162,9 +167,11 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-If a session is built `with_execution_providers` after configuring global defaults, the EPs provided by the session will be registered *after* the environment defaults. It does not override the environment EPs.
+<Warning>
+    `ort::init` must come before you create any sessions, otherwise the configuration will not take effect!
+</Warning>
 
-Note that `ort::init` must come before you create any sessions, otherwise the configuration will not take effect!
+Sessions configured with their own execution providers will *extend* the execution provider defaults, rather than overriding them.
 
 ## Troubleshooting
 If it seems like the execution provider is not registering properly, or you are not getting acceptable performance, see the [Troubleshooting: Performance](/troubleshooting/performance) page for more information on how to debug any EP issues.

@@ -1,6 +1,7 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/pykeio/ort/v2/docs/icon.png")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-#![allow(clippy::tabs_in_doc_comments)]
+#![allow(clippy::tabs_in_doc_comments, clippy::arc_with_non_send_sync)]
+#![warn(clippy::unwrap_used)]
 
 //! <div align=center>
 //! 	<img src="https://raw.githubusercontent.com/pykeio/ort/v2/docs/banner.png" width="350px">
@@ -122,7 +123,7 @@ pub(crate) fn lib_handle() -> &'static libloading::Library {
 			let relative = std::env::current_exe()
 				.expect("could not get current executable path")
 				.parent()
-				.unwrap()
+				.expect("executable is root?")
 				.join(&path);
 			if relative.exists() { relative } else { path }
 		};
@@ -182,7 +183,8 @@ pub fn api() -> NonNull<ort_sys::OrtApi> {
 					{
 						let base: *const ort_sys::OrtApiBase = ort_sys::OrtGetApiBase();
 						assert_ne!(base, ptr::null());
-						let get_api: extern_system_fn! { unsafe fn(u32) -> *const ort_sys::OrtApi } = (*base).GetApi.unwrap();
+						let get_api: extern_system_fn! { unsafe fn(u32) -> *const ort_sys::OrtApi } =
+							(*base).GetApi.expect("`GetApi` must be present in `OrtApiBase`");
 						let api: *const ort_sys::OrtApi = get_api(ort_sys::ORT_API_VERSION);
 						assert!(!api.is_null());
 						AtomicPtr::new(api.cast_mut())
@@ -195,44 +197,44 @@ pub fn api() -> NonNull<ort_sys::OrtApi> {
 
 macro_rules! ortsys {
 	($method:ident) => {
-		$crate::api().as_ref().$method.unwrap()
+		$crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))
 	};
 	(unsafe $method:ident) => {
-		unsafe { $crate::api().as_ref().$method.unwrap() }
+		unsafe { $crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null"))) }
 	};
 	($method:ident($($n:expr),+ $(,)?)) => {
-		$crate::api().as_ref().$method.unwrap()($($n),+)
+		$crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+)
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?)) => {
-		unsafe { $crate::api().as_ref().$method.unwrap()($($n),+) }
+		unsafe { $crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) }
 	};
-	($method:ident($($n:expr),+ $(,)?).unwrap()) => {
-		$crate::error::status_to_result($crate::api().as_ref().$method.unwrap()($($n),+)).unwrap()
+	($method:ident($($n:expr),+ $(,)?).expect($e:expr)) => {
+		$crate::error::status_to_result($crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+)).expect($e)
 	};
-	(unsafe $method:ident($($n:expr),+ $(,)?).unwrap()) => {
-		$crate::error::status_to_result(unsafe { $crate::api().as_ref().$method.unwrap()($($n),+) }).unwrap()
+	(unsafe $method:ident($($n:expr),+ $(,)?).expect($e:expr)) => {
+		$crate::error::status_to_result(unsafe { $crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) }).expect($e)
 	};
 	($method:ident($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {
-		$crate::api().as_ref().$method.unwrap()($($n),+);
+		$crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+);
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {{
-		let _x = unsafe { $crate::api().as_ref().$method.unwrap()($($n),+) };
+		let _x = unsafe { $crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) };
 		$($crate::error::assert_non_null_pointer($check, stringify!($method)).unwrap();)+
 		_x
 	}};
 	($method:ident($($n:expr),+ $(,)?) -> $err:expr$(;)?) => {
-		$crate::error::status_to_result($crate::api().as_ref().$method.unwrap()($($n),+)).map_err($err)?;
+		$crate::error::status_to_result($crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+)).map_err($err)?;
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?) -> $err:expr$(;)?) => {
-		$crate::error::status_to_result(unsafe { $crate::api().as_ref().$method.unwrap()($($n),+) }).map_err($err)?;
+		$crate::error::status_to_result(unsafe { $crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) }).map_err($err)?;
 	};
 	($method:ident($($n:expr),+ $(,)?) -> $err:expr; nonNull($($check:expr),+ $(,)?)$(;)?) => {
-		$crate::error::status_to_result($crate::api().as_ref().$method.unwrap()($($n),+)).map_err($err)?;
+		$crate::error::status_to_result($crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+)).map_err($err)?;
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?) -> $err:expr; nonNull($($check:expr),+ $(,)?)$(;)?) => {{
-		$crate::error::status_to_result(unsafe { $crate::api().as_ref().$method.unwrap()($($n),+) }).map_err($err)?;
+		$crate::error::status_to_result(unsafe { $crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) }).map_err($err)?;
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	}};
 }
@@ -255,9 +257,9 @@ mod test {
 	use super::*;
 
 	#[test]
-	fn test_char_p_to_string() {
-		let s = CString::new("foo").unwrap();
+	fn test_char_p_to_string() 
+		let s = CString::new("foo").unwrap_or_else(|_| unreachable!());
 		let ptr = s.as_c_str().as_ptr();
-		assert_eq!("foo", char_p_to_string(ptr).unwrap());
+		assert_eq!("foo", char_p_to_string(ptr).expect("failed to convert string"));
 	}
 }

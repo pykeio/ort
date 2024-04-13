@@ -9,7 +9,7 @@ use std::{
 };
 
 use super::{UpcastableTarget, Value, ValueInner, ValueTypeMarker};
-use crate::{ortsys, DynValue, IntoTensorElementType, ValueRef, ValueRefMut, ValueType};
+use crate::{ortsys, DynValue, Error, IntoTensorElementType, MemoryInfo, Result, ValueRef, ValueRefMut, ValueType};
 
 pub trait TensorValueTypeMarker: ValueTypeMarker {}
 
@@ -34,6 +34,29 @@ pub type TensorRefMut<'v, T> = ValueRefMut<'v, TensorValueType<T>>;
 impl UpcastableTarget for DynTensorValueType {
 	fn can_upcast(dtype: &ValueType) -> bool {
 		matches!(dtype, ValueType::Tensor { .. })
+	}
+}
+
+impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
+	/// Returns a mutable pointer to the tensor's data.
+	pub fn data_ptr_mut(&mut self) -> Result<*mut ort_sys::c_void> {
+		let mut buffer_ptr: *mut ort_sys::c_void = std::ptr::null_mut();
+		ortsys![unsafe GetTensorMutableData(self.ptr(), &mut buffer_ptr) -> Error::GetTensorMutableData; nonNull(buffer_ptr)];
+		Ok(buffer_ptr)
+	}
+
+	/// Returns a pointer to the tensor's data.
+	pub fn data_ptr(&self) -> Result<*const ort_sys::c_void> {
+		let mut buffer_ptr: *mut ort_sys::c_void = std::ptr::null_mut();
+		ortsys![unsafe GetTensorMutableData(self.ptr(), &mut buffer_ptr) -> Error::GetTensorMutableData; nonNull(buffer_ptr)];
+		Ok(buffer_ptr)
+	}
+
+	/// Returns information about the device this tensor is allocated on.
+	pub fn memory_info(&self) -> Result<MemoryInfo> {
+		let mut memory_info_ptr: *const ort_sys::OrtMemoryInfo = std::ptr::null_mut();
+		ortsys![unsafe GetTensorMemoryInfo(self.ptr(), &mut memory_info_ptr) -> Error::GetTensorMemoryInfo; nonNull(memory_info_ptr)];
+		Ok(MemoryInfo::from_raw(unsafe { NonNull::new_unchecked(memory_info_ptr.cast_mut()) }, false))
 	}
 }
 
@@ -91,14 +114,14 @@ impl<T: IntoTensorElementType + Clone + Debug, const N: usize> Index<[i64; N]> f
 	type Output = T;
 	fn index(&self, index: [i64; N]) -> &Self::Output {
 		let mut out: *mut ort_sys::c_void = std::ptr::null_mut();
-		ortsys![unsafe TensorAt(self.ptr(), index.as_ptr(), N as _, &mut out).unwrap()];
+		ortsys![unsafe TensorAt(self.ptr(), index.as_ptr(), N as _, &mut out).expect("Failed to index tensor")];
 		unsafe { &*out.cast::<T>() }
 	}
 }
 impl<T: IntoTensorElementType + Clone + Debug, const N: usize> IndexMut<[i64; N]> for Tensor<T> {
 	fn index_mut(&mut self, index: [i64; N]) -> &mut Self::Output {
 		let mut out: *mut ort_sys::c_void = std::ptr::null_mut();
-		ortsys![unsafe TensorAt(self.ptr(), index.as_ptr(), N as _, &mut out).unwrap()];
+		ortsys![unsafe TensorAt(self.ptr(), index.as_ptr(), N as _, &mut out).expect("Failed to index tensor")];
 		unsafe { &mut *out.cast::<T>() }
 	}
 }
@@ -109,7 +132,7 @@ mod tests {
 
 	use ndarray::{ArcArray1, Array1, CowArray};
 
-	use crate::*;
+	use crate::{Allocator, DynTensor, TensorElementType, Value, ValueType};
 
 	#[test]
 	#[cfg(feature = "ndarray")]

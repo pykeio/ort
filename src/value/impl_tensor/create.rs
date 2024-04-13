@@ -17,7 +17,7 @@ use crate::{
 	ortsys,
 	tensor::{IntoTensorElementType, TensorElementType, Utf8Data},
 	value::ValueInner,
-	AllocatorType, DynValue, Error, MemoryType, Result, Value
+	AllocatorType, DynValue, Error, MemoryType, Result, TensorRefMut, Value
 };
 
 impl DynTensor {
@@ -210,6 +210,63 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 			},
 			_markers: PhantomData
 		})
+	}
+}
+
+impl<'a, T: IntoTensorElementType + Debug> TensorRefMut<'a, T> {
+	/// Create a mutable tensor view from a raw pointer and shape.
+	///
+	/// The length of data is determined by `T` and the given shape, so the given buffer must be at least
+	/// `shape.iter().product() * std::mem::size_of::<T>()` bytes.
+	///
+	/// This function can be used to create data from raw device memory, e.g. to directly provide data to an execution
+	/// provider. For instance, to create a tensor from a raw CUDA buffer using [`cudarc`](https://docs.rs/cudarc):
+	/// ```ignore
+	/// let device = CudaDevice::new(0)?;
+	/// let device_data = device.htod_sync_copy(&input_data)?;
+	///
+	/// let tensor: TensorRefMut<'_, f32> = unsafe {
+	/// 	TensorRefMut::from_raw(
+	/// 		MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?,
+	/// 		(*device_data.device_ptr() as usize as *mut ()).cast(),
+	/// 		vec![1, 3, 512, 512]
+	/// 	)?
+	/// };
+	/// ```
+	///
+	/// # Safety
+	/// - The pointer must be valid for the device description provided by `MemoryInfo`.
+	/// - The returned tensor must outlive the data described by the data pointer.
+	pub unsafe fn from_raw(info: MemoryInfo, data: *mut ort_sys::c_void, shape: Vec<i64>) -> Result<TensorRefMut<'a, T>> {
+		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
+
+		// f16 and bf16 are repr(transparent) to u16, so memory layout should be identical to onnxruntime
+		let shape_ptr: *const i64 = shape.as_ptr();
+		let shape_len = shape.len();
+
+		let data_len = shape.iter().product::<i64>() as usize * std::mem::size_of::<T>();
+
+		ortsys![
+			unsafe CreateTensorWithDataAsOrtValue(
+				info.ptr.as_ptr(),
+				data,
+				data_len as _,
+				shape_ptr,
+				shape_len as _,
+				T::into_tensor_element_type().into(),
+				&mut value_ptr
+			) -> Error::CreateTensorWithData;
+			nonNull(value_ptr)
+		];
+
+		Ok(TensorRefMut::new(Value {
+			inner: ValueInner::CppOwned {
+				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
+				drop: true,
+				_session: None
+			},
+			_markers: PhantomData
+		}))
 	}
 }
 

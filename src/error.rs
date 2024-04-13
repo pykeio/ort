@@ -19,7 +19,7 @@ impl<T> IntoStatus for Result<T, Error> {
 			Ok(_) => return ptr::null_mut(),
 			Err(e) => (ort_sys::OrtErrorCode::ORT_FAIL, Some(e.to_string()))
 		};
-		let message = message.map(|c| CString::new(c).unwrap());
+		let message = message.map(|c| CString::new(c).unwrap_or_else(|_| unreachable!()));
 		// message will be copied, so this shouldn't leak
 		ortsys![unsafe CreateStatus(code, message.map(|c| c.as_ptr()).unwrap_or_else(std::ptr::null))]
 	}
@@ -136,6 +136,8 @@ pub enum Error {
 	/// Error occurred when extracting data from an ONNX tensor into an C array to be used as an `ndarray::ArrayView`.
 	#[error("Failed to get tensor data: {0}")]
 	GetTensorMutableData(ErrorInternal),
+	#[error("Failed to get memory info from tensor: {0}")]
+	GetTensorMemoryInfo(ErrorInternal),
 	/// Error occurred when extracting string data from an ONNX tensor
 	#[error("Failed to get tensor string data: {0}")]
 	GetStringTensorContent(ErrorInternal),
@@ -261,7 +263,11 @@ pub enum Error {
 	#[error("Could't get `MemoryInfo` from allocator: {0}")]
 	AllocatorGetInfo(ErrorInternal),
 	#[error("Could't get `MemoryType` from memory info: {0}")]
-	GetMemoryType(ErrorInternal)
+	GetMemoryType(ErrorInternal),
+	#[error("Could't get `AllocatorType` from memory info: {0}")]
+	GetAllocatorType(ErrorInternal),
+	#[error("Could't get device ID from memory info: {0}")]
+	GetDeviceId(ErrorInternal)
 }
 
 impl From<Infallible> for Error {

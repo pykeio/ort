@@ -101,7 +101,7 @@ impl<T: ValueTypeMarker + UpcastableTarget + Debug + Sized + 'static> Value<Sequ
 
 impl<T: ValueTypeMarker + UpcastableTarget + Debug + Sized> Value<SequenceValueType<T>> {
 	pub fn extract_sequence<'s>(&'s self, allocator: &Allocator) -> Vec<ValueRef<'s, T>> {
-		self.try_extract_sequence(allocator).unwrap()
+		self.try_extract_sequence(allocator).expect("Failed to extract sequence")
 	}
 
 	/// Converts from a strongly-typed [`Sequence<T>`] to a type-erased [`DynSequence`].

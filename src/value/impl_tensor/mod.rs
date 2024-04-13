@@ -9,7 +9,7 @@ use std::{
 };
 
 use super::{UpcastableTarget, Value, ValueInner, ValueTypeMarker};
-use crate::{ortsys, DynValue, IntoTensorElementType, ValueRef, ValueRefMut, ValueType};
+use crate::{ortsys, DynValue, Error, IntoTensorElementType, MemoryInfo, Result, ValueRef, ValueRefMut, ValueType};
 
 pub trait TensorValueTypeMarker: ValueTypeMarker {}
 
@@ -34,6 +34,29 @@ pub type TensorRefMut<'v, T> = ValueRefMut<'v, TensorValueType<T>>;
 impl UpcastableTarget for DynTensorValueType {
 	fn can_upcast(dtype: &ValueType) -> bool {
 		matches!(dtype, ValueType::Tensor { .. })
+	}
+}
+
+impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
+	/// Returns a mutable pointer to the tensor's data.
+	pub fn data_ptr_mut(&mut self) -> Result<*mut ort_sys::c_void> {
+		let mut buffer_ptr: *mut ort_sys::c_void = std::ptr::null_mut();
+		ortsys![unsafe GetTensorMutableData(self.ptr(), &mut buffer_ptr) -> Error::GetTensorMutableData; nonNull(buffer_ptr)];
+		Ok(buffer_ptr)
+	}
+
+	/// Returns a pointer to the tensor's data.
+	pub fn data_ptr(&self) -> Result<*const ort_sys::c_void> {
+		let mut buffer_ptr: *mut ort_sys::c_void = std::ptr::null_mut();
+		ortsys![unsafe GetTensorMutableData(self.ptr(), &mut buffer_ptr) -> Error::GetTensorMutableData; nonNull(buffer_ptr)];
+		Ok(buffer_ptr)
+	}
+
+	/// Returns information about the device this tensor is allocated on.
+	pub fn memory_info(&self) -> Result<MemoryInfo> {
+		let mut memory_info_ptr: *const ort_sys::OrtMemoryInfo = std::ptr::null_mut();
+		ortsys![unsafe GetTensorMemoryInfo(self.ptr(), &mut memory_info_ptr) -> Error::GetTensorMemoryInfo; nonNull(memory_info_ptr)];
+		Ok(MemoryInfo::from_raw(unsafe { NonNull::new_unchecked(memory_info_ptr.cast_mut()) }, false))
 	}
 }
 

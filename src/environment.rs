@@ -41,7 +41,7 @@ impl Environment {
 }
 
 impl Drop for Environment {
-	// #[tracing::instrument]
+	#[tracing::instrument]
 	fn drop(&mut self) {
 		debug!("Releasing environment");
 

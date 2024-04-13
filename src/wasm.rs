@@ -1,12 +1,27 @@
+//! Utilities for using `ort` in WebAssembly.
+//!
+//! You **must** call `ort::wasm::initialize()` before using any `ort` APIs:
+//! ```
+//! # use ort::Session;
+//! # static MODEL_BYTES: &[u8] = include_bytes!("../tests/data/upsample.ort");
+//! # fn main() -> ort::Result<()> {
+//! #[cfg(target_arch = "wasm32")]
+//! ort::wasm::initialize();
+//!
+//! let session = Session::builder()?.commit_from_memory_directly(MODEL_BYTES)?;
+//! # 	Ok(())
+//! # }
+//! ```
+
 use std::{
 	alloc::{self, Layout},
 	arch::wasm32,
-	ffi::c_void,
 	ptr, slice, str
 };
 
-pub mod fmt_shims {
-	use super::*;
+mod fmt_shims {
+	// localized time string formatting functions
+	// TODO: remove any remaining codepaths to these
 
 	#[no_mangle]
 	pub unsafe extern "C" fn strftime_l(_s: *mut u8, _l: usize, _m: *const u8, _t: *const (), _lt: *const ()) -> usize {
@@ -30,20 +45,39 @@ pub mod fmt_shims {
 	}
 }
 
-pub mod libc_shims {
+pub(crate) mod libc_shims {
 	use super::*;
 
-	const _: () = assert!(std::mem::size_of::<usize>() == 4);
+	// Rust, unlike C, requires us to know the exact layout of an allocation in order to deallocate it, so we need to
+	// store this data at the beginning of the allocation for us to be able to pick up on deallocation:
+	//
+	//     ┌---- actual allocated pointer
+	//     ▼
+	//     +-------------+-------+------+----------------+
+	//     | ...padding  | align | size |    data...     |
+	//     | -align..-8  |  -8   |  -4  |    0..size     |
+	//     +-------------+- -----+------+----------------+
+	//                                  ▲
+	//       pointer returned to C   ---┘
+	//
+	// This does unfortunately mean we waste a little extra memory (note that most allocators *also* store the layout
+	// information in a similar manner, but we can't access it).
 
-	unsafe fn alloc_inner(size: usize, align: usize) -> *mut u8 {
+	const _: () = assert!(std::mem::size_of::<usize>() == 4, "32-bit pointer width (wasm32) required");
+
+	unsafe fn alloc_inner<const ZERO: bool>(size: usize, align: usize) -> *mut u8 {
+		// need enough space to store the size & alignment bytes
 		let align = align.max(8);
-		let ptr = alloc::alloc_zeroed(Layout::from_size_align_unchecked(size + align, align));
+
+		let layout = Layout::from_size_align_unchecked(size + align, align);
+		let ptr = if ZERO { alloc::alloc_zeroed(layout) } else { alloc::alloc(layout) };
 		ptr::copy_nonoverlapping(size.to_le_bytes().as_ptr(), ptr.add(align - 4), 4);
 		ptr::copy_nonoverlapping(align.to_le_bytes().as_ptr(), ptr.add(align - 8), 4);
 		ptr.add(align)
 	}
 
 	unsafe fn free_inner(ptr: *mut u8) {
+		// something likes to free(NULL) a lot, which is valid in C (because of course it is...)
 		if ptr.is_null() {
 			return;
 		}
@@ -54,17 +88,19 @@ pub mod libc_shims {
 		alloc::dealloc(ptr.sub(align), layout);
 	}
 
+	const DEFAULT_ALIGNMENT: usize = 32;
+
 	#[no_mangle]
 	pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
-		alloc_inner(size, 32)
+		alloc_inner::<false>(size, DEFAULT_ALIGNMENT)
 	}
 	#[no_mangle]
 	pub unsafe extern "C" fn __libc_malloc(size: usize) -> *mut u8 {
-		alloc_inner(size, 32)
+		alloc_inner::<false>(size, DEFAULT_ALIGNMENT)
 	}
 	#[no_mangle]
 	pub unsafe extern "C" fn __libc_calloc(n: usize, size: usize) -> *mut u8 {
-		alloc_inner(size * n, 32)
+		alloc_inner::<true>(size * n, DEFAULT_ALIGNMENT)
 	}
 	#[no_mangle]
 	pub unsafe extern "C" fn free(ptr: *mut u8) {
@@ -77,7 +113,7 @@ pub mod libc_shims {
 
 	#[no_mangle]
 	pub unsafe extern "C" fn posix_memalign(ptr: *mut *mut u8, align: usize, size: usize) -> i32 {
-		*ptr = alloc_inner(size, align);
+		*ptr = alloc_inner::<false>(size, align);
 		0
 	}
 
@@ -99,37 +135,45 @@ pub mod libc_shims {
 
 #[cfg(not(target_os = "wasi"))]
 mod wasi_shims {
+	#[allow(non_camel_case_types)]
+	type __wasi_errno_t = u16;
+
+	const __WASI_ENOTSUP: __wasi_errno_t = 58;
+
+	// mock filesystem for non-WASI platforms - most of the codepaths to any FS operations should've been removed, but we
+	// return ENOTSUP just to be safe
+
 	#[no_mangle]
-	pub unsafe extern "C" fn __wasi_environ_sizes_get(argc: *mut usize, argv_buf_size: *mut usize) -> u16 {
+	pub unsafe extern "C" fn __wasi_environ_sizes_get(argc: *mut usize, argv_buf_size: *mut usize) -> __wasi_errno_t {
 		*argc = 0;
 		*argv_buf_size = 0;
-		58
+		__WASI_ENOTSUP
 	}
 
 	#[no_mangle]
-	pub unsafe extern "C" fn __wasi_environ_get(_environ: *mut *mut u8, _buf: *mut u8) -> u16 {
-		58
+	pub unsafe extern "C" fn __wasi_environ_get(_environ: *mut *mut u8, _buf: *mut u8) -> __wasi_errno_t {
+		__WASI_ENOTSUP
 	}
 
 	#[no_mangle]
-	pub unsafe extern "C" fn __wasi_fd_seek(_fd: u32, _offset: i64, _whence: u8, _new_offset: *mut u64) -> u16 {
-		58
+	pub unsafe extern "C" fn __wasi_fd_seek(_fd: u32, _offset: i64, _whence: u8, _new_offset: *mut u64) -> __wasi_errno_t {
+		__WASI_ENOTSUP
 	}
 	#[no_mangle]
-	pub unsafe extern "C" fn __wasi_fd_write(_fd: u32, _iovs: *const (), _iovs_len: usize, _nwritten: *mut usize) -> u16 {
-		58
+	pub unsafe extern "C" fn __wasi_fd_write(_fd: u32, _iovs: *const (), _iovs_len: usize, _nwritten: *mut usize) -> __wasi_errno_t {
+		__WASI_ENOTSUP
 	}
 	#[no_mangle]
-	pub unsafe extern "C" fn __wasi_fd_read(_fd: u32, _iovs: *const (), _iovs_len: usize, _nread: *mut usize) -> u16 {
-		58
+	pub unsafe extern "C" fn __wasi_fd_read(_fd: u32, _iovs: *const (), _iovs_len: usize, _nread: *mut usize) -> __wasi_errno_t {
+		__WASI_ENOTSUP
 	}
 	#[no_mangle]
-	pub unsafe extern "C" fn __wasi_fd_close(_fd: u32) -> u16 {
-		58
+	pub unsafe extern "C" fn __wasi_fd_close(_fd: u32) -> __wasi_errno_t {
+		__WASI_ENOTSUP
 	}
 }
 
-pub mod emscripten_shims {
+mod emscripten_shims {
 	use super::*;
 
 	#[no_mangle]
@@ -163,15 +207,21 @@ pub mod emscripten_shims {
 	}
 
 	#[no_mangle]
+	#[tracing::instrument]
 	pub unsafe extern "C" fn emscripten_errn(str: *const u8, len: usize) {
 		let c = str::from_utf8_unchecked(slice::from_raw_parts(str, len));
-		eprintln!("{c}");
+		tracing::error!("Emscripten error: {c}");
 	}
 }
 
 #[no_mangle]
 #[export_name = "_initialize"]
 pub fn initialize() {
+	// No idea what the hell this does, but the presence of an `_initialize` function prevents the linker from calling
+	// `__wasm_call_ctors` at the top of every function - including the functions `wasm-bindgen` interprets to generate
+	// JS glue code. The `__wasm_call_ctors` call was calling complex functions that the interpreter isn't equipped to
+	// handle, which was preventing wbg from outputting anything. I don't know what specific constructors this is calling,
+	// but they're probably important, so we encourage the user to perform this initialization at program start.
 	extern "C" {
 		fn __wasm_call_ctors();
 	}

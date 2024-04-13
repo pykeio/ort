@@ -6,13 +6,13 @@ use std::os::windows::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::{
 	any::Any,
-	ffi::CString,
 	marker::PhantomData,
-	path::Path,
 	ptr::{self, NonNull},
 	rc::Rc,
 	sync::{atomic::Ordering, Arc}
 };
+#[cfg(not(target_arch = "wasm32"))]
+use std::{ffi::CString, path::Path};
 
 use super::{dangerous, InMemorySession, Input, Output, Session, SharedSessionInner};
 #[cfg(feature = "fetch-models")]
@@ -166,6 +166,8 @@ impl SessionBuilder {
 	/// newly optimized model to the given path (for 'offline' graph optimization).
 	///
 	/// Note that the file will only be created after the model is committed.
+	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn with_optimized_model_path<S: AsRef<str>>(self, path: S) -> Result<Self> {
 		#[cfg(windows)]
 		let path = path.as_ref().encode_utf16().chain([0]).collect::<Vec<_>>();
@@ -177,6 +179,8 @@ impl SessionBuilder {
 
 	/// Enables profiling. Profile information will be writen to `profiling_file` after profiling completes.
 	/// See [`Session::end_profiling`].
+	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn with_profiling<S: AsRef<str>>(self, profiling_file: S) -> Result<Self> {
 		#[cfg(windows)]
 		let profiling_file = profiling_file.as_ref().encode_utf16().chain([0]).collect::<Vec<_>>();
@@ -205,8 +209,8 @@ impl SessionBuilder {
 	}
 
 	/// Registers a custom operator library at the given library path.
-	#[cfg(feature = "operator-libraries")]
-	#[cfg_attr(docsrs, doc(cfg(feature = "operator-libraries")))]
+	#[cfg(all(feature = "operator-libraries", not(target_arch = "wasm32")))]
+	#[cfg_attr(docsrs, doc(cfg(all(feature = "operator-libraries", not(target_arch = "wasm32")))))]
 	pub fn with_operator_library(mut self, lib_path: impl AsRef<str>) -> Result<Self> {
 		let path_cstr = CString::new(lib_path.as_ref())?;
 
@@ -232,6 +236,8 @@ impl SessionBuilder {
 	}
 
 	/// Enables [`onnxruntime-extensions`](https://github.com/microsoft/onnxruntime-extensions) custom operators.
+	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn with_extensions(self) -> Result<Self> {
 		let status = ortsys![unsafe EnableOrtCustomOps(self.session_options_ptr.as_ptr())];
 		status_to_result(status).map_err(Error::CreateSessionOptions)?;
@@ -246,8 +252,8 @@ impl SessionBuilder {
 	}
 
 	/// Downloads a pre-trained ONNX model from the given URL and builds the session.
-	#[cfg(feature = "fetch-models")]
-	#[cfg_attr(docsrs, doc(cfg(feature = "fetch-models")))]
+	#[cfg(all(feature = "fetch-models", not(target_arch = "wasm32")))]
+	#[cfg_attr(docsrs, doc(cfg(all(feature = "fetch-models", not(target_arch = "wasm32")))))]
 	pub fn commit_from_url(self, model_url: impl AsRef<str>) -> Result<Session> {
 		let mut download_dir = ort_sys::internal::dirs::cache_dir()
 			.expect("could not determine cache directory")
@@ -292,6 +298,8 @@ impl SessionBuilder {
 	}
 
 	/// Loads an ONNX model from a file and builds the session.
+	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn commit_from_file<P>(mut self, model_filepath_ref: P) -> Result<Session>
 	where
 		P: AsRef<Path>

@@ -110,7 +110,7 @@ impl<T: ValueTypeMarker + UpcastableTarget + Debug + Sized> Value<SequenceValueT
 		unsafe { std::mem::transmute(self) }
 	}
 
-	/// Converts from a strongly-typed [`Sequence<T>`] to a reference to a type-erased [`DynTensor`].
+	/// Converts from a strongly-typed [`Sequence<T>`] to a reference to a type-erased [`DynSequence`].
 	#[inline]
 	pub fn downcast_ref(&self) -> DynSequenceRef {
 		DynSequenceRef::new(unsafe {
@@ -121,7 +121,7 @@ impl<T: ValueTypeMarker + UpcastableTarget + Debug + Sized> Value<SequenceValueT
 		})
 	}
 
-	/// Converts from a strongly-typed [`Sequence<T>`] to a mutable reference to a type-erased [`DynTensor`].
+	/// Converts from a strongly-typed [`Sequence<T>`] to a mutable reference to a type-erased [`DynSequence`].
 	#[inline]
 	pub fn downcast_mut(&mut self) -> DynSequenceRefMut {
 		DynSequenceRefMut::new(unsafe {

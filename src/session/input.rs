@@ -141,7 +141,7 @@ macro_rules! inputs {
 mod tests {
 	use std::{collections::HashMap, sync::Arc};
 
-	use crate::*;
+	use crate::{DynTensor, SessionInputs};
 
 	#[test]
 	fn test_hashmap_static_keys() -> crate::Result<()> {

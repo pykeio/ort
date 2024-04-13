@@ -114,14 +114,14 @@ impl<T: IntoTensorElementType + Clone + Debug, const N: usize> Index<[i64; N]> f
 	type Output = T;
 	fn index(&self, index: [i64; N]) -> &Self::Output {
 		let mut out: *mut ort_sys::c_void = std::ptr::null_mut();
-		ortsys![unsafe TensorAt(self.ptr(), index.as_ptr(), N as _, &mut out).unwrap()];
+		ortsys![unsafe TensorAt(self.ptr(), index.as_ptr(), N as _, &mut out).expect("Failed to index tensor")];
 		unsafe { &*out.cast::<T>() }
 	}
 }
 impl<T: IntoTensorElementType + Clone + Debug, const N: usize> IndexMut<[i64; N]> for Tensor<T> {
 	fn index_mut(&mut self, index: [i64; N]) -> &mut Self::Output {
 		let mut out: *mut ort_sys::c_void = std::ptr::null_mut();
-		ortsys![unsafe TensorAt(self.ptr(), index.as_ptr(), N as _, &mut out).unwrap()];
+		ortsys![unsafe TensorAt(self.ptr(), index.as_ptr(), N as _, &mut out).expect("Failed to index tensor")];
 		unsafe { &mut *out.cast::<T>() }
 	}
 }
@@ -132,7 +132,7 @@ mod tests {
 
 	use ndarray::{ArcArray1, Array1, CowArray};
 
-	use crate::*;
+	use crate::{Allocator, DynTensor, TensorElementType, Value, ValueType};
 
 	#[test]
 	#[cfg(feature = "ndarray")]

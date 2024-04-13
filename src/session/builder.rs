@@ -54,7 +54,7 @@ impl Clone for SessionBuilder {
 		let mut session_options_ptr = ptr::null_mut();
 		status_to_result(ortsys![unsafe CloneSessionOptions(self.session_options_ptr.as_ptr(), ptr::addr_of_mut!(session_options_ptr))])
 			.expect("error cloning session options");
-		assert_non_null_pointer(session_options_ptr, "OrtSessionOptions").unwrap();
+		assert_non_null_pointer(session_options_ptr, "OrtSessionOptions").expect("Cloned session option pointer is null");
 		Self {
 			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },
 			memory_info: self.memory_info.clone(),
@@ -253,11 +253,11 @@ impl SessionBuilder {
 			.expect("could not determine cache directory")
 			.join("models");
 		if std::fs::create_dir_all(&download_dir).is_err() {
-			download_dir = std::env::current_dir().unwrap();
+			download_dir = std::env::current_dir().expect("Failed to obtain current working directory");
 		}
 
 		let url = model_url.as_ref();
-		let model_filename = PathBuf::from(url.split('/').last().unwrap());
+		let model_filename = PathBuf::from(url.split('/').last().expect("Missing filename in model URL"));
 		let model_filepath = download_dir.join(model_filename);
 		let downloaded_path = if model_filepath.exists() {
 			tracing::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), "Model already exists, skipping download");
@@ -267,13 +267,15 @@ impl SessionBuilder {
 
 			let resp = ureq::get(url).call().map_err(Box::new).map_err(FetchModelError::FetchError)?;
 
-			assert!(resp.has("Content-Length"));
-			let len = resp.header("Content-Length").and_then(|s| s.parse::<usize>().ok()).unwrap();
+			let len = resp
+				.header("Content-Length")
+				.and_then(|s| s.parse::<usize>().ok())
+				.expect("Missing Content-Length header");
 			tracing::info!(len, "Downloading {} bytes", len);
 
 			let mut reader = resp.into_reader();
 
-			let f = std::fs::File::create(&model_filepath).unwrap();
+			let f = std::fs::File::create(&model_filepath).expect("Failed to create model file");
 			let mut writer = std::io::BufWriter::new(f);
 
 			let bytes_io_count = std::io::copy(&mut reader, &mut writer).map_err(FetchModelError::IoError)?;

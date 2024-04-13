@@ -48,7 +48,7 @@ impl ExecutionProvider for XNNPACKExecutionProvider {
 			let (key_ptrs, value_ptrs, len, _keys, _values) = super::map_keys! {
 				intra_op_num_threads = self.intra_op_num_threads.as_ref()
 			};
-			let ep_name = std::ffi::CString::new("XNNPACK").unwrap();
+			let ep_name = std::ffi::CString::new("XNNPACK").unwrap_or_else(|_| unreachable!());
 			return crate::error::status_to_result(crate::ortsys![unsafe SessionOptionsAppendExecutionProvider(
 				session_builder.session_options_ptr.as_ptr(),
 				ep_name.as_ptr(),

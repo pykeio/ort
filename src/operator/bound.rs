@@ -141,7 +141,7 @@ impl<O: Operator> BoundOperator<O> {
 			.and_then(|c| c.variadic_min_arity)
 			.unwrap_or(1)
 			.try_into()
-			.unwrap()
+			.expect("input minimum arity overflows i32")
 	}
 	pub(crate) unsafe extern "C" fn GetVariadicInputHomogeneity(_: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
 		O::inputs()
@@ -158,7 +158,7 @@ impl<O: Operator> BoundOperator<O> {
 			.and_then(|c| c.variadic_min_arity)
 			.unwrap_or(1)
 			.try_into()
-			.unwrap()
+			.expect("output minimum arity overflows i32")
 	}
 	pub(crate) unsafe extern "C" fn GetVariadicOutputHomogeneity(_: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
 		O::outputs()
@@ -170,7 +170,7 @@ impl<O: Operator> BoundOperator<O> {
 	}
 
 	pub(crate) unsafe extern "C" fn InferOutputShapeFn(_: *const ort_sys::OrtCustomOp, arg1: *mut ort_sys::OrtShapeInferContext) -> *mut ort_sys::OrtStatus {
-		O::get_infer_shape_function().unwrap()(arg1).into_status()
+		O::get_infer_shape_function().expect("missing infer shape function")(arg1).into_status()
 	}
 }
 

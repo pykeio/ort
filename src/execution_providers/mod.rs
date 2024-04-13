@@ -169,8 +169,8 @@ macro_rules! map_keys {
 			let mut values = ::std::vec::Vec::<std::ffi::CString>::new();
 			$(
 				if let Some(v) = $ex {
-					keys.push(::std::ffi::CString::new(stringify!($fn_name)).unwrap());
-					values.push(::std::ffi::CString::new(v.to_string().as_str()).unwrap());
+					keys.push(::std::ffi::CString::new(stringify!($fn_name)).unwrap_or_else(|_| unreachable!()));
+					values.push(::std::ffi::CString::new(v.to_string().as_str()).unwrap_or_else(|_| unreachable!()));
 				}
 			)*
 			assert_eq!(keys.len(), values.len()); // sanity check

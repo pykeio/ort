@@ -27,7 +27,7 @@ impl Allocator {
 	}
 
 	pub(crate) unsafe fn free<T>(&self, ptr: *mut T) {
-		self.ptr.as_ref().Free.unwrap_unchecked()(self.ptr.as_ptr(), ptr.cast());
+		self.ptr.as_ref().Free.unwrap_or_else(|| unreachable!("Allocator method `Free` is null"))(self.ptr.as_ptr(), ptr.cast());
 	}
 
 	/// Creates a new [`Allocator`] for the given session, to allocate memory on the device described in the
@@ -59,7 +59,7 @@ impl Allocator {
 impl Default for Allocator {
 	fn default() -> Self {
 		let mut allocator_ptr: *mut ort_sys::OrtAllocator = std::ptr::null_mut();
-		status_to_result(ortsys![unsafe GetAllocatorWithDefaultOptions(&mut allocator_ptr); nonNull(allocator_ptr)]).unwrap();
+		status_to_result(ortsys![unsafe GetAllocatorWithDefaultOptions(&mut allocator_ptr); nonNull(allocator_ptr)]).expect("Failed to get default allocator");
 		Self {
 			ptr: unsafe { NonNull::new_unchecked(allocator_ptr) },
 			is_default: true,
@@ -217,7 +217,7 @@ impl MemoryInfo {
 	#[tracing::instrument]
 	pub fn new(allocation_device: AllocationDevice, device_id: c_int, allocator_type: AllocatorType, memory_type: MemoryType) -> Result<Self> {
 		let mut memory_info_ptr: *mut ort_sys::OrtMemoryInfo = std::ptr::null_mut();
-		let allocator_name = CString::new(allocation_device.as_str()).unwrap();
+		let allocator_name = CString::new(allocation_device.as_str()).unwrap_or_else(|_| unreachable!());
 		ortsys![
 			unsafe CreateMemoryInfo(allocator_name.as_ptr(), allocator_type.into(), device_id, memory_type.into(), &mut memory_info_ptr)
 				-> Error::CreateMemoryInfo;
@@ -281,8 +281,9 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn create_memory_info() {
-		let memory_info = MemoryInfo::new_cpu(AllocatorType::Device, MemoryType::Default).unwrap();
+	fn create_memory_info() -> crate::Result<()> {
+		let memory_info = MemoryInfo::new_cpu(AllocatorType::Device, MemoryType::Default)?;
 		std::mem::drop(memory_info);
+		Ok(())
 	}
 }

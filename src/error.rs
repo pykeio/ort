@@ -19,7 +19,7 @@ impl<T> IntoStatus for Result<T, Error> {
 			Ok(_) => return ptr::null_mut(),
 			Err(e) => (ort_sys::OrtErrorCode::ORT_FAIL, Some(e.to_string()))
 		};
-		let message = message.map(|c| CString::new(c).unwrap());
+		let message = message.map(|c| CString::new(c).unwrap_or_else(|_| unreachable!()));
 		// message will be copied, so this shouldn't leak
 		ortsys![unsafe CreateStatus(code, message.map(|c| c.as_ptr()).unwrap_or_else(std::ptr::null))]
 	}

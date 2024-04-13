@@ -132,7 +132,7 @@ impl EnvironmentBuilder {
 			let mut env_ptr: *mut ort_sys::OrtEnv = std::ptr::null_mut();
 			let logging_function: ort_sys::OrtLoggingFunction = Some(custom_logger);
 			let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
-			let cname = CString::new(self.name.clone()).unwrap();
+			let cname = CString::new(self.name.clone()).unwrap_or_else(|_| unreachable!());
 
 			let mut thread_options: *mut ort_sys::OrtThreadingOptions = std::ptr::null_mut();
 			ortsys![unsafe CreateThreadingOptions(&mut thread_options) -> Error::CreateEnvironment; nonNull(thread_options)];
@@ -146,7 +146,7 @@ impl EnvironmentBuilder {
 				ortsys![unsafe SetGlobalSpinControl(thread_options, i32::from(spin_control)) -> Error::CreateEnvironment];
 			}
 			if let Some(intra_op_thread_affinity) = global_thread_pool.intra_op_thread_affinity {
-				let cstr = CString::new(intra_op_thread_affinity).unwrap();
+				let cstr = CString::new(intra_op_thread_affinity).unwrap_or_else(|_| unreachable!());
 				ortsys![unsafe SetGlobalIntraOpThreadAffinity(thread_options, cstr.as_ptr()) -> Error::CreateEnvironment];
 			}
 
@@ -165,7 +165,7 @@ impl EnvironmentBuilder {
 			let logging_function: ort_sys::OrtLoggingFunction = Some(custom_logger);
 			// FIXME: What should go here?
 			let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
-			let cname = CString::new(self.name.clone()).unwrap();
+			let cname = CString::new(self.name.clone()).unwrap_or_else(|_| unreachable!());
 			ortsys![unsafe CreateEnvWithCustomLogger(
 					logging_function,
 					logger_param,
@@ -243,17 +243,17 @@ extern_system_fn! {
 	/// Callback from C that will handle ONNX logging, forwarding ONNX's logs to the `tracing` crate.
 	pub(crate) fn custom_logger(_params: *mut ffi::c_void, severity: ort_sys::OrtLoggingLevel, category: *const c_char, _: *const c_char, code_location: *const c_char, message: *const c_char) {
 		assert_ne!(category, ptr::null());
-		let category = unsafe { CStr::from_ptr(category) };
+		let category = unsafe { CStr::from_ptr(category) }.to_str().unwrap_or("<decode error>");
 		assert_ne!(code_location, ptr::null());
-		let code_location_str = unsafe { CStr::from_ptr(code_location) }.to_str().unwrap();
+		let code_location_str = unsafe { CStr::from_ptr(code_location) }.to_str().unwrap_or("<decode error>");
 		assert_ne!(message, ptr::null());
-		let message = unsafe { CStr::from_ptr(message) }.to_str().unwrap();
+		let message = unsafe { CStr::from_ptr(message) }.to_str().unwrap_or("<decode error>");
 
 		let code_location = CodeLocation::from(code_location_str);
 		let span = tracing::span!(
 			Level::TRACE,
 			"ort",
-			category = category.to_str().unwrap_or("<unknown>"),
+			category = category,
 			file = code_location.file,
 			line = code_location.line,
 			function = code_location.function
@@ -278,7 +278,12 @@ mod tests {
 	use super::*;
 
 	fn is_env_initialized() -> bool {
-		unsafe { (*G_ENV.cell.get()).as_ref() }.is_some() && !unsafe { (*G_ENV.cell.get()).as_ref() }.unwrap().env_ptr.load(Ordering::Relaxed).is_null()
+		unsafe { (*G_ENV.cell.get()).as_ref() }.is_some()
+			&& !unsafe { (*G_ENV.cell.get()).as_ref() }
+				.unwrap_or_else(|| unreachable!())
+				.env_ptr
+				.load(Ordering::Relaxed)
+				.is_null()
 	}
 
 	fn env_ptr() -> Option<*mut ort_sys::OrtEnv> {
@@ -296,18 +301,19 @@ mod tests {
 			.get_or_init(|| ConcurrentTestRun { lock: Arc::new(RwLock::new(())) })
 			.lock
 			.write()
-			.unwrap()
+			.expect("RwLock poisoned")
 	}
 
 	#[test]
-	fn env_is_initialized() {
+	fn env_is_initialized() -> crate::Result<()> {
 		let _run_lock = single_test_run();
 
 		assert!(!is_env_initialized());
 		assert_eq!(env_ptr(), None);
 
-		EnvironmentBuilder::default().with_name("env_is_initialized").commit().unwrap();
+		EnvironmentBuilder::default().with_name("env_is_initialized").commit()?;
 		assert!(is_env_initialized());
 		assert_ne!(env_ptr(), None);
+		Ok(())
 	}
 }

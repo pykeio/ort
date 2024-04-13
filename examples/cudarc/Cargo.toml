@@ -1,0 +1,14 @@
+[package]
+name = "example-cudarc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ort = { path = "../../", features = [ "cuda", "fetch-models" ] }
+cudarc = "0.10"
+anyhow = "1.0"
+ndarray = "0.15"
+image = "0.24"
+tracing = "0.1"
+show-image = { version = "0.13", features = [ "image", "raqote" ] }
+tracing-subscriber = { version = "0.3", features = [ "fmt" ] }

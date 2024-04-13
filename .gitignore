@@ -186,6 +186,7 @@ WixTools/
 # ONNX Runtime downloaded models
 **/*.onnx
 **/*.ort
+!examples/webassembly/**/*.ort
 !tests/data/*.onnx
 !tests/data/*.ort
 

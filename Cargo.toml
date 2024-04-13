@@ -6,7 +6,8 @@ members = [
 	'examples/gpt2',
 	'examples/model-info',
 	'examples/yolov8',
-	'examples/modnet'
+	'examples/modnet',
+	'examples/webassembly'
 ]
 default-members = [
 	'.',

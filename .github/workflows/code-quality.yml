@@ -56,7 +56,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@nightly
       - name: Get Rust version
         id: rust-version
         run: echo "::set-output name=version::$(cargo --version | cut -d ' ' -f 2)"
@@ -65,15 +65,15 @@ jobs:
         id: tarpaulin-cache
         with:
           path: ~/.cargo/bin/cargo-tarpaulin
-          key: ${{ runner.os }}-cargo-${{ steps.rustc-version.outputs.version }}
+          key: ${{ runner.os }}-cargo-${{ steps.rust-version.outputs.version }}-0.28.0
       - name: Install tarpaulin
         if: steps.tarpaulin-cache.outputs.cache-hit != 'true'
-        run: cargo install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin --version 0.28.0
       - name: Generate code coverage
         run: |
-          cargo tarpaulin -p ort --features fetch-models --verbose --timeout 120 --out xml
+          cargo tarpaulin -p ort --features fetch-models --verbose --timeout 120 --out xml --engine llvm --doc --lib
       - name: Upload to codecov.io
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false

@@ -257,7 +257,7 @@ mod test {
 	use super::*;
 
 	#[test]
-	fn test_char_p_to_string() 
+	fn test_char_p_to_string() {
 		let s = CString::new("foo").unwrap_or_else(|_| unreachable!());
 		let ptr = s.as_c_str().as_ptr();
 		assert_eq!("foo", char_p_to_string(ptr).expect("failed to convert string"));

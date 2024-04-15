@@ -58,6 +58,7 @@
 			"group": "Setup",
 			"pages": [
 				"setup/platforms",
+				"setup/webassembly",
 				"setup/linking",
 				"setup/cargo-features"
 			]

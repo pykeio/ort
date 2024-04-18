@@ -28,6 +28,7 @@
 - **[edge-transformers](https://github.com/npc-engine/edge-transformers)** uses `ort` for accelerated transformer model inference at the edge.
 - **[Ortex](https://github.com/relaypro-open/ortex)** uses `ort` for safe ONNX Runtime bindings in Elixir.
 - **[Supabase](https://github.com/relaypro-open/ortex)** uses `ort` to remove cold starts for their edge functions using ONNX runtimes.
+- **[Lantern](https://github.com/lanterndata/lantern_extras)** uses `ort` to provide embedding model inference inside Postgres.
 
 ## 🌠 Sponsor `ort`
 <a href="https://opencollective.com/pyke-osai">

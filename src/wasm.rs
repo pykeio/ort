@@ -221,7 +221,8 @@ pub fn initialize() {
 	// `__wasm_call_ctors` at the top of every function - including the functions `wasm-bindgen` interprets to generate
 	// JS glue code. The `__wasm_call_ctors` call was calling complex functions that the interpreter isn't equipped to
 	// handle, which was preventing wbg from outputting anything. I don't know what specific constructors this is calling,
-	// but they're probably important, so we encourage the user to perform this initialization at program start.
+	// and most basic ONNX Runtime APIs *do* work without calling this, but we encourage the user to perform this
+	// initialization at program start anyways to be safe.
 	extern "C" {
 		fn __wasm_call_ctors();
 	}

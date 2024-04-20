@@ -49,8 +49,6 @@ fn run_test() {
 		.without_time()
 		.init();
 
-	wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
-
 	std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
 	upsample();

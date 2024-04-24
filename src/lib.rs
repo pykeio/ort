@@ -37,6 +37,8 @@ use std::{
 	}
 };
 
+pub use ort_sys as sys;
+
 #[cfg(feature = "load-dynamic")]
 pub use self::environment::init_from;
 pub use self::environment::{get_environment, init, Environment, EnvironmentBuilder, EnvironmentGlobalThreadPoolOptions};

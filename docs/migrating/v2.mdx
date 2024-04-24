@@ -48,9 +48,9 @@ let dyn_value: DynValue = tensor.into_dyn();
 ```
 
 ### Tensor extraction directly returns an `ArrayView`
-`extract_tensor` (and now `try_extract_tensor`) now return an `ndarray::ArrayView` directly, instead of putting it behind the old `ort::Tensor<T>` type (not to be confused with the new specialized value type). This means you don't have to `.view()` on the result:
+The new `extract_tensor` and `try_extract_tensor` functions return an `ndarray::ArrayView` directly, instead of putting it behind the old `ort::Tensor<T>` type (not to be confused with the new specialized value type). This means you don't have to `.view()` on the result:
 ```diff
--let generated_tokens: Tensor<f32> = outputs["output1"].extract_tensor()?;
+-let generated_tokens: Tensor<f32> = outputs["output1"].try_extract()?;
 -let generated_tokens = generated_tokens.view();
 +let generated_tokens: ArrayViewD<f32> = outputs["output1"].try_extract_tensor()?;
 ```
@@ -176,7 +176,7 @@ let outputs = session.run(ort::inputs![
 Just like how inputs can now be specified by name, you can now retrieve session outputs by name.
 
 ```rust
-let l = outputs["latents"].extract_tensor::<f32>()?;
+let l = outputs["latents"].try_extract_tensor::<f32>()?;
 ```
 
 ## Execution providers

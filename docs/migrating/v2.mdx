@@ -16,6 +16,67 @@ ort::init()
 
 `commit()` must be called before any sessions are created to take effect. Otherwise, a default environment will be created. The global environment can be updated afterward by calling `commit()` on another `EnvironmentBuilder`, however you'll need to recreate sessions after comitting the new environment in order for them to use it.
 
+## Value specialization
+The `Value` struct has been refactored into multiple strongly-typed structs: `Tensor<T>`, `Map<K, V>`, and `Sequence<T>`, and their type-erased variants: `DynTensor`, `DynMap`, and `DynSequence`.
+
+Values returned by session inference are now `DynValue`s, which behave exactly the same as `Value` in previous versions.
+
+Tensors created from Rust, like via the new `Tensor::new` function, can be directly and infallibly extracted into its underlying data via `extract_tensor` (no `try_`):
+```rust
+let allocator = Allocator::new(&session, MemoryInfo::new(AllocationDevice::CUDAPinned, 0, AllocatorType::Device, MemoryType::CPUInput)?)?;
+let tensor = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
+
+let array = tensor.extract_array();
+// no need to specify type or handle errors - Tensor<f32> can only extract into an f32 ArrayView
+```
+
+You can still extract tensors, maps, or sequence values normally from a `DynValue` using `try_extract_*`:
+```rust
+let generated_tokens: ArrayViewD<f32> = outputs["output1"].try_extract_tensor()?;
+```
+
+`DynValue` can be `upcast()`ed to the more specialized types, like `DynMap` or `Tensor<T>`:
+```rust
+let tensor: Tensor<f32> = value.upcast()?;
+let map: DynMap = value.upcast()?;
+```
+
+Similarly, a strongly-typed value like `Tensor<T>` can be downcast back into a `DynValue` or `DynTensor`.
+```rust
+let dyn_tensor: DynTensor = tensor.downcast();
+let dyn_value: DynValue = tensor.into_dyn();
+```
+
+### Tensor extraction directly returns an `ArrayView`
+`extract_tensor` (and now `try_extract_tensor`) now return an `ndarray::ArrayView` directly, instead of putting it behind the old `ort::Tensor<T>` type (not to be confused with the new specialized value type). This means you don't have to `.view()` on the result:
+```diff
+-let generated_tokens: Tensor<f32> = outputs["output1"].extract_tensor()?;
+-let generated_tokens = generated_tokens.view();
++let generated_tokens: ArrayViewD<f32> = outputs["output1"].try_extract_tensor()?;
+```
+
+### Full support for sequence & map values
+You can now construct and extract `Sequence`/`Map` values.
+
+### Value views
+You can now obtain a view of any `Value` via the new `view()` and `view_mut()` functions, which operate similar to `ndarray`'s own view system. These views can also now be passed into session inputs.
+
+### Mutable tensor extraction
+You can extract a mutable `ArrayViewMut` or `&mut [T]` from a mutable reference to a tensor.
+```rust
+let (raw_shape, raw_data) = tensor.extract_raw_tensor_mut();
+```
+
+### Device-allocated tensors
+You can now create a tensor on device memory with `Tensor::new` & an allocator:
+
+```rust
+let allocator = Allocator::new(&session, MemoryInfo::new(AllocationDevice::CUDAPinned, 0, AllocatorType::Device, MemoryType::CPUInput)?)?;
+let tensor = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
+```
+
+The data will be allocated by the device specified by the allocator. You can then use the new mutable tensor extraction to modify the tensor's data.
+
 ## Session creation
 `SessionBuilder::new(&environment)` has been soft-replaced with `Session::builder()`:
 
@@ -37,7 +98,7 @@ The final `SessionBuilder` methods have been renamed for clarity.
 ## Session inputs
 
 ### `CowArray`/`IxDyn`/`ndarray` no longer required
-One of the biggest usability changes is that the usual pattern of `CowArray::from(array.into_dyn())` is no longer required to create `Value`s. Now, `Value`s can be created from:
+One of the biggest usability changes is that the usual pattern of `CowArray::from(array.into_dyn())` is no longer required to create tensors. Now, tensors can be created from:
 - Owned `Array`s of any dimensionality
 - `ArrayView`s of any dimensionality
 - Shared references to `CowArray`s of any dimensionality (i.e. `&CowArray<'_, f32, Ix3>`)
@@ -51,10 +112,10 @@ One of the biggest usability changes is that the usual pattern of `CowArray::fro
 +let mut tokens = Array1::from_iter(tokens.iter().cloned());
 ```
 
-It should be noted that there are some cases in which an array is cloned when converting into a `Value` which may lead to a surprising performance hit. ONNX Runtime does not expose an API to specify the strides of a tensor, so if an array is reshaped before being transformed into a `Value`, it must be cloned in order to make the data contiguous. Specifically:
+It should be noted that there are some cases in which an array is cloned when converting into a tensor which may lead to a surprising performance hit. ONNX Runtime does not expose an API to specify the strides of a tensor, so if an array is reshaped before being converted into a tensor, it must be cloned in order to make the data contiguous. Specifically:
 - `&CowArray`, `ArrayView` will **always be cloned** (due to the fact that we cannot guarantee the lifetime of the array).
 - `Array`, `&mut ArcArray` will only be cloned **if the memory layout is not contiguous**, i.e. if it has been reshaped.
-- Raw data will never be cloned.
+- Raw data will never be cloned as it is assumed to already have a contiguous memory layout.
 
 ### `ort::inputs!` macro
 
@@ -87,39 +148,29 @@ let binding = model.create_binding()?;
 let outputs = model.run(ort::inputs![bind = binding]?)?;
 ```
 
-### `Value::from_array` no longer requires the session's allocator
-In previous versions, `Value::from_array` took an allocator parameter. The allocator was only used because the string data contained in string tensors had to be cloned into ONNX Runtime-managed memory. However, 99% of users only ever use primitive tensors, so the extra parameter served little purpose. `Value::from_array` now takes only an array, and the logic for converting string arrays has been moved to a new function, `Value::from_string_array`.
+### Tensor creation no longer requires the session's allocator
+In previous versions, `Value::from_array` took an allocator parameter. The allocator was only used because the string data contained in string tensors had to be cloned into ONNX Runtime-managed memory. However, 99% of users only ever use primitive tensors, so the extra parameter served little purpose. The new `Tensor::from_array` function now takes only an array, and the logic for converting string arrays has been moved to a new function, `DynTensor::from_string_array`.
 
 ```diff
 -// v1.x
 -let val = Value::from_array(session.allocator(), &array)?;
 +// v2
-+let val = Value::from_array(&array)?;
++let val = Tensor::from_array(&array)?;
 ```
 
 ### Separate string tensor creation
-As previously mentioned, the logic for creating string tensors has been moved from `Value::from_array` to `Value::from_string_array`.
+As previously mentioned, the logic for creating string tensors has been moved from `Value::from_array` to `DynTensor::from_string_array`.
 
-To use string tensors with `ort::inputs!`, you must create a `Value` using `Value::from_string_array`.
+To use string tensors with `ort::inputs!`, you must create a `DynTensor` using `DynTensor::from_string_array`.
 
 ```rust
 let array = ndarray::Array::from_shape_vec((1,), vec![document]).unwrap();
 let outputs = session.run(ort::inputs![
-    "input" => Value::from_string_array(session.allocator(), array)?
+    "input" => DynTensor::from_string_array(session.allocator(), array)?
 ]?)?;
 ```
 
 ## Session outputs
-
-### `try_extract` -> `extract_tensor`
-v2.0 adds the groundwork for supporting sequence and maps types in `Value`s, so for clarity, the definition of `Value::try_extract` is made more explicit. No changes other than a rename are required.
-
-```diff
--// v1.x
--let output1 = outputs[0].try_extract::<f32>()?;
-+// v2
-+let output1 = outputs[0].extract_tensor::<f32>()?;
-```
 
 ### New: Retrieve outputs by name
 Just like how inputs can now be specified by name, you can now retrieve session outputs by name.
@@ -146,9 +197,6 @@ Execution provider structs with public fields have been replaced with builder pa
 
 ## Updated dependencies & features
 
-### `ort::sys` has been split into `ort-sys`
-The `ort::sys` module has been split out into [its own `ort-sys` crate](https://crates.io/crates/ort-sys). If you don't use `ort::sys` in your application, this won't affect you.
-
 ### `ndarray` is now optional
 The dependency on `ndarray` is now declared optional. If you use `ort` with `default-features = false`, you'll need to add the `ndarray` feature.
 
@@ -161,12 +209,11 @@ You can still use `Session::commit_from_url`, it just now takes a URL string ins
 Environment-level logging configuration (i.e. `EnvironmentBuilder::with_log_level`) has been removed because it could cause unnecessary confusion with our `tracing` integration.
 
 ## The Flattening
-All modules except `download` are no longer public. Exports have been flattened to the crate root, so i.e. `ort::session::Session` becomes `ort::Session`.
+All modules except `download` and `sys` are now private. Exports have been flattened to the crate root, so i.e. `ort::session::Session` becomes `ort::Session`.
 
 ## Renamed types
 The following types have been renamed with no other changes.
 - `NdArrayExtensions` -> `ArrayExtensions`
-- `OrtOwnedTensor` -> `Tensor`
 - `OrtResult`, `OrtError` -> `ort::Result`, `ort::Error`
 - `TensorDataToType` -> `ExtractTensorData`
 - `TensorElementDataType`, `IntoTensorElementDataType` -> `TensorElementType`, `IntoTensorElementType`

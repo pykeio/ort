@@ -1,5 +1,5 @@
 <div align=center>
-    <img src="https://raw.githubusercontent.com/pykeio/ort/v2/docs/banner.png" width="350px">
+    <img src="https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/docs/trend-banner.png" width="350px">
     <hr />
     <a href="https://app.codecov.io/gh/pykeio/ort" target="_blank"><img alt="Coverage Results" src="https://img.shields.io/codecov/c/gh/pykeio/ort?style=for-the-badge"></a> <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/d/ort?style=for-the-badge"></a> <a href="https://opencollective.com/pyke-osai" target="_blank"><img alt="Open Collective backers and sponsors" src="https://img.shields.io/opencollective/all/pyke-osai?style=for-the-badge&label=sponsors"></a>
     <br />

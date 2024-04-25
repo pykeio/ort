@@ -2,10 +2,10 @@
 	"$schema": "https://mintlify.com/schema.json",
 	"name": "ort",
 	"logo": {
-		"dark": "/banner.png",
-		"light": "/banner.png"
+		"dark": "/assets/banner.png",
+		"light": "/assets/banner.png"
 	},
-	"favicon": "/icon.png",
+	"favicon": "/assets/icon.png",
 	"colors": {
 		"primary": "#F74C00",
 		"light": "#F74C00",

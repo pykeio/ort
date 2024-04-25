@@ -24,11 +24,14 @@ pub(crate) mod operator;
 pub(crate) mod session;
 pub(crate) mod tensor;
 pub(crate) mod value;
+#[cfg_attr(docsrs, doc(cfg(target_arch = "wasm32")))]
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;
 
 #[cfg(feature = "load-dynamic")]
 use std::sync::Arc;
 use std::{
-	ffi::{self, CStr},
+	ffi::CStr,
 	os::raw::c_char,
 	ptr::{self, NonNull},
 	sync::{
@@ -154,7 +157,7 @@ pub fn api() -> NonNull<ort_sys::OrtApi> {
 						let base: *const ort_sys::OrtApiBase = base_getter();
 						assert_ne!(base, ptr::null());
 
-						let get_version_string: extern_system_fn! { unsafe fn () -> *const ffi::c_char } =
+						let get_version_string: extern_system_fn! { unsafe fn () -> *const c_char } =
 							(*base).GetVersionString.expect("`GetVersionString` must be present in `OrtApiBase`");
 						let version_string = get_version_string();
 						let version_string = CStr::from_ptr(version_string).to_string_lossy();
@@ -251,11 +254,13 @@ pub(crate) fn char_p_to_string(raw: *const c_char) -> Result<String> {
 
 #[cfg(test)]
 mod test {
+	use std::ffi::CString;
+
 	use super::*;
 
 	#[test]
 	fn test_char_p_to_string() {
-		let s = ffi::CString::new("foo").unwrap_or_else(|_| unreachable!());
+		let s = CString::new("foo").unwrap_or_else(|_| unreachable!());
 		let ptr = s.as_c_str().as_ptr();
 		assert_eq!("foo", char_p_to_string(ptr).expect("failed to convert string"));
 	}

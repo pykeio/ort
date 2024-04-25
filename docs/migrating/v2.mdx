@@ -35,15 +35,15 @@ You can still extract tensors, maps, or sequence values normally from a `DynValu
 let generated_tokens: ArrayViewD<f32> = outputs["output1"].try_extract_tensor()?;
 ```
 
-`DynValue` can be `upcast()`ed to the more specialized types, like `DynMap` or `Tensor<T>`:
+`DynValue` can be `downcast()`ed to the more specialized types, like `DynMap` or `Tensor<T>`:
 ```rust
-let tensor: Tensor<f32> = value.upcast()?;
-let map: DynMap = value.upcast()?;
+let tensor: Tensor<f32> = value.downcast()?;
+let map: DynMap = value.downcast()?;
 ```
 
-Similarly, a strongly-typed value like `Tensor<T>` can be downcast back into a `DynValue` or `DynTensor`.
+Similarly, a strongly-typed value like `Tensor<T>` can be upcast back into a `DynValue` or `DynTensor`.
 ```rust
-let dyn_tensor: DynTensor = tensor.downcast();
+let dyn_tensor: DynTensor = tensor.upcast();
 let dyn_value: DynValue = tensor.into_dyn();
 ```
 

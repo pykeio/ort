@@ -139,13 +139,13 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementT
 
 	/// Converts from a strongly-typed [`Map<K, V>`] to a type-erased [`DynMap`].
 	#[inline]
-	pub fn downcast(self) -> DynMap {
+	pub fn upcast(self) -> DynMap {
 		unsafe { std::mem::transmute(self) }
 	}
 
 	/// Converts from a strongly-typed [`Map<K, V>`] to a reference to a type-erased [`DynMap`].
 	#[inline]
-	pub fn downcast_ref(&self) -> DynMapRef {
+	pub fn upcast_ref(&self) -> DynMapRef {
 		DynMapRef::new(unsafe {
 			Value::from_ptr_nodrop(
 				NonNull::new_unchecked(self.ptr()),
@@ -156,7 +156,7 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementT
 
 	/// Converts from a strongly-typed [`Map<K, V>`] to a mutable reference to a type-erased [`DynMap`].
 	#[inline]
-	pub fn downcast_mut(&mut self) -> DynMapRefMut {
+	pub fn upcast_mut(&mut self) -> DynMapRefMut {
 		DynMapRefMut::new(unsafe {
 			Value::from_ptr_nodrop(
 				NonNull::new_unchecked(self.ptr()),

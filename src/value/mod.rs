@@ -249,14 +249,14 @@ impl<'v, Type: ValueTypeMarker + ?Sized> DerefMut for ValueRefMut<'v, Type> {
 ///
 /// ## Usage
 /// You can access the data contained in a `Value` by using the relevant `extract` methods.
-/// You can also use [`DynValue::upcast`] to attempt to convert from a [`DynValue`] to a more strongly typed value.
+/// You can also use [`DynValue::downcast`] to attempt to convert from a [`DynValue`] to a more strongly typed value.
 ///
 /// For dynamic values, where the type is not known at compile time, see the `try_extract_*` methods:
 /// - [`Tensor::try_extract_tensor`], [`Tensor::try_extract_raw_tensor`]
 /// - [`Sequence::try_extract_sequence`]
 /// - [`Map::try_extract_map`]
 ///
-/// If the type was created from Rust (via a method like [`Tensor::from_array`] or via upcasting), you can directly
+/// If the type was created from Rust (via a method like [`Tensor::from_array`] or via downcasting), you can directly
 /// extract the data using the infallible extract methods:
 /// - [`Tensor::extract_tensor`], [`Tensor::extract_raw_tensor`]
 #[derive(Debug)]
@@ -267,7 +267,7 @@ pub struct Value<Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
 
 /// A dynamic value, which could be a [`Tensor`], [`Sequence`], or [`Map`].
 ///
-/// To attempt to convert a dynamic value to a strongly typed value, use [`DynValue::upcast`]. You can also attempt to
+/// To attempt to convert a dynamic value to a strongly typed value, use [`DynValue::downcast`]. You can also attempt to
 /// extract data from dynamic values directly using `try_extract_*` methods; see [`Value`] for more information.
 pub type DynValue = Value<DynValueTypeMarker>;
 
@@ -277,14 +277,14 @@ pub type DynValue = Value<DynValueTypeMarker>;
 /// inherits this trait), i.e. [`Tensor`]s, [`DynTensor`]s, and [`DynValue`]s.
 pub trait ValueTypeMarker: Debug {}
 
-/// Represents a type that a [`DynValue`] can be upcast to.
-pub trait UpcastableTarget: ValueTypeMarker {
-	fn can_upcast(dtype: &ValueType) -> bool;
+/// Represents a type that a [`DynValue`] can be downcast to.
+pub trait DowncastableTarget: ValueTypeMarker {
+	fn can_downcast(dtype: &ValueType) -> bool;
 }
 
 // this implementation is used in case we want to extract `DynValue`s from a [`Sequence`]; see `try_extract_sequence`
-impl UpcastableTarget for DynValueTypeMarker {
-	fn can_upcast(_: &ValueType) -> bool {
+impl DowncastableTarget for DynValueTypeMarker {
+	fn can_downcast(_: &ValueType) -> bool {
 		true
 	}
 }
@@ -406,21 +406,23 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	pub fn into_dyn(self) -> DynValue {
 		unsafe { std::mem::transmute(self) }
 	}
+}
 
-	/// Attempts to upcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed variant,
+impl Value<DynValueTypeMarker> {
+	/// Attempts to downcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed variant,
 	/// like [`Tensor<T>`].
 	#[inline]
-	pub fn upcast<OtherType: ValueTypeMarker + UpcastableTarget + Debug + ?Sized>(self) -> Result<Value<OtherType>> {
+	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(self) -> Result<Value<OtherType>> {
 		let dt = self.dtype()?;
-		if OtherType::can_upcast(&dt) { Ok(unsafe { std::mem::transmute(self) }) } else { panic!() }
+		if OtherType::can_downcast(&dt) { Ok(unsafe { std::mem::transmute(self) }) } else { panic!() }
 	}
 
-	/// Attempts to upcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed reference
+	/// Attempts to downcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed reference
 	/// variant, like [`TensorRef<T>`].
 	#[inline]
-	pub fn upcast_ref<OtherType: ValueTypeMarker + UpcastableTarget + Debug + ?Sized>(&self) -> Result<ValueRef<'_, OtherType>> {
+	pub fn downcast_ref<OtherType: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(&self) -> Result<ValueRef<'_, OtherType>> {
 		let dt = self.dtype()?;
-		if OtherType::can_upcast(&dt) {
+		if OtherType::can_downcast(&dt) {
 			Ok(ValueRef::new(unsafe {
 				Value::from_ptr_nodrop(
 					NonNull::new_unchecked(self.ptr()),
@@ -435,9 +437,9 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	/// Attempts to upcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed
 	/// mutable-reference variant, like [`TensorRefMut<T>`].
 	#[inline]
-	pub fn upcast_mut<OtherType: ValueTypeMarker + UpcastableTarget + Debug + ?Sized>(&mut self) -> Result<ValueRefMut<'_, OtherType>> {
+	pub fn downcast_mut<OtherType: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(&mut self) -> Result<ValueRefMut<'_, OtherType>> {
 		let dt = self.dtype()?;
-		if OtherType::can_upcast(&dt) {
+		if OtherType::can_downcast(&dt) {
 			Ok(ValueRefMut::new(unsafe {
 				Value::from_ptr_nodrop(
 					NonNull::new_unchecked(self.ptr()),

@@ -527,7 +527,7 @@ where
 {
 	type Error = Error;
 	fn try_from(arr: &'i CowArray<'v, T, D>) -> Result<Self, Self::Error> {
-		Tensor::from_array(arr).map(|c| c.downcast())
+		Tensor::from_array(arr).map(|c| c.upcast())
 	}
 }
 
@@ -536,7 +536,7 @@ where
 impl<'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for DynTensor {
 	type Error = Error;
 	fn try_from(arr: ArrayView<'v, T, D>) -> Result<Self, Self::Error> {
-		Tensor::from_array(arr).map(|c| c.downcast())
+		Tensor::from_array(arr).map(|c| c.upcast())
 	}
 }
 
@@ -573,7 +573,7 @@ macro_rules! impl_try_from {
 			impl<T: IntoTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for DynTensor {
 				type Error = Error;
 				fn try_from(value: $t) -> Result<Self, Self::Error> {
-					Tensor::from_array(value).map(|c| c.downcast())
+					Tensor::from_array(value).map(|c| c.upcast())
 				}
 			}
 			impl<T: IntoTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for crate::DynValue {
@@ -597,7 +597,7 @@ macro_rules! impl_try_from {
 			impl<T: IntoTensorElementType + Debug + Clone + 'static, D: ndarray::Dimension + 'static> TryFrom<$t> for DynTensor {
 				type Error = Error;
 				fn try_from(value: $t) -> Result<Self, Self::Error> {
-					Tensor::from_array(value).map(|c| c.downcast())
+					Tensor::from_array(value).map(|c| c.upcast())
 				}
 			}
 			#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]

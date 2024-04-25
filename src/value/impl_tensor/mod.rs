@@ -8,7 +8,7 @@ use std::{
 	ptr::NonNull
 };
 
-use super::{UpcastableTarget, Value, ValueInner, ValueTypeMarker};
+use super::{DowncastableTarget, Value, ValueInner, ValueTypeMarker};
 use crate::{ortsys, DynValue, Error, IntoTensorElementType, MemoryInfo, Result, ValueRef, ValueRefMut, ValueType};
 
 pub trait TensorValueTypeMarker: ValueTypeMarker {}
@@ -31,8 +31,8 @@ pub type DynTensorRefMut<'v> = ValueRefMut<'v, DynTensorValueType>;
 pub type TensorRef<'v, T> = ValueRef<'v, TensorValueType<T>>;
 pub type TensorRefMut<'v, T> = ValueRefMut<'v, TensorValueType<T>>;
 
-impl UpcastableTarget for DynTensorValueType {
-	fn can_upcast(dtype: &ValueType) -> bool {
+impl DowncastableTarget for DynTensorValueType {
+	fn can_downcast(dtype: &ValueType) -> bool {
 		matches!(dtype, ValueType::Tensor { .. })
 	}
 }
@@ -63,13 +63,13 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// Converts from a strongly-typed [`Tensor<T>`] to a type-erased [`DynTensor`].
 	#[inline]
-	pub fn downcast(self) -> DynTensor {
+	pub fn upcast(self) -> DynTensor {
 		unsafe { std::mem::transmute(self) }
 	}
 
 	/// Converts from a strongly-typed [`Tensor<T>`] to a reference to a type-erased [`DynTensor`].
 	#[inline]
-	pub fn downcast_ref(&self) -> DynTensorRef {
+	pub fn upcast_ref(&self) -> DynTensorRef {
 		DynTensorRef::new(unsafe {
 			Value::from_ptr_nodrop(
 				NonNull::new_unchecked(self.ptr()),
@@ -80,7 +80,7 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 
 	/// Converts from a strongly-typed [`Tensor<T>`] to a mutable reference to a type-erased [`DynTensor`].
 	#[inline]
-	pub fn downcast_mut(&mut self) -> DynTensorRefMut {
+	pub fn upcast_mut(&mut self) -> DynTensorRefMut {
 		DynTensorRefMut::new(unsafe {
 			Value::from_ptr_nodrop(
 				NonNull::new_unchecked(self.ptr()),
@@ -90,8 +90,8 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	}
 }
 
-impl<T: IntoTensorElementType + Debug> UpcastableTarget for TensorValueType<T> {
-	fn can_upcast(dtype: &ValueType) -> bool {
+impl<T: IntoTensorElementType + Debug> DowncastableTarget for TensorValueType<T> {
+	fn can_downcast(dtype: &ValueType) -> bool {
 		match dtype {
 			ValueType::Tensor { ty, .. } => *ty == T::into_tensor_element_type(),
 			_ => false

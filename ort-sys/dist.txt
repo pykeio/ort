@@ -1,0 +1,19 @@
+none	aarch64-apple-darwin	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.3/ortrs-msort_static-v1.17.3-aarch64-apple-darwin.tgz	4D3EFABA9B329900B400570FBC1A1F72899149EB3756F9540772701944DC5E49
+none	aarch64-pc-windows-msvc	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.3/ortrs-msort_static-v1.17.3-aarch64-pc-windows-msvc.tgz	7BCECBBC15F64C631051C894C5044FB01658F171D7B5D4E9635D7D7F464B8B3E
+none	aarch64-unknown-linux-gnu	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.3/ortrs-msort_static-v1.17.3-aarch64-unknown-linux-gnu.tgz	CA36FB040F127C5CAFA081BAC713240EE8C3F4D9F1BD7B789B789FFDD4885F0F
+
+none	x86_64-apple-darwin	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.3/ortrs-msort_static-v1.17.3-x86_64-apple-darwin.tgz	938EFA25B53283CA4768E6A779E8BFCA3423468C617FBA458A6E2CA04D2B2E3F
+none	x86_64-pc-windows-msvc	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.3/ortrs-msort_static-v1.17.3-x86_64-pc-windows-msvc.tgz	F28C68199A3CDE9AD0D748994894AE2920BDB0A258D3F390E715975FBAB5B4DA
+none	x86_64-unknown-linux-gnu	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.3/ortrs-msort_static-v1.17.3-x86_64-unknown-linux-gnu.tgz	6FAF334246A635808FCDAC6D5550C4D56814B1E92CCA5FC0642AF41437BF071F
+
+cu11	x86_64-pc-windows-msvc	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.3/ortrs-msort_dylib_cuda11-v1.17.3-x86_64-pc-windows-msvc.tgz	9AE21DECB9BE1270CD850276AAC1AB9C2E2AE978B563B733804F5DF7DACC3BE5
+cu12	x86_64-pc-windows-msvc	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.3/ortrs-msort_dylib_cuda12-v1.17.3-x86_64-pc-windows-msvc.tgz	8748005ED6F11A3DA741601FA41D0C6DCCD9FABF704A0853BD3D2CE82FBD49F0
+cu11	x86_64-unknown-linux-gnu	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.3/ortrs-msort_dylib_cuda11-v1.17.3-x86_64-unknown-linux-gnu.tgz	D4C264EA6805790D4C8B51D166EF6BD407FB3ECC641B33AEFE77FCD5BF0C6ECA
+cu12	x86_64-unknown-linux-gnu	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.3/ortrs-msort_dylib_cuda12-v1.17.3-x86_64-unknown-linux-gnu.tgz	C23A69F709DF91D2BB185D76A29901BD4BE81CD66D85DBCFC5E8BCD851DE9891
+rocm	x86_64-unknown-linux-gnu	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.3/ortrs-msort_dylib_rocm-v1.17.3-x86_64-unknown-linux-gnu.tgz	50E39B38484A0676B3D24365149CE9E7760F658B552EFE5A9382AB503D73D7E7
+
+# todo: update WASM build to 1.17.3
+none	wasm32-wasi	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-pkort_static_b2-v1.17.1-wasm32-unknown-unknown.tgz	41A5713B37EEE40A0D7608B9E77AEB3E1A5DCE6845496A5F5E65F89A13E45089
+none	wasm32-wasi-preview1	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-pkort_static_b2-v1.17.1-wasm32-unknown-unknown.tgz	41A5713B37EEE40A0D7608B9E77AEB3E1A5DCE6845496A5F5E65F89A13E45089
+none	wasm32-wasi-preview2	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-pkort_static_b2-v1.17.1-wasm32-unknown-unknown.tgz	41A5713B37EEE40A0D7608B9E77AEB3E1A5DCE6845496A5F5E65F89A13E45089
+none	wasm32-unknown-unknown	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-pkort_static_b2-v1.17.1-wasm32-unknown-unknown.tgz	41A5713B37EEE40A0D7608B9E77AEB3E1A5DCE6845496A5F5E65F89A13E45089

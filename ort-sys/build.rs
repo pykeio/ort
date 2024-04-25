@@ -8,6 +8,8 @@ const ORT_ENV_SYSTEM_LIB_PROFILE: &str = "ORT_LIB_PROFILE";
 #[cfg(feature = "download-binaries")]
 const ORT_EXTRACT_DIR: &str = "onnxruntime";
 
+const DIST_TABLE: &str = include_str!("dist.txt");
+
 #[path = "src/internal/dirs.rs"]
 mod dirs;
 use self::dirs::cache_dir;
@@ -35,6 +37,38 @@ fn fetch_file(source_url: &str) -> Vec<u8> {
 	buffer
 }
 
+fn find_dist(target: &str, designator: &str) -> Option<(&'static str, &'static str)> {
+	DIST_TABLE
+		.split('\n')
+		.filter(|c| !c.is_empty() && !c.starts_with('#'))
+		.map(|c| c.split('\t').collect::<Vec<_>>())
+		.find(|c| c[0] == designator && c[1] == target)
+		.map(|c| (c[2], c[3]))
+}
+
+fn lib_exists(name: &str) -> bool {
+	#[cfg(any(target_family = "windows", unix))]
+	let lib_str = std::ffi::CString::new(name).unwrap();
+	// note that we're not performing any cleanup here because this is a short lived build script; the OS will clean it up
+	// for us when we finish
+	#[cfg(target_family = "windows")]
+	return unsafe {
+		extern "C" {
+			fn LoadLibraryA(lplibfilename: *const std::ffi::c_char) -> isize;
+		}
+		LoadLibraryA(lib_str.as_ptr()) != 0
+	};
+	#[cfg(unix)]
+	return unsafe {
+		extern "C" {
+			fn dlopen(file: *const std::ffi::c_char, mode: std::ffi::c_int) -> *const std::ffi::c_void;
+		}
+		!dlopen(lib_str.as_ptr(), 1).is_null()
+	};
+	#[cfg(not(any(target_family = "windows", unix)))]
+	return false;
+}
+
 #[cfg(feature = "download-binaries")]
 fn hex_str_to_bytes(c: impl AsRef<[u8]>) -> Vec<u8> {
 	fn nibble(c: u8) -> u8 {
@@ -51,8 +85,7 @@ fn hex_str_to_bytes(c: impl AsRef<[u8]>) -> Vec<u8> {
 
 #[cfg(feature = "download-binaries")]
 fn verify_file(buf: &[u8], hash: impl AsRef<[u8]>) -> bool {
-	use sha2::Digest;
-	sha2::Sha256::digest(buf)[..] == hex_str_to_bytes(hash)
+	<sha2::Sha256 as sha2::Digest>::digest(buf)[..] == hex_str_to_bytes(hash)
 }
 
 #[cfg(feature = "download-binaries")]
@@ -103,7 +136,7 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 		#[cfg(target_os = "linux")]
 		{
 			let main_dy = lib_dir.join("libonnxruntime.so");
-			let versioned_dy = out_dir.join("libonnxruntime.so.1.17.1");
+			let versioned_dy = out_dir.join("libonnxruntime.so.1.17.3");
 			if main_dy.exists() && !versioned_dy.exists() {
 				if versioned_dy.is_symlink() {
 					fs::remove_file(&versioned_dy).unwrap();
@@ -284,59 +317,30 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 		#[cfg(feature = "download-binaries")]
 		{
 			let target = env::var("TARGET").unwrap().to_string();
-			let (prebuilt_url, prebuilt_hash) = match target.as_str() {
-				"aarch64-apple-darwin" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_static-v1.17.1-aarch64-apple-darwin.tgz",
-					"041D1DD6005B29F4EAB74EF0E0B491FE9932004ADEE740FE9BA037D7BC52DBFC"
-				),
-				"aarch64-pc-windows-msvc" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_static-v1.17.1-aarch64-pc-windows-msvc.tgz",
-					"5AA68F5DB1BA1A5084E00E3C60AB4FA6BDEECA05104DACA8B88D6DBCC178EBF5"
-				),
-				"aarch64-unknown-linux-gnu" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_static-v1.17.1-aarch64-unknown-linux-gnu.tgz",
-					"73A569FF807D655FD6258816FBC9660667370AEB4A47C6754746BCBF07C280F9"
-				),
-				"wasm32-wasi" | "wasm32-unknown-unknown" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-pkort_static_b2-v1.17.1-wasm32-unknown-unknown.tgz",
-					"41A5713B37EEE40A0D7608B9E77AEB3E1A5DCE6845496A5F5E65F89A13E45089"
-				),
-				"wasm32-unknown-emscripten" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_static-v1.17.1-wasm32-unknown-emscripten.tgz",
-					"58EAD204FE53A488489287FFD97113E89A2CCA91876D3186CDBCA10A4F5A3287"
-				),
-				"x86_64-apple-darwin" => (
-					"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_static-v1.17.1-x86_64-apple-darwin.tgz",
-					"BB4320E2B4FB86D785B7CBB4D0CBDCCCD95253E70588410A4B2F27BCE9E917F8"
-				),
-				"x86_64-pc-windows-msvc" => {
-					if cfg!(any(feature = "cuda", feature = "tensorrt")) {
-						(
-							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_dylib_cuda-v1.17.1-x86_64-pc-windows-msvc.tgz",
-							"020A5E0F4DE81DDAAFB7A7928112E57A7153C3B43C7548EA1A3C570A6AFB6F00"
-						)
-					} else {
-						(
-							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_static-v1.17.1-x86_64-pc-windows-msvc.tgz",
-							"1388EABC74F1FA0E0695896C0BBFADCCE3E16B6DA489392D790DCAC642DEF6AE"
-						)
-					}
-				}
-				"x86_64-unknown-linux-gnu" => {
-					if cfg!(any(feature = "cuda", feature = "tensorrt")) {
-						(
-							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_dylib_cuda-v1.17.1-x86_64-unknown-linux-gnu.tgz",
-							"3000FAC7DB9AD3292AA9F0D887F85F2CDF8F522A9920B60D803648ED0E00FA13"
-						)
-					} else {
-						(
-							"https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.17.1/ortrs-msort_static-v1.17.1-x86_64-unknown-linux-gnu.tgz",
-							"14AFEC12219C8D587396F4EF3AB471CE5B64DFB5BB0CFD4C21C22B85BE5E519F"
-						)
-					}
-				}
-				x => panic!("downloaded binaries not available for target {x}\nyou may have to compile ONNX Runtime from source")
+			let designator = if cfg!(any(feature = "cuda", feature = "tensorrt")) {
+				if lib_exists("cudart64_12.dll") || lib_exists("libcudart.so.12") { "cu12" } else { "cu11" }
+			} else if cfg!(feature = "rocm") {
+				"rocm"
+			} else {
+				"none"
 			};
+			let mut dist = find_dist(&target, designator);
+			if dist.is_none() && designator != "none" {
+				dist = find_dist(&target, "none");
+			}
+
+			if dist.is_none() {
+				panic!(
+					"downloaded binaries not available for target {target}{}\nyou may have to compile ONNX Runtime from source",
+					if designator != "none" {
+						format!(" (note: also requested `{designator}`)")
+					} else {
+						String::new()
+					}
+				);
+			}
+
+			let (prebuilt_url, prebuilt_hash) = dist.unwrap();
 
 			let mut cache_dir = cache_dir()
 				.expect("could not determine cache directory")
@@ -350,7 +354,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 			let lib_dir = cache_dir.join(ORT_EXTRACT_DIR);
 			if !lib_dir.exists() {
 				let downloaded_file = fetch_file(prebuilt_url);
-				assert!(verify_file(&downloaded_file, prebuilt_hash), "hash does not match!");
+				assert!(verify_file(&downloaded_file, prebuilt_hash), "hash of downloaded ONNX Runtime binary does not match!");
 				extract_tgz(&downloaded_file, &cache_dir);
 			}
 

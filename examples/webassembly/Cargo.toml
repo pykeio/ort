@@ -16,6 +16,7 @@ web-sys = "0.3"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 tracing-subscriber-wasm = "0.1"
+image = { version = "0.25", default-features = false, features = [ "jpeg"  ]}
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

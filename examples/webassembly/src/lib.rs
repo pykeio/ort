@@ -1,22 +1,36 @@
-use ndarray::{Array4, ArrayViewD};
-use ort::Session;
+use image::{ImageBuffer, Luma, Pixel};
+use ort::{ArrayExtensions, Session};
 use wasm_bindgen::prelude::*;
 
-static MODEL_BYTES: &[u8] = include_bytes!("upsample.ort");
+static IMAGE_BYTES: &[u8] = include_bytes!("../../../tests/data/mnist_5.jpg");
+static MODEL_BYTES: &[u8] = include_bytes!("mnist.ort");
 
 pub fn upsample_inner() -> ort::Result<()> {
 	let session = Session::builder()?
 		.commit_from_memory_directly(MODEL_BYTES)
 		.expect("Could not read model from memory");
 
-	let array = Array4::<f32>::zeros((1, 224, 224, 3));
+	let image_buffer: ImageBuffer<Luma<u8>, Vec<u8>> = image::load_from_memory(IMAGE_BYTES).unwrap().to_luma8();
+
+	let array = ndarray::Array::from_shape_fn((1, 1, 28, 28), |(_, c, j, i)| {
+		let pixel = image_buffer.get_pixel(i as u32, j as u32);
+		let channels = pixel.channels();
+		(channels[c] as f32) / 255.0
+	});
 
 	let outputs = session.run(ort::inputs![array]?)?;
 
-	assert_eq!(outputs.len(), 1);
-	let output: ArrayViewD<f32> = outputs[0].try_extract_tensor()?;
+	let mut probabilities: Vec<(usize, f32)> = outputs[0]
+		.try_extract_tensor()?
+		.softmax(ndarray::Axis(1))
+		.iter()
+		.copied()
+		.enumerate()
+		.collect::<Vec<_>>();
 
-	assert_eq!(output.shape(), [1, 448, 448, 3]);
+	probabilities.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+	assert_eq!(probabilities[0].0, 5, "Expecting class '5' (got {})", probabilities[0].0);
 
 	Ok(())
 }

@@ -212,6 +212,12 @@ mod emscripten_shims {
 		let c = str::from_utf8_unchecked(slice::from_raw_parts(str, len));
 		tracing::error!("Emscripten error: {c}");
 	}
+
+	// despite disabling exceptions literally everywhere when compiling, we still have to stub this...
+	#[no_mangle]
+	pub unsafe extern "C" fn __cxa_throw(_ptr: *const (), _type: *const (), _destructor: *const ()) -> ! {
+		std::process::abort();
+	}
 }
 
 #[no_mangle]

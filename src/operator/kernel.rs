@@ -66,7 +66,7 @@ impl<'s> GetKernelAttribute<'s> for String {
 	{
 		let mut size = ort_sys::size_t::default();
 		status_to_result(ortsys![unsafe KernelInfoGetAttribute_string(info, name, ptr::null_mut(), &mut size)]).ok()?;
-		let mut out = vec![0u8; size];
+		let mut out = vec![0u8; size as _];
 		status_to_result(ortsys![unsafe KernelInfoGetAttribute_string(info, name, out.as_mut_ptr().cast::<c_char>(), &mut size)]).ok()?;
 		String::from_utf8(out).ok()
 	}
@@ -79,7 +79,7 @@ impl<'s> GetKernelAttribute<'s> for Vec<f32> {
 	{
 		let mut size = ort_sys::size_t::default();
 		status_to_result(ortsys![unsafe KernelInfoGetAttributeArray_float(info, name, ptr::null_mut(), &mut size)]).ok()?;
-		let mut out = vec![0f32; size];
+		let mut out = vec![0f32; size as _];
 		status_to_result(ortsys![unsafe KernelInfoGetAttributeArray_float(info, name, out.as_mut_ptr(), &mut size)]).ok()?;
 		Some(out)
 	}
@@ -92,7 +92,7 @@ impl<'s> GetKernelAttribute<'s> for Vec<i64> {
 	{
 		let mut size = ort_sys::size_t::default();
 		status_to_result(ortsys![unsafe KernelInfoGetAttributeArray_int64(info, name, ptr::null_mut(), &mut size)]).ok()?;
-		let mut out = vec![0i64; size];
+		let mut out = vec![0i64; size as _];
 		status_to_result(ortsys![unsafe KernelInfoGetAttributeArray_int64(info, name, out.as_mut_ptr(), &mut size)]).ok()?;
 		Some(out)
 	}

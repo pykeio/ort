@@ -68,7 +68,7 @@ impl<'s> GetKernelAttribute<'s> for String {
 		status_to_result(ortsys![unsafe KernelInfoGetAttribute_string(info, name, ptr::null_mut(), &mut size)]).ok()?;
 		let mut out = vec![0u8; size as _];
 		status_to_result(ortsys![unsafe KernelInfoGetAttribute_string(info, name, out.as_mut_ptr().cast::<c_char>(), &mut size)]).ok()?;
-		String::from_utf8(out).ok()
+		CString::from_vec_with_nul(out).ok().and_then(|c| c.into_string().ok())
 	}
 }
 

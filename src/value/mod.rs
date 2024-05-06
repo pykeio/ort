@@ -178,6 +178,14 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 		ValueRef { inner, lifetime: PhantomData }
 	}
 
+	/// Attempts to downcast a temporary dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed
+	/// variant, like [`TensorRef<T>`].
+	#[inline]
+	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(self) -> Result<ValueRef<'v, OtherType>> {
+		let dt = self.dtype()?;
+		if OtherType::can_downcast(&dt) { Ok(unsafe { std::mem::transmute(self) }) } else { panic!() }
+	}
+
 	pub fn into_dyn(self) -> ValueRef<'v, DynValueTypeMarker> {
 		unsafe { std::mem::transmute(self) }
 	}
@@ -201,6 +209,14 @@ pub struct ValueRefMut<'v, Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> 
 impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 	pub(crate) fn new(inner: Value<Type>) -> Self {
 		ValueRefMut { inner, lifetime: PhantomData }
+	}
+
+	/// Attempts to downcast a temporary mutable dynamic value (like [`DynValue`] or [`DynTensor`]) to a more
+	/// strongly typed variant, like [`TensorRefMut<T>`].
+	#[inline]
+	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(self) -> Result<ValueRefMut<'v, OtherType>> {
+		let dt = self.dtype()?;
+		if OtherType::can_downcast(&dt) { Ok(unsafe { std::mem::transmute(self) }) } else { panic!() }
 	}
 
 	pub fn into_dyn(self) -> ValueRefMut<'v, DynValueTypeMarker> {

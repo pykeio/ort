@@ -5,6 +5,7 @@ use crate::{
 	Value, ValueRef, ValueRefMut
 };
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SessionInputValue<'v> {
 	ViewMut(ValueRefMut<'v, DynValueTypeMarker>),
 	View(ValueRef<'v, DynValueTypeMarker>),

@@ -186,7 +186,11 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 		let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap().to_lowercase();
 		let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap().to_lowercase();
 		let platform_format_lib = |a: &str| {
-			if target_os.contains("windows") { format!("{}.lib", a) } else { format!("lib{}.a", a) }
+			if target_os.contains("windows") {
+				format!("{}.lib", a)
+			} else {
+				format!("lib{}.a", a)
+			}
 		};
 
 		let mut profile = env::var(ORT_ENV_SYSTEM_LIB_PROFILE).unwrap_or_default();
@@ -318,7 +322,11 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 		{
 			let target = env::var("TARGET").unwrap().to_string();
 			let designator = if cfg!(any(feature = "cuda", feature = "tensorrt")) {
-				if lib_exists("cudart64_12.dll") || lib_exists("libcudart.so.12") { "cu12" } else { "cu11" }
+				if lib_exists("cudart64_12.dll") || lib_exists("libcudart.so.12") {
+					"cu12"
+				} else {
+					"cu11"
+				}
 			} else if cfg!(feature = "rocm") {
 				"rocm"
 			} else {
@@ -376,6 +384,19 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 	}
 }
 
+fn try_setup_with_pkg_config() -> bool {
+	match pkg_config::Config::new().probe("libonnxruntime") {
+		Ok(lib) => {
+			println!("Using onnxruntime found by pkg-config: {:}", lib.display());
+			true
+		}
+		Err(_) => {
+			println!("onnxruntime not found using pkg-config, falling back to manual setup.");
+			false
+		}
+	}
+}
+
 fn real_main(link: bool) {
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_SYSTEM_LIB_LOCATION);
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_SYSTEM_LIB_PROFILE);
@@ -400,14 +421,20 @@ fn main() {
 	}
 
 	if cfg!(feature = "load-dynamic") {
-		// we only need to execute the real main step if we are using the download strategy...
-		if cfg!(feature = "download-binaries") && env::var(ORT_ENV_SYSTEM_LIB_LOCATION).is_err() {
-			// but we don't need to link to the binaries we download (so all we are doing is downloading them and placing them in
-			// the output directory)
-			real_main(false);
+		if !try_setup_with_pkg_config() {
+			// Only execute the real main step if pkg-config fails and if we are using the download
+			// strategy
+			if cfg!(feature = "download-binaries") && env::var(ORT_ENV_SYSTEM_LIB_LOCATION).is_err() {
+				// but we don't need to link to the binaries we download (so all we are doing is
+				// downloading them and placing them in the output directory)
+				real_main(false); // but we don't need to link to the binaries we download
+			}
 		}
 	} else {
-		// if we are not using the load-dynamic feature then we need to link to dylibs.
-		real_main(true);
+		// If pkg-config setup was successful, we don't need further action
+		// Otherwise, if we are not using the load-dynamic feature, we need to link to the dylibs.
+		if !try_setup_with_pkg_config() {
+			real_main(true);
+		}
 	}
 }

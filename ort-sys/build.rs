@@ -387,7 +387,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 fn try_setup_with_pkg_config() -> bool {
 	match pkg_config::Config::new().probe("libonnxruntime") {
 		Ok(lib) => {
-			println!("Using onnxruntime found by pkg-config: {:}", lib.display());
+			println!("Using onnxruntime found by pkg-config: {:?}", lib);
 			true
 		}
 		Err(_) => {

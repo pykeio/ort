@@ -186,11 +186,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 		let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap().to_lowercase();
 		let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap().to_lowercase();
 		let platform_format_lib = |a: &str| {
-			if target_os.contains("windows") {
-				format!("{}.lib", a)
-			} else {
-				format!("lib{}.a", a)
-			}
+			if target_os.contains("windows") { format!("{}.lib", a) } else { format!("lib{}.a", a) }
 		};
 
 		let mut profile = env::var(ORT_ENV_SYSTEM_LIB_PROFILE).unwrap_or_default();
@@ -322,11 +318,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 		{
 			let target = env::var("TARGET").unwrap().to_string();
 			let designator = if cfg!(any(feature = "cuda", feature = "tensorrt")) {
-				if lib_exists("cudart64_12.dll") || lib_exists("libcudart.so.12") {
-					"cu12"
-				} else {
-					"cu11"
-				}
+				if lib_exists("cudart64_12.dll") || lib_exists("libcudart.so.12") { "cu12" } else { "cu11" }
 			} else if cfg!(feature = "rocm") {
 				"rocm"
 			} else {

@@ -124,7 +124,7 @@ How to use dynamic linking configuration with `pkg-config`:
                 brew install pkg-config
                 ```
             </Tab>
-            <Tab title="macOS">
+            <Tab title="Windows">
                 ```shell
                 pacman -Syu
                 pacman -S pkg-config
@@ -142,6 +142,6 @@ How to use dynamic linking configuration with `pkg-config`:
 2. Setting Link Paths: The `pkg-config` tool provides a list of directories where the linker can find the binary files of libraries (`*.so`, `*.dll`, `*.dylib`). This is crucial because it ensures that the linker knows where to look for the libraries, which might not be in the default library search paths of the system. This is important when libraries are installed in non-standard locations.
 3. Specifying Libraries to Link Against: `pkg-config` also specifies the exact names of the libraries to link against. This precise specification prevents errors that could arise from linking against incorrect library versions or similar libraries with different names. It ensures that the build process is both accurate and reliable.
 
-#### How It Works?
+#### How it works?
 - Probing Libraries: `pkg-config` probes the installed libraries on the system using the library's package name, in this case `libonnxruntime` for ONNX Runtime. If the library is found, `pkg-config` retrieves the necessary compilation and linking information.
 - Extracting and Applying Configurations: The tool extracts configuration details such as library paths (where the libraries are located) and library names (which libraries to link against). These details are then used to set the appropriate flags for the Rust compiler and linker, ensuring that they can find and link the required libraries correctly.

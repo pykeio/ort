@@ -379,7 +379,17 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 fn try_setup_with_pkg_config() -> bool {
 	match pkg_config::Config::new().probe("libonnxruntime") {
 		Ok(lib) => {
-			println!("Using onnxruntime found by pkg-config: {:?}", lib);
+			// Setting the link paths
+			for path in lib.link_paths {
+				println!("cargo:rustc-link-search=native={}", path.display());
+			}
+
+			// Setting the libraries to link against
+			for lib in lib.libs {
+				println!("cargo:rustc-link-lib={}", lib);
+			}
+
+			println!("Using onnxruntime found by pkg-config.");
 			true
 		}
 		Err(_) => {

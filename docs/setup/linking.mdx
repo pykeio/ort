@@ -104,3 +104,44 @@ To configure rpath, you'll need to:
         </Tabs>
     </Step>
 </Steps>
+
+### Easy Dynamic Linking Configuration With `pkg-config`
+When working with external C or C++ libraries in Rust such as ONNX Runtime, `pkg-config` serves as a powerful tool to handle the configuration of linking paths and library dependencies. This approach is especially valuable in complex build environments. If your system has `pkg-config` installed and ONNX Runtime is registered with `pkg-config`, you can leverage this to simplify the linking process.
+
+How to use dynamic linking configuration with `pkg-config`:
+<Steps>
+    <Step title="Ensure `pkg-config` is installed on your system.">
+        <Tabs>
+            <Tab title="Linux">
+                Ubuntu
+                ```shell
+                sudo apt-get update
+                sudo apt-get install pkg-config
+                ```
+            </Tab>
+            <Tab title="macOS">
+                ```shell
+                brew install pkg-config
+                ```
+            </Tab>
+            <Tab title="macOS">
+                ```shell
+                pacman -Syu
+                pacman -S pkg-config
+                ```
+            </Tab>
+        </Tabs>
+    </Step>
+    </Step>
+        After installing `pkg-config`, you may need to set the `PKG_CONFIG_PATH` environment variable if `pkg-config` does not automatically find all installed libraries. This variable tells `pkg-config` where to look for its `.pc` files which store the package information.
+    </Step>
+</Steps>
+
+#### What does `pkg-config` automatically do for you?
+1. Automatic Configuration of Linker Flags: `pkg-config` automates the process of configuring the linker flags that are necessary to link a Rust application with external libraries. It retrieves and supplies the correct flags based on the library's configuration on the system, which typically includes paths to the library files and the names of the libraries themselves.
+2. Setting Link Paths: The `pkg-config` tool provides a list of directories where the linker can find the binary files of libraries (`*.so`, `*.dll`, `*.dylib`). This is crucial because it ensures that the linker knows where to look for the libraries, which might not be in the default library search paths of the system. This is important when libraries are installed in non-standard locations.
+3. Specifying Libraries to Link Against: `pkg-config` also specifies the exact names of the libraries to link against. This precise specification prevents errors that could arise from linking against incorrect library versions or similar libraries with different names. It ensures that the build process is both accurate and reliable.
+
+#### How It Works?
+- Probing Libraries: `pkg-config` probes the installed libraries on the system using the library's package name, in this case `libonnxruntime` for ONNX Runtime. If the library is found, `pkg-config` retrieves the necessary compilation and linking information.
+- Extracting and Applying Configurations: The tool extracts configuration details such as library paths (where the libraries are located) and library names (which libraries to link against). These details are then used to set the appropriate flags for the Rust compiler and linker, ensuring that they can find and link the required libraries correctly.

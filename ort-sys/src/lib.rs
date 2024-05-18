@@ -821,8 +821,109 @@ fn bindgen_test_layout_OrtOpenVINOProviderOptions() {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct OrtTrainingApi {
+pub struct OrtTrainingSession {
 	_unused: [u8; 0]
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OrtCheckpointState {
+	_unused: [u8; 0]
+}
+#[repr(i32)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum OrtPropertyType {
+	OrtIntProperty = 0,
+	OrtFloatProperty = 1,
+	OrtStringProperty = 2
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OrtTrainingApi {
+	pub LoadCheckpoint: ::std::option::Option<
+		_system!(unsafe fn(checkpoint_path: *const ::std::os::raw::c_char, checkpoint_state: *mut *mut OrtCheckpointState) -> OrtStatusPtr)
+	>,
+	pub SaveCheckpoint: ::std::option::Option<
+		_system!(
+			unsafe fn(checkpoint_state: *mut OrtCheckpointState, checkpoint_path: *const ::std::os::raw::c_char, include_optimizer_state: bool) -> OrtStatusPtr
+		)
+	>,
+	pub CreateTrainingSession: ::std::option::Option<
+		_system!(
+			unsafe fn(
+				env: *const OrtEnv,
+				options: *const OrtSessionOptions,
+				checkpoint_state: *mut OrtCheckpointState,
+				train_model_path: *const ortchar,
+				eval_model_path: *const ortchar,
+				optimizer_model_path: *const ortchar,
+				out: *mut *mut OrtTrainingSession
+			) -> OrtStatusPtr
+		)
+	>,
+	pub CreateTrainingSessionFromBuffer: ::std::option::Option<
+		_system!(
+			unsafe fn(
+				env: *const OrtEnv,
+				options: *const OrtSessionOptions,
+				checkpoint_state: *mut OrtCheckpointState,
+				train_model_data: *const (),
+				train_data_length: size_t,
+				eval_model_data: *const (),
+				eval_data_length: size_t,
+				optimizer_model_data: *const (),
+				optimizer_data_length: size_t,
+				out: *mut *mut OrtTrainingSession
+			) -> OrtStatusPtr
+		)
+	>,
+	pub TrainingSessionGetTrainingModelOutputCount:
+		::std::option::Option<_system!(unsafe fn(sess: *const OrtTrainingSession, out: *mut size_t) -> OrtStatusPtr)>,
+	pub TrainingSessionGetEvalModelOutputCount: ::std::option::Option<_system!(unsafe fn(sess: *const OrtTrainingSession, out: *mut size_t) -> OrtStatusPtr)>,
+	pub TrainingSessionGetTrainingModelOutputName: ::std::option::Option<
+		_system!(unsafe fn(sess: *const OrtTrainingSession, index: size_t, allocator: *mut OrtAllocator, output: *mut *mut char) -> OrtStatusPtr)
+	>,
+	pub TrainingSessionGetEvalModelOutputName: ::std::option::Option<
+		_system!(unsafe fn(sess: *const OrtTrainingSession, index: size_t, allocator: *mut OrtAllocator, output: *mut *mut char) -> OrtStatusPtr)
+	>,
+	pub LazyResetGrad: ::std::option::Option<_system!(unsafe fn(session: *mut OrtTrainingSession) -> OrtStatusPtr)>,
+	pub TrainStep: ::std::option::Option<
+		_system!(
+			unsafe fn(
+				session: *mut OrtTrainingSession,
+				run_options: *const OrtRunOptions,
+				inputs_len: size_t,
+				inputs: *const *const OrtValue,
+				outputs_len: size_t,
+				outputs: *mut *mut OrtValue
+			) -> OrtStatusPtr
+		)
+	>,
+	pub EvalStep: ::std::option::Option<
+		_system!(
+			unsafe fn(
+				session: *mut OrtTrainingSession,
+				run_options: *const OrtRunOptions,
+				inputs_len: size_t,
+				inputs: *const *const OrtValue,
+				outputs_len: size_t,
+				outputs: *mut *mut OrtValue
+			) -> OrtStatusPtr
+		)
+	>,
+	pub SetLearningRate: ::std::option::Option<_system!(unsafe fn(session: *mut OrtTrainingSession, learning_rate: f32) -> OrtStatusPtr)>,
+	pub GetLearningRate: ::std::option::Option<_system!(unsafe fn(session: *mut OrtTrainingSession, learning_rate: *mut f32) -> OrtStatusPtr)>,
+	pub OptimizerStep: ::std::option::Option<_system!(unsafe fn(session: *mut OrtTrainingSession, run_options: *const OrtRunOptions) -> OrtStatusPtr)>,
+	pub RegisterLinearLRScheduler: ::std::option::Option<
+		_system!(unsafe fn(session: *mut OrtTrainingSession, warmup_step_count: i64, total_step_count: i64, initial_lr: f32) -> OrtStatusPtr)
+	>,
+	pub SchedulerStep: ::std::option::Option<_system!(unsafe fn(session: *mut OrtTrainingSession) -> OrtStatusPtr)>,
+	pub GetParametersSize: ::std::option::Option<_system!(unsafe fn(session: *mut OrtTrainingSession, out: *mut size_t, trainable_only: bool) -> OrtStatusPtr)>,
+	pub CopyParametersToBuffer:
+		::std::option::Option<_system!(unsafe fn(session: *mut OrtTrainingSession, parameters_buffer: *mut OrtValue, trainable_only: bool) -> OrtStatusPtr)>,
+	pub CopyBufferToParameters:
+		::std::option::Option<_system!(unsafe fn(session: *mut OrtTrainingSession, parameters_buffer: *mut OrtValue, trainable_only: bool) -> OrtStatusPtr)>,
+	pub ReleaseTrainingSession: ::std::option::Option<_system!(unsafe fn(input: *mut OrtTrainingSession))>,
+	pub ReleaseCheckpointState: ::std::option::Option<_system!(unsafe fn(input: *mut OrtCheckpointState))>
 }
 #[doc = " \\brief The helper interface to get the right version of OrtApi\n\n Get a pointer to this structure through ::OrtGetApiBase"]
 #[repr(C)]

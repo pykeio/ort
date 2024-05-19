@@ -25,6 +25,7 @@ pub(crate) mod session;
 pub(crate) mod tensor;
 #[cfg(feature = "training")]
 pub(crate) mod training;
+pub(crate) mod util;
 pub(crate) mod value;
 #[cfg_attr(docsrs, doc(cfg(target_arch = "wasm32")))]
 #[cfg(target_arch = "wasm32")]

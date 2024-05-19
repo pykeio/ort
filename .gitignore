@@ -186,6 +186,7 @@ WixTools/
 # ONNX Runtime downloaded models
 **/*.onnx
 **/*.ort
+**/*.pbseq
 !examples/webassembly/**/*.ort
 !tests/data/*.onnx
 !tests/data/*.ort
@@ -195,3 +196,6 @@ WixTools/
 
 # Glassbench results
 /glassbench*.db
+
+# Python virtual environment
+.venv

@@ -839,13 +839,10 @@ pub enum OrtPropertyType {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct OrtTrainingApi {
-	pub LoadCheckpoint: ::std::option::Option<
-		_system!(unsafe fn(checkpoint_path: *const ::std::os::raw::c_char, checkpoint_state: *mut *mut OrtCheckpointState) -> OrtStatusPtr)
-	>,
+	pub LoadCheckpoint:
+		::std::option::Option<_system!(unsafe fn(checkpoint_path: *const ortchar, checkpoint_state: *mut *mut OrtCheckpointState) -> OrtStatusPtr)>,
 	pub SaveCheckpoint: ::std::option::Option<
-		_system!(
-			unsafe fn(checkpoint_state: *mut OrtCheckpointState, checkpoint_path: *const ::std::os::raw::c_char, include_optimizer_state: bool) -> OrtStatusPtr
-		)
+		_system!(unsafe fn(checkpoint_state: *mut OrtCheckpointState, checkpoint_path: *const ortchar, include_optimizer_state: bool) -> OrtStatusPtr)
 	>,
 	pub CreateTrainingSession: ::std::option::Option<
 		_system!(

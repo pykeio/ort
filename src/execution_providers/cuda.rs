@@ -171,7 +171,7 @@ impl ExecutionProvider for CUDAExecutionProvider {
 	}
 
 	fn supported_by_platform(&self) -> bool {
-		cfg!(any(all(target_os = "linux", any(target_os = "aarch64", target_os = "x86_64")), all(target_os = "windows", target_arch = "x86_64")))
+		cfg!(any(all(target_os = "linux", any(target_arch = "aarch64", target_arch = "x86_64")), all(target_os = "windows", target_arch = "x86_64")))
 	}
 
 	#[allow(unused, unreachable_code)]

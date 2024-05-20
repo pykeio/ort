@@ -1,7 +1,3 @@
-#[cfg(unix)]
-use std::os::unix::ffi::OsStrExt;
-#[cfg(target_family = "windows")]
-use std::os::windows::ffi::OsStrExt;
 #[cfg(feature = "fetch-models")]
 use std::path::PathBuf;
 use std::{

@@ -11,13 +11,10 @@ type OsCharArray = Vec<u16>;
 #[cfg(not(target_family = "windows"))]
 type OsCharArray = Vec<c_char>;
 
-pub fn path_to_os_char(path: impl AsRef<Path>) -> Vec<u16> {
+pub fn path_to_os_char(path: impl AsRef<Path>) -> OsCharArray {
 	let model_path = OsString::from(path.as_ref());
 	#[cfg(target_family = "windows")]
-	let model_path: Vec<u16> = model_path
-		.encode_wide()
-		.chain(std::iter::once(0))
-		.collect();
+	let model_path: Vec<u16> = model_path.encode_wide().chain(std::iter::once(0)).collect();
 	#[cfg(not(target_family = "windows"))]
 	let model_path: Vec<c_char> = model_path
 		.as_encoded_bytes()

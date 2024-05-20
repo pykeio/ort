@@ -110,7 +110,8 @@ class CLM(nn.Module):
 		x = self.word_embeddings(x)
 		for layer in self.layers:
 			x = layer(x)
-		return self.lm_head(self.norm(x))
+		logits = self.lm_head(self.norm(x))
+		return logits.view(-1, logits.size(-1))
 
 lm = CLM(256, 4, vocab_size=32000)
 torch.onnx.export(
@@ -121,7 +122,7 @@ torch.onnx.export(
 	output_names=['probs'],
 	dynamic_axes={
 		'input_ids': {0: 'batch', 1: 'seq'},
-		'probs': {0: 'batch', 1: 'seq'}
+		'probs': {0: 'batch_seq'}
 	},
 	opset_version=14
 )

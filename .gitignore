@@ -198,4 +198,7 @@ WixTools/
 /glassbench*.db
 
 # Python virtual environment
-.venv
+.venv*
+
+# Training checkpoints
+tools/train-data/**/checkpoint

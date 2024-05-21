@@ -75,6 +75,7 @@ pub struct EnvironmentGlobalThreadPoolOptions {
 /// Struct used to build an `Environment`.
 pub struct EnvironmentBuilder {
 	name: String,
+	telemetry: bool,
 	execution_providers: Vec<ExecutionProviderDispatch>,
 	global_thread_pool_options: Option<EnvironmentGlobalThreadPoolOptions>
 }
@@ -83,6 +84,7 @@ impl Default for EnvironmentBuilder {
 	fn default() -> Self {
 		EnvironmentBuilder {
 			name: "default".to_string(),
+			telemetry: true,
 			execution_providers: vec![],
 			global_thread_pool_options: None
 		}
@@ -97,6 +99,12 @@ impl EnvironmentBuilder {
 		S: Into<String>
 	{
 		self.name = name.into();
+		self
+	}
+
+	#[must_use]
+	pub fn with_telemetry(mut self, enable: bool) -> Self {
+		self.telemetry = enable;
 		self
 	}
 
@@ -176,6 +184,12 @@ impl EnvironmentBuilder {
 			(env_ptr, false)
 		};
 		debug!(env_ptr = format!("{env_ptr:?}").as_str(), "Environment created");
+
+		if self.telemetry {
+			ortsys![unsafe EnableTelemetryEvents(env_ptr) -> Error::CreateEnvironment];
+		} else {
+			ortsys![unsafe DisableTelemetryEvents(env_ptr) -> Error::CreateEnvironment];
+		}
 
 		unsafe {
 			*G_ENV.cell.get() = Some(Arc::new(Environment {

@@ -10,7 +10,7 @@
 #[doc(hidden)]
 pub mod internal;
 
-pub const ORT_API_VERSION: u32 = 17;
+pub const ORT_API_VERSION: u32 = 18;
 
 pub use std::ffi::{c_char, c_int, c_ulong, c_ulonglong, c_ushort, c_void};
 

@@ -298,7 +298,8 @@ pub struct OrtAllocator {
 	#[doc = "< Free a block of memory previously allocated with OrtAllocator::Alloc"]
 	pub Free: ::std::option::Option<_system!(unsafe fn(this_: *mut OrtAllocator, p: *mut ::std::os::raw::c_void))>,
 	#[doc = "< Return a pointer to an ::OrtMemoryInfo that describes this allocator"]
-	pub Info: ::std::option::Option<_system!(unsafe fn(this_: *const OrtAllocator) -> *const OrtMemoryInfo)>
+	pub Info: ::std::option::Option<_system!(unsafe fn(this_: *const OrtAllocator) -> *const OrtMemoryInfo)>,
+	pub Reserve: ::std::option::Option<_system!(unsafe fn(this_: *const OrtAllocator, size: size_t) -> *mut ::std::os::raw::c_void)>
 }
 #[test]
 fn bindgen_test_layout_OrtAllocator() {
@@ -522,6 +523,7 @@ pub struct OrtROCMProviderOptions {
 	pub user_compute_stream: *mut ::std::os::raw::c_void,
 	#[doc = " \\brief ROCM memory arena configuration parameters"]
 	pub default_memory_arena_cfg: *mut OrtArenaCfg,
+	pub enable_hip_graph: ::std::os::raw::c_int,
 	#[doc = " \\brief Enable TunableOp for using.\n   Set it to 1/0 to enable/disable TunableOp. Otherwise, it is disabled by default.\n   This option can be overriden by environment variable ORT_ROCM_TUNABLE_OP_ENABLE."]
 	pub tunable_op_enable: ::std::os::raw::c_int,
 	#[doc = " \\brief Enable TunableOp for tuning.\n   Set it to 1/0 to enable/disable TunableOp tuning. Otherwise, it is disabled by default.\n   This option can be overriden by environment variable ORT_ROCM_TUNABLE_OP_TUNING_ENABLE."]
@@ -1829,6 +1831,39 @@ pub struct OrtApi {
 				provider_options_keys: *const *const ::std::os::raw::c_char,
 				provider_options_values: *const *const ::std::os::raw::c_char,
 				num_keys: size_t
+			) -> OrtStatusPtr
+		)
+	>,
+	pub SessionOptionsAppendExecutionProvider_VitisAI: ::std::option::Option<
+		_system!(
+			unsafe fn(
+				options: *mut OrtSessionOptions,
+				provider_options_keys: *const *const ::std::os::raw::c_char,
+				provider_options_values: *const *const ::std::os::raw::c_char,
+				num_keys: size_t
+			) -> OrtStatusPtr
+		)
+	>,
+	pub KernelContext_GetScratchBuffer: ::std::option::Option<
+		_system!(
+			unsafe fn(
+				context: *const OrtKernelContext,
+				mem_info: *const OrtMemoryInfo,
+				count_or_bytes: size_t,
+				out: *mut *mut ::std::os::raw::c_void
+			) -> OrtStatusPtr
+		)
+	>,
+	pub KernelInfoGetAllocator:
+		::std::option::Option<_system!(unsafe fn(info: *const OrtKernelInfo, mem_type: OrtMemType, out: *mut *mut OrtAllocator) -> OrtStatusPtr)>,
+	pub AddExternalInitializersFromMemory: ::std::option::Option<
+		_system!(
+			unsafe fn(
+				options: *mut OrtSessionOptions,
+				external_initializer_file_names: *const *const ortchar,
+				external_initializer_file_buffer_array: *const *mut ::std::os::raw::c_char,
+				external_initializer_file_lengths: *const size_t,
+				num_external_initializer_files: size_t
 			) -> OrtStatusPtr
 		)
 	>
@@ -3254,7 +3289,13 @@ pub struct OrtCustomOp {
 	pub KernelComputeV2: ::std::option::Option<_system!(unsafe fn(op_kernel: *mut ::std::os::raw::c_void, context: *mut OrtKernelContext) -> OrtStatusPtr)>,
 	pub InferOutputShapeFn: ::std::option::Option<_system!(unsafe fn(op: *const OrtCustomOp, arg1: *mut OrtShapeInferContext) -> OrtStatusPtr)>,
 	pub GetStartVersion: ::std::option::Option<_system!(unsafe fn(op: *const OrtCustomOp) -> ::std::os::raw::c_int)>,
-	pub GetEndVersion: ::std::option::Option<_system!(unsafe fn(op: *const OrtCustomOp) -> ::std::os::raw::c_int)>
+	pub GetEndVersion: ::std::option::Option<_system!(unsafe fn(op: *const OrtCustomOp) -> ::std::os::raw::c_int)>,
+	pub GetMayInplace:
+		::std::option::Option<_system!(unsafe fn(input_index: *mut *mut ::std::os::raw::c_int, output_index: *mut *mut ::std::os::raw::c_int) -> size_t)>,
+	pub ReleaseMayInplace: ::std::option::Option<_system!(unsafe fn(input_index: *mut ::std::os::raw::c_int, output_index: *mut *mut ::std::os::raw::c_int))>,
+	pub GetAliasMap:
+		::std::option::Option<_system!(unsafe fn(input_index: *mut *mut ::std::os::raw::c_int, output_index: *mut *mut ::std::os::raw::c_int) -> size_t)>,
+	pub ReleaseAliasMap: ::std::option::Option<_system!(unsafe fn(input_index: *mut ::std::os::raw::c_int, output_index: *mut *mut ::std::os::raw::c_int))>
 }
 #[test]
 fn bindgen_test_layout_OrtCustomOp() {

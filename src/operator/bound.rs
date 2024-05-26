@@ -43,6 +43,10 @@ impl<O: Operator> BoundOperator<O> {
 				GetVariadicInputMinArity: Some(BoundOperator::<O>::GetVariadicInputMinArity),
 				GetVariadicOutputHomogeneity: Some(BoundOperator::<O>::GetVariadicOutputHomogeneity),
 				GetVariadicOutputMinArity: Some(BoundOperator::<O>::GetVariadicOutputMinArity),
+				GetAliasMap: None,
+				ReleaseAliasMap: None,
+				GetMayInplace: None,
+				ReleaseMayInplace: None,
 				InferOutputShapeFn: if O::get_infer_shape_function().is_some() {
 					Some(BoundOperator::<O>::InferOutputShapeFn)
 				} else {

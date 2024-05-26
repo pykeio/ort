@@ -12,6 +12,7 @@ pub struct ROCmExecutionProvider {
 	do_copy_in_default_stream: bool,
 	user_compute_stream: Option<*mut c_void>,
 	default_memory_arena_cfg: Option<*mut ort_sys::OrtArenaCfg>,
+	enable_hip_graph: bool,
 	tunable_op_enable: bool,
 	tunable_op_tuning_enable: bool,
 	tunable_op_max_tuning_duration_ms: i32
@@ -30,6 +31,7 @@ impl Default for ROCmExecutionProvider {
 			do_copy_in_default_stream: true,
 			user_compute_stream: None,
 			default_memory_arena_cfg: None,
+			enable_hip_graph: false,
 			tunable_op_enable: false,
 			tunable_op_tuning_enable: false,
 			tunable_op_max_tuning_duration_ms: 0
@@ -77,6 +79,12 @@ impl ROCmExecutionProvider {
 	#[must_use]
 	pub fn with_default_memory_arena_cfg(mut self, cfg: *mut ort_sys::OrtArenaCfg) -> Self {
 		self.default_memory_arena_cfg = Some(cfg);
+		self
+	}
+
+	#[must_use]
+	pub fn with_hip_graph(mut self, enable: bool) -> Self {
+		self.enable_hip_graph = enable;
 		self
 	}
 
@@ -135,6 +143,7 @@ impl ExecutionProvider for ROCmExecutionProvider {
 				has_user_compute_stream: self.user_compute_stream.is_some().into(),
 				user_compute_stream: self.user_compute_stream.unwrap_or_else(std::ptr::null_mut),
 				default_memory_arena_cfg: self.default_memory_arena_cfg.unwrap_or_else(std::ptr::null_mut),
+				enable_hip_graph: self.enable_hip_graph.into(),
 				tunable_op_enable: self.tunable_op_enable.into(),
 				tunable_op_tuning_enable: self.tunable_op_tuning_enable.into(),
 				tunable_op_max_tuning_duration_ms: self.tunable_op_max_tuning_duration_ms

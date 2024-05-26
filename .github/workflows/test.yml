@@ -61,7 +61,7 @@ jobs:
       - name: Run tests
         working-directory: examples/webassembly
         run: |
-          wasm-pack test --node --debug
+          wasm-pack test --node
   # Disable cross-compile until cross updates aarch64-unknown-linux-gnu to Ubuntu 22.04
   # ref https://github.com/cross-rs/cross/pull/973
   #cross-compile:

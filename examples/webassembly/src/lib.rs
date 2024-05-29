@@ -10,13 +10,19 @@ pub fn upsample_inner() -> ort::Result<()> {
 		.commit_from_memory_directly(MODEL_BYTES)
 		.expect("Could not read model from memory");
 
-	let image_buffer: ImageBuffer<Luma<u8>, Vec<u8>> = image::load_from_memory(IMAGE_BYTES).unwrap().to_luma8();
-
-	let array = ndarray::Array::from_shape_fn((1, 1, 28, 28), |(_, c, j, i)| {
-		let pixel = image_buffer.get_pixel(i as u32, j as u32);
-		let channels = pixel.channels();
-		(channels[c] as f32) / 255.0
-	});
+	// NOTE: An earlier nightly version of Rust 1.78 includes a patch required for ONNX Runtime to link properly, but a
+	// later version enables debug assertions in `dlmalloc`, which surfaces an allocation bug in the `image` crate:
+	// https://github.com/rustwasm/wasm-pack/issues/1389 Because of this, using `image::load_from_memory` crashes.
+	// For demonstration purposes, we're replacing the image loading code shown below with zeros(). In a real application,
+	// you can get the image from another source, like an HTML canvas.
+	//
+	//     let image_buffer: ImageBuffer<Luma<u8>, Vec<u8>> = image::load_from_memory(IMAGE_BYTES).unwrap().to_luma8();
+	//     let array = ndarray::Array::from_shape_fn((1, 1, 28, 28), |(_, c, j, i)| {
+	//     	let pixel = image_buffer.get_pixel(i as u32, j as u32);
+	//     	let channels = pixel.channels();
+	//     	(channels[c] as f32) / 255.0
+	//     });
+	let array = ndarray::Array4::<f32>::zeros((1, 1, 28, 28));
 
 	let outputs = session.run(ort::inputs![array]?)?;
 

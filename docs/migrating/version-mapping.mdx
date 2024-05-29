@@ -6,7 +6,7 @@ description: Information about `ort`'s versioning and relation to ONNX Runtime v
 ## A note on SemVer
 `ort` versions pre-2.0 were not SemVer compatible. From v2.0 onwards, breaking API changes are accompanied by a **major version update**.
 
-Updates to the version of ONNX Runtime used by `ort` may occur on **minor** version updates, i.e. 2.0 ships with ONNX Runtime 1.17.3, but 2.1 may ship with 1.18.0. ONNX Runtime is generally forward compatible, but in case you require a specific version of ONNX Runtime, you should pin the minor version in your `Cargo.toml` using a [tilde requirement](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#tilde-requirements):
+Updates to the version of ONNX Runtime used by `ort` may occur on **minor** version updates, i.e. 2.0 ships with ONNX Runtime 1.18.0, but 2.1 may ship with 1.19.0. ONNX Runtime is generally forward compatible, but in case you require a specific version of ONNX Runtime, you should pin the minor version in your `Cargo.toml` using a [tilde requirement](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#tilde-requirements):
 ```toml
 [dependencies]
 ort = { version = "~2.0", ... }
@@ -16,7 +16,7 @@ ort = { version = "~2.0", ... }
 
 | **ort**  | **ONNX Runtime** |
 | -------- | ----------------:|
-| v2.0.0+ | v1.17.3 |
+| v2.0.0+ | v1.18.0 |
 | v1.16.0-v1.16.2 | v1.16.0 |
 | v1.15.0-v1.15.5 | v1.15.1 |
 | v1.14.2-v1.14.8 | v1.14.1 |

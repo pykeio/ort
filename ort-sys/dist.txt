@@ -12,4 +12,4 @@ none	x86_64-pc-windows-msvc	https://parcel.pyke.io/v2/delivery/ortrs/packages/ms
 none	aarch64-apple-darwin	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.18.0/ortrs-msort_static-v1.18.0-aarch64-apple-darwin.tgz	F8DB068DFACFE3B00B9F0181B79780C6971CD1A6EAEB9D9A7FC2129CEB8413A5
 none	x86_64-apple-darwin	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.18.0/ortrs-msort_static-v1.18.0-x86_64-apple-darwin.tgz	E6E0457CB9C727DBA818D10245D3A2A29203CB037546B39C217E4CC9FB61ABE8
 
-none	wasm32-unknown-unknown	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.18.0/ortrs-pkort_static-v1.18.0-wasm32-unknown-unknown.tgz	8CDB6A4809652CAAB9F1AC704D8E549472836FC4A95187A63E5FE4E50EB9A15E
+none	wasm32-unknown-unknown	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.18.0/ortrs-pkort_static-v1.18.0-wasm32-unknown-unknown.tgz	8AB76874E977961A1CFA9714973521AA1B85F0F40D31EF38492CCA659BE58BF5

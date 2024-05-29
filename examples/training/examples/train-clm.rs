@@ -1,11 +1,13 @@
 use ndarray::{ArrayView0, Array1, Array2};
-use ort::{Allocator, Checkpoint, SessionBuilder, Trainer};
+use ort::{Allocator, Checkpoint, CUDAExecutionProvider, SessionBuilder, Trainer};
 
 fn main() -> ort::Result<()> {
+	tracing_subscriber::fmt::init();
+
 	ort::init().commit()?;
 
 	let trainer = Trainer::new(
-		SessionBuilder::new()?,
+		SessionBuilder::new()?.with_execution_providers([CUDAExecutionProvider::default().build()])?,
 		Allocator::default(),
 		Checkpoint::load("tools/train-data/mini-clm/checkpoint")?,
 		"tools/train-data/mini-clm/training_model.onnx",

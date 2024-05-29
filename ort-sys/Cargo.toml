@@ -16,6 +16,7 @@ include = [ "src/", "dist.txt", "build.rs", "LICENSE-APACHE", "LICENSE-MIT" ]
 
 [features]
 default = []
+training = []
 download-binaries = [ "ureq", "tar", "flate2", "sha2" ]
 load-dynamic = []
 copy-dylibs = []
@@ -37,7 +38,6 @@ rknpu = []
 vitis = []
 cann = []
 qnn = []
-
 
 [build-dependencies]
 ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }

@@ -53,7 +53,7 @@ rustdoc-args = [ "--cfg", "docsrs" ]
 [features]
 default = [ "ndarray", "half", "download-binaries", "copy-dylibs" ]
 
-training = []
+training = [ "ort-sys/training" ]
 
 operator-libraries = [ "libc", "winapi" ]
 

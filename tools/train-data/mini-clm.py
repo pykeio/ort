@@ -113,10 +113,10 @@ class CLM(nn.Module):
 		logits = self.lm_head(self.norm(x))
 		return logits.view(-1, logits.size(-1))
 
-lm = CLM(256, 4, vocab_size=32000)
+lm = CLM(256, 4, vocab_size=50257)
 torch.onnx.export(
 	lm,
-	torch.randint(0, 32000, (1, 64)),
+	torch.randint(0, 50256, (1, 64)),
 	f'tools/train-data/mini-clm/model.onnx',
 	input_names=['input_ids'],
 	output_names=['probs'],

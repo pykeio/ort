@@ -1,4 +1,5 @@
 use std::{
+	ffi::CString,
 	path::Path,
 	ptr::{self, NonNull},
 	sync::{
@@ -9,7 +10,11 @@ use std::{
 
 use ort_sys::c_char;
 
-use crate::{char_p_to_string, ortsys, Allocator, Error, Result, RunOptions, SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs, Value};
+use crate::{
+	char_p_to_string,
+	error::{assert_non_null_pointer, status_to_result},
+	ortsys, Allocator, Error, Result, RunOptions, SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs, Value
+};
 
 pub(crate) static TRAINING_API: OnceLock<AtomicPtr<ort_sys::OrtTrainingApi>> = OnceLock::new();
 
@@ -237,6 +242,83 @@ impl Trainer {
 			.collect();
 
 		Ok(SessionOutputs::new(self.train_output_names.iter().map(|o| o.as_str()), outputs))
+	}
+
+	pub fn eval<'s, 'i1, 'v1: 'i1, 'i2: 'i1, 'v2: 'i2 + 'i1, const N1: usize, const N2: usize>(
+		&'s self,
+		inputs: impl Into<SessionInputs<'i1, 'v1, N1>>,
+		labels: impl Into<SessionInputs<'i2, 'v2, N2>>
+	) -> Result<SessionOutputs<'s>> {
+		match inputs.into() {
+			SessionInputs::ValueSlice(input_values) => match labels.into() {
+				SessionInputs::ValueSlice(labels) => self.eval_inner(input_values.iter().chain(labels), None),
+				SessionInputs::ValueArray(labels) => self.eval_inner(input_values.iter().chain(labels.iter()), None),
+				SessionInputs::ValueMap(_) => unimplemented!("named values not supported?")
+			},
+			SessionInputs::ValueArray(input_values) => match labels.into() {
+				SessionInputs::ValueSlice(labels) => self.eval_inner(input_values.iter().chain(labels), None),
+				SessionInputs::ValueArray(labels) => self.eval_inner(input_values.iter().chain(labels.iter()), None),
+				SessionInputs::ValueMap(_) => unimplemented!("named values not supported?")
+			},
+			SessionInputs::ValueMap(_) => unimplemented!("named values not supported?")
+		}
+	}
+
+	fn eval_inner<'s, 'i1, 'v1: 'i1, 'i2, 'v2: 'i2>(
+		&'s self,
+		input_values: impl Iterator<Item = &'i1 SessionInputValue<'v1>>,
+		run_options: Option<Arc<RunOptions>>
+	) -> Result<SessionOutputs<'s>> {
+		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![std::ptr::null_mut(); self.train_output_names.len()];
+
+		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.map(|input_array_ort| input_array_ort.ptr().cast_const()).collect();
+
+		let run_options_ptr = if let Some(run_options) = &run_options {
+			run_options.run_options_ptr.as_ptr()
+		} else {
+			std::ptr::null_mut()
+		};
+
+		trainsys![unsafe EvalStep(self.ptr.as_ptr(), run_options_ptr, input_ort_values.len(), input_ort_values.as_ptr(), output_tensor_ptrs.len(), output_tensor_ptrs.as_mut_ptr()) -> Error::SessionRun];
+
+		let outputs: Vec<Value> = output_tensor_ptrs
+			.into_iter()
+			.map(|tensor_ptr| unsafe {
+				// TODO: `Value` should absolutely be refactored to accept a different backing pointer than `SharedSessionInner`.
+				// but for now, nobody should be using the loss tensor past the lifetime of the trainer... right...? 😣
+				Value::from_ptr(NonNull::new(tensor_ptr).expect("OrtValue ptr returned from session Run should not be null"), None)
+			})
+			.collect();
+
+		Ok(SessionOutputs::new(self.train_output_names.iter().map(|o| o.as_str()), outputs))
+	}
+
+	pub fn export<O: AsRef<str>>(&self, out_path: impl AsRef<Path>, output_names: impl AsRef<[O]>) -> Result<()> {
+		let out_path = crate::util::path_to_os_char(out_path);
+
+		let output_names_ptr: Vec<*const c_char> = output_names
+			.as_ref()
+			.iter()
+			.map(|output| CString::new(output.as_ref()).unwrap_or_else(|_| unreachable!()))
+			.map(|n| n.into_raw().cast_const())
+			.collect();
+
+		let res = trainsys![unsafe ExportModelForInferencing(self.ptr.as_ptr(), out_path.as_ptr(), output_names_ptr.len(), output_names_ptr.as_ptr())];
+
+		// Reconvert name ptrs to CString so drop impl is called and memory is freed
+		drop(
+			output_names_ptr
+				.into_iter()
+				.map(|p| {
+					assert_non_null_pointer(p, "c_char for CString")?;
+					unsafe { Ok(CString::from_raw(p.cast_mut().cast())) }
+				})
+				.collect::<Result<Vec<_>>>()?
+		);
+
+		status_to_result(res).map_err(Error::CreateSession)?;
+
+		Ok(())
 	}
 
 	pub fn optimizer(&self) -> &Optimizer {

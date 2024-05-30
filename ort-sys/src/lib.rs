@@ -922,7 +922,17 @@ pub struct OrtTrainingApi {
 	pub CopyBufferToParameters:
 		::std::option::Option<_system!(unsafe fn(session: *mut OrtTrainingSession, parameters_buffer: *mut OrtValue, trainable_only: bool) -> OrtStatusPtr)>,
 	pub ReleaseTrainingSession: ::std::option::Option<_system!(unsafe fn(input: *mut OrtTrainingSession))>,
-	pub ReleaseCheckpointState: ::std::option::Option<_system!(unsafe fn(input: *mut OrtCheckpointState))>
+	pub ReleaseCheckpointState: ::std::option::Option<_system!(unsafe fn(input: *mut OrtCheckpointState))>,
+	pub ExportModelForInferencing: ::std::option::Option<
+		_system!(
+			unsafe fn(
+				session: *mut OrtTrainingSession,
+				inference_model_path: *const ortchar,
+				graph_outputs_len: usize,
+				graph_output_names: *const *const c_char
+			) -> OrtStatusPtr
+		)
+	>
 }
 #[doc = " \\brief The helper interface to get the right version of OrtApi\n\n Get a pointer to this structure through ::OrtGetApiBase"]
 #[repr(C)]

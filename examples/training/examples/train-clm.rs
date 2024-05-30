@@ -4,6 +4,7 @@ use std::{
 	path::Path
 };
 
+use kdam::BarExt;
 use ndarray::{concatenate, s, Array1, Array2, ArrayViewD, Axis, Ix0};
 use ort::{Allocator, CUDAExecutionProvider, Checkpoint, Session, SessionBuilder, Trainer};
 use rand::RngCore;
@@ -16,6 +17,9 @@ fn main() -> ort::Result<()> {
 	tracing_subscriber::fmt::init();
 
 	ort::init().commit()?;
+
+	kdam::term::init(true);
+	let _ = kdam::term::hide_cursor();
 
 	let trainer = Trainer::new(
 		SessionBuilder::new()?.with_execution_providers([CUDAExecutionProvider::default().build()])?,
@@ -46,6 +50,7 @@ fn main() -> ort::Result<()> {
 
 	let mut input_buffer = vec![0u16; SEQUENCE_LENGTH * BATCH_SIZE];
 	let mut label_buffer = vec![0u16; SEQUENCE_LENGTH * BATCH_SIZE];
+	let mut pb = kdam::tqdm!(total = 5000);
 	for _ in 0..5000 {
 		for batch in 0..BATCH_SIZE {
 			let start_idx = rng.next_u64() % (num_tokens - SEQUENCE_LENGTH - 1) as u64;
@@ -82,13 +87,17 @@ fn main() -> ort::Result<()> {
 			.into_dimensionality::<Ix0>()
 			.unwrap()
 			.into_scalar();
-		println!("{}", loss);
+		pb.set_postfix(format!("loss={loss:.3}"));
+		pb.update(1).unwrap();
 		if loss.is_nan() {
 			return Ok(());
 		}
 		optimizer.step()?;
 		optimizer.reset_grad()?;
 	}
+
+	eprintln!();
+	let _ = kdam::term::show_cursor();
 
 	trainer.export("trained-clm.onnx", ["probs"])?;
 

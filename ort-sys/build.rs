@@ -376,6 +376,29 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 	}
 }
 
+fn try_setup_with_pkg_config() -> bool {
+	match pkg_config::Config::new().probe("libonnxruntime") {
+		Ok(lib) => {
+			// Setting the link paths
+			for path in lib.link_paths {
+				println!("cargo:rustc-link-search=native={}", path.display());
+			}
+
+			// Setting the libraries to link against
+			for lib in lib.libs {
+				println!("cargo:rustc-link-lib={}", lib);
+			}
+
+			println!("Using onnxruntime found by pkg-config.");
+			true
+		}
+		Err(_) => {
+			println!("onnxruntime not found using pkg-config, falling back to manual setup.");
+			false
+		}
+	}
+}
+
 fn real_main(link: bool) {
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_SYSTEM_LIB_LOCATION);
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_SYSTEM_LIB_PROFILE);
@@ -400,14 +423,20 @@ fn main() {
 	}
 
 	if cfg!(feature = "load-dynamic") {
-		// we only need to execute the real main step if we are using the download strategy...
-		if cfg!(feature = "download-binaries") && env::var(ORT_ENV_SYSTEM_LIB_LOCATION).is_err() {
-			// but we don't need to link to the binaries we download (so all we are doing is downloading them and placing them in
-			// the output directory)
-			real_main(false);
+		if !try_setup_with_pkg_config() {
+			// Only execute the real main step if pkg-config fails and if we are using the download
+			// strategy
+			if cfg!(feature = "download-binaries") && env::var(ORT_ENV_SYSTEM_LIB_LOCATION).is_err() {
+				// but we don't need to link to the binaries we download (so all we are doing is
+				// downloading them and placing them in the output directory)
+				real_main(false); // but we don't need to link to the binaries we download
+			}
 		}
 	} else {
-		// if we are not using the load-dynamic feature then we need to link to dylibs.
-		real_main(true);
+		// If pkg-config setup was successful, we don't need further action
+		// Otherwise, if we are not using the load-dynamic feature, we need to link to the dylibs.
+		if !try_setup_with_pkg_config() {
+			real_main(true);
+		}
 	}
 }

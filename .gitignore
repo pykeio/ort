@@ -195,3 +195,5 @@ WixTools/
 
 # Glassbench results
 /glassbench*.db
+
+.venv*

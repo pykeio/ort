@@ -141,13 +141,6 @@ let noise_pred = unet.run(ort::inputs![
 ]?)?;
 ```
 
-You can also supply `ort::inputs!` your `IoBinding` by specifying `bind =`:
-```rust
-let binding = model.create_binding()?;
-...
-let outputs = model.run(ort::inputs![bind = binding]?)?;
-```
-
 ### Tensor creation no longer requires the session's allocator
 In previous versions, `Value::from_array` took an allocator parameter. The allocator was only used because the string data contained in string tensors had to be cloned into ONNX Runtime-managed memory. However, 99% of users only ever use primitive tensors, so the extra parameter served little purpose. The new `Tensor::from_array` function now takes only an array, and the logic for converting string arrays has been moved to a new function, `DynTensor::from_string_array`.
 

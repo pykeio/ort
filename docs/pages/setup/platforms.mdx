@@ -3,6 +3,8 @@ title: Platform support
 description: ONNX Runtime, and by extension `ort`, supports a wide variety of platforms. For most desktop users, pre-built binaries are available, so setting up `ort` is as simple as adding it to your `Cargo.toml`!
 ---
 
+import { Callout } from 'nextra/components';
+
 Here are the supported platforms and binary availability status, as of v2.0.0-rc.2.
 
 * 🟢 - Supported. Dynamic & static binaries provided by pyke.
@@ -19,14 +21,18 @@ Here are the supported platforms and binary availability status, as of v2.0.0-rc
 | **Android** | ❌ | ❌ | ⭕ | ⭕ | ❌ |
 | **Web** | ❌ | ❌ | ❌ | ❌ | 🔷¶ |
 
-<sup>\* Recent version of Windows 10/11 required for pyke binaries.</sup><br />
-<sup>† glibc ≥ 2.31 (Ubuntu ≥ 20.04) required for pyke binaries.</sup><br />
-<sup>‡ glibc ≥ 2.35 (Ubuntu ≥ 22.04) required for pyke binaries.</sup><br />
-<sup>§ macOS ≥ 10.15 required.</sup><br />
-<sup>¶ WASM supports a limited subset of ONNX Runtime features. For more info, see [the docs on WebAssembly support](/setup/webassembly).</sup>
+<div style={{ opacity: 0.5, display: 'flex', flexDirection: 'column', fontSize: '0.75rem' }}>
+<p>\* Recent version of Windows 10/11 required for pyke binaries.</p>
+<p>† glibc ≥ 2.31 (Ubuntu ≥ 20.04) required for pyke binaries.</p>
+<p>‡ glibc ≥ 2.35 (Ubuntu ≥ 22.04) required for pyke binaries.</p>
+<p>§ macOS ≥ 10.15 required.</p>
+<p>¶ WASM supports a limited subset of ONNX Runtime features. For more info, see [the docs on WebAssembly support](/setup/webassembly).</p>
+</div>
 
 If your platform is marked as 🟢 or 🔷, you're in luck! Almost no setup will be required to get `ort` up and running.
 
 For platforms marked as ⭕, you'll need to [compile ONNX Runtime from source](https://onnxruntime.ai/docs/build/) and then [link `ort` to your custom binaries](/setup/linking) (but don't worry, we made this setup as simple as possible!)
 
-<Note>Certain execution providers may not have binaries available. You can check EP binary support in the [Execution providers](/perf/execution-providers) documentation.</Note>
+<Callout type='info'>
+    Certain execution providers may not have binaries available. You can check EP binary support in the [Execution providers](/perf/execution-providers) documentation.
+</Callout>

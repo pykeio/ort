@@ -2,14 +2,17 @@
 title: Introduction
 ---
 
+import Image from 'next/image';
+import { Callout, Card, Cards, Steps } from 'nextra/components';
+
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
     <img src="/assets/trend-banner.png" style={{ maxHeight: '360px' }} />
     <p style={{ fontSize: '1.5rem', textAlign: 'center', marginTop: 0 }}><code>ort</code> is an open-source Rust binding for <a href="https://onnxruntime.ai/">ONNX Runtime</a>.</p>
 </div>
 
-<Warning>
+<Callout type='warning'>
     These docs are for the latest alpha version of `ort`, `2.0.0-rc.2`. This version is production-ready (just not API stable) and we recommend new & existing projects use it.
-</Warning>
+</Callout>
 
 `ort` makes it easy to deploy your machine learning models to production via [ONNX Runtime](https://onnxruntime.ai/), a hardware-accelerated inference engine. With `ort` + ONNX Runtime, you can run almost any ML model (including ResNet, YOLOv8, BERT, LLaMA) on almost any hardware, often far faster than PyTorch, and with the added bonus of Rust's efficiency.
 
@@ -29,52 +32,54 @@ Converting a neural network to a graph representation like ONNX opens the door t
 
 # Getting started
 <Steps>
-    <Step title="Add ort to your Cargo.toml">
-        If you have a [supported platform](/setup/platforms) (and you probably do), installing `ort` couldn't be any simpler! Just add it to your Cargo dependencies:
-        ```toml
-        [dependencies]
-        ort = "2.0.0-rc.2"
-        ```
-    </Step>
-    <Step title="Convert your model">
-        Your model will need to be converted to an ONNX graph before you can use it.
-        - The awesome folks at Hugging Face have [a guide](https://huggingface.co/docs/transformers/serialization) to export 🤗 Transformers models to ONNX with 🤗 Optimum.
-        - For any PyTorch model: [`torch.onnx`](https://pytorch.org/docs/stable/onnx.html)
-        - For `scikit-learn` models: [`sklearn-onnx`](https://onnx.ai/sklearn-onnx/)
-        - For TensorFlow, Keras, TFlite, & TensorFlow.js: [`tf2onnx`](https://github.com/onnx/tensorflow-onnx)
-        - For PaddlePaddle: [`Paddle2ONNX`](https://github.com/PaddlePaddle/Paddle2ONNX)
-    </Step>
-    <Step title="Load your model">
-        Once you've got a model, load it via `ort` by creating a [`Session`](/fundamentals/session):
 
-        ```rust
-        use ort::{GraphOptimizationLevel, Session};
+### Add ort to your Cargo.toml
+If you have a [supported platform](/setup/platforms) (and you probably do), installing `ort` couldn't be any simpler! Just add it to your Cargo dependencies:
+```toml
+[dependencies]
+ort = "2.0.0-rc.2"
+```
 
-        let model = Session::builder()?
-            .with_optimization_level(GraphOptimizationLevel::Level3)?
-            .with_intra_threads(4)?
-            .commit_from_file("yolov8m.onnx")?;
-        ```
-    </Step>
-    <Step title="Perform inference">
-        Preprocess your inputs, then `run()` the session to perform inference.
+### Convert your model
+Your model will need to be converted to an ONNX graph before you can use it.
+- The awesome folks at Hugging Face have [a guide](https://huggingface.co/docs/transformers/serialization) to export 🤗 Transformers models to ONNX with 🤗 Optimum.
+- For any PyTorch model: [`torch.onnx`](https://pytorch.org/docs/stable/onnx.html)
+- For `scikit-learn` models: [`sklearn-onnx`](https://onnx.ai/sklearn-onnx/)
+- For TensorFlow, Keras, TFlite, & TensorFlow.js: [`tf2onnx`](https://github.com/onnx/tensorflow-onnx)
+- For PaddlePaddle: [`Paddle2ONNX`](https://github.com/PaddlePaddle/Paddle2ONNX)
 
-        ```rust
-        let outputs = model.run(ort::inputs!["image" => image]?)?;
-        let predictions = outputs["output0"].try_extract_tensor::<f32>()?;
-        ...
-        ```
+### Load your model
+Once you've got a model, load it via `ort` by creating a [`Session`](/fundamentals/session):
 
-        <Note>There are some more useful examples [in the `ort` repo](https://github.com/pykeio/ort/tree/main/examples)!</Note>
-    </Step>
+```rust
+use ort::{GraphOptimizationLevel, Session};
+
+let model = Session::builder()?
+    .with_optimization_level(GraphOptimizationLevel::Level3)?
+    .with_intra_threads(4)?
+    .commit_from_file("yolov8m.onnx")?;
+```
+
+### Perform inference
+Preprocess your inputs, then `run()` the session to perform inference.
+
+```rust
+let outputs = model.run(ort::inputs!["image" => image]?)?;
+let predictions = outputs["output0"].try_extract_tensor::<f32>()?;
+...
+```
+
+<Callout type='info'>There are some more useful examples [in the `ort` repo](https://github.com/pykeio/ort/tree/main/examples)!</Callout>
+
 </Steps>
 
 # Next steps
 <Steps>
-    <Step title="Unlock more performance with EPs">
-        Use [execution providers](/perf/execution-providers) to enable hardware acceleration in your app and unlock the full power of your GPU or NPU.
-    </Step>
-    <Step title="Show off your project!">
-        We'd love to see what you've made with `ort`! Show off your project in [GitHub Discussions](https://github.com/pykeio/ort/discussions/categories/show-and-tell) or on our [Discord](https://discord.gg/uQtsNu2xMa).
-    </Step>
+
+### Unlock more performance with EPs
+Use [execution providers](/perf/execution-providers) to enable hardware acceleration in your app and unlock the full power of your GPU or NPU.
+
+### Show off your project!
+We'd love to see what you've made with `ort`! Show off your project in [GitHub Discussions](https://github.com/pykeio/ort/discussions/categories/show-and-tell) or on our [Discord](https://discord.gg/uQtsNu2xMa).
+
 </Steps>

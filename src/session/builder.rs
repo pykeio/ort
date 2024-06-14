@@ -112,7 +112,7 @@ impl SessionBuilder {
 	///   `CUDAExecutionProvider`) **is discouraged** unless you allow the user to configure the execution providers by
 	///   providing a `Vec` of [`ExecutionProviderDispatch`]es.
 	pub fn with_execution_providers(self, execution_providers: impl IntoIterator<Item = ExecutionProviderDispatch>) -> Result<Self> {
-		apply_execution_providers(&self, execution_providers.into_iter());
+		apply_execution_providers(&self, execution_providers.into_iter())?;
 		Ok(self)
 	}
 
@@ -329,7 +329,7 @@ impl SessionBuilder {
             .collect();
 
 		let env = get_environment()?;
-		apply_execution_providers(&self, env.execution_providers.iter().cloned());
+		apply_execution_providers(&self, env.execution_providers.iter().cloned())?;
 
 		if env.has_global_threadpool {
 			ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr.as_ptr()) -> Error::CreateSessionOptions];
@@ -406,7 +406,7 @@ impl SessionBuilder {
 		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
 
 		let env = get_environment()?;
-		apply_execution_providers(&self, env.execution_providers.iter().cloned());
+		apply_execution_providers(&self, env.execution_providers.iter().cloned())?;
 
 		if env.has_global_threadpool {
 			ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr.as_ptr()) -> Error::CreateSessionOptions];

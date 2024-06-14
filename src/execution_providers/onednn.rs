@@ -29,7 +29,7 @@ impl OneDNNExecutionProvider {
 
 impl From<OneDNNExecutionProvider> for ExecutionProviderDispatch {
 	fn from(value: OneDNNExecutionProvider) -> Self {
-		ExecutionProviderDispatch::OneDNN(value)
+		ExecutionProviderDispatch::new(value)
 	}
 }
 

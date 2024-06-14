@@ -103,7 +103,7 @@ impl OpenVINOExecutionProvider {
 
 impl From<OpenVINOExecutionProvider> for ExecutionProviderDispatch {
 	fn from(value: OpenVINOExecutionProvider) -> Self {
-		ExecutionProviderDispatch::OpenVINO(value)
+		ExecutionProviderDispatch::new(value)
 	}
 }
 

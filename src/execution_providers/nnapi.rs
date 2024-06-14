@@ -59,7 +59,7 @@ impl NNAPIExecutionProvider {
 
 impl From<NNAPIExecutionProvider> for ExecutionProviderDispatch {
 	fn from(value: NNAPIExecutionProvider) -> Self {
-		ExecutionProviderDispatch::NNAPI(value)
+		ExecutionProviderDispatch::new(value)
 	}
 }
 

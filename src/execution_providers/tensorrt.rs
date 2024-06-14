@@ -210,7 +210,7 @@ impl TensorRTExecutionProvider {
 
 impl From<TensorRTExecutionProvider> for ExecutionProviderDispatch {
 	fn from(value: TensorRTExecutionProvider) -> Self {
-		ExecutionProviderDispatch::TensorRT(value)
+		ExecutionProviderDispatch::new(value)
 	}
 }
 

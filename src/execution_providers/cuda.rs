@@ -161,7 +161,7 @@ impl CUDAExecutionProvider {
 
 impl From<CUDAExecutionProvider> for ExecutionProviderDispatch {
 	fn from(value: CUDAExecutionProvider) -> Self {
-		ExecutionProviderDispatch::CUDA(value)
+		ExecutionProviderDispatch::new(value)
 	}
 }
 

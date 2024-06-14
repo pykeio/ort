@@ -26,7 +26,7 @@ impl ArmNNExecutionProvider {
 
 impl From<ArmNNExecutionProvider> for ExecutionProviderDispatch {
 	fn from(value: ArmNNExecutionProvider) -> Self {
-		ExecutionProviderDispatch::ArmNN(value)
+		ExecutionProviderDispatch::new(value)
 	}
 }
 

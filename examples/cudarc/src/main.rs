@@ -11,7 +11,7 @@ fn main() -> anyhow::Result<()> {
 	tracing_subscriber::fmt::init();
 
 	ort::init()
-		.with_execution_providers([CUDAExecutionProvider::default().build()])
+		.with_execution_providers([CUDAExecutionProvider::default().build().error_on_failure()])
 		.commit()?;
 
 	let model =

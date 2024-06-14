@@ -26,7 +26,7 @@ impl DirectMLExecutionProvider {
 
 impl From<DirectMLExecutionProvider> for ExecutionProviderDispatch {
 	fn from(value: DirectMLExecutionProvider) -> Self {
-		ExecutionProviderDispatch::DirectML(value)
+		ExecutionProviderDispatch::new(value)
 	}
 }
 

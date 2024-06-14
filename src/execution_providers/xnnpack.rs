@@ -23,7 +23,7 @@ impl XNNPACKExecutionProvider {
 
 impl From<XNNPACKExecutionProvider> for ExecutionProviderDispatch {
 	fn from(value: XNNPACKExecutionProvider) -> Self {
-		ExecutionProviderDispatch::XNNPACK(value)
+		ExecutionProviderDispatch::new(value)
 	}
 }
 

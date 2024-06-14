@@ -110,7 +110,7 @@ impl QNNExecutionProvider {
 
 impl From<QNNExecutionProvider> for ExecutionProviderDispatch {
 	fn from(value: QNNExecutionProvider) -> Self {
-		ExecutionProviderDispatch::QNN(value)
+		ExecutionProviderDispatch::new(value)
 	}
 }
 

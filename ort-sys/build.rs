@@ -409,7 +409,7 @@ fn real_main(link: bool) {
 
 	if link {
 		if needs_link {
-			println!("cargo:rustc-link-lib=onnxruntime");
+			println!("cargo:rustc-link-lib=static=onnxruntime");
 			println!("cargo:rustc-link-search=native={}", lib_dir.display());
 		}
 

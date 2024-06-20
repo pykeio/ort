@@ -32,6 +32,8 @@ mod xnnpack;
 pub use self::xnnpack::XNNPACKExecutionProvider;
 mod armnn;
 pub use self::armnn::ArmNNExecutionProvider;
+mod migraphx;
+pub use self::migraphx::MIGraphXExecutionProvider;
 
 /// ONNX Runtime works with different hardware acceleration libraries through its extensible **Execution Providers**
 /// (EP) framework to optimally execute the ONNX models on the hardware platform. This interface enables flexibility for

@@ -11,8 +11,7 @@ use super::{
 };
 use crate::error::IntoStatus;
 
-#[repr(C)]
-#[derive(Clone)]
+#[repr(C)] // <- important! a defined layout allows us to store extra data after the `OrtCustomOp` that we can retrieve later
 pub(crate) struct BoundOperator<O: Operator> {
 	implementation: ort_sys::OrtCustomOp,
 	name: CString,
@@ -184,7 +183,10 @@ unsafe impl Send for ErasedBoundOperator {}
 
 impl ErasedBoundOperator {
 	pub(crate) fn new<O: Operator>(bound: BoundOperator<O>) -> Self {
-		ErasedBoundOperator(NonNull::from(unsafe { &mut *(Box::leak(Box::new(bound)) as *mut _ as *mut ()) }))
+		ErasedBoundOperator(NonNull::from(unsafe {
+			// horrible horrible horrible horrible horrible horrible horrible horrible horrible
+			&mut *(Box::leak(Box::new(bound)) as *mut _ as *mut ())
+		}))
 	}
 
 	pub(crate) fn op_ptr(&self) -> *mut ort_sys::OrtCustomOp {

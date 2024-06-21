@@ -92,16 +92,15 @@ impl<'i, 'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<
 /// # }
 /// ```
 ///
-/// Note that string tensors must be created manually with [`Value::from_string_array`].
+/// Note that string tensors must be created manually with [`crate::Tensor::from_string_array`].
 ///
 /// ```no_run
 /// # use std::{error::Error, sync::Arc};
 /// # use ndarray::Array1;
-/// # use ort::{GraphOptimizationLevel, Session, Value};
+/// # use ort::{GraphOptimizationLevel, Session, Tensor};
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// # 	let mut session = Session::builder()?.commit_from_file("model.onnx")?;
-/// let _ = session
-/// 	.run(ort::inputs![Value::from_string_array(session.allocator(), Array1::from_vec(vec!["hello", "world"]))?]?);
+/// let _ = session.run(ort::inputs![Tensor::from_string_array(Array1::from_vec(vec!["hello", "world"]))?]?);
 /// # 	Ok(())
 /// # }
 /// ```

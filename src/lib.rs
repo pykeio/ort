@@ -65,7 +65,7 @@ pub use self::session::{
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 pub use self::tensor::ArrayExtensions;
-pub use self::tensor::{IntoTensorElementType, TensorElementType};
+pub use self::tensor::{IntoTensorElementType, Utf8Data, PrimitiveTensorElementType, TensorElementType};
 pub use self::value::{
 	DowncastableTarget, DynMap, DynMapRef, DynMapRefMut, DynMapValueType, DynSequence, DynSequenceRef, DynSequenceRefMut, DynSequenceValueType, DynTensor,
 	DynTensorRef, DynTensorRefMut, DynTensorValueType, DynValue, DynValueTypeMarker, Map, MapRef, MapRefMut, MapValueType, MapValueTypeMarker, Sequence,
@@ -143,6 +143,23 @@ pub(crate) static G_ORT_API: OnceLock<AtomicPtr<ort_sys::OrtApi>> = OnceLock::ne
 /// May panic if:
 /// - Getting the `OrtApi` struct fails, due to `ort` loading an unsupported version of ONNX Runtime.
 /// - Loading the ONNX Runtime dynamic library fails if the `load-dynamic` feature is enabled.
+///
+/// # Examples
+/// The primary (public-facing) use case for this function is accessing APIs that do not have a corresponding safe
+/// implementation in `ort`. For example, [`GetBuildInfoString`](https://onnxruntime.ai/docs/api/c/struct_ort_api.html#a0a7dba37b0017c0ef3a0ab4e266a967d):
+///
+/// ```
+/// # use std::ffi::CStr;
+/// # fn main() -> ort::Result<()> {
+/// let api = ort::api().as_ptr();
+/// let build_info = unsafe { CStr::from_ptr((*api).GetBuildInfoString.unwrap()()) };
+/// println!("{}", build_info.to_string_lossy());
+/// // ORT Build Info: git-branch=HEAD, git-commit-id=4573740, build type=Release, cmake cxx flags: /DWIN32 /D_WINDOWS /EHsc /EHsc /wd26812 -DEIGEN_HAS_C99_MATH -DCPUINFO_SUPPORTED
+/// # Ok(())
+/// # }
+/// ```
+///
+/// For the full list of ONNX Runtime APIs, consult the [`ort_sys::OrtApi`] struct and the [ONNX Runtime C API](https://onnxruntime.ai/docs/api/c/struct_ort_api.html).
 pub fn api() -> NonNull<ort_sys::OrtApi> {
 	unsafe {
 		NonNull::new_unchecked(
@@ -251,6 +268,26 @@ pub(crate) fn char_p_to_string(raw: *const c_char) -> Result<String> {
 	}
 	.map_err(Error::FfiStringConversion)
 }
+
+pub(crate) struct PrivateTraitMarker;
+
+macro_rules! private_trait {
+	() => {
+		#[doc(hidden)]
+		#[allow(private_interfaces)]
+		fn _private() -> crate::PrivateTraitMarker;
+	};
+}
+macro_rules! private_impl {
+	() => {
+		#[allow(private_interfaces)]
+		fn _private() -> crate::PrivateTraitMarker {
+			crate::PrivateTraitMarker
+		}
+	};
+}
+pub(crate) use private_impl;
+pub(crate) use private_trait;
 
 #[cfg(test)]
 mod test {

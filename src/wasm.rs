@@ -1,6 +1,6 @@
 //! Utilities for using `ort` in WebAssembly.
 //!
-//! You **must** call `ort::wasm::initialize()` before using any `ort` APIs:
+//! You **must** call `ort::wasm::initialize()` before using any `ort` APIs in WASM:
 //! ```
 //! # use ort::Session;
 //! # static MODEL_BYTES: &[u8] = include_bytes!("../tests/data/upsample.ort");
@@ -223,12 +223,12 @@ mod emscripten_shims {
 #[no_mangle]
 #[export_name = "_initialize"]
 pub fn initialize() {
-	// No idea what the hell this does, but the presence of an `_initialize` function prevents the linker from calling
-	// `__wasm_call_ctors` at the top of every function - including the functions `wasm-bindgen` interprets to generate
-	// JS glue code. The `__wasm_call_ctors` call was calling complex functions that the interpreter isn't equipped to
-	// handle, which was preventing wbg from outputting anything. I don't know what specific constructors this is calling,
-	// and most basic ONNX Runtime APIs *do* work without calling this, but we encourage the user to perform this
-	// initialization at program start anyways to be safe.
+	// The presence of an `_initialize` function prevents the linker from calling `__wasm_call_ctors` at the top of every
+	// function - including the functions `wasm-bindgen` interprets to generate JS glue code. `__wasm_call_ctors` calls
+	// complex functions that wbg's interpreter isn't equipped to handle, which was preventing wbg from outputting
+	// anything.
+	// I'm not entirely sure what `__wasm_call_ctors` is initializing, but it seems to have something to do with C++
+	// vtables, and it's crucial for proper operation.
 	extern "C" {
 		fn __wasm_call_ctors();
 	}

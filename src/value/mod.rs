@@ -166,6 +166,14 @@ pub(crate) enum ValueInner {
 	}
 }
 
+impl ValueInner {
+	pub(crate) fn ptr(&self) -> *mut ort_sys::OrtValue {
+		match self {
+			ValueInner::CppOwned { ptr, .. } | ValueInner::RustOwned { ptr, .. } => ptr.as_ptr()
+		}
+	}
+}
+
 /// A temporary version of a [`Value`] with a lifetime specifier.
 #[derive(Debug)]
 pub struct ValueRef<'v, Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
@@ -277,8 +285,8 @@ impl<'v, Type: ValueTypeMarker + ?Sized> DerefMut for ValueRefMut<'v, Type> {
 /// - [`Tensor::extract_tensor`], [`Tensor::extract_raw_tensor`]
 #[derive(Debug)]
 pub struct Value<Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
-	inner: ValueInner,
-	_markers: PhantomData<Type>
+	pub(crate) inner: Arc<ValueInner>,
+	pub(crate) _markers: PhantomData<Type>
 }
 
 /// A dynamic value, which could be a [`Tensor`], [`Sequence`], or [`Map`].
@@ -291,11 +299,15 @@ pub type DynValue = Value<DynValueTypeMarker>;
 ///
 /// For example, [`Tensor::try_extract_tensor`] can only be used on [`Value`]s with the [`TensorValueTypeMarker`] (which
 /// inherits this trait), i.e. [`Tensor`]s, [`DynTensor`]s, and [`DynValue`]s.
-pub trait ValueTypeMarker: Debug {}
+pub trait ValueTypeMarker: Debug {
+	crate::private_trait!();
+}
 
 /// Represents a type that a [`DynValue`] can be downcast to.
 pub trait DowncastableTarget: ValueTypeMarker {
 	fn can_downcast(dtype: &ValueType) -> bool;
+
+	crate::private_trait!();
 }
 
 // this implementation is used in case we want to extract `DynValue`s from a [`Sequence`]; see `try_extract_sequence`
@@ -303,15 +315,25 @@ impl DowncastableTarget for DynValueTypeMarker {
 	fn can_downcast(_: &ValueType) -> bool {
 		true
 	}
+
+	crate::private_impl!();
 }
 
 /// The dynamic type marker, used for values which can be of any type.
 #[derive(Debug)]
 pub struct DynValueTypeMarker;
-impl ValueTypeMarker for DynValueTypeMarker {}
-impl MapValueTypeMarker for DynValueTypeMarker {}
-impl SequenceValueTypeMarker for DynValueTypeMarker {}
-impl TensorValueTypeMarker for DynValueTypeMarker {}
+impl ValueTypeMarker for DynValueTypeMarker {
+	crate::private_impl!();
+}
+impl MapValueTypeMarker for DynValueTypeMarker {
+	crate::private_impl!();
+}
+impl SequenceValueTypeMarker for DynValueTypeMarker {
+	crate::private_impl!();
+}
+impl TensorValueTypeMarker for DynValueTypeMarker {
+	crate::private_impl!();
+}
 
 unsafe impl Send for Value {}
 
@@ -350,7 +372,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// If the value belongs to a session (i.e. if it is returned from [`crate::Session::run`] or
 	/// [`crate::IoBinding::run`]), you must provide the [`SharedSessionInner`] (acquired from
-	/// [`crate::Session::inner`]). This ensures the session is not dropped until the value is.
+	/// [`crate::Session::inner`]). This ensures the session is not dropped until any values owned by it is.
 	///
 	/// # Safety
 	///
@@ -359,7 +381,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	#[must_use]
 	pub unsafe fn from_ptr(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value<Type> {
 		Value {
-			inner: ValueInner::CppOwned { ptr, drop: true, _session: session },
+			inner: Arc::new(ValueInner::CppOwned { ptr, drop: true, _session: session }),
 			_markers: PhantomData
 		}
 	}
@@ -369,16 +391,14 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	#[must_use]
 	pub(crate) unsafe fn from_ptr_nodrop(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value<Type> {
 		Value {
-			inner: ValueInner::CppOwned { ptr, drop: false, _session: session },
+			inner: Arc::new(ValueInner::CppOwned { ptr, drop: false, _session: session }),
 			_markers: PhantomData
 		}
 	}
 
 	/// Returns the underlying [`ort_sys::OrtValue`] pointer.
 	pub fn ptr(&self) -> *mut ort_sys::OrtValue {
-		match &self.inner {
-			ValueInner::CppOwned { ptr, .. } | ValueInner::RustOwned { ptr, .. } => ptr.as_ptr()
-		}
+		self.inner.ptr()
 	}
 
 	/// Create a view of this value's data.
@@ -386,7 +406,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 		ValueRef::new(unsafe {
 			Value::from_ptr_nodrop(
 				NonNull::new_unchecked(self.ptr()),
-				if let ValueInner::CppOwned { _session, .. } = &self.inner { _session.clone() } else { None }
+				if let ValueInner::CppOwned { _session, .. } = &*self.inner { _session.clone() } else { None }
 			)
 		})
 	}
@@ -396,7 +416,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 		ValueRefMut::new(unsafe {
 			Value::from_ptr_nodrop(
 				NonNull::new_unchecked(self.ptr()),
-				if let ValueInner::CppOwned { _session, .. } = &self.inner { _session.clone() } else { None }
+				if let ValueInner::CppOwned { _session, .. } = &*self.inner { _session.clone() } else { None }
 			)
 		})
 	}
@@ -442,7 +462,7 @@ impl Value<DynValueTypeMarker> {
 			Ok(ValueRef::new(unsafe {
 				Value::from_ptr_nodrop(
 					NonNull::new_unchecked(self.ptr()),
-					if let ValueInner::CppOwned { _session, .. } = &self.inner { _session.clone() } else { None }
+					if let ValueInner::CppOwned { _session, .. } = &*self.inner { _session.clone() } else { None }
 				)
 			}))
 		} else {
@@ -450,7 +470,7 @@ impl Value<DynValueTypeMarker> {
 		}
 	}
 
-	/// Attempts to upcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed
+	/// Attempts to downcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed
 	/// mutable-reference variant, like [`TensorRefMut<T>`].
 	#[inline]
 	pub fn downcast_mut<OtherType: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(&mut self) -> Result<ValueRefMut<'_, OtherType>> {
@@ -459,7 +479,7 @@ impl Value<DynValueTypeMarker> {
 			Ok(ValueRefMut::new(unsafe {
 				Value::from_ptr_nodrop(
 					NonNull::new_unchecked(self.ptr()),
-					if let ValueInner::CppOwned { _session, .. } = &self.inner { _session.clone() } else { None }
+					if let ValueInner::CppOwned { _session, .. } = &*self.inner { _session.clone() } else { None }
 				)
 			}))
 		} else {
@@ -468,17 +488,17 @@ impl Value<DynValueTypeMarker> {
 	}
 }
 
-impl<Type: ValueTypeMarker + ?Sized> Drop for Value<Type> {
+impl Drop for ValueInner {
 	fn drop(&mut self) {
 		let ptr = self.ptr();
 		tracing::trace!(
 			"dropping {} value at {ptr:p}",
-			match &self.inner {
+			match self {
 				ValueInner::RustOwned { .. } => "rust-owned",
 				ValueInner::CppOwned { .. } => "cpp-owned"
 			}
 		);
-		if !matches!(&self.inner, ValueInner::CppOwned { drop: false, .. }) {
+		if !matches!(self, ValueInner::CppOwned { drop: false, .. }) {
 			ortsys![unsafe ReleaseValue(ptr)];
 		}
 	}

@@ -121,9 +121,6 @@ pub enum Error {
 	/// Error occurred when filling a tensor with string data
 	#[error("Failed to fill string tensor: {0}")]
 	FillStringTensor(ErrorInternal),
-	/// Error occurred when checking if a value is a tensor
-	#[error("Failed to check if value is a tensor: {0}")]
-	FailedTensorCheck(ErrorInternal),
 	/// Error occurred when getting tensor type and shape
 	#[error("Failed to get tensor type and shape: {0}")]
 	GetTensorTypeAndShape(ErrorInternal),
@@ -159,12 +156,6 @@ pub enum Error {
 	/// Error occurred when downloading a pre-trained ONNX model from the [ONNX Model Zoo](https://github.com/onnx/models).
 	#[error("Failed to download ONNX model: {0}")]
 	DownloadError(#[from] FetchModelError),
-	/// Type of input data and the ONNX model do not match.
-	#[error("Data types do not match: expected {model:?}, got {input:?}")]
-	NonMatchingDataTypes { input: TensorElementType, model: TensorElementType },
-	/// Dimensions of input data and the ONNX model do not match.
-	#[error("Dimensions do not match: {0:?}")]
-	NonMatchingDimensions(NonMatchingDimensionsError),
 	/// File does not exist
 	#[error("File `{filename:?}` does not exist")]
 	FileDoesNotExist {
@@ -186,9 +177,6 @@ pub enum Error {
 	/// ORT pointer should not have been null
 	#[error("`{0}` should not be a null pointer")]
 	PointerShouldNotBeNull(&'static str),
-	/// The runtime type was undefined.
-	#[error("Undefined tensor element type")]
-	UndefinedTensorElementType,
 	/// Could not retrieve model metadata.
 	#[error("Failed to retrieve model metadata: {0}")]
 	GetModelMetadata(ErrorInternal),
@@ -208,8 +196,8 @@ pub enum Error {
 	ExecutionProviderNotRegistered(&'static str),
 	#[error("Expected tensor to be on CPU in order to get data, but had allocation device `{0}`.")]
 	TensorNotOnCpu(&'static str),
-	#[error("String tensors require the session's allocator to be provided through `Value::from_array`.")]
-	StringTensorRequiresAllocator,
+	#[error("Cannot extract scalar value from a {0}-dimensional tensor")]
+	TensorNot0Dimensional(usize),
 	#[error("Failed to create memory info: {0}")]
 	CreateMemoryInfo(ErrorInternal),
 	#[error("Could not get allocation device from `MemoryInfo`: {0}")]
@@ -222,10 +210,10 @@ pub enum Error {
 	BindInput(ErrorInternal),
 	#[error("Error when binding output: {0}")]
 	BindOutput(ErrorInternal),
-	#[error("Failed to clear IO binding: {0}")]
-	ClearBinding(ErrorInternal),
 	#[error("Error when retrieving session outputs from `IoBinding`: {0}")]
 	GetBoundOutputs(ErrorInternal),
+	#[error("Cannot use `extract_tensor` on a value that is {0:?}")]
+	NotTensor(ValueType),
 	#[error("Cannot use `extract_sequence` on a value that is {0:?}")]
 	NotSequence(ValueType),
 	#[error("Cannot use `extract_map` on a value that is {0:?}")]
@@ -252,6 +240,8 @@ pub enum Error {
 	GetOperatorInput(ErrorInternal),
 	#[error("Failed to get operator output: {0}")]
 	GetOperatorOutput(ErrorInternal),
+	#[error("Failed to retrieve GPU compute stream from kernel context: {0}")]
+	GetOperatorGPUComputeStream(ErrorInternal),
 	#[error("{0}")]
 	CustomError(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
 	#[error("String tensors cannot be borrowed as mutable")]
@@ -266,37 +256,20 @@ pub enum Error {
 	GetDeviceId(ErrorInternal)
 }
 
-impl From<Infallible> for Error {
-	fn from(_: Infallible) -> Self {
-		Error::Infallible
+impl Error {
+	/// Wrap a custom, user-provided error in an [`ort::Error`](Error). The resulting error will be the
+	/// [`Error::CustomError`] variant.
+	///
+	/// This can be used to return custom errors from e.g. training dataloaders or custom operators if a non-`ort`
+	/// related operation fails.
+	pub fn wrap<T: std::error::Error + Send + Sync + 'static>(err: T) -> Self {
+		Error::CustomError(Box::new(err) as Box<dyn std::error::Error + Send + Sync + 'static>)
 	}
 }
 
-/// Error used when the input dimensions defined in the model and passed from an inference call do not match.
-#[non_exhaustive]
-#[derive(Error, Debug)]
-pub enum NonMatchingDimensionsError {
-	/// Number of inputs from model does not match the number of inputs from inference call.
-	#[error(
-		"Non-matching number of inputs: {inference_input_count:?} provided vs {model_input_count:?} for model (inputs: {inference_input:?}, model: {model_input:?})"
-	)]
-	InputsCount {
-		/// Number of input dimensions used by inference call
-		inference_input_count: usize,
-		/// Number of input dimensions defined in model
-		model_input_count: usize,
-		/// Input dimensions used by inference call
-		inference_input: Vec<Vec<usize>>,
-		/// Input dimensions defined in model
-		model_input: Vec<Vec<Option<u32>>>
-	},
-	/// Inputs length from model does not match the expected input from inference call
-	#[error("Different input lengths; expected input: {model_input:?}, received input: {inference_input:?}")]
-	InputsLength {
-		/// Input dimensions used by inference call
-		inference_input: Vec<Vec<usize>>,
-		/// Input dimensions defined in model
-		model_input: Vec<Vec<Option<u32>>>
+impl From<Infallible> for Error {
+	fn from(_: Infallible) -> Self {
+		Error::Infallible
 	}
 }
 

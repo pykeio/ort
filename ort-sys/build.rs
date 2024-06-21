@@ -409,7 +409,15 @@ fn real_main(link: bool) {
 
 	if link {
 		if needs_link {
-			println!("cargo:rustc-link-lib=static=onnxruntime");
+			let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+			let static_lib_file_name = if target_os.contains("windows") { "onnxruntime.lib" } else { "libonnxruntime.a" };
+
+			let static_lib_path = lib_dir.join(static_lib_file_name);
+			if static_lib_path.exists() {
+				println!("cargo:rustc-link-lib=static=onnxruntime");
+			} else {
+				println!("cargo:rustc-link-lib=onnxruntime");
+			}
 			println!("cargo:rustc-link-search=native={}", lib_dir.display());
 		}
 

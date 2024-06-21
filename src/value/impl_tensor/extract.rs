@@ -310,7 +310,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 					// length calculations easy
 					let mut offsets = vec![0; (len + 1) as _];
 
-					ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len) -> Error::GetStringTensorContent];
+					ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len as _) -> Error::GetStringTensorContent];
 
 					// final offset = overall length so that per-string length calculations work for the last string
 					debug_assert_eq!(0, offsets[len]);
@@ -380,7 +380,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 					// length calculations easy
 					let mut offsets = vec![0; (len + 1) as _];
 
-					ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len) -> Error::GetStringTensorContent];
+					ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len as _) -> Error::GetStringTensorContent];
 
 					// final offset = overall length so that per-string length calculations work for the last string
 					debug_assert_eq!(0, offsets[len]);

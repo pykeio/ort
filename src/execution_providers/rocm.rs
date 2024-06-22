@@ -114,7 +114,7 @@ impl ROCmExecutionProvider {
 
 impl From<ROCmExecutionProvider> for ExecutionProviderDispatch {
 	fn from(value: ROCmExecutionProvider) -> Self {
-		ExecutionProviderDispatch::ROCm(value)
+		ExecutionProviderDispatch::new(value)
 	}
 }
 

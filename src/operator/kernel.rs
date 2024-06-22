@@ -138,4 +138,13 @@ impl KernelContext {
 		ortsys![unsafe KernelContext_GetOutput(self.ptr.as_ptr(), idx as ort_sys::size_t, shape.as_ptr(), shape.len() as _, &mut value_ptr) -> Error::GetOperatorOutput];
 		Ok(NonNull::new(value_ptr).map(|c| ValueRefMut::new(unsafe { Value::from_ptr_nodrop(c, None) })))
 	}
+
+	/// Returns a pointer to the GPU compute stream (i.e. `cudaStream_t`) used by the execution provider, if this
+	/// kernel's operator was configured to use said execution provider (see
+	/// [`super::Operator::execution_provider_type`]).
+	pub fn compute_stream(&self) -> Result<Option<NonNull<ort_sys::c_void>>> {
+		let mut stream_ptr: *mut ort_sys::c_void = ptr::null_mut();
+		ortsys![unsafe KernelContext_GetGPUComputeStream(self.ptr.as_ptr(), &mut stream_ptr) -> Error::GetOperatorGPUComputeStream];
+		Ok(NonNull::new(stream_ptr))
+	}
 }

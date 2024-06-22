@@ -15,15 +15,15 @@ use crate::{
 	error::assert_non_null_pointer,
 	memory::{Allocator, MemoryInfo},
 	ortsys,
-	tensor::{IntoTensorElementType, TensorElementType, Utf8Data},
-	value::ValueInner,
-	AllocatorType, DynValue, Error, MemoryType, Result, TensorRefMut, Value
+	tensor::{TensorElementType, Utf8Data},
+	value::{impl_tensor::calculate_tensor_size, ValueInner},
+	AllocationDevice, AllocatorType, DynValue, Error, MemoryType, PrimitiveTensorElementType, Result, TensorRefMut, Value
 };
 
-impl DynTensor {
-	/// Construct a [`Value`] from an array of strings.
+impl Tensor<String> {
+	/// Construct a [`DynTensor`] from an array of strings.
 	///
-	/// Just like numeric tensors, string tensor `Value`s can be created from:
+	/// Just like numeric tensors, string tensors can be created from:
 	/// - (with feature `ndarray`) a shared reference to a [`ndarray::CowArray`] (`&CowArray<'_, T, D>`);
 	/// - (with feature `ndarray`) a mutable/exclusive reference to an [`ndarray::ArcArray`] (`&mut ArcArray<T, D>`);
 	/// - (with feature `ndarray`) an owned [`ndarray::Array`];
@@ -36,26 +36,19 @@ impl DynTensor {
 	/// ```
 	/// # use ort::{Session, Value};
 	/// # fn main() -> ort::Result<()> {
-	/// # 	let session = Session::builder()?.commit_from_file("tests/data/vectorizer.onnx")?;
-	/// // You'll need to obtain an `Allocator` from a session in order to create string tensors.
-	/// let allocator = session.allocator();
-	///
 	/// // Create a string tensor from a raw data vector
 	/// let data = vec!["hello", "world"];
-	/// let value = Value::from_string_array(allocator, ([data.len()], data.into_boxed_slice()))?;
+	/// let value = Value::from_string_array(([data.len()], data.into_boxed_slice()))?;
 	///
 	/// // Create a string tensor from an `ndarray::Array`
 	/// #[cfg(feature = "ndarray")]
-	/// let value = Value::from_string_array(
-	/// 	allocator,
-	/// 	ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap()
-	/// )?;
+	/// let value = Value::from_string_array(ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap())?;
 	/// # 	Ok(())
 	/// # }
 	/// ```
 	///
 	/// Note that string data will *always* be copied, no matter what form the data is provided in.
-	pub fn from_string_array<T: Utf8Data>(allocator: &Allocator, input: impl IntoValueTensor<Item = T>) -> Result<DynTensor> {
+	pub fn from_string_array<T: Utf8Data>(input: impl IntoValueTensor<Item = T>) -> Result<Tensor<String>> {
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 
 		let (shape, data) = input.ref_parts()?;
@@ -64,7 +57,7 @@ impl DynTensor {
 
 		// create tensor without data -- data is filled in later
 		ortsys![
-			unsafe CreateTensorAsOrtValue(allocator.ptr.as_ptr(), shape_ptr, shape_len as _, TensorElementType::String.into(), &mut value_ptr)
+			unsafe CreateTensorAsOrtValue(Allocator::default().ptr.as_ptr(), shape_ptr, shape_len as _, TensorElementType::String.into(), &mut value_ptr)
 				-> Error::CreateTensor;
 			nonNull(value_ptr)
 		];
@@ -84,18 +77,18 @@ impl DynTensor {
 		ortsys![unsafe FillStringTensor(value_ptr, string_pointers.as_ptr(), string_pointers.len() as _) -> Error::FillStringTensor];
 
 		Ok(Value {
-			inner: ValueInner::RustOwned {
+			inner: Arc::new(ValueInner::RustOwned {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
 				_array: Box::new(()),
 				_memory_info: None
-			},
+			}),
 			_markers: PhantomData
 		})
 	}
 }
 
-impl<T: IntoTensorElementType + Debug> Tensor<T> {
-	/// Construct a tensor [`Value`] in a given allocator with a given shape and datatype. The data contained in the
+impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
+	/// Construct a tensor in a given allocator with a given shape and datatype. The data contained in the
 	/// value will be zero-allocated on the allocation device.
 	///
 	/// This can be used to create a tensor with data on a certain device. For example, to create a tensor with pinned
@@ -132,18 +125,18 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 		];
 
 		Ok(Value {
-			inner: ValueInner::RustOwned {
+			inner: Arc::new(ValueInner::RustOwned {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
 				_array: Box::new(()),
 				_memory_info: None
-			},
+			}),
 			_markers: PhantomData
 		})
 	}
 
-	/// Construct a tensor [`Value`] from an array of data.
+	/// Construct a tensor from an array of data.
 	///
-	/// Tensor `Value`s can be created from:
+	/// Tensors can be created from:
 	/// - (with feature `ndarray`) a shared reference to a [`ndarray::CowArray`] (`&CowArray<'_, T, D>`);
 	/// - (with feature `ndarray`) a mutable/exclusive reference to an [`ndarray::ArcArray`] (`&mut ArcArray<T, D>`);
 	/// - (with feature `ndarray`) an owned [`ndarray::Array`];
@@ -154,19 +147,19 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	///   * and `data` is one of `Vec<T>`, `Box<[T]>`, `Arc<Box<[T]>>`, or `&[T]`.
 	///
 	/// ```
-	/// # use ort::Value;
+	/// # use ort::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// // Create a tensor from a raw data vector
-	/// let value = Value::from_array(([1usize, 2, 3], vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0].into_boxed_slice()))?;
+	/// let tensor = Tensor::from_array(([1usize, 2, 3], vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0].into_boxed_slice()))?;
 	///
 	/// // Create a tensor from an `ndarray::Array`
 	/// #[cfg(feature = "ndarray")]
-	/// let value = Value::from_array(ndarray::Array4::<f32>::zeros((1, 16, 16, 3)))?;
+	/// let tensor = Tensor::from_array(ndarray::Array4::<f32>::zeros((1, 16, 16, 3)))?;
 	/// # 	Ok(())
 	/// # }
 	/// ```
 	///
-	/// Creating string tensors requires a separate method; see [`Value::from_string_array`].
+	/// Creating string tensors requires a separate method; see [`DynTensor::from_string_array`].
 	///
 	/// Note that data provided in an `ndarray` may be copied in some circumstances:
 	/// - `&CowArray<'_, T, D>` will always be copied regardless of whether it is uniquely owned or borrowed.
@@ -177,7 +170,7 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// Raw data provided as a `Arc<Box<[T]>>`, `Box<[T]>`, or `Vec<T>` will never be copied. Raw data is expected to be
 	/// in standard, contigous layout.
 	pub fn from_array(input: impl IntoValueTensor<Item = T>) -> Result<Tensor<T>> {
-		let memory_info = MemoryInfo::new_cpu(AllocatorType::Arena, MemoryType::Default)?;
+		let memory_info = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Arena, MemoryType::Default)?;
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 
@@ -203,17 +196,17 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 		];
 
 		Ok(Value {
-			inner: ValueInner::RustOwned {
+			inner: Arc::new(ValueInner::RustOwned {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
 				_array: guard,
 				_memory_info: Some(memory_info)
-			},
+			}),
 			_markers: PhantomData
 		})
 	}
 }
 
-impl<'a, T: IntoTensorElementType + Debug> TensorRefMut<'a, T> {
+impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 	/// Create a mutable tensor view from a raw pointer and shape.
 	///
 	/// The length of data is determined by `T` and the given shape, so the given buffer must be at least
@@ -260,11 +253,11 @@ impl<'a, T: IntoTensorElementType + Debug> TensorRefMut<'a, T> {
 		];
 
 		Ok(TensorRefMut::new(Value {
-			inner: ValueInner::CppOwned {
+			inner: Arc::new(ValueInner::CppOwned {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
 				drop: true,
 				_session: None
-			},
+			}),
 			_markers: PhantomData
 		}))
 	}
@@ -290,7 +283,7 @@ macro_rules! impl_to_dimensions {
 				.enumerate()
 				.map(|(i, c)| if *c >= 1 { Ok(*c as i64) } else { Err(Error::InvalidDimension(i)) })
 				.collect::<Result<_>>()?;
-			let sum = v.iter().product::<i64>() as usize;
+			let sum = calculate_tensor_size(&v);
 			if let Some(expected_size) = expected_size {
 				if sum != expected_size {
 					Err(Error::TensorShapeMismatch {
@@ -318,6 +311,14 @@ macro_rules! impl_to_dimensions {
 	};
 }
 
+impl ToDimensions for () {
+	fn to_dimensions(&self, expected_size: Option<usize>) -> Result<Vec<i64>> {
+		match expected_size {
+			Some(1) | None => Ok(vec![]),
+			Some(x) => Err(Error::TensorShapeMismatch { input: vec![], total: 1, expected: x })
+		}
+	}
+}
 impl_to_dimensions!(for &[usize], for &[i32], for &[i64], for Vec<usize>, for Vec<i32>, for Vec<i64>);
 impl_to_dimensions!(<N> for [usize; N], for [i32; N], for [i64; N]);
 
@@ -500,7 +501,7 @@ impl<T: Clone + Debug + 'static, D: ToDimensions> IntoValueTensor for (D, Arc<Bo
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'i, 'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for Tensor<T>
+impl<'i, 'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for Tensor<T>
 where
 	'i: 'v
 {
@@ -512,7 +513,7 @@ where
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for Tensor<T> {
+impl<'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for Tensor<T> {
 	type Error = Error;
 	fn try_from(arr: ArrayView<'v, T, D>) -> Result<Self, Self::Error> {
 		Tensor::from_array(arr)
@@ -521,7 +522,7 @@ impl<'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'sta
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'i, 'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for DynTensor
+impl<'i, 'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for DynTensor
 where
 	'i: 'v
 {
@@ -533,7 +534,7 @@ where
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for DynTensor {
+impl<'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for DynTensor {
 	type Error = Error;
 	fn try_from(arr: ArrayView<'v, T, D>) -> Result<Self, Self::Error> {
 		Tensor::from_array(arr).map(|c| c.upcast())
@@ -542,7 +543,7 @@ impl<'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'sta
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'i, 'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for DynValue
+impl<'i, 'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for DynValue
 where
 	'i: 'v
 {
@@ -554,7 +555,7 @@ where
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for DynValue {
+impl<'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for DynValue {
 	type Error = Error;
 	fn try_from(arr: ArrayView<'v, T, D>) -> Result<Self, Self::Error> {
 		Tensor::from_array(arr).map(|c| c.into_dyn())
@@ -564,19 +565,19 @@ impl<'v, T: IntoTensorElementType + Debug + Clone + 'static, D: Dimension + 'sta
 macro_rules! impl_try_from {
 	(@T,I $($t:ty),+) => {
 		$(
-			impl<T: IntoTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for Tensor<T> {
+			impl<T: PrimitiveTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for Tensor<T> {
 				type Error = Error;
 				fn try_from(value: $t) -> Result<Self, Self::Error> {
 					Tensor::from_array(value)
 				}
 			}
-			impl<T: IntoTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for DynTensor {
+			impl<T: PrimitiveTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for DynTensor {
 				type Error = Error;
 				fn try_from(value: $t) -> Result<Self, Self::Error> {
 					Tensor::from_array(value).map(|c| c.upcast())
 				}
 			}
-			impl<T: IntoTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for crate::DynValue {
+			impl<T: PrimitiveTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for crate::DynValue {
 				type Error = Error;
 				fn try_from(value: $t) -> Result<Self, Self::Error> {
 					Tensor::from_array(value).map(|c| c.into_dyn())
@@ -587,21 +588,21 @@ macro_rules! impl_try_from {
 	(@T,D $($t:ty),+) => {
 		$(
 			#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-			impl<T: IntoTensorElementType + Debug + Clone + 'static, D: ndarray::Dimension + 'static> TryFrom<$t> for Tensor<T> {
+			impl<T: PrimitiveTensorElementType + Debug + Clone + 'static, D: ndarray::Dimension + 'static> TryFrom<$t> for Tensor<T> {
 				type Error = Error;
 				fn try_from(value: $t) -> Result<Self, Self::Error> {
 					Tensor::from_array(value)
 				}
 			}
 			#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-			impl<T: IntoTensorElementType + Debug + Clone + 'static, D: ndarray::Dimension + 'static> TryFrom<$t> for DynTensor {
+			impl<T: PrimitiveTensorElementType + Debug + Clone + 'static, D: ndarray::Dimension + 'static> TryFrom<$t> for DynTensor {
 				type Error = Error;
 				fn try_from(value: $t) -> Result<Self, Self::Error> {
 					Tensor::from_array(value).map(|c| c.upcast())
 				}
 			}
 			#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-			impl<T: IntoTensorElementType + Debug + Clone + 'static, D: ndarray::Dimension + 'static> TryFrom<$t> for crate::DynValue {
+			impl<T: PrimitiveTensorElementType + Debug + Clone + 'static, D: ndarray::Dimension + 'static> TryFrom<$t> for crate::DynValue {
 				type Error = Error;
 				fn try_from(value: $t) -> Result<Self, Self::Error> {
 					Tensor::from_array(value).map(|c| c.into_dyn())

@@ -46,7 +46,7 @@ impl CoreMLExecutionProvider {
 
 impl From<CoreMLExecutionProvider> for ExecutionProviderDispatch {
 	fn from(value: CoreMLExecutionProvider) -> Self {
-		ExecutionProviderDispatch::CoreML(value)
+		ExecutionProviderDispatch::new(value)
 	}
 }
 

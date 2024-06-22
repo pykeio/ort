@@ -1,4 +1,4 @@
-use std::{fmt::Debug, os::raw::c_char, ptr, string::FromUtf8Error};
+use std::{fmt::Debug, ptr, string::FromUtf8Error};
 
 #[cfg(feature = "ndarray")]
 use ndarray::IxDyn;
@@ -7,9 +7,7 @@ use super::TensorValueTypeMarker;
 #[cfg(feature = "ndarray")]
 use crate::tensor::{extract_primitive_array, extract_primitive_array_mut};
 use crate::{
-	ortsys,
-	tensor::{IntoTensorElementType, TensorElementType},
-	Error, Result, Tensor, Value
+	ortsys, tensor::TensorElementType, value::impl_tensor::calculate_tensor_size, Error, PrimitiveTensorElementType, Result, Tensor, Value, ValueType
 };
 
 impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
@@ -38,38 +36,81 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// - This is a [`crate::DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the
 	///   infallible [`Tensor::extract_tensor`] instead)*
 	/// - The provided type `T` does not match the tensor's element type.
+	/// - The tensor's data is not allocated in CPU memory.
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-	pub fn try_extract_tensor<T: IntoTensorElementType>(&self) -> Result<ndarray::ArrayViewD<'_, T>> {
-		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
+	pub fn try_extract_tensor<T: PrimitiveTensorElementType>(&self) -> Result<ndarray::ArrayViewD<'_, T>> {
+		let dtype = self.dtype()?;
+		match dtype {
+			ValueType::Tensor { ty, dimensions } => {
+				let device = self.memory_info()?.allocation_device()?;
+				if !device.is_cpu_accessible() {
+					return Err(Error::TensorNotOnCpu(device.as_str()));
+				}
 
-		let res = {
-			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
-			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
-			let data_type: TensorElementType = type_sys.into();
-			if data_type == T::into_tensor_element_type() {
-				let mut num_dims = 0;
-				ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
-
-				let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-				ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
-				let shape = IxDyn(&node_dims.iter().map(|&n| n as usize).collect::<Vec<_>>());
-
-				let mut len = 0;
-				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
-
-				Ok(extract_primitive_array(shape, self.ptr())?)
-			} else {
-				Err(Error::DataTypeMismatch {
-					actual: data_type,
-					requested: T::into_tensor_element_type()
-				})
+				if ty == T::into_tensor_element_type() {
+					Ok(extract_primitive_array(IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>()), self.ptr())?)
+				} else {
+					Err(Error::DataTypeMismatch {
+						actual: ty,
+						requested: T::into_tensor_element_type()
+					})
+				}
 			}
-		};
-		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
-		res
+			t => Err(Error::NotTensor(t))
+		}
+	}
+
+	/// Attempt to extract the scalar from a tensor of type `T`.
+	///
+	/// ```
+	/// # use std::sync::Arc;
+	/// # use ort::{Session, Value};
+	/// # fn main() -> ort::Result<()> {
+	/// let value = Value::from_array(((), vec![3.14_f32]))?;
+	///
+	/// let extracted = value.try_extract_scalar::<f32>()?;
+	/// assert_eq!(extracted, 3.14);
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	///
+	/// # Errors
+	/// May return an error if:
+	/// - The tensor is not 0-dimensional.
+	/// - The provided type `T` does not match the tensor's element type.
+	/// - This is a [`crate::DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the
+	///   infallible [`Tensor::extract_tensor`] instead)*
+	/// - The tensor's data is not allocated in CPU memory.
+	pub fn try_extract_scalar<T: PrimitiveTensorElementType + Copy>(&self) -> Result<T> {
+		let dtype = self.dtype()?;
+		match dtype {
+			ValueType::Tensor { ty, dimensions } => {
+				let device = self.memory_info()?.allocation_device()?;
+				if !device.is_cpu_accessible() {
+					return Err(Error::TensorNotOnCpu(device.as_str()));
+				}
+
+				if !dimensions.is_empty() {
+					return Err(Error::TensorNot0Dimensional(dimensions.len()));
+				}
+
+				if ty == T::into_tensor_element_type() {
+					let mut output_array_ptr: *mut T = ptr::null_mut();
+					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
+					let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
+					ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
+
+					Ok(unsafe { *output_array_ptr })
+				} else {
+					Err(Error::DataTypeMismatch {
+						actual: ty,
+						requested: T::into_tensor_element_type()
+					})
+				}
+			}
+			t => Err(Error::NotTensor(t))
+		}
 	}
 
 	/// Attempt to extract the underlying data of type `T` into a mutable read-only [`ndarray::ArrayViewMut`].
@@ -101,36 +142,26 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// - The provided type `T` does not match the tensor's element type.
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-	pub fn try_extract_tensor_mut<T: IntoTensorElementType>(&mut self) -> Result<ndarray::ArrayViewMutD<'_, T>> {
-		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
+	pub fn try_extract_tensor_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<ndarray::ArrayViewMutD<'_, T>> {
+		let dtype = self.dtype()?;
+		match dtype {
+			ValueType::Tensor { ty, dimensions } => {
+				let device = self.memory_info()?.allocation_device()?;
+				if !device.is_cpu_accessible() {
+					return Err(Error::TensorNotOnCpu(device.as_str()));
+				}
 
-		let res = {
-			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
-			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
-			let data_type: TensorElementType = type_sys.into();
-			if data_type == T::into_tensor_element_type() {
-				let mut num_dims = 0;
-				ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
-
-				let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-				ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
-				let shape = IxDyn(&node_dims.iter().map(|&n| n as usize).collect::<Vec<_>>());
-
-				let mut len = 0;
-				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
-
-				Ok(extract_primitive_array_mut(shape, self.ptr())?)
-			} else {
-				Err(Error::DataTypeMismatch {
-					actual: data_type,
-					requested: T::into_tensor_element_type()
-				})
+				if ty == T::into_tensor_element_type() {
+					Ok(extract_primitive_array_mut(IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>()), self.ptr())?)
+				} else {
+					Err(Error::DataTypeMismatch {
+						actual: ty,
+						requested: T::into_tensor_element_type()
+					})
+				}
 			}
-		};
-		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
-		res
+			t => Err(Error::NotTensor(t))
+		}
 	}
 
 	/// Attempt to extract the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and an
@@ -159,40 +190,32 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// - This is a [`crate::DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the
 	///   infallible [`Tensor::extract_raw_tensor`] instead)*
 	/// - The provided type `T` does not match the tensor's element type.
-	pub fn try_extract_raw_tensor<T: IntoTensorElementType>(&self) -> Result<(Vec<i64>, &[T])> {
-		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
+	pub fn try_extract_raw_tensor<T: PrimitiveTensorElementType>(&self) -> Result<(Vec<i64>, &[T])> {
+		let dtype = self.dtype()?;
+		match dtype {
+			ValueType::Tensor { ty, dimensions } => {
+				let device = self.memory_info()?.allocation_device()?;
+				if !device.is_cpu_accessible() {
+					return Err(Error::TensorNotOnCpu(device.as_str()));
+				}
 
-		let res = {
-			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
-			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
-			let data_type: TensorElementType = type_sys.into();
-			if data_type == T::into_tensor_element_type() {
-				let mut num_dims = 0;
-				ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
+				if ty == T::into_tensor_element_type() {
+					let mut output_array_ptr: *mut T = ptr::null_mut();
+					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
+					let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
+					ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
 
-				let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-				ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
-
-				let mut output_array_ptr: *mut T = ptr::null_mut();
-				let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
-				let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
-				ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
-
-				let mut len = 0;
-				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
-
-				Ok((node_dims, unsafe { std::slice::from_raw_parts(output_array_ptr, len as _) }))
-			} else {
-				Err(Error::DataTypeMismatch {
-					actual: data_type,
-					requested: T::into_tensor_element_type()
-				})
+					let len = calculate_tensor_size(&dimensions);
+					Ok((dimensions, unsafe { std::slice::from_raw_parts(output_array_ptr, len) }))
+				} else {
+					Err(Error::DataTypeMismatch {
+						actual: ty,
+						requested: T::into_tensor_element_type()
+					})
+				}
 			}
-		};
-		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
-		res
+			t => Err(Error::NotTensor(t))
+		}
 	}
 
 	/// Attempt to extract the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and a
@@ -218,50 +241,41 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// - This is a [`crate::DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the
 	///   infallible [`Tensor::extract_raw_tensor_mut`] instead)*
 	/// - The provided type `T` does not match the tensor's element type.
-	pub fn try_extract_raw_tensor_mut<T: IntoTensorElementType>(&mut self) -> Result<(Vec<i64>, &mut [T])> {
-		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
+	pub fn try_extract_raw_tensor_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<(Vec<i64>, &mut [T])> {
+		let dtype = self.dtype()?;
+		match dtype {
+			ValueType::Tensor { ty, dimensions } => {
+				let device = self.memory_info()?.allocation_device()?;
+				if !device.is_cpu_accessible() {
+					return Err(Error::TensorNotOnCpu(device.as_str()));
+				}
 
-		let res = {
-			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
-			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
-			let data_type: TensorElementType = type_sys.into();
-			if data_type == T::into_tensor_element_type() {
-				let mut num_dims = 0;
-				ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
+				if ty == T::into_tensor_element_type() {
+					let mut output_array_ptr: *mut T = ptr::null_mut();
+					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
+					let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
+					ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
 
-				let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-				ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
-
-				let mut output_array_ptr: *mut T = ptr::null_mut();
-				let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
-				let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
-				ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
-
-				let mut len = 0;
-				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
-
-				Ok((node_dims, unsafe { std::slice::from_raw_parts_mut(output_array_ptr, len as _) }))
-			} else {
-				Err(Error::DataTypeMismatch {
-					actual: data_type,
-					requested: T::into_tensor_element_type()
-				})
+					let len = calculate_tensor_size(&dimensions);
+					Ok((dimensions, unsafe { std::slice::from_raw_parts_mut(output_array_ptr, len) }))
+				} else {
+					Err(Error::DataTypeMismatch {
+						actual: ty,
+						requested: T::into_tensor_element_type()
+					})
+				}
 			}
-		};
-		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
-		res
+			t => Err(Error::NotTensor(t))
+		}
 	}
 
 	/// Attempt to extract the underlying data into a Rust `ndarray`.
 	///
 	/// ```
-	/// # use ort::{Allocator, Session, DynTensor, TensorElementType};
+	/// # use ort::{Session, Tensor, TensorElementType};
 	/// # fn main() -> ort::Result<()> {
-	/// # 	let allocator = Allocator::default();
 	/// let array = ndarray::Array1::from_vec(vec!["hello", "world"]);
-	/// let tensor = DynTensor::from_string_array(&allocator, array.clone())?;
+	/// let tensor = Tensor::from_string_array(array.clone())?;
 	///
 	/// let extracted = tensor.try_extract_string_tensor()?;
 	/// assert_eq!(array.into_dyn(), extracted);
@@ -271,78 +285,68 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_string_tensor(&self) -> Result<ndarray::ArrayD<String>> {
-		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
+		let dtype = self.dtype()?;
+		match dtype {
+			ValueType::Tensor { ty, dimensions } => {
+				let device = self.memory_info()?.allocation_device()?;
+				if !device.is_cpu_accessible() {
+					return Err(Error::TensorNotOnCpu(device.as_str()));
+				}
 
-		let res = {
-			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
-			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
-			let data_type: TensorElementType = type_sys.into();
-			if data_type == TensorElementType::String {
-				let mut num_dims = 0;
-				ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
+				if ty == TensorElementType::String {
+					let len = calculate_tensor_size(&dimensions);
 
-				let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-				ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
-				let shape = IxDyn(&node_dims.iter().map(|&n| n as usize).collect::<Vec<_>>());
+					// Total length of string data, not including \0 suffix
+					let mut total_length: ort_sys::size_t = 0;
+					ortsys![unsafe GetStringTensorDataLength(self.ptr(), &mut total_length) -> Error::GetStringTensorDataLength];
 
-				let mut len: ort_sys::size_t = 0;
-				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
+					// In the JNI impl of this, tensor_element_len was included in addition to total_length,
+					// but that seems contrary to the docs of GetStringTensorDataLength, and those extra bytes
+					// don't seem to be written to in practice either.
+					// If the string data actually did go farther, it would panic below when using the offset
+					// data to get slices for each string.
+					let mut string_contents = vec![0u8; total_length as _];
+					// one extra slot so that the total length can go in the last one, making all per-string
+					// length calculations easy
+					let mut offsets = vec![0; (len + 1) as _];
 
-				// Total length of string data, not including \0 suffix
-				let mut total_length: ort_sys::size_t = 0;
-				ortsys![unsafe GetStringTensorDataLength(self.ptr(), &mut total_length) -> Error::GetStringTensorDataLength];
+					ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len as _) -> Error::GetStringTensorContent];
 
-				// In the JNI impl of this, tensor_element_len was included in addition to total_length,
-				// but that seems contrary to the docs of GetStringTensorDataLength, and those extra bytes
-				// don't seem to be written to in practice either.
-				// If the string data actually did go farther, it would panic below when using the offset
-				// data to get slices for each string.
-				let mut string_contents = vec![0u8; total_length as _];
-				// one extra slot so that the total length can go in the last one, making all per-string
-				// length calculations easy
-				let mut offsets = vec![0; (len + 1) as _];
+					// final offset = overall length so that per-string length calculations work for the last string
+					debug_assert_eq!(0, offsets[len]);
+					offsets[len] = total_length;
 
-				ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len) -> Error::GetStringTensorContent];
+					let strings = offsets
+						// offsets has 1 extra offset past the end so that all windows work
+						.windows(2)
+						.map(|w| {
+							let slice = &string_contents[w[0] as _..w[1] as _];
+							String::from_utf8(slice.into())
+						})
+						.collect::<Result<Vec<String>, FromUtf8Error>>()
+						.map_err(Error::StringFromUtf8Error)?;
 
-				// final offset = overall length so that per-string length calculations work for the last string
-				debug_assert_eq!(0, offsets[len as usize]);
-				offsets[len as usize] = total_length;
-
-				let strings = offsets
-					// offsets has 1 extra offset past the end so that all windows work
-					.windows(2)
-					.map(|w| {
-						let slice = &string_contents[w[0] as _..w[1] as _];
-						String::from_utf8(slice.into())
+					Ok(ndarray::Array::from_shape_vec(IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>()), strings)
+						.expect("Shape extracted from tensor didn't match tensor contents"))
+				} else {
+					Err(Error::DataTypeMismatch {
+						actual: ty,
+						requested: TensorElementType::String
 					})
-					.collect::<Result<Vec<String>, FromUtf8Error>>()
-					.map_err(Error::StringFromUtf8Error)?;
-
-				Ok(ndarray::Array::from_shape_vec(shape, strings)
-					.expect("Shape extracted from tensor didn't match tensor contents")
-					.into_dyn())
-			} else {
-				Err(Error::DataTypeMismatch {
-					actual: data_type,
-					requested: TensorElementType::String
-				})
+				}
 			}
-		};
-		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
-		res
+			t => Err(Error::NotTensor(t))
+		}
 	}
 
 	/// Attempt to extract the underlying string data into a "raw" data tuple, consisting of the tensor's dimensions and
 	/// an owned `Vec` of its data.
 	///
 	/// ```
-	/// # use ort::{Allocator, Session, DynTensor, TensorElementType};
+	/// # use ort::{Session, Tensor, TensorElementType};
 	/// # fn main() -> ort::Result<()> {
-	/// # 	let allocator = Allocator::default();
 	/// let array = vec!["hello", "world"];
-	/// let tensor = DynTensor::from_string_array(&allocator, ([array.len()], array.clone().into_boxed_slice()))?;
+	/// let tensor = Tensor::from_string_array(([array.len()], array.clone().into_boxed_slice()))?;
 	///
 	/// let (extracted_shape, extracted_data) = tensor.try_extract_raw_string_tensor()?;
 	/// assert_eq!(extracted_data, array);
@@ -351,68 +355,57 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # }
 	/// ```
 	pub fn try_extract_raw_string_tensor(&self) -> Result<(Vec<i64>, Vec<String>)> {
-		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
+		let dtype = self.dtype()?;
+		match dtype {
+			ValueType::Tensor { ty, dimensions } => {
+				let device = self.memory_info()?.allocation_device()?;
+				if !device.is_cpu_accessible() {
+					return Err(Error::TensorNotOnCpu(device.as_str()));
+				}
 
-		let res = {
-			let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-			ortsys![unsafe GetTensorElementType(tensor_info_ptr, &mut type_sys) -> Error::GetTensorElementType];
-			assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
-			let data_type: TensorElementType = type_sys.into();
-			if data_type == TensorElementType::String {
-				let mut num_dims = 0;
-				ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
+				if ty == TensorElementType::String {
+					let len = calculate_tensor_size(&dimensions);
 
-				let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-				ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
+					// Total length of string data, not including \0 suffix
+					let mut total_length: ort_sys::size_t = 0;
+					ortsys![unsafe GetStringTensorDataLength(self.ptr(), &mut total_length) -> Error::GetStringTensorDataLength];
 
-				let mut output_array_ptr: *mut c_char = ptr::null_mut();
-				let output_array_ptr_ptr: *mut *mut c_char = &mut output_array_ptr;
-				let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
-				ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
+					// In the JNI impl of this, tensor_element_len was included in addition to total_length,
+					// but that seems contrary to the docs of GetStringTensorDataLength, and those extra bytes
+					// don't seem to be written to in practice either.
+					// If the string data actually did go farther, it would panic below when using the offset
+					// data to get slices for each string.
+					let mut string_contents = vec![0u8; total_length as _];
+					// one extra slot so that the total length can go in the last one, making all per-string
+					// length calculations easy
+					let mut offsets = vec![0; (len + 1) as _];
 
-				let mut len: ort_sys::size_t = 0;
-				ortsys![unsafe GetTensorShapeElementCount(tensor_info_ptr, &mut len) -> Error::GetTensorShapeElementCount];
-				// Total length of string data, not including \0 suffix
-				let mut total_length = 0;
-				ortsys![unsafe GetStringTensorDataLength(self.ptr(), &mut total_length) -> Error::GetStringTensorDataLength];
+					ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len as _) -> Error::GetStringTensorContent];
 
-				// In the JNI impl of this, tensor_element_len was included in addition to total_length,
-				// but that seems contrary to the docs of GetStringTensorDataLength, and those extra bytes
-				// don't seem to be written to in practice either.
-				// If the string data actually did go farther, it would panic below when using the offset
-				// data to get slices for each string.
-				let mut string_contents = vec![0u8; total_length as _];
-				// one extra slot so that the total length can go in the last one, making all per-string
-				// length calculations easy
-				let mut offsets = vec![0; len as usize + 1];
+					// final offset = overall length so that per-string length calculations work for the last string
+					debug_assert_eq!(0, offsets[len]);
+					offsets[len] = total_length;
 
-				ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length as _, offsets.as_mut_ptr(), len as _) -> Error::GetStringTensorContent];
+					let strings = offsets
+						// offsets has 1 extra offset past the end so that all windows work
+						.windows(2)
+						.map(|w| {
+							let slice = &string_contents[w[0] as _..w[1] as _];
+							String::from_utf8(slice.into())
+						})
+						.collect::<Result<Vec<String>, FromUtf8Error>>()
+						.map_err(Error::StringFromUtf8Error)?;
 
-				// final offset = overall length so that per-string length calculations work for the last string
-				debug_assert_eq!(0, offsets[len as usize]);
-				offsets[len as usize] = total_length;
-
-				let strings = offsets
-					// offsets has 1 extra offset past the end so that all windows work
-					.windows(2)
-					.map(|w| {
-						let slice = &string_contents[w[0] as _..w[1] as _];
-						String::from_utf8(slice.into())
+					Ok((dimensions, strings))
+				} else {
+					Err(Error::DataTypeMismatch {
+						actual: ty,
+						requested: TensorElementType::String
 					})
-					.collect::<Result<Vec<String>, FromUtf8Error>>()
-					.map_err(Error::StringFromUtf8Error)?;
-
-				Ok((node_dims, strings))
-			} else {
-				Err(Error::DataTypeMismatch {
-					actual: data_type,
-					requested: TensorElementType::String
-				})
+				}
 			}
-		};
-		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
-		res
+			t => Err(Error::NotTensor(t))
+		}
 	}
 
 	/// Returns the shape of the tensor.
@@ -445,7 +438,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	}
 }
 
-impl<T: IntoTensorElementType + Debug> Tensor<T> {
+impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// Extracts the underlying data into a read-only [`ndarray::ArrayView`].
 	///
 	/// ```

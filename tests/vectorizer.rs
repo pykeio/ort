@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use ndarray::{ArrayD, IxDyn};
-use ort::{inputs, DynTensor, GraphOptimizationLevel, Session};
+use ort::{inputs, GraphOptimizationLevel, Session, Tensor};
 use test_log::test;
 
 #[test]
@@ -22,7 +22,7 @@ fn vectorizer() -> ort::Result<()> {
 	let array = ndarray::CowArray::from(ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap());
 
 	// Just one input
-	let input_tensor_values = inputs![DynTensor::from_string_array(session.allocator(), &array)?]?;
+	let input_tensor_values = inputs![Tensor::from_string_array(&array)?]?;
 
 	// Perform the inference
 	let outputs = session.run(input_tensor_values)?;

@@ -40,7 +40,7 @@ cann = []
 qnn = []
 
 [build-dependencies]
-ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }
+ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls", "socks-proxy" ] }
 tar = { version = "0.4", optional = true }
 flate2 = { version = "1.0", optional = true }
 sha2 = { version = "0.10", optional = true }

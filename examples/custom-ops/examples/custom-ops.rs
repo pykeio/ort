@@ -82,7 +82,7 @@ impl Kernel for CustomOpTwoKernel {
 
 fn main() -> ort::Result<()> {
 	let session = Session::builder()?
-		.with_operators(OperatorDomain::new("test.customop")?.add(CustomOpOne)?.add(CustomOpTwo)?)?
+		.with_operators(OperatorDomain::new("test.customop")?.add::<CustomOpOne>()?.add::<CustomOpTwo>()?)?
 		.commit_from_file("tests/data/custom_op_test.onnx")?;
 
 	let values = session.run(ort::inputs![Array2::<f32>::zeros((3, 5)), Array2::<f32>::ones((3, 5))]?)?;

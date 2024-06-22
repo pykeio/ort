@@ -16,11 +16,26 @@ use crate::{operator::bound::BoundOperator, ortsys, Error, Result};
 
 pub type InferShapeFn = dyn FnMut(*mut ort_sys::OrtShapeInferContext) -> crate::Result<()>;
 
+/// A custom operator descriptor, which describes the expected inputs & outputs of a graph operator.
+///
+/// [`Operator`]s are bound to [`OperatorDomain`]s. Multiple operators can have the same name as long as they have
+/// different input/output types, in which case the exact operator will be picked depending on the input/output
+/// types. If you want to, for example, define a `Sort` operator that can accept either a single `f32` or `i64` tensor
+/// input, you'll need to define 2 separate operators (which can be done via a macro); but both of these
+/// [`Operator`] structs can return the same name in [`Operator::name`] so that they are usable as simply
+/// `my.domain:Sort` in the graph.
 pub trait Operator: Send {
 	type Kernel: Kernel;
 
+	/// Returns the name of the operator.
 	fn name() -> &'static str;
 
+	/// Returns the execution provider this operator runs on, e.g. `CUDAExecutionProvider`.
+	///
+	/// If the returned type is not `None`, and the execution provider used by the session matches this operator's
+	/// EP type, the value will not be copied to the CPU and you may use functions like [`crate::Tensor::data_ptr`] to
+	/// access the underlying device memory, and [`super::KernelContext::compute_stream`] to access the GPU compute
+	/// stream.
 	fn execution_provider_type() -> Option<&'static str> {
 		None
 	}
@@ -42,6 +57,7 @@ pub trait Operator: Send {
 	}
 }
 
+/// Dummy type implementing [`Operator`] used by [`ErasedBoundOperator`] to cheat the type system.
 struct DummyOperator;
 
 impl Operator for DummyOperator {
@@ -84,7 +100,7 @@ impl OperatorDomain {
 	}
 
 	#[allow(clippy::should_implement_trait)]
-	pub fn add<O: Operator>(mut self, _operator: O) -> Result<Self> {
+	pub fn add<O: Operator>(mut self) -> Result<Self> {
 		let name = O::name();
 
 		let bound = BoundOperator::<O>::new(CString::new(name)?, O::execution_provider_type().map(CString::new).transpose()?);

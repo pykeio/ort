@@ -54,7 +54,7 @@ impl TVMExecutionProvider {
 
 impl From<TVMExecutionProvider> for ExecutionProviderDispatch {
 	fn from(value: TVMExecutionProvider) -> Self {
-		ExecutionProviderDispatch::TVM(value)
+		ExecutionProviderDispatch::new(value)
 	}
 }
 

@@ -34,7 +34,7 @@ pub struct Environment {
 }
 
 impl Environment {
-	/// Loads the underlying [`ort_sys::OrtEnv`] pointer.
+	/// Returns the underlying [`ort_sys::OrtEnv`] pointer.
 	pub fn ptr(&self) -> *mut ort_sys::OrtEnv {
 		self.env_ptr.load(Ordering::Relaxed)
 	}
@@ -52,13 +52,14 @@ impl Drop for Environment {
 	}
 }
 
-/// Gets a reference to the global environment, creating one if an environment has been committed yet.
+/// Gets a reference to the global environment, creating one if an environment has not been
+/// [`commit`](EnvironmentBuilder::commit)ted yet.
 pub fn get_environment() -> Result<&'static Arc<Environment>> {
 	if let Some(c) = unsafe { &*G_ENV.cell.get() } {
 		Ok(c)
 	} else {
 		debug!("Environment not yet initialized, creating a new one");
-		EnvironmentBuilder::default().commit()?;
+		EnvironmentBuilder::new().commit()?;
 
 		Ok(unsafe { (*G_ENV.cell.get()).as_ref().unwrap_unchecked() })
 	}
@@ -72,7 +73,7 @@ pub struct EnvironmentGlobalThreadPoolOptions {
 	pub intra_op_thread_affinity: Option<String>
 }
 
-/// Struct used to build an `Environment`.
+/// Struct used to build an [`Environment`]; see [`crate::init`].
 pub struct EnvironmentBuilder {
 	name: String,
 	telemetry: bool,
@@ -80,8 +81,8 @@ pub struct EnvironmentBuilder {
 	global_thread_pool_options: Option<EnvironmentGlobalThreadPoolOptions>
 }
 
-impl Default for EnvironmentBuilder {
-	fn default() -> Self {
+impl EnvironmentBuilder {
+	pub(crate) fn new() -> Self {
 		EnvironmentBuilder {
 			name: "default".to_string(),
 			telemetry: true,
@@ -89,11 +90,9 @@ impl Default for EnvironmentBuilder {
 			global_thread_pool_options: None
 		}
 	}
-}
 
-impl EnvironmentBuilder {
 	/// Configure the environment with a given name for logging purposes.
-	#[must_use]
+	#[must_use = "commit() must be called in order for the environment to take effect"]
 	pub fn with_name<S>(mut self, name: S) -> Self
 	where
 		S: Into<String>
@@ -102,7 +101,17 @@ impl EnvironmentBuilder {
 		self
 	}
 
-	#[must_use]
+	/// Enable or disable sending telemetry events to Microsoft.
+	///
+	/// Typically, only Windows builds of ONNX Runtime provided by Microsoft will have telemetry enabled.
+	/// Pre-built binaries provided by pyke, or binaries compiled from source, won't have telemetry enabled.
+	///
+	/// The exact kind of telemetry data sent can be found [here](https://github.com/microsoft/onnxruntime/blob/v1.18.0/onnxruntime/core/platform/windows/telemetry.cc).
+	/// Currently, this includes (but is not limited to): ONNX graph version, model producer name & version, whether or
+	/// not FP16 is used, operator domains & versions, model graph name & custom metadata, execution provider names,
+	/// error messages, and the total number & time of session inference runs. The ONNX Runtime team uses this data to
+	/// better understand how customers use ONNX Runtime and where performance can be improved.
+	#[must_use = "commit() must be called in order for the environment to take effect"]
 	pub fn with_telemetry(mut self, enable: bool) -> Self {
 		self.telemetry = enable;
 		self
@@ -116,14 +125,14 @@ impl EnvironmentBuilder {
 	/// Execution providers will only work if the corresponding Cargo feature is enabled and ONNX Runtime was built
 	/// with support for the corresponding execution provider. Execution providers that do not have their corresponding
 	/// feature enabled will emit a warning.
-	#[must_use]
+	#[must_use = "commit() must be called in order for the environment to take effect"]
 	pub fn with_execution_providers(mut self, execution_providers: impl AsRef<[ExecutionProviderDispatch]>) -> Self {
 		self.execution_providers = execution_providers.as_ref().to_vec();
 		self
 	}
 
 	/// Enables the global thread pool for this environment.
-	#[must_use]
+	#[must_use = "commit() must be called in order for the environment to take effect"]
 	pub fn with_global_thread_pool(mut self, options: EnvironmentGlobalThreadPoolOptions) -> Self {
 		self.global_thread_pool_options = Some(options);
 		self
@@ -158,14 +167,17 @@ impl EnvironmentBuilder {
 				ortsys![unsafe SetGlobalIntraOpThreadAffinity(thread_options, cstr.as_ptr()) -> Error::CreateEnvironment];
 			}
 
-			ortsys![unsafe CreateEnvWithCustomLoggerAndGlobalThreadPools(
+			ortsys![
+				unsafe CreateEnvWithCustomLoggerAndGlobalThreadPools(
 					logging_function,
 					logger_param,
 					ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
 					cname.as_ptr(),
 					thread_options,
 					&mut env_ptr
-				) -> Error::CreateEnvironment; nonNull(env_ptr)];
+				) -> Error::CreateEnvironment;
+				nonNull(env_ptr)
+			];
 			ortsys![unsafe ReleaseThreadingOptions(thread_options)];
 			(env_ptr, true)
 		} else {
@@ -174,13 +186,16 @@ impl EnvironmentBuilder {
 			// FIXME: What should go here?
 			let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
 			let cname = CString::new(self.name.clone()).unwrap_or_else(|_| unreachable!());
-			ortsys![unsafe CreateEnvWithCustomLogger(
+			ortsys![
+				unsafe CreateEnvWithCustomLogger(
 					logging_function,
 					logger_param,
 					ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
 					cname.as_ptr(),
 					&mut env_ptr
-				) -> Error::CreateEnvironment; nonNull(env_ptr)];
+				) -> Error::CreateEnvironment;
+				nonNull(env_ptr)
+			];
 			(env_ptr, false)
 		};
 		debug!(env_ptr = format!("{env_ptr:?}").as_str(), "Environment created");
@@ -205,15 +220,25 @@ impl EnvironmentBuilder {
 
 /// Creates an ONNX Runtime environment.
 ///
+/// ```
+/// # use ort::CUDAExecutionProvider;
+/// # fn main() -> ort::Result<()> {
+/// ort::init()
+/// 	.with_execution_providers([CUDAExecutionProvider::default().build()])
+/// 	.commit()?;
+/// # Ok(())
+/// # }
+/// ```
+///
 /// # Notes
 /// - It is not required to call this function. If this is not called by the time any other `ort` APIs are used, a
 ///   default environment will be created.
-/// - Library crates that use `ort` shouldn't create their own environment. Let downstream applications create it.
+/// - **Library crates that use `ort` shouldn't create their own environment.** Let downstream applications create it.
 /// - In order for environment settings to apply, this must be called **before** you use other APIs like
 ///   [`crate::Session`], and you *must* call `.commit()` on the builder returned by this function.
-#[must_use]
+#[must_use = "commit() must be called in order for the environment to take effect"]
 pub fn init() -> EnvironmentBuilder {
-	EnvironmentBuilder::default()
+	EnvironmentBuilder::new()
 }
 
 /// Creates an ONNX Runtime environment, dynamically loading ONNX Runtime from the library file (`.dll`/`.so`/`.dylib`)
@@ -221,15 +246,26 @@ pub fn init() -> EnvironmentBuilder {
 ///
 /// This must be called before any other `ort` APIs are used in order for the correct dynamic library to be loaded.
 ///
+/// ```no_run
+/// # use ort::CUDAExecutionProvider;
+/// # fn main() -> ort::Result<()> {
+/// let lib_path = std::env::current_exe().unwrap().parent().unwrap().join("lib");
+/// ort::init_from(lib_path.join("onnxruntime.dll"))
+/// 	.with_execution_providers([CUDAExecutionProvider::default().build()])
+/// 	.commit()?;
+/// # Ok(())
+/// # }
+/// ```
+///
 /// # Notes
 /// - In order for environment settings to apply, this must be called **before** you use other APIs like
 ///   [`crate::Session`], and you *must* call `.commit()` on the builder returned by this function.
 #[cfg(feature = "load-dynamic")]
 #[cfg_attr(docsrs, doc(cfg(feature = "load-dynamic")))]
-#[must_use]
+#[must_use = "commit() must be called in order for the environment to take effect"]
 pub fn init_from(path: impl ToString) -> EnvironmentBuilder {
 	let _ = G_ORT_DYLIB_PATH.set(Arc::new(path.to_string()));
-	EnvironmentBuilder::default()
+	EnvironmentBuilder::new()
 }
 
 /// ONNX's logger sends the code location where the log occurred, which will be parsed into this struct.
@@ -325,7 +361,7 @@ mod tests {
 		assert!(!is_env_initialized());
 		assert_eq!(env_ptr(), None);
 
-		EnvironmentBuilder::default().with_name("env_is_initialized").commit()?;
+		EnvironmentBuilder::new().with_name("env_is_initialized").commit()?;
 		assert!(is_env_initialized());
 		assert_ne!(env_ptr(), None);
 		Ok(())

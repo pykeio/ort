@@ -26,7 +26,7 @@ impl ACLExecutionProvider {
 
 impl From<ACLExecutionProvider> for ExecutionProviderDispatch {
 	fn from(value: ACLExecutionProvider) -> Self {
-		ExecutionProviderDispatch::ACL(value)
+		ExecutionProviderDispatch::new(value)
 	}
 }
 

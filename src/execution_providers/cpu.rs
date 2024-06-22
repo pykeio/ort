@@ -21,7 +21,7 @@ impl CPUExecutionProvider {
 
 impl From<CPUExecutionProvider> for ExecutionProviderDispatch {
 	fn from(value: CPUExecutionProvider) -> Self {
-		ExecutionProviderDispatch::CPU(value)
+		ExecutionProviderDispatch::new(value)
 	}
 }
 

@@ -107,7 +107,22 @@ fn main() -> anyhow::Result<()> {
 ## Fallback behavior
 `ort` will silently fail and fall back to executing on the CPU if all execution providers fail to register. In many cases, though, you'll want to show the user an error message when an EP fails to register, or outright abort the process.
 
-To receive these registration errors, instead use `ExecutionProvider::register` to register an execution provider:
+You can configure an EP to return an error on failure by adding `.error_on_failure()` after you `.build()` it. In this example, if CUDA doesn't register successfully, the program will exit with an error at `with_execution_providers`:
+```rust
+use ort::{CoreMLExecutionProvider, Session};
+
+fn main() -> anyhow::Result<()> {
+    let session = Session::builder()?
+        .with_execution_providers([
+            CUDAExecutionProvider::default().build().error_on_failure()
+        ])?
+        .commit_from_file("model.onnx")?;
+
+    Ok(())
+}
+```
+
+If you require more complex error handling, you can also manually register execution providers via the `ExecutionProvider::register` method:
 
 ```rust
 use ort::{CUDAExecutionProvider, ExecutionProvider, Session};

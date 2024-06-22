@@ -1,4 +1,4 @@
-use std::{fmt::Debug, os::raw::c_char};
+use std::{fmt::Debug, os::raw::c_char, sync::Arc};
 
 use crate::{char_p_to_string, ortsys, Error, Result, SessionBuilder};
 
@@ -32,6 +32,8 @@ mod xnnpack;
 pub use self::xnnpack::XNNPACKExecutionProvider;
 mod armnn;
 pub use self::armnn::ArmNNExecutionProvider;
+mod migraphx;
+pub use self::migraphx::MIGraphXExecutionProvider;
 
 /// ONNX Runtime works with different hardware acceleration libraries through its extensible **Execution Providers**
 /// (EP) framework to optimally execute the ONNX models on the hardware platform. This interface enables flexibility for
@@ -60,16 +62,17 @@ pub trait ExecutionProvider {
 		true
 	}
 
-	/// Returns `Ok(true)` if ONNX Runtime was compiled with support for this execution provider, and `Ok(false)`
+	/// Returns `Ok(true)` if ONNX Runtime was *compiled with support* for this execution provider, and `Ok(false)`
 	/// otherwise.
 	///
 	/// An `Err` may be returned if a serious internal error occurs, in which case your application should probably
 	/// just abort.
 	///
-	/// Note that this does not always mean the execution provider is *usable* for a specific model. A model may use
-	/// operators not supported by an execution provider, or the EP may encounter an error while attempting to load a
-	/// dynamic library during registration. In most cases (i.e. showing the user an error message if CUDA could not be
-	/// enabled), you'll instead want to detect and handle errors from [`ExecutionProvider::register`].
+	/// **Note that this does not always mean the execution provider is *usable* for a specific session.** A model may
+	/// use operators not supported by an execution provider, or the EP may encounter an error while attempting to load
+	/// dependencies during session creation. In most cases (i.e. showing the user an error message if CUDA could not be
+	/// enabled), you'll instead want to manually register this EP via [`ExecutionProvider::register`] and detect
+	/// and handle any errors returned by that function.
 	fn is_available(&self) -> Result<bool> {
 		let mut providers: *mut *mut c_char = std::ptr::null_mut();
 		let mut num_providers = 0;
@@ -110,56 +113,50 @@ pub enum ArenaExtendStrategy {
 	SameAsRequested
 }
 
-/// Execution provider container. See [the ONNX Runtime docs](https://onnxruntime.ai/docs/execution-providers/) for more
-/// info on execution providers. Execution providers are actually registered via the functions [`crate::SessionBuilder`]
-/// (per-session) or [`EnvironmentBuilder`](crate::environment::EnvironmentBuilder) (default for all sessions in an
-/// environment).
-#[derive(Debug, Clone)]
+/// Dynamic execution provider container, used to provide a list of multiple types of execution providers when
+/// configuring execution providers for a [`SessionBuilder`](crate::SessionBuilder) or
+/// [`EnvironmentBuilder`](crate::environment::EnvironmentBuilder).
+///
+/// See [`ExecutionProvider`] for more info on execution providers.
+#[derive(Clone)]
 #[allow(missing_docs)]
 #[non_exhaustive]
-pub enum ExecutionProviderDispatch {
-	CPU(CPUExecutionProvider),
-	CUDA(CUDAExecutionProvider),
-	TensorRT(TensorRTExecutionProvider),
-	OpenVINO(OpenVINOExecutionProvider),
-	ACL(ACLExecutionProvider),
-	OneDNN(OneDNNExecutionProvider),
-	CoreML(CoreMLExecutionProvider),
-	DirectML(DirectMLExecutionProvider),
-	ROCm(ROCmExecutionProvider),
-	NNAPI(NNAPIExecutionProvider),
-	QNN(QNNExecutionProvider),
-	TVM(TVMExecutionProvider),
-	CANN(CANNExecutionProvider),
-	XNNPACK(XNNPACKExecutionProvider),
-	ArmNN(ArmNNExecutionProvider)
+pub struct ExecutionProviderDispatch {
+	pub(crate) inner: Arc<dyn ExecutionProvider>,
+	error_on_failure: bool
 }
 
-macro_rules! impl_dispatch {
-	($($variant:ident),*) => {
-		impl ExecutionProvider for ExecutionProviderDispatch {
-			fn as_str(&self) -> &'static str {
-				match self {
-					$(Self::$variant(inner) => inner.as_str(),)*
-				}
-			}
-
-			fn is_available(&self) -> $crate::Result<bool> {
-				match self {
-					$(Self::$variant(inner) => inner.is_available(),)*
-				}
-			}
-
-			fn register(&self, session_builder: &$crate::SessionBuilder) -> $crate::Result<()> {
-				match self {
-					$(Self::$variant(inner) => inner.register(session_builder),)*
-				}
-			}
+impl ExecutionProviderDispatch {
+	pub(crate) fn new<E: ExecutionProvider + 'static>(ep: E) -> Self {
+		ExecutionProviderDispatch {
+			inner: Arc::new(ep) as Arc<dyn ExecutionProvider>,
+			error_on_failure: false
 		}
-	};
+	}
+
+	/// Configures this execution provider to silently log an error if registration of the EP fails.
+	/// This is the default behavior; it can be overridden with [`ExecutionProviderDispatch::error_on_failure`].
+	pub fn fail_silently(mut self) -> Self {
+		self.error_on_failure = false;
+		self
+	}
+
+	/// Configures this execution provider to return an error upon EP registration if registration of this EP fails.
+	/// The default behavior is to silently fail and fall back to the next execution provider, or the CPU provider if no
+	/// registrations succeed.
+	pub fn error_on_failure(mut self) -> Self {
+		self.error_on_failure = true;
+		self
+	}
 }
 
-impl_dispatch!(CPU, CUDA, TensorRT, ACL, OneDNN, OpenVINO, CoreML, CANN, ROCm, DirectML, TVM, NNAPI, QNN, XNNPACK, ArmNN);
+impl Debug for ExecutionProviderDispatch {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct(self.inner.as_str())
+			.field("error_on_failure", &self.error_on_failure)
+			.finish()
+	}
+}
 
 #[allow(unused)]
 macro_rules! map_keys {
@@ -207,26 +204,31 @@ macro_rules! get_ep_register {
 pub(crate) use get_ep_register;
 
 #[tracing::instrument(skip_all)]
-pub(crate) fn apply_execution_providers(session_builder: &SessionBuilder, execution_providers: impl Iterator<Item = ExecutionProviderDispatch>) {
+pub(crate) fn apply_execution_providers(session_builder: &SessionBuilder, execution_providers: impl Iterator<Item = ExecutionProviderDispatch>) -> Result<()> {
 	let execution_providers: Vec<_> = execution_providers.collect();
 	let mut fallback_to_cpu = !execution_providers.is_empty();
 	for ex in execution_providers {
-		if let Err(e) = ex.register(session_builder) {
+		if let Err(e) = ex.inner.register(session_builder) {
+			if ex.error_on_failure {
+				return Err(e);
+			}
+
 			if let &Error::ExecutionProviderNotRegistered(ep_name) = &e {
-				if ex.supported_by_platform() {
+				if ex.inner.supported_by_platform() {
 					tracing::warn!("{e}");
 				} else {
-					tracing::debug!("{e} (additionally, `{ep_name}` is not supported on this platform)");
+					tracing::debug!("{e} (note: additionally, `{ep_name}` is not supported on this platform)");
 				}
 			} else {
-				tracing::warn!("An error occurred when attempting to register `{}`: {e}", ex.as_str());
+				tracing::error!("An error occurred when attempting to register `{}`: {e}", ex.inner.as_str());
 			}
 		} else {
-			tracing::info!("Successfully registered `{}`", ex.as_str());
+			tracing::info!("Successfully registered `{}`", ex.inner.as_str());
 			fallback_to_cpu = false;
 		}
 	}
 	if fallback_to_cpu {
 		tracing::warn!("No execution providers registered successfully. Falling back to CPU.");
 	}
+	Ok(())
 }

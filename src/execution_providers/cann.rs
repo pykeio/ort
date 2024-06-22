@@ -109,7 +109,7 @@ impl CANNExecutionProvider {
 
 impl From<CANNExecutionProvider> for ExecutionProviderDispatch {
 	fn from(value: CANNExecutionProvider) -> Self {
-		ExecutionProviderDispatch::CANN(value)
+		ExecutionProviderDispatch::new(value)
 	}
 }
 

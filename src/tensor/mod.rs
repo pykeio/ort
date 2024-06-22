@@ -22,4 +22,4 @@ mod types;
 pub use self::ndarray::ArrayExtensions;
 #[cfg(feature = "ndarray")]
 pub(crate) use self::types::{extract_primitive_array, extract_primitive_array_mut};
-pub use self::types::{IntoTensorElementType, TensorElementType, Utf8Data};
+pub use self::types::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType, Utf8Data};

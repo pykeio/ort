@@ -5,7 +5,7 @@ use std::{
 };
 
 use kdam::BarExt;
-use ndarray::{concatenate, s, Array1, Array2, ArrayViewD, Axis, Ix0};
+use ndarray::{concatenate, s, Array1, Array2, ArrayViewD, Axis};
 use ort::{Allocator, CUDAExecutionProvider, Checkpoint, Session, SessionBuilder, Trainer};
 use rand::RngCore;
 use tokenizers::Tokenizer;
@@ -82,11 +82,7 @@ fn main() -> ort::Result<()> {
 		let labels = Array1::<i64>::from_shape_vec([BATCH_SIZE * SEQUENCE_LENGTH], label_buffer.iter().map(|c| *c as i64).collect()).unwrap();
 
 		let outputs = trainer.step(ort::inputs![inputs.view()]?, ort::inputs![labels.view()]?)?;
-		let loss = outputs[0]
-			.try_extract_tensor::<f32>()?
-			.into_dimensionality::<Ix0>()
-			.unwrap()
-			.into_scalar();
+		let loss = outputs[0].try_extract_scalar::<f32>()?;
 		pb.set_postfix(format!("loss={loss:.3}"));
 		pb.update(1).unwrap();
 		if loss.is_nan() {

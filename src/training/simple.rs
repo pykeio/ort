@@ -1,7 +1,5 @@
 use std::{collections::VecDeque, fs, path::PathBuf};
 
-use ndarray::Ix0;
-
 use crate::{Result, SessionInputs};
 
 #[allow(clippy::len_without_is_empty)]
@@ -182,11 +180,7 @@ impl super::Trainer {
 			let (inputs, labels) = (inputs.into(), labels.into());
 
 			let outputs = self.step(inputs, labels)?;
-			let loss = outputs[0]
-				.try_extract_tensor::<f32>()?
-				.into_dimensionality::<Ix0>()
-				.expect("first output should be the 0-dimensional loss tensor")
-				.into_scalar();
+			let loss = outputs[0].try_extract_scalar::<f32>()?;
 			println!("epoch={epoch} step={global_step} loss={loss}");
 
 			if iter_step % args.gradient_accumulation_steps == 0 {
@@ -237,11 +231,7 @@ impl super::Trainer {
 			let (inputs, labels) = (inputs.into(), labels.into());
 
 			let outputs = self.eval_step(inputs, labels)?;
-			let loss = outputs[0]
-				.try_extract_tensor::<f32>()?
-				.into_dimensionality::<Ix0>()
-				.expect("first output should be the 0-dimensional loss tensor")
-				.into_scalar();
+			let loss = outputs[0].try_extract_scalar::<f32>()?;
 			total_loss = (total_loss * (step as f32) + loss) / (step as f32 + 1.);
 		}
 

@@ -27,7 +27,7 @@ pub use self::{
 	builder::{GraphOptimizationLevel, SessionBuilder},
 	input::{SessionInputValue, SessionInputs},
 	output::SessionOutputs,
-	run_options::RunOptions
+	run_options::{OutputSelector, RunOptions}
 };
 
 /// Holds onto an [`ort_sys::OrtSession`] pointer and its associated allocator.
@@ -161,7 +161,7 @@ impl Session {
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn run<'s, 'i, 'v: 'i, const N: usize>(&'s self, input_values: impl Into<SessionInputs<'i, 'v, N>>) -> Result<SessionOutputs<'s>> {
+	pub fn run<'s, 'i, 'v: 'i, const N: usize>(&'s self, input_values: impl Into<SessionInputs<'i, 'v, N>>) -> Result<SessionOutputs<'_, 's>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
 				self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values.iter(), None)
@@ -201,11 +201,11 @@ impl Session {
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn run_with_options<'s, 'i, 'v: 'i, const N: usize>(
+	pub fn run_with_options<'r, 's: 'r, 'i, 'v: 'i, const N: usize>(
 		&'s self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>>,
-		run_options: &RunOptions
-	) -> Result<SessionOutputs<'s>> {
+		run_options: &'r RunOptions
+	) -> Result<SessionOutputs<'r, 's>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
 				self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values.iter(), Some(run_options))
@@ -219,25 +219,34 @@ impl Session {
 		}
 	}
 
-	fn run_inner<'i, 'v: 'i>(
-		&self,
+	fn run_inner<'i, 'r, 's: 'r, 'v: 'i>(
+		&'s self,
 		input_names: &[&str],
 		input_values: impl Iterator<Item = &'i SessionInputValue<'v>>,
-		run_options: Option<&RunOptions>
-	) -> Result<SessionOutputs<'_>> {
+		run_options: Option<&'r RunOptions>
+	) -> Result<SessionOutputs<'r, 's>> {
 		let input_names_ptr: Vec<*const c_char> = input_names
 			.iter()
 			.map(|n| CString::new(n.as_bytes()).unwrap_or_else(|_| unreachable!()))
 			.map(|n| n.into_raw().cast_const())
 			.collect();
-		let output_names_ptr: Vec<*const c_char> = self
-			.outputs
+
+		let (output_names, output_tensors) = match run_options {
+			Some(r) => r.outputs.resolve_outputs(&self.outputs),
+			None => (self.outputs.iter().map(|o| o.name.as_str()).collect(), std::iter::repeat_with(|| None).take(self.outputs.len()).collect())
+		};
+		let output_names_ptr: Vec<*const c_char> = output_names
 			.iter()
-			.map(|output| CString::new(output.name.as_str()).unwrap_or_else(|_| unreachable!()))
+			.map(|n| CString::new(*n).unwrap_or_else(|_| unreachable!()))
 			.map(|n| n.into_raw().cast_const())
 			.collect();
-
-		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![std::ptr::null_mut(); self.outputs.len()];
+		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = output_tensors
+			.iter()
+			.map(|c| match c {
+				Some(v) => v.ptr(),
+				None => std::ptr::null_mut()
+			})
+			.collect();
 
 		// The C API expects pointers for the arrays (pointers to C-arrays)
 		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.map(|input_array_ort| input_array_ort.ptr().cast_const()).collect();
@@ -261,10 +270,17 @@ impl Session {
 			) -> Error::SessionRun
 		];
 
-		let outputs: Vec<Value> = output_tensor_ptrs
+		let outputs: Vec<Value> = output_tensors
 			.into_iter()
-			.map(|tensor_ptr| unsafe {
-				Value::from_ptr(NonNull::new(tensor_ptr).expect("OrtValue ptr returned from session Run should not be null"), Some(Arc::clone(&self.inner)))
+			.enumerate()
+			.map(|(i, v)| match v {
+				Some(value) => value,
+				None => unsafe {
+					Value::from_ptr(
+						NonNull::new(output_tensor_ptrs[i]).expect("OrtValue ptr returned from session Run should not be null"),
+						Some(Arc::clone(&self.inner))
+					)
+				}
 			})
 			.collect();
 
@@ -280,7 +296,7 @@ impl Session {
 				.collect::<Result<Vec<_>>>()?
 		);
 
-		Ok(SessionOutputs::new(self.outputs.iter().map(|o| o.name.as_str()), outputs))
+		Ok(SessionOutputs::new(output_names.into_iter(), outputs))
 	}
 
 	/// Asynchronously run input data through the ONNX graph, performing inference.

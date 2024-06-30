@@ -172,16 +172,16 @@ impl<'s> IoBinding<'s> {
 	}
 
 	/// Performs inference on the session using the bound inputs specified by [`IoBinding::bind_input`].
-	pub fn run(&mut self) -> Result<SessionOutputs<'_>> {
+	pub fn run(&mut self) -> Result<SessionOutputs<'_, '_>> {
 		self.run_inner(None)
 	}
 
 	/// Performs inference on the session using the bound inputs specified by [`IoBinding::bind_input`].
-	pub fn run_with_options(&mut self, run_options: Arc<RunOptions>) -> Result<SessionOutputs<'_>> {
+	pub fn run_with_options(&mut self, run_options: &RunOptions) -> Result<SessionOutputs<'_, 's>> {
 		self.run_inner(Some(run_options))
 	}
 
-	fn run_inner(&mut self, run_options: Option<Arc<RunOptions>>) -> Result<SessionOutputs<'_>> {
+	fn run_inner(&mut self, run_options: Option<&RunOptions>) -> Result<SessionOutputs<'_, 's>> {
 		let run_options_ptr = if let Some(run_options) = run_options {
 			run_options.run_options_ptr.as_ptr()
 		} else {

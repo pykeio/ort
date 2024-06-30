@@ -3,6 +3,7 @@ use std::{
 	ffi::{c_char, CString},
 	future::Future,
 	mem::MaybeUninit,
+	ops::Deref,
 	pin::Pin,
 	ptr::NonNull,
 	sync::{
@@ -26,13 +27,13 @@ const VALUE_PRESENT: usize = 1 << 0;
 const CHANNEL_CLOSED: usize = 1 << 1;
 
 #[derive(Debug)]
-pub(crate) struct InferenceFutInner<'s> {
+pub(crate) struct InferenceFutInner<'r, 's> {
 	presence: AtomicUsize,
-	value: UnsafeCell<MaybeUninit<Result<SessionOutputs<'s>>>>,
+	value: UnsafeCell<MaybeUninit<Result<SessionOutputs<'r, 's>>>>,
 	waker: Mutex<Option<Waker>>
 }
 
-impl<'s> InferenceFutInner<'s> {
+impl<'r, 's> InferenceFutInner<'r, 's> {
 	pub(crate) fn new() -> Self {
 		InferenceFutInner {
 			presence: AtomicUsize::new(0),
@@ -41,7 +42,7 @@ impl<'s> InferenceFutInner<'s> {
 		}
 	}
 
-	pub(crate) fn try_take(&self) -> InnerValue<Result<SessionOutputs<'s>>> {
+	pub(crate) fn try_take(&self) -> InnerValue<Result<SessionOutputs<'r, 's>>> {
 		let state_snapshot = self.presence.fetch_and(!VALUE_PRESENT, Ordering::Acquire);
 		if state_snapshot & VALUE_PRESENT == 0 {
 			if self.presence.load(Ordering::Acquire) & CHANNEL_CLOSED != 0 {
@@ -54,7 +55,7 @@ impl<'s> InferenceFutInner<'s> {
 		}
 	}
 
-	pub(crate) fn emplace_value(&self, value: Result<SessionOutputs<'s>>) {
+	pub(crate) fn emplace_value(&self, value: Result<SessionOutputs<'r, 's>>) {
 		unsafe { (*self.value.get()).write(value) };
 		self.presence.fetch_or(VALUE_PRESENT, Ordering::Release);
 	}
@@ -74,7 +75,7 @@ impl<'s> InferenceFutInner<'s> {
 	}
 }
 
-impl<'s> Drop for InferenceFutInner<'s> {
+impl<'r, 's> Drop for InferenceFutInner<'r, 's> {
 	fn drop(&mut self) {
 		if self.presence.load(Ordering::Acquire) & VALUE_PRESENT != 0 {
 			unsafe { (*self.value.get()).assume_init_drop() };
@@ -82,17 +83,45 @@ impl<'s> Drop for InferenceFutInner<'s> {
 	}
 }
 
-unsafe impl<'s> Send for InferenceFutInner<'s> {}
-unsafe impl<'s> Sync for InferenceFutInner<'s> {}
+unsafe impl<'r, 's> Send for InferenceFutInner<'r, 's> {}
+unsafe impl<'r, 's> Sync for InferenceFutInner<'r, 's> {}
 
-pub struct InferenceFut<'s> {
-	inner: Arc<InferenceFutInner<'s>>,
-	run_options: Arc<RunOptions>,
+pub enum RunOptionsRef<'r> {
+	Arc(Arc<RunOptions>),
+	Ref(&'r RunOptions)
+}
+
+impl<'r> From<&Arc<RunOptions>> for RunOptionsRef<'r> {
+	fn from(value: &Arc<RunOptions>) -> Self {
+		Self::Arc(Arc::clone(value))
+	}
+}
+
+impl<'r> From<&'r RunOptions> for RunOptionsRef<'r> {
+	fn from(value: &'r RunOptions) -> Self {
+		Self::Ref(value)
+	}
+}
+
+impl<'r> Deref for RunOptionsRef<'r> {
+	type Target = RunOptions;
+
+	fn deref(&self) -> &Self::Target {
+		match self {
+			Self::Arc(r) => r,
+			Self::Ref(r) => r
+		}
+	}
+}
+
+pub struct InferenceFut<'s, 'r> {
+	inner: Arc<InferenceFutInner<'r, 's>>,
+	run_options: RunOptionsRef<'r>,
 	did_receive: bool
 }
 
-impl<'s> InferenceFut<'s> {
-	pub(crate) fn new(inner: Arc<InferenceFutInner<'s>>, run_options: Arc<RunOptions>) -> Self {
+impl<'s, 'r> InferenceFut<'s, 'r> {
+	pub(crate) fn new(inner: Arc<InferenceFutInner<'r, 's>>, run_options: RunOptionsRef<'r>) -> Self {
 		Self {
 			inner,
 			run_options,
@@ -101,8 +130,8 @@ impl<'s> InferenceFut<'s> {
 	}
 }
 
-impl<'s> Future for InferenceFut<'s> {
-	type Output = Result<SessionOutputs<'s>>;
+impl<'s, 'r> Future for InferenceFut<'s, 'r> {
+	type Output = Result<SessionOutputs<'r, 's>>;
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		let this = Pin::into_inner(self);
@@ -122,7 +151,7 @@ impl<'s> Future for InferenceFut<'s> {
 	}
 }
 
-impl<'s> Drop for InferenceFut<'s> {
+impl<'s, 'r> Drop for InferenceFut<'s, 'r> {
 	fn drop(&mut self) {
 		if !self.did_receive && self.inner.close() {
 			let _ = self.run_options.terminate();
@@ -131,8 +160,8 @@ impl<'s> Drop for InferenceFut<'s> {
 	}
 }
 
-pub(crate) struct AsyncInferenceContext<'s> {
-	pub(crate) inner: Arc<InferenceFutInner<'s>>,
+pub(crate) struct AsyncInferenceContext<'r, 's> {
+	pub(crate) inner: Arc<InferenceFutInner<'r, 's>>,
 	pub(crate) _input_values: Vec<SessionInputValue<'s>>,
 	pub(crate) input_ort_values: Vec<*const ort_sys::OrtValue>,
 	pub(crate) input_name_ptrs: Vec<*const c_char>,
@@ -144,7 +173,7 @@ pub(crate) struct AsyncInferenceContext<'s> {
 
 crate::extern_system_fn! {
 	pub(crate) fn async_callback(user_data: *mut c_void, _: *mut *mut ort_sys::OrtValue, _: ort_sys::size_t, status: *mut OrtStatus) {
-		let ctx = unsafe { Box::from_raw(user_data.cast::<AsyncInferenceContext<'_>>()) };
+		let ctx = unsafe { Box::from_raw(user_data.cast::<AsyncInferenceContext<'_, '_>>()) };
 
 		// Reconvert name ptrs to CString so drop impl is called and memory is freed
 		drop(

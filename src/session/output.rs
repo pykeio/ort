@@ -25,16 +25,16 @@ use crate::{Allocator, DynValue};
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct SessionOutputs<'s> {
-	map: BTreeMap<&'s str, DynValue>,
-	idxs: Vec<&'s str>,
+pub struct SessionOutputs<'r, 's> {
+	map: BTreeMap<&'r str, DynValue>,
+	idxs: Vec<&'r str>,
 	backing_ptr: Option<(&'s Allocator, *mut c_void)>
 }
 
-unsafe impl<'s> Send for SessionOutputs<'s> {}
+unsafe impl<'r, 's> Send for SessionOutputs<'r, 's> {}
 
-impl<'s> SessionOutputs<'s> {
-	pub(crate) fn new(output_names: impl Iterator<Item = &'s str> + Clone, output_values: impl IntoIterator<Item = DynValue>) -> Self {
+impl<'r, 's> SessionOutputs<'r, 's> {
+	pub(crate) fn new(output_names: impl Iterator<Item = &'r str> + Clone, output_values: impl IntoIterator<Item = DynValue>) -> Self {
 		let map = output_names.clone().zip(output_values).collect();
 		Self {
 			map,
@@ -44,7 +44,7 @@ impl<'s> SessionOutputs<'s> {
 	}
 
 	pub(crate) fn new_backed(
-		output_names: impl Iterator<Item = &'s str> + Clone,
+		output_names: impl Iterator<Item = &'r str> + Clone,
 		output_values: impl IntoIterator<Item = DynValue>,
 		allocator: &'s Allocator,
 		backing_ptr: *mut c_void
@@ -66,7 +66,7 @@ impl<'s> SessionOutputs<'s> {
 	}
 }
 
-impl<'s> Drop for SessionOutputs<'s> {
+impl<'r, 's> Drop for SessionOutputs<'r, 's> {
 	fn drop(&mut self) {
 		if let Some((allocator, ptr)) = self.backing_ptr {
 			unsafe { allocator.free(ptr) };
@@ -74,35 +74,35 @@ impl<'s> Drop for SessionOutputs<'s> {
 	}
 }
 
-impl<'s> Deref for SessionOutputs<'s> {
-	type Target = BTreeMap<&'s str, DynValue>;
+impl<'r, 's> Deref for SessionOutputs<'r, 's> {
+	type Target = BTreeMap<&'r str, DynValue>;
 
 	fn deref(&self) -> &Self::Target {
 		&self.map
 	}
 }
 
-impl<'s> DerefMut for SessionOutputs<'s> {
+impl<'r, 's> DerefMut for SessionOutputs<'r, 's> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		&mut self.map
 	}
 }
 
-impl<'s> Index<&str> for SessionOutputs<'s> {
+impl<'r, 's> Index<&str> for SessionOutputs<'r, 's> {
 	type Output = DynValue;
 	fn index(&self, index: &str) -> &Self::Output {
 		self.map.get(index).expect("no entry found for key")
 	}
 }
 
-impl<'s> Index<String> for SessionOutputs<'s> {
+impl<'r, 's> Index<String> for SessionOutputs<'r, 's> {
 	type Output = DynValue;
 	fn index(&self, index: String) -> &Self::Output {
 		self.map.get(index.as_str()).expect("no entry found for key")
 	}
 }
 
-impl<'s> Index<usize> for SessionOutputs<'s> {
+impl<'r, 's> Index<usize> for SessionOutputs<'r, 's> {
 	type Output = DynValue;
 	fn index(&self, index: usize) -> &Self::Output {
 		self.map.get(&self.idxs[index]).expect("no entry found for key")

@@ -62,8 +62,8 @@ pub use self::operator::{
 	InferShapeFn, Operator, OperatorDomain
 };
 pub use self::session::{
-	GraphOptimizationLevel, InMemorySession, Input, Output, RunOptions, Session, SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs,
-	SharedSessionInner
+	GraphOptimizationLevel, InMemorySession, Input, Output, OutputSelector, RunOptions, Session, SessionBuilder, SessionInputValue, SessionInputs,
+	SessionOutputs, SharedSessionInner
 };
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]

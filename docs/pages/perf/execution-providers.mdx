@@ -195,6 +195,11 @@ If it seems like the execution provider is not registering properly, or you are 
 
 ## Notes
 
+### CUDA
+`ort` provides binaries for both CUDA 11 and CUDA 12; `ort` will automatically choose which binary to install based on whether CUDA 12 is installed.
+
+CUDA 11 requires cuDNN 8.x. CUDA 12 requires cuDNN 9.x. Make sure the correct version of cuDNN is installed and available on the `PATH`.
+
 ### CoreML
 Statically linking to CoreML (the default behavior when using downloaded binaries + the `coreml` Cargo feature) requires an additional Rust flag in order to link properly. You'll need to provide the flag `-C link-arg=-fapple-link-rtlib` to `rustc`. You can do this via an entry in [`.cargo/config.toml`](https://doc.rust-lang.org/cargo/reference/config.html#hierarchical-structure), in a build script, or in an environment variable.
 

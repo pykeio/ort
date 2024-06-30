@@ -133,7 +133,7 @@ impl Drop for Allocator {
 /// Represents possible devices that have their own device allocator.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AllocationDevice {
-	// https://github.com/microsoft/onnxruntime/blob/v1.18.0/include/onnxruntime/core/framework/allocator.h#L43-L53
+	// https://github.com/microsoft/onnxruntime/blob/v1.18.1/include/onnxruntime/core/framework/allocator.h#L43-L53
 	// ort will likely never support WebGPU, so I think it's best to leave `WebGPU_Buffer` out entirely to reduce confusion
 	CPU,
 	CUDA,

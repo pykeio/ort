@@ -3,6 +3,7 @@ use std::{
 	ffi::{c_char, CString},
 	future::Future,
 	mem::MaybeUninit,
+	ops::Deref,
 	pin::Pin,
 	ptr::NonNull,
 	sync::{
@@ -85,14 +86,42 @@ impl<'s> Drop for InferenceFutInner<'s> {
 unsafe impl<'s> Send for InferenceFutInner<'s> {}
 unsafe impl<'s> Sync for InferenceFutInner<'s> {}
 
-pub struct InferenceFut<'s> {
+pub enum RunOptionsRef<'r> {
+	Arc(Arc<RunOptions>),
+	Ref(&'r RunOptions)
+}
+
+impl<'r> From<&Arc<RunOptions>> for RunOptionsRef<'r> {
+	fn from(value: &Arc<RunOptions>) -> Self {
+		Self::Arc(Arc::clone(value))
+	}
+}
+
+impl<'r> From<&'r RunOptions> for RunOptionsRef<'r> {
+	fn from(value: &'r RunOptions) -> Self {
+		Self::Ref(value)
+	}
+}
+
+impl<'r> Deref for RunOptionsRef<'r> {
+	type Target = RunOptions;
+
+	fn deref(&self) -> &Self::Target {
+		match self {
+			Self::Arc(r) => r,
+			Self::Ref(r) => r
+		}
+	}
+}
+
+pub struct InferenceFut<'s, 'r> {
 	inner: Arc<InferenceFutInner<'s>>,
-	run_options: Arc<RunOptions>,
+	run_options: RunOptionsRef<'r>,
 	did_receive: bool
 }
 
-impl<'s> InferenceFut<'s> {
-	pub(crate) fn new(inner: Arc<InferenceFutInner<'s>>, run_options: Arc<RunOptions>) -> Self {
+impl<'s, 'r> InferenceFut<'s, 'r> {
+	pub(crate) fn new(inner: Arc<InferenceFutInner<'s>>, run_options: RunOptionsRef<'r>) -> Self {
 		Self {
 			inner,
 			run_options,
@@ -101,7 +130,7 @@ impl<'s> InferenceFut<'s> {
 	}
 }
 
-impl<'s> Future for InferenceFut<'s> {
+impl<'s, 'r> Future for InferenceFut<'s, 'r> {
 	type Output = Result<SessionOutputs<'s>>;
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -122,7 +151,7 @@ impl<'s> Future for InferenceFut<'s> {
 	}
 }
 
-impl<'s> Drop for InferenceFut<'s> {
+impl<'s, 'r> Drop for InferenceFut<'s, 'r> {
 	fn drop(&mut self) {
 		if !self.did_receive && self.inner.close() {
 			let _ = self.run_options.terminate();

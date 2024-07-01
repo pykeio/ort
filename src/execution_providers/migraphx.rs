@@ -1,7 +1,10 @@
 use std::ffi::CString;
 
-use super::ExecutionProvider;
-use crate::{Error, ExecutionProviderDispatch, Result, SessionBuilder};
+use crate::{
+	error::{Error, Result},
+	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
+	session::SessionBuilder
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct MIGraphXExecutionProvider {

@@ -4,7 +4,7 @@ use std::{convert::Infallible, ffi::CString, io, path::PathBuf, ptr, string};
 
 use thiserror::Error;
 
-use super::{char_p_to_string, ortsys, tensor::TensorElementType, ValueType};
+use crate::{char_p_to_string, ortsys, tensor::TensorElementType, value::ValueType};
 
 /// Type alias for the Result type returned by ORT functions.
 pub type Result<T, E = Error> = std::result::Result<T, E>;

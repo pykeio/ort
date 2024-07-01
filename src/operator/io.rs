@@ -1,4 +1,4 @@
-use crate::{MemoryType, TensorElementType};
+use crate::{memory::MemoryType, tensor::TensorElementType};
 
 #[repr(i32)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]

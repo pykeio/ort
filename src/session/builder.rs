@@ -23,8 +23,9 @@ use crate::{
 	environment::get_environment,
 	error::{assert_non_null_pointer, status_to_result, Error, Result},
 	execution_providers::{apply_execution_providers, ExecutionProviderDispatch},
-	memory::Allocator,
-	ortsys, MemoryInfo, OperatorDomain
+	memory::{Allocator, MemoryInfo},
+	operator::OperatorDomain,
+	ortsys
 };
 
 /// Creates a session using the builder pattern.

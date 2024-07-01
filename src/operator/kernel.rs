@@ -3,7 +3,12 @@ use std::{
 	ptr::{self, NonNull}
 };
 
-use crate::{error::status_to_result, ortsys, value::ValueRefMut, Allocator, DowncastableTarget, DynValue, Error, Result, Value, ValueRef};
+use crate::{
+	error::{status_to_result, Error, Result},
+	memory::Allocator,
+	ortsys,
+	value::{DowncastableTarget, DynValue, Value, ValueRef, ValueRefMut}
+};
 
 pub trait Kernel {
 	fn compute(&mut self, ctx: &KernelContext) -> crate::Result<()>;

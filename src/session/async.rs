@@ -11,7 +11,11 @@ use std::{
 
 use ort_sys::{c_void, OrtStatus};
 
-use crate::{error::assert_non_null_pointer, Error, Result, RunOptions, SelectedOutputMarker, SessionInputValue, SessionOutputs, SharedSessionInner, Value};
+use crate::{
+	error::{assert_non_null_pointer, Error, Result},
+	session::{RunOptions, SelectedOutputMarker, SessionInputValue, SessionOutputs, SharedSessionInner},
+	value::Value
+};
 
 #[derive(Debug)]
 pub(crate) struct InferenceFutInner<'r, 's> {

@@ -1,5 +1,8 @@
-use super::ExecutionProvider;
-use crate::{ArenaExtendStrategy, Error, ExecutionProviderDispatch, Result, SessionBuilder};
+use crate::{
+	error::{Error, Result},
+	execution_providers::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderDispatch},
+	session::SessionBuilder
+};
 
 /// The type of search done for cuDNN convolution algorithms.
 #[derive(Debug, Clone)]

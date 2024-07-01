@@ -1,9 +1,6 @@
 use std::{borrow::Cow, collections::HashMap, ops::Deref};
 
-use crate::{
-	value::{DynValueTypeMarker, ValueTypeMarker},
-	Value, ValueRef, ValueRefMut
-};
+use crate::value::{DynValueTypeMarker, Value, ValueRef, ValueRefMut, ValueTypeMarker};
 
 pub enum SessionInputValue<'v> {
 	ViewMut(ValueRefMut<'v, DynValueTypeMarker>),
@@ -140,7 +137,8 @@ macro_rules! inputs {
 mod tests {
 	use std::{collections::HashMap, sync::Arc};
 
-	use crate::{DynTensor, SessionInputs};
+	use super::SessionInputs;
+	use crate::value::DynTensor;
 
 	#[test]
 	fn test_hashmap_static_keys() -> crate::Result<()> {

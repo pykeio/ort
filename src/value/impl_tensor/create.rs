@@ -10,14 +10,13 @@ use std::{
 #[cfg(feature = "ndarray")]
 use ndarray::{ArcArray, Array, ArrayView, CowArray, Dimension};
 
-use super::{DynTensor, Tensor};
+use super::{calculate_tensor_size, DynTensor, Tensor, TensorRefMut};
 use crate::{
-	error::assert_non_null_pointer,
-	memory::{Allocator, MemoryInfo},
+	error::{assert_non_null_pointer, Error, Result},
+	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
 	ortsys,
-	tensor::{TensorElementType, Utf8Data},
-	value::{impl_tensor::calculate_tensor_size, ValueInner},
-	AllocationDevice, AllocatorType, DynValue, Error, MemoryType, PrimitiveTensorElementType, Result, TensorRefMut, Value
+	tensor::{PrimitiveTensorElementType, TensorElementType, Utf8Data},
+	value::{DynValue, Value, ValueInner}
 };
 
 impl Tensor<String> {

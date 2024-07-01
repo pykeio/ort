@@ -1,6 +1,11 @@
 use std::{collections::HashMap, ffi::CString, marker::PhantomData, ptr::NonNull, sync::Arc};
 
-use crate::{ortsys, DynValue, Error, Output, Result, Value, ValueTypeMarker};
+use crate::{
+	error::{Error, Result},
+	ortsys,
+	session::Output,
+	value::{DynValue, Value, ValueTypeMarker}
+};
 
 /// Allows selecting/deselecting/preallocating the outputs of a [`crate::Session`] inference call.
 ///

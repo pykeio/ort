@@ -7,12 +7,15 @@ use std::{
 	sync::Arc
 };
 
-use super::{ValueInner, ValueTypeMarker};
+use super::{
+	impl_tensor::{calculate_tensor_size, DynTensor, Tensor},
+	DynValue, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker
+};
 use crate::{
+	error::{Error, Result},
 	memory::Allocator,
 	ortsys,
-	value::impl_tensor::{calculate_tensor_size, DynTensor},
-	DynValue, Error, IntoTensorElementType, PrimitiveTensorElementType, Result, Tensor, TensorElementType, Value, ValueRef, ValueRefMut, ValueType
+	tensor::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType}
 };
 
 pub trait MapValueTypeMarker: ValueTypeMarker {

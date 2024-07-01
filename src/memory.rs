@@ -4,11 +4,12 @@ use std::{
 	sync::Arc
 };
 
-use super::{
-	error::{Error, Result},
-	ortsys
+use crate::{
+	char_p_to_string,
+	error::{status_to_result, Error, Result},
+	ortsys,
+	session::{Session, SharedSessionInner}
 };
-use crate::{char_p_to_string, error::status_to_result, Session, SharedSessionInner};
 
 /// A device allocator used to manage the allocation of [`crate::Value`]s.
 ///

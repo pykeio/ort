@@ -15,7 +15,8 @@ use tracing::{debug, Level};
 use crate::G_ORT_DYLIB_PATH;
 use crate::{
 	error::{Error, Result},
-	extern_system_fn, ortsys, ExecutionProviderDispatch
+	execution_providers::ExecutionProviderDispatch,
+	extern_system_fn, ortsys
 };
 
 struct EnvironmentSingleton {

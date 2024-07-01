@@ -1,7 +1,11 @@
 use std::{ffi::CString, os::raw::c_char, ptr::NonNull};
 
-use super::{char_p_to_string, error::Result, ortsys, Error};
-use crate::Allocator;
+use crate::{
+	char_p_to_string,
+	error::{Error, Result},
+	memory::Allocator,
+	ortsys
+};
 
 /// Container for model metadata, including name & producer information.
 pub struct ModelMetadata<'s> {

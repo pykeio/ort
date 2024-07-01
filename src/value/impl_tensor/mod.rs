@@ -8,8 +8,13 @@ use std::{
 	ptr::NonNull
 };
 
-use super::{DowncastableTarget, Value, ValueInner, ValueTypeMarker};
-use crate::{ortsys, DynValue, Error, IntoTensorElementType, MemoryInfo, Result, ValueRef, ValueRefMut, ValueType};
+use super::{DowncastableTarget, DynValue, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker};
+use crate::{
+	error::{Error, Result},
+	memory::MemoryInfo,
+	ortsys,
+	tensor::IntoTensorElementType
+};
 
 pub trait TensorValueTypeMarker: ValueTypeMarker {
 	crate::private_trait!();

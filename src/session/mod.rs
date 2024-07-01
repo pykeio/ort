@@ -2,7 +2,7 @@
 
 use std::{any::Any, ffi::CString, marker::PhantomData, ops::Deref, os::raw::c_char, ptr::NonNull, sync::Arc};
 
-use super::{
+use crate::{
 	char_p_to_string,
 	environment::Environment,
 	error::{assert_non_null_pointer, assert_null_pointer, status_to_result, Error, ErrorInternal, Result},

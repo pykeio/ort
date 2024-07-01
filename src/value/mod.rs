@@ -18,7 +18,13 @@ pub use self::{
 	},
 	impl_tensor::{DynTensor, DynTensorRef, DynTensorRefMut, DynTensorValueType, Tensor, TensorRef, TensorRefMut, TensorValueType, TensorValueTypeMarker}
 };
-use crate::{error::status_to_result, memory::MemoryInfo, ortsys, session::SharedSessionInner, tensor::TensorElementType, Error, Result};
+use crate::{
+	error::{status_to_result, Error, Result},
+	memory::MemoryInfo,
+	ortsys,
+	session::SharedSessionInner,
+	tensor::TensorElementType
+};
 
 /// The type of a [`Value`], or a session input/output.
 ///

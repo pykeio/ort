@@ -2,9 +2,7 @@
 
 use std::{any::Any, ffi::CString, marker::PhantomData, ops::Deref, os::raw::c_char, ptr::NonNull, sync::Arc};
 
-use r#async::RunOptionsRef;
-
-use super::{
+use crate::{
 	char_p_to_string,
 	environment::Environment,
 	error::{assert_non_null_pointer, assert_null_pointer, status_to_result, Error, ErrorInternal, Result},
@@ -21,13 +19,13 @@ pub(crate) mod builder;
 pub(crate) mod input;
 pub(crate) mod output;
 mod run_options;
-use self::r#async::{AsyncInferenceContext, InferenceFutInner};
+use self::r#async::{AsyncInferenceContext, InferenceFutInner, RunOptionsRef};
 pub use self::{
 	r#async::InferenceFut,
 	builder::{GraphOptimizationLevel, SessionBuilder},
 	input::{SessionInputValue, SessionInputs},
 	output::SessionOutputs,
-	run_options::{OutputSelector, RunOptions}
+	run_options::{HasSelectedOutputs, NoSelectedOutputs, OutputSelector, RunOptions, SelectedOutputMarker}
 };
 
 /// Holds onto an [`ort_sys::OrtSession`] pointer and its associated allocator.
@@ -164,14 +162,16 @@ impl Session {
 	pub fn run<'s, 'i, 'v: 'i, const N: usize>(&'s self, input_values: impl Into<SessionInputs<'i, 'v, N>>) -> Result<SessionOutputs<'_, 's>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
-				self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values.iter(), None)
+				self.run_inner::<NoSelectedOutputs>(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values.iter(), None)
 			}
 			SessionInputs::ValueArray(input_values) => {
-				self.run_inner(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values.iter(), None)
+				self.run_inner::<NoSelectedOutputs>(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values.iter(), None)
 			}
-			SessionInputs::ValueMap(input_values) => {
-				self.run_inner(&input_values.iter().map(|(k, _)| k.as_ref()).collect::<Vec<_>>(), input_values.iter().map(|(_, v)| v), None)
-			}
+			SessionInputs::ValueMap(input_values) => self.run_inner::<NoSelectedOutputs>(
+				&input_values.iter().map(|(k, _)| k.as_ref()).collect::<Vec<_>>(),
+				input_values.iter().map(|(_, v)| v),
+				None
+			)
 		}
 	}
 
@@ -201,10 +201,10 @@ impl Session {
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn run_with_options<'r, 's: 'r, 'i, 'v: 'i, const N: usize>(
+	pub fn run_with_options<'r, 's: 'r, 'i, 'v: 'i, O: SelectedOutputMarker, const N: usize>(
 		&'s self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>>,
-		run_options: &'r RunOptions
+		run_options: &'r RunOptions<O>
 	) -> Result<SessionOutputs<'r, 's>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
@@ -219,11 +219,11 @@ impl Session {
 		}
 	}
 
-	fn run_inner<'i, 'r, 's: 'r, 'v: 'i>(
+	fn run_inner<'i, 'r, 's: 'r, 'v: 'i, O: SelectedOutputMarker>(
 		&'s self,
 		input_names: &[&str],
 		input_values: impl Iterator<Item = &'i SessionInputValue<'v>>,
-		run_options: Option<&'r RunOptions>
+		run_options: Option<&'r RunOptions<O>>
 	) -> Result<SessionOutputs<'r, 's>> {
 		let input_names_ptr: Vec<*const c_char> = input_names
 			.iter()
@@ -321,7 +321,7 @@ impl Session {
 	pub fn run_async<'s, 'i, 'v: 'i + 's, const N: usize>(
 		&'s self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>> + 'static
-	) -> Result<InferenceFut<'s, '_>> {
+	) -> Result<InferenceFut<'s, '_, NoSelectedOutputs>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(_) => unimplemented!("slices cannot be used in `run_async`"),
 			SessionInputs::ValueArray(input_values) => {
@@ -335,11 +335,11 @@ impl Session {
 
 	/// Asynchronously run input data through the ONNX graph, performing inference, with the given [`RunOptions`].
 	/// See [`Session::run_with_options`] and [`Session::run_async`] for more details.
-	pub fn run_async_with_options<'s, 'i, 'v: 'i + 's, 'r, const N: usize>(
+	pub fn run_async_with_options<'s, 'i, 'v: 'i + 's, 'r, O: SelectedOutputMarker, const N: usize>(
 		&'s self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>> + 'static,
-		run_options: &'r RunOptions
-	) -> Result<InferenceFut<'s, 'r>> {
+		run_options: &'r RunOptions<O>
+	) -> Result<InferenceFut<'s, 'r, O>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(_) => unimplemented!("slices cannot be used in `run_async`"),
 			SessionInputs::ValueArray(input_values) => {
@@ -353,17 +353,20 @@ impl Session {
 		}
 	}
 
-	fn run_inner_async<'s, 'v: 's, 'r>(
+	fn run_inner_async<'s, 'v: 's, 'r, O: SelectedOutputMarker>(
 		&'s self,
 		input_names: &[String],
 		input_values: impl Iterator<Item = SessionInputValue<'v>>,
-		run_options: Option<&'r RunOptions>
-	) -> Result<InferenceFut<'s, 'r>> {
+		run_options: Option<&'r RunOptions<O>>
+	) -> Result<InferenceFut<'s, 'r, O>> {
 		let run_options = match run_options {
 			Some(r) => RunOptionsRef::Ref(r),
 			// create a `RunOptions` to pass to the future so that when it drops, it terminates inference - crucial
 			// (performance-wise) for routines involving `tokio::select!` or timeouts
-			None => RunOptionsRef::Arc(Arc::new(RunOptions::new()?))
+			None => RunOptionsRef::Arc(Arc::new(unsafe {
+				// SAFETY: transmuting from `RunOptions<NoSelectedOutputs>` to `RunOptions<O>`; safe because its just a marker
+				std::mem::transmute(RunOptions::new()?)
+			}))
 		};
 
 		let input_name_ptrs: Vec<*const c_char> = input_names

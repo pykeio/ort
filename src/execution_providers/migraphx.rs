@@ -1,7 +1,10 @@
-use std::{ffi::CString, ptr};
+use std::ffi::CString;
 
-use super::ExecutionProvider;
-use crate::{ortsys, Error, ExecutionProviderDispatch, Result, SessionBuilder};
+use crate::{
+	error::{Error, Result},
+	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
+	session::SessionBuilder
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct MIGraphXExecutionProvider {
@@ -68,9 +71,13 @@ impl ExecutionProvider for MIGraphXExecutionProvider {
 				migraphx_fp16_enable: self.enable_fp16.into(),
 				migraphx_int8_enable: self.enable_int8.into(),
 				migraphx_use_native_calibration_table: self.use_native_calibration_table.into(),
-				migraphx_int8_calibration_table_name: self.int8_calibration_table_name.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null)
+				migraphx_int8_calibration_table_name: self
+					.int8_calibration_table_name
+					.as_ref()
+					.map(|c| c.as_ptr())
+					.unwrap_or_else(std::ptr::null)
 			};
-			ortsys![unsafe SessionOptionsAppendExecutionProvider_MIGraphX(session_builder.session_options_ptr.as_ptr(), &options) -> Error::ExecutionProvider];
+			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_MIGraphX(session_builder.session_options_ptr.as_ptr(), &options) -> Error::ExecutionProvider];
 			return Ok(());
 		}
 

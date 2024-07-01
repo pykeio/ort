@@ -8,11 +8,14 @@ pub(crate) mod io;
 pub(crate) mod kernel;
 
 use self::{
-	bound::ErasedBoundOperator,
+	bound::{BoundOperator, ErasedBoundOperator},
 	io::{OperatorInput, OperatorOutput},
 	kernel::{DummyKernel, Kernel, KernelAttributes}
 };
-use crate::{operator::bound::BoundOperator, ortsys, Error, Result};
+use crate::{
+	error::{Error, Result},
+	ortsys
+};
 
 pub type InferShapeFn = dyn FnMut(*mut ort_sys::OrtShapeInferContext) -> crate::Result<()>;
 

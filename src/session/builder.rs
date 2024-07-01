@@ -1,3 +1,7 @@
+#[cfg(any(feature = "operator-libraries", not(windows)))]
+use std::ffi::CString;
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::Path;
 #[cfg(feature = "fetch-models")]
 use std::path::PathBuf;
 use std::{
@@ -7,8 +11,6 @@ use std::{
 	rc::Rc,
 	sync::{atomic::Ordering, Arc}
 };
-#[cfg(not(target_arch = "wasm32"))]
-use std::{ffi::CString, path::Path};
 
 use super::{dangerous, InMemorySession, Input, Output, Session, SharedSessionInner};
 #[cfg(feature = "fetch-models")]
@@ -17,8 +19,9 @@ use crate::{
 	environment::get_environment,
 	error::{assert_non_null_pointer, status_to_result, Error, Result},
 	execution_providers::{apply_execution_providers, ExecutionProviderDispatch},
-	memory::Allocator,
-	ortsys, MemoryInfo, OperatorDomain
+	memory::{Allocator, MemoryInfo},
+	operator::OperatorDomain,
+	ortsys
 };
 
 /// Creates a session using the builder pattern.

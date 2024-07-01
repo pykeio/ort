@@ -5,8 +5,12 @@ use std::{
 	sync::Arc
 };
 
-use super::{DowncastableTarget, ValueInner, ValueTypeMarker};
-use crate::{memory::Allocator, ortsys, Error, Result, Value, ValueRef, ValueRefMut, ValueType};
+use super::{DowncastableTarget, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker};
+use crate::{
+	error::{Error, Result},
+	memory::Allocator,
+	ortsys
+};
 
 pub trait SequenceValueTypeMarker: ValueTypeMarker {
 	crate::private_trait!();

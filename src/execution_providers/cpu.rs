@@ -1,5 +1,9 @@
-use super::ExecutionProvider;
-use crate::{error::status_to_result, ortsys, Error, ExecutionProviderDispatch, Result, SessionBuilder};
+use crate::{
+	error::{status_to_result, Error, Result},
+	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
+	ortsys,
+	session::SessionBuilder
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct CPUExecutionProvider {

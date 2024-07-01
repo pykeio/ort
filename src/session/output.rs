@@ -4,7 +4,7 @@ use std::{
 	ops::{Deref, DerefMut, Index}
 };
 
-use crate::{Allocator, DynValue};
+use crate::{memory::Allocator, value::DynValue};
 
 /// The outputs returned by a [`crate::Session`] inference call.
 ///

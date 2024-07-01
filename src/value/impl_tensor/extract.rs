@@ -3,11 +3,14 @@ use std::{fmt::Debug, ptr, string::FromUtf8Error};
 #[cfg(feature = "ndarray")]
 use ndarray::IxDyn;
 
-use super::TensorValueTypeMarker;
+use super::{calculate_tensor_size, Tensor, TensorValueTypeMarker};
 #[cfg(feature = "ndarray")]
 use crate::tensor::{extract_primitive_array, extract_primitive_array_mut};
 use crate::{
-	ortsys, tensor::TensorElementType, value::impl_tensor::calculate_tensor_size, Error, PrimitiveTensorElementType, Result, Tensor, Value, ValueType
+	error::{Error, Result},
+	ortsys,
+	tensor::{PrimitiveTensorElementType, TensorElementType},
+	value::{Value, ValueType}
 };
 
 impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {

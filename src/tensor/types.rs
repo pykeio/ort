@@ -2,7 +2,10 @@
 use std::ptr;
 
 #[cfg(feature = "ndarray")]
-use crate::{ortsys, Error, Result};
+use crate::{
+	error::{Error, Result},
+	ortsys
+};
 
 /// Enum mapping ONNX Runtime's supported tensor data types.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

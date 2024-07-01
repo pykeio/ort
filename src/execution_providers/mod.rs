@@ -1,6 +1,11 @@
 use std::{fmt::Debug, os::raw::c_char, sync::Arc};
 
-use crate::{char_p_to_string, ortsys, Error, Result, SessionBuilder};
+use crate::{
+	char_p_to_string,
+	error::{Error, Result},
+	ortsys,
+	session::SessionBuilder
+};
 
 mod cpu;
 pub use self::cpu::CPUExecutionProvider;

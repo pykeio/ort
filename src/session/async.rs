@@ -2,14 +2,10 @@ use std::{
 	cell::UnsafeCell,
 	ffi::{c_char, CString},
 	future::Future,
-	mem::MaybeUninit,
 	ops::Deref,
 	pin::Pin,
 	ptr::NonNull,
-	sync::{
-		atomic::{AtomicUsize, Ordering},
-		Arc, Mutex
-	},
+	sync::{Arc, Mutex},
 	task::{Context, Poll, Waker}
 };
 
@@ -17,47 +13,26 @@ use ort_sys::{c_void, OrtStatus};
 
 use crate::{error::assert_non_null_pointer, Error, Result, RunOptions, SessionInputValue, SessionOutputs, SharedSessionInner, Value};
 
-pub(crate) enum InnerValue<T> {
-	Present(T),
-	Pending,
-	Closed
-}
-
-const VALUE_PRESENT: usize = 1 << 0;
-const CHANNEL_CLOSED: usize = 1 << 1;
-
 #[derive(Debug)]
 pub(crate) struct InferenceFutInner<'r, 's> {
-	presence: AtomicUsize,
-	value: UnsafeCell<MaybeUninit<Result<SessionOutputs<'r, 's>>>>,
+	value: UnsafeCell<Option<Result<SessionOutputs<'r, 's>>>>,
 	waker: Mutex<Option<Waker>>
 }
 
 impl<'r, 's> InferenceFutInner<'r, 's> {
 	pub(crate) fn new() -> Self {
 		InferenceFutInner {
-			presence: AtomicUsize::new(0),
 			waker: Mutex::new(None),
-			value: UnsafeCell::new(MaybeUninit::uninit())
+			value: UnsafeCell::new(None)
 		}
 	}
 
-	pub(crate) fn try_take(&self) -> InnerValue<Result<SessionOutputs<'r, 's>>> {
-		let state_snapshot = self.presence.fetch_and(!VALUE_PRESENT, Ordering::Acquire);
-		if state_snapshot & VALUE_PRESENT == 0 {
-			if self.presence.load(Ordering::Acquire) & CHANNEL_CLOSED != 0 {
-				InnerValue::Closed
-			} else {
-				InnerValue::Pending
-			}
-		} else {
-			InnerValue::Present(unsafe { (*self.value.get()).assume_init_read() })
-		}
+	pub(crate) fn try_take(&self) -> Option<Result<SessionOutputs<'r, 's>>> {
+		unsafe { &mut *self.value.get() }.take()
 	}
 
 	pub(crate) fn emplace_value(&self, value: Result<SessionOutputs<'r, 's>>) {
-		unsafe { (*self.value.get()).write(value) };
-		self.presence.fetch_or(VALUE_PRESENT, Ordering::Release);
+		unsafe { &mut *self.value.get() }.replace(value);
 	}
 
 	pub(crate) fn set_waker(&self, waker: Option<&Waker>) {
@@ -67,18 +42,6 @@ impl<'r, 's> InferenceFutInner<'r, 's> {
 	pub(crate) fn wake(&self) {
 		if let Some(waker) = self.waker.lock().expect("Poisoned waker mutex").take() {
 			waker.wake();
-		}
-	}
-
-	pub(crate) fn close(&self) -> bool {
-		self.presence.fetch_or(CHANNEL_CLOSED, Ordering::Acquire) & CHANNEL_CLOSED == 0
-	}
-}
-
-impl<'r, 's> Drop for InferenceFutInner<'r, 's> {
-	fn drop(&mut self) {
-		if self.presence.load(Ordering::Acquire) & VALUE_PRESENT != 0 {
-			unsafe { (*self.value.get()).assume_init_drop() };
 		}
 	}
 }
@@ -136,24 +99,19 @@ impl<'s, 'r> Future for InferenceFut<'s, 'r> {
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		let this = Pin::into_inner(self);
 
-		match this.inner.try_take() {
-			InnerValue::Present(v) => {
-				this.did_receive = true;
-				return Poll::Ready(v);
-			}
-			InnerValue::Pending => {}
-			InnerValue::Closed => panic!()
-		};
+		if let Some(v) = this.inner.try_take() {
+			this.did_receive = true;
+			return Poll::Ready(v);
+		}
 
 		this.inner.set_waker(Some(cx.waker()));
-
 		Poll::Pending
 	}
 }
 
 impl<'s, 'r> Drop for InferenceFut<'s, 'r> {
 	fn drop(&mut self) {
-		if !self.did_receive && self.inner.close() {
+		if !self.did_receive {
 			let _ = self.run_options.terminate();
 			self.inner.set_waker(None);
 		}

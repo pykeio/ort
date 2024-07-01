@@ -1,7 +1,11 @@
+#[cfg(any(feature = "operator-libraries", not(windows)))]
+use std::ffi::CString;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 #[cfg(target_family = "windows")]
 use std::os::windows::ffi::OsStrExt;
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::Path;
 #[cfg(feature = "fetch-models")]
 use std::path::PathBuf;
 use std::{
@@ -11,8 +15,6 @@ use std::{
 	rc::Rc,
 	sync::{atomic::Ordering, Arc}
 };
-#[cfg(not(target_arch = "wasm32"))]
-use std::{ffi::CString, path::Path};
 
 use super::{dangerous, InMemorySession, Input, Output, Session, SharedSessionInner};
 #[cfg(feature = "fetch-models")]

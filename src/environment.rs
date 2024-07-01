@@ -268,45 +268,21 @@ pub fn init_from(path: impl ToString) -> EnvironmentBuilder {
 	EnvironmentBuilder::new()
 }
 
-/// ONNX's logger sends the code location where the log occurred, which will be parsed into this struct.
-#[derive(Debug)]
-struct CodeLocation<'a> {
-	file: &'a str,
-	line: &'a str,
-	function: &'a str
-}
-
-impl<'a> From<&'a str> for CodeLocation<'a> {
-	fn from(code_location: &'a str) -> Self {
-		let mut splitter = code_location.split(' ');
-		let file_and_line = splitter.next().unwrap_or("<unknown file>:<unknown line>");
-		let function = splitter.next().unwrap_or("<unknown function>");
-		let mut file_and_line_splitter = file_and_line.split(':');
-		let file = file_and_line_splitter.next().unwrap_or("<unknown file>");
-		let line = file_and_line_splitter.next().unwrap_or("<unknown line>");
-
-		CodeLocation { file, line, function }
-	}
-}
-
 extern_system_fn! {
 	/// Callback from C that will handle ONNX logging, forwarding ONNX's logs to the `tracing` crate.
-	pub(crate) fn custom_logger(_params: *mut ffi::c_void, severity: ort_sys::OrtLoggingLevel, category: *const c_char, _: *const c_char, code_location: *const c_char, message: *const c_char) {
-		assert_ne!(category, ptr::null());
-		let category = unsafe { CStr::from_ptr(category) }.to_str().unwrap_or("<decode error>");
+	pub(crate) fn custom_logger(_params: *mut ffi::c_void, severity: ort_sys::OrtLoggingLevel, _: *const c_char, id: *const c_char, code_location: *const c_char, message: *const c_char) {
 		assert_ne!(code_location, ptr::null());
-		let code_location_str = unsafe { CStr::from_ptr(code_location) }.to_str().unwrap_or("<decode error>");
+		let code_location = unsafe { CStr::from_ptr(code_location) }.to_str().unwrap_or("<decode error>");
 		assert_ne!(message, ptr::null());
 		let message = unsafe { CStr::from_ptr(message) }.to_str().unwrap_or("<decode error>");
+		assert_ne!(id, ptr::null());
+		let id = unsafe { CStr::from_ptr(id) }.to_str().unwrap_or("<decode error>");
 
-		let code_location = CodeLocation::from(code_location_str);
 		let span = tracing::span!(
 			Level::TRACE,
 			"ort",
-			category = category,
-			file = code_location.file,
-			line = code_location.line,
-			function = code_location.function
+			id = id,
+			location = code_location
 		);
 
 		match severity {

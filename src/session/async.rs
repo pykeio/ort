@@ -11,7 +11,7 @@ use std::{
 
 use ort_sys::{c_void, OrtStatus};
 
-use crate::{error::assert_non_null_pointer, Error, Result, RunOptions, SessionInputValue, SessionOutputs, SharedSessionInner, Value};
+use crate::{error::assert_non_null_pointer, Error, Result, RunOptions, SelectedOutputMarker, SessionInputValue, SessionOutputs, SharedSessionInner, Value};
 
 #[derive(Debug)]
 pub(crate) struct InferenceFutInner<'r, 's> {
@@ -49,25 +49,25 @@ impl<'r, 's> InferenceFutInner<'r, 's> {
 unsafe impl<'r, 's> Send for InferenceFutInner<'r, 's> {}
 unsafe impl<'r, 's> Sync for InferenceFutInner<'r, 's> {}
 
-pub enum RunOptionsRef<'r> {
-	Arc(Arc<RunOptions>),
-	Ref(&'r RunOptions)
+pub enum RunOptionsRef<'r, O: SelectedOutputMarker> {
+	Arc(Arc<RunOptions<O>>),
+	Ref(&'r RunOptions<O>)
 }
 
-impl<'r> From<&Arc<RunOptions>> for RunOptionsRef<'r> {
-	fn from(value: &Arc<RunOptions>) -> Self {
+impl<'r, O: SelectedOutputMarker> From<&Arc<RunOptions<O>>> for RunOptionsRef<'r, O> {
+	fn from(value: &Arc<RunOptions<O>>) -> Self {
 		Self::Arc(Arc::clone(value))
 	}
 }
 
-impl<'r> From<&'r RunOptions> for RunOptionsRef<'r> {
-	fn from(value: &'r RunOptions) -> Self {
+impl<'r, O: SelectedOutputMarker> From<&'r RunOptions<O>> for RunOptionsRef<'r, O> {
+	fn from(value: &'r RunOptions<O>) -> Self {
 		Self::Ref(value)
 	}
 }
 
-impl<'r> Deref for RunOptionsRef<'r> {
-	type Target = RunOptions;
+impl<'r, O: SelectedOutputMarker> Deref for RunOptionsRef<'r, O> {
+	type Target = RunOptions<O>;
 
 	fn deref(&self) -> &Self::Target {
 		match self {
@@ -77,14 +77,14 @@ impl<'r> Deref for RunOptionsRef<'r> {
 	}
 }
 
-pub struct InferenceFut<'s, 'r> {
+pub struct InferenceFut<'s, 'r, O: SelectedOutputMarker> {
 	inner: Arc<InferenceFutInner<'r, 's>>,
-	run_options: RunOptionsRef<'r>,
+	run_options: RunOptionsRef<'r, O>,
 	did_receive: bool
 }
 
-impl<'s, 'r> InferenceFut<'s, 'r> {
-	pub(crate) fn new(inner: Arc<InferenceFutInner<'r, 's>>, run_options: RunOptionsRef<'r>) -> Self {
+impl<'s, 'r, O: SelectedOutputMarker> InferenceFut<'s, 'r, O> {
+	pub(crate) fn new(inner: Arc<InferenceFutInner<'r, 's>>, run_options: RunOptionsRef<'r, O>) -> Self {
 		Self {
 			inner,
 			run_options,
@@ -93,7 +93,7 @@ impl<'s, 'r> InferenceFut<'s, 'r> {
 	}
 }
 
-impl<'s, 'r> Future for InferenceFut<'s, 'r> {
+impl<'s, 'r, O: SelectedOutputMarker> Future for InferenceFut<'s, 'r, O> {
 	type Output = Result<SessionOutputs<'r, 's>>;
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -109,7 +109,7 @@ impl<'s, 'r> Future for InferenceFut<'s, 'r> {
 	}
 }
 
-impl<'s, 'r> Drop for InferenceFut<'s, 'r> {
+impl<'s, 'r, O: SelectedOutputMarker> Drop for InferenceFut<'s, 'r, O> {
 	fn drop(&mut self) {
 		if !self.did_receive {
 			let _ = self.run_options.terminate();

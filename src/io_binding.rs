@@ -12,7 +12,7 @@ use crate::{
 	ortsys,
 	session::{output::SessionOutputs, RunOptions},
 	value::{Value, ValueInner},
-	DynValue, Error, Result, Session, ValueTypeMarker
+	DynValue, Error, NoSelectedOutputs, Result, Session, ValueTypeMarker
 };
 
 /// Enables binding of session inputs and/or outputs to pre-allocated memory.
@@ -177,11 +177,11 @@ impl<'s> IoBinding<'s> {
 	}
 
 	/// Performs inference on the session using the bound inputs specified by [`IoBinding::bind_input`].
-	pub fn run_with_options(&mut self, run_options: &RunOptions) -> Result<SessionOutputs<'_, 's>> {
+	pub fn run_with_options(&mut self, run_options: &RunOptions<NoSelectedOutputs>) -> Result<SessionOutputs<'_, 's>> {
 		self.run_inner(Some(run_options))
 	}
 
-	fn run_inner(&mut self, run_options: Option<&RunOptions>) -> Result<SessionOutputs<'_, 's>> {
+	fn run_inner(&mut self, run_options: Option<&RunOptions<NoSelectedOutputs>>) -> Result<SessionOutputs<'_, 's>> {
 		let run_options_ptr = if let Some(run_options) = run_options {
 			run_options.run_options_ptr.as_ptr()
 		} else {

@@ -261,7 +261,9 @@ pub enum Error {
 	#[error("Could't get `AllocatorType` from memory info: {0}")]
 	GetAllocatorType(ErrorInternal),
 	#[error("Could't get device ID from memory info: {0}")]
-	GetDeviceId(ErrorInternal)
+	GetDeviceId(ErrorInternal),
+	#[error("Training API is not enabled in this build of ONNX Runtime.")]
+	TrainingNotEnabled
 }
 
 impl Error {

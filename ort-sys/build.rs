@@ -37,12 +37,12 @@ fn fetch_file(source_url: &str) -> Vec<u8> {
 	buffer
 }
 
-fn find_dist(target: &str, designator: &str) -> Option<(&'static str, &'static str)> {
+fn find_dist(target: &str, feature_set: &str) -> Option<(&'static str, &'static str)> {
 	DIST_TABLE
 		.split('\n')
 		.filter(|c| !c.is_empty() && !c.starts_with('#'))
 		.map(|c| c.split('\t').collect::<Vec<_>>())
-		.find(|c| c[0] == designator && c[1] == target)
+		.find(|c| c[0] == feature_set && c[1] == target)
 		.map(|c| (c[2], c[3]))
 }
 
@@ -317,23 +317,31 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 		#[cfg(feature = "download-binaries")]
 		{
 			let target = env::var("TARGET").unwrap().to_string();
-			let designator = if cfg!(any(feature = "cuda", feature = "tensorrt")) {
-				if lib_exists("cudart64_12.dll") || lib_exists("libcudart.so.12") { "cu12" } else { "cu11" }
+
+			let mut feature_set = Vec::new();
+			if cfg!(feature = "training") {
+				feature_set.push("train");
+			}
+			if cfg!(any(feature = "cuda", feature = "tensorrt")) {
+				if lib_exists("cudart64_11.dll") || lib_exists("libcudart.so.11") || env::var("ORT_DFBIN_FORCE_CUDA_VERSION").as_deref() == Ok("11") {
+					feature_set.push("cu11");
+				} else {
+					feature_set.push("cu12");
+				}
 			} else if cfg!(feature = "rocm") {
-				"rocm"
-			} else {
-				"none"
-			};
-			let mut dist = find_dist(&target, designator);
-			if dist.is_none() && designator != "none" {
+				feature_set.push("rocm");
+			}
+			let feature_set = if !feature_set.is_empty() { feature_set.join(",") } else { "none".to_owned() };
+			let mut dist = find_dist(&target, &feature_set);
+			if dist.is_none() && feature_set != "none" {
 				dist = find_dist(&target, "none");
 			}
 
 			if dist.is_none() {
 				panic!(
 					"downloaded binaries not available for target {target}{}\nyou may have to compile ONNX Runtime from source",
-					if designator != "none" {
-						format!(" (note: also requested `{designator}`)")
+					if feature_set != "none" {
+						format!(" (note: also requested features `{feature_set}`)")
 					} else {
 						String::new()
 					}

@@ -23,6 +23,9 @@ pub(crate) mod metadata;
 pub(crate) mod operator;
 pub(crate) mod session;
 pub(crate) mod tensor;
+#[cfg(feature = "training")]
+pub(crate) mod training;
+pub(crate) mod util;
 pub(crate) mod value;
 #[cfg_attr(docsrs, doc(cfg(target_arch = "wasm32")))]
 #[cfg(target_arch = "wasm32")]
@@ -66,6 +69,9 @@ pub use self::session::{
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 pub use self::tensor::ArrayExtensions;
 pub use self::tensor::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType, Utf8Data};
+#[cfg(feature = "training")]
+#[cfg_attr(docsrs, doc(cfg(feature = "training")))]
+pub use self::training::*;
 pub use self::value::{
 	DowncastableTarget, DynMap, DynMapRef, DynMapRefMut, DynMapValueType, DynSequence, DynSequenceRef, DynSequenceRefMut, DynSequenceValueType, DynTensor,
 	DynTensorRef, DynTensorRefMut, DynTensorValueType, DynValue, DynValueTypeMarker, Map, MapRef, MapRefMut, MapValueType, MapValueTypeMarker, Sequence,

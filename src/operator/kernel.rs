@@ -44,15 +44,15 @@ impl KernelAttributes {
 		let mut inputs = Vec::with_capacity(num_inputs as _);
 		for idx in 0..num_inputs as usize {
 			let mut name_len: ort_sys::size_t = 0;
-			ortsys![unsafe KernelInfo_GetInputName(self.0.as_ptr(), idx, ptr::null_mut(), &mut name_len) -> Error::GetOperatorInput];
+			ortsys![unsafe KernelInfo_GetInputName(self.0.as_ptr(), idx as _, ptr::null_mut(), &mut name_len) -> Error::GetOperatorInput];
 			let mut name = vec![0u8; name_len as _];
-			ortsys![unsafe KernelInfo_GetInputName(self.0.as_ptr(), idx, name.as_mut_ptr().cast::<c_char>(), &mut name_len) -> Error::GetOperatorInput];
+			ortsys![unsafe KernelInfo_GetInputName(self.0.as_ptr(), idx as _, name.as_mut_ptr().cast::<c_char>(), &mut name_len) -> Error::GetOperatorInput];
 			let name = CString::from_vec_with_nul(name)
 				.map_err(|e| Error::FfiStringConversion(ErrorInternal::Msg(e.to_string())))?
 				.into_string()
 				.map_err(|e| Error::FfiStringConversion(ErrorInternal::IntoStringError(e)))?;
 			let mut type_info = ptr::null_mut();
-			ortsys![unsafe KernelInfo_GetInputTypeInfo(self.0.as_ptr(), idx, &mut type_info) -> Error::GetOperatorInput; nonNull(type_info)];
+			ortsys![unsafe KernelInfo_GetInputTypeInfo(self.0.as_ptr(), idx as _, &mut type_info) -> Error::GetOperatorInput; nonNull(type_info)];
 			let input_type = ValueType::from_type_info(type_info)?;
 			inputs.push(Input { name, input_type })
 		}
@@ -66,15 +66,15 @@ impl KernelAttributes {
 		let mut outputs = Vec::with_capacity(num_outputs as _);
 		for idx in 0..num_outputs as usize {
 			let mut name_len: ort_sys::size_t = 0;
-			ortsys![unsafe KernelInfo_GetOutputName(self.0.as_ptr(), idx, ptr::null_mut(), &mut name_len) -> Error::GetOperatorOutput];
+			ortsys![unsafe KernelInfo_GetOutputName(self.0.as_ptr(), idx as _, ptr::null_mut(), &mut name_len) -> Error::GetOperatorOutput];
 			let mut name = vec![0u8; name_len as _];
-			ortsys![unsafe KernelInfo_GetOutputName(self.0.as_ptr(), idx, name.as_mut_ptr().cast::<c_char>(), &mut name_len) -> Error::GetOperatorOutput];
+			ortsys![unsafe KernelInfo_GetOutputName(self.0.as_ptr(), idx as _, name.as_mut_ptr().cast::<c_char>(), &mut name_len) -> Error::GetOperatorOutput];
 			let name = CString::from_vec_with_nul(name)
 				.map_err(|e| Error::FfiStringConversion(ErrorInternal::Msg(e.to_string())))?
 				.into_string()
 				.map_err(|e| Error::FfiStringConversion(ErrorInternal::IntoStringError(e)))?;
 			let mut type_info = ptr::null_mut();
-			ortsys![unsafe KernelInfo_GetOutputTypeInfo(self.0.as_ptr(), idx, &mut type_info) -> Error::GetOperatorOutput; nonNull(type_info)];
+			ortsys![unsafe KernelInfo_GetOutputTypeInfo(self.0.as_ptr(), idx as _, &mut type_info) -> Error::GetOperatorOutput; nonNull(type_info)];
 			let output_type = ValueType::from_type_info(type_info)?;
 			outputs.push(Output { name, output_type })
 		}

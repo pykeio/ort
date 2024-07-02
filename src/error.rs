@@ -240,8 +240,16 @@ pub enum Error {
 	GetOperatorInput(ErrorInternal),
 	#[error("Failed to get operator output: {0}")]
 	GetOperatorOutput(ErrorInternal),
+	#[error("Failed to get operator node name: {0}")]
+	GetOperatorNodeName(ErrorInternal),
 	#[error("Failed to retrieve GPU compute stream from kernel context: {0}")]
-	GetOperatorGPUComputeStream(ErrorInternal),
+	GetKernelGPUComputeStream(ErrorInternal),
+	#[error("Failed to retrieve EP resource from kernel context: {0}")]
+	GetKernelResource(ErrorInternal),
+	#[error("Failed to create allocator in kernel context: {0}")]
+	GetKernelAllocator(ErrorInternal),
+	#[error("Failed to allocate temporary buffer in kernel context: {0}")]
+	GetKernelBuffer(ErrorInternal),
 	#[error("{0}")]
 	CustomError(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
 	#[error("String tensors cannot be borrowed as mutable")]
@@ -280,8 +288,8 @@ pub enum ErrorInternal {
 	/// Details about the error.
 	#[error("{0}")]
 	Msg(String),
-	/// Converting the ONNX error message to UTF-8 failed.
-	#[error("an error occurred, but ort failed to convert the error message to UTF-8")]
+	/// Converting an FFI string to UTF-8 failed.
+	#[error("failed to convert string to UTF-8: {0}")]
 	IntoStringError(std::ffi::IntoStringError)
 }
 

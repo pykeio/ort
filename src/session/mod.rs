@@ -448,7 +448,6 @@ unsafe impl Sync for Session {}
 
 mod dangerous {
 	use super::*;
-	use crate::value::{extract_data_type_from_map_info, extract_data_type_from_sequence_info, extract_data_type_from_tensor_info};
 
 	pub(super) fn extract_inputs_count(session_ptr: NonNull<ort_sys::OrtSession>) -> Result<usize> {
 		let f = ortsys![unsafe SessionGetInputCount];
@@ -545,29 +544,6 @@ mod dangerous {
 		status_to_result(status).map_err(Error::GetTypeInfo)?;
 		assert_non_null_pointer(typeinfo_ptr, "TypeInfo")?;
 
-		let mut ty: ort_sys::ONNXType = ort_sys::ONNXType::ONNX_TYPE_UNKNOWN;
-		let status = ortsys![unsafe GetOnnxTypeFromTypeInfo(typeinfo_ptr, &mut ty)];
-		status_to_result(status).map_err(Error::GetOnnxTypeFromTypeInfo)?;
-		let io_type = match ty {
-			ort_sys::ONNXType::ONNX_TYPE_TENSOR | ort_sys::ONNXType::ONNX_TYPE_SPARSETENSOR => {
-				let mut info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-				ortsys![unsafe CastTypeInfoToTensorInfo(typeinfo_ptr, &mut info_ptr) -> Error::CastTypeInfoToTensorInfo; nonNull(info_ptr)];
-				unsafe { extract_data_type_from_tensor_info(info_ptr)? }
-			}
-			ort_sys::ONNXType::ONNX_TYPE_SEQUENCE => {
-				let mut info_ptr: *const ort_sys::OrtSequenceTypeInfo = std::ptr::null_mut();
-				ortsys![unsafe CastTypeInfoToSequenceTypeInfo(typeinfo_ptr, &mut info_ptr) -> Error::CastTypeInfoToSequenceTypeInfo; nonNull(info_ptr)];
-				unsafe { extract_data_type_from_sequence_info(info_ptr)? }
-			}
-			ort_sys::ONNXType::ONNX_TYPE_MAP => {
-				let mut info_ptr: *const ort_sys::OrtMapTypeInfo = std::ptr::null_mut();
-				ortsys![unsafe CastTypeInfoToMapTypeInfo(typeinfo_ptr, &mut info_ptr) -> Error::CastTypeInfoToMapTypeInfo; nonNull(info_ptr)];
-				unsafe { extract_data_type_from_map_info(info_ptr)? }
-			}
-			_ => unreachable!()
-		};
-
-		ortsys![unsafe ReleaseTypeInfo(typeinfo_ptr)];
-		Ok(io_type)
+		ValueType::from_type_info(typeinfo_ptr)
 	}
 }

@@ -257,8 +257,12 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					println!("cargo:rustc-link-lib=static=onnx");
 					println!("cargo:rustc-link-lib=static=onnx_proto");
 
-					add_search_dir(transform_dep(external_lib_dir.join("google_nsync-build"), &profile));
-					println!("cargo:rustc-link-lib=static=nsync_cpp");
+					let nsync_path = transform_dep(external_lib_dir.join("google_nsync-build"), &profile);
+					// some builds of ONNX Runtime, particularly the default no-EP windows build, don't require nsync
+					if nsync_path.exists() {
+						add_search_dir(nsync_path);
+						println!("cargo:rustc-link-lib=static=nsync_cpp");
+					}
 
 					if target_arch != "wasm32" {
 						add_search_dir(transform_dep(external_lib_dir.join("pytorch_cpuinfo-build"), &profile));

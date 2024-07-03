@@ -28,6 +28,7 @@
 - **[Ortex](https://github.com/relaypro-open/ortex)** uses `ort` for safe ONNX Runtime bindings in Elixir.
 - **[Supabase](https://supabase.com/)** uses `ort` to remove cold starts for their edge functions.
 - **[Lantern](https://github.com/lanterndata/lantern_extras)** uses `ort` to provide embedding model inference inside Postgres.
+- **[Magika](https://github.com/google/magika)** uses `ort` for content type detection.
 
 ## 🌠 Sponsor `ort`
 <a href="https://opencollective.com/pyke-osai">

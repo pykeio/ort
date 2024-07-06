@@ -6,7 +6,7 @@
     <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/v/ort?style=for-the-badge&label=ort&logo=rust"></a> <img alt="ONNX Runtime" src="https://img.shields.io/badge/onnxruntime-v1.18.1-blue?style=for-the-badge&logo=cplusplus">
 </div>
 
-`ort` is an (unofficial) [ONNX Runtime](https://onnxruntime.ai/) 1.18 wrapper for Rust based on the now inactive [`onnxruntime-rs`](https://github.com/nbigaouette/onnxruntime-rs). ONNX Runtime accelerates ML inference on both CPU & GPU.
+`ort` is an (unofficial) [ONNX Runtime](https://onnxruntime.ai/) 1.18 wrapper for Rust based on the now inactive [`onnxruntime-rs`](https://github.com/nbigaouette/onnxruntime-rs). ONNX Runtime accelerates ML inference and training on both CPU & GPU.
 
 ## 📖 Documentation
 - [Guide](https://ort.pyke.io/)

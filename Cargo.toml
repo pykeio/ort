@@ -23,8 +23,8 @@ exclude = [ 'examples/cudarc' ]
 
 [package]
 name = "ort"
-description = "A safe Rust wrapper for ONNX Runtime 1.17 - Optimize and Accelerate Machine Learning Inferencing"
-version = "2.0.0-rc.2"
+description = "A safe Rust wrapper for ONNX Runtime 1.18 - Optimize and accelerate machine learning inference & training"
+version = "2.0.0-rc.3"
 edition = "2021"
 rust-version = "1.70"
 license = "MIT OR Apache-2.0"
@@ -83,7 +83,7 @@ qnn = [ "ort-sys/qnn" ]
 [dependencies]
 ndarray = { version = "0.15", optional = true }
 thiserror = "1.0"
-ort-sys = { version = "2.0.0-rc.2", path = "ort-sys" }
+ort-sys = { version = "2.0.0-rc.3", path = "ort-sys" }
 libloading = { version = "0.8", optional = true }
 
 ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }

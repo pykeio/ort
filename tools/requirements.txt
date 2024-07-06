@@ -1,0 +1,4 @@
+torch~=2.3
+torch-ort~=1.17
+onnx~=1.16
+--extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ORT/pypi/simple/ onnxruntime-training-cpu==1.18.0

@@ -7,6 +7,7 @@ members = [
 	'examples/model-info',
 	'examples/yolov8',
 	'examples/modnet',
+	'examples/training',
 	'examples/webassembly'
 ]
 default-members = [
@@ -45,12 +46,14 @@ strip = true
 codegen-units = 1
 
 [package.metadata.docs.rs]
-features = [ "ndarray", "half", "operator-libraries", "fetch-models", "load-dynamic", "copy-dylibs" ]
+features = [ "ndarray", "half", "training", "operator-libraries", "fetch-models", "load-dynamic", "copy-dylibs" ]
 targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 rustdoc-args = [ "--cfg", "docsrs" ]
 
 [features]
 default = [ "ndarray", "half", "download-binaries", "copy-dylibs" ]
+
+training = [ "ort-sys/training" ]
 
 operator-libraries = [ "libc", "winapi" ]
 

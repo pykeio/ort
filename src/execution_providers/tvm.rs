@@ -6,7 +6,7 @@ use crate::{
 
 #[cfg(all(not(feature = "load-dynamic"), feature = "tvm"))]
 extern "C" {
-	fn OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut ort_sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> ort_sys::OrtStatusPtr;
+	fn OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut ort_sys::OrtSessionOptions, opt_str: *const std::os::raw::c_char) -> ort_sys::OrtStatusPtr;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

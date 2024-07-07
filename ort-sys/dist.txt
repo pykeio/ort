@@ -27,3 +27,8 @@ train	aarch64-apple-darwin	https://parcel.pyke.io/v2/delivery/ortrs/packages/mso
 train	x86_64-apple-darwin	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.18.1/ortrs-msort_static_train-v1.18.1-x86_64-apple-darwin.tgz	898EC9E3F852843ECDB618CF8E317F4C92BDEB33FC773038960857BCB37CB347
 
 none	wasm32-unknown-unknown	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.18.1/ortrs-pkort_static-v1.18.1-wasm32-unknown-unknown.tgz	D1BF756F02A53C3BC254E3C2048BE617082905A89182A6B1BD18C229920228EF
+
+train,cu12+cudnn8	x86_64-pc-windows-msvc	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.18.1/ortrs-msort_dylib_train,cu12+cudnn8-v1.18.1-x86_64-pc-windows-msvc.tgz	52F02DBF276409DC49533373DE89B17FDE0CCB31F9974CCF31F250DC51258971
+train,cu12+cudnn8	x86_64-unknown-linux-gnu	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.18.1/ortrs-msort_dylib_train,cu12+cudnn8-v1.18.1-x86_64-unknown-linux-gnu.tgz	EE0580CA961CE512ECF7C1087FB081E74C780A494EAC95596CEF1089AB573242
+cu12+cudnn8	x86_64-unknown-linux-gnu	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.18.1/ortrs-msort_dylib_cu12+cudnn8-v1.18.1-x86_64-unknown-linux-gnu.tgz	F8D72E825F744A7A7BF2036591CBE6D1F30352DBE108BEEAD1745BD571566819
+cu12+cudnn8	x86_64-pc-windows-msvc	https://parcel.pyke.io/v2/delivery/ortrs/packages/msort-binary/1.18.1/ortrs-msort_dylib_cu12+cudnn8-v1.18.1-x86_64-pc-windows-msvc.tgz	D41121A6489B52EB7AF9614D7924AE984F4F10BF49F15E0C4FC2655649A978ED

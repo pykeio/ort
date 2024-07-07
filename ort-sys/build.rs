@@ -328,6 +328,18 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 				feature_set.push("train");
 			}
 			if cfg!(any(feature = "cuda", feature = "tensorrt")) {
+				// pytorch's CUDA docker images set `NV_CUDNN_VERSION`
+				let cu12_tag = match env::var("NV_CUDNN_VERSION").or_else(|_| env::var("ORT_CUDNN_VERSION")).as_deref() {
+					Ok(v) => {
+						if v.starts_with("8") {
+							"cu12+cudnn8"
+						} else {
+							"cu12"
+						}
+					}
+					Err(_) => "cu12"
+				};
+
 				match env::var("ORT_DFBIN_FORCE_CUDA_VERSION").as_deref() {
 					Ok("11") => feature_set.push("cu11"),
 					Ok("12") => feature_set.push("cu12"),
@@ -340,7 +352,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 								let release_section = version_line.split(", ").nth(1).unwrap();
 								let version_number = release_section.split(' ').nth(1).unwrap();
 								if version_number.starts_with("12") {
-									feature_set.push("cu12");
+									feature_set.push(cu12_tag);
 								} else {
 									feature_set.push("cu11");
 								}
@@ -351,7 +363,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 						if !success {
 							println!("cargo:warning=nvcc call did not succeed. falling back to CUDA 12");
 							// fallback to CUDA 12.
-							feature_set.push("cu12");
+							feature_set.push(cu12_tag);
 						}
 					}
 				}

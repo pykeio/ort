@@ -230,6 +230,11 @@ impl ExecutionProvider for TensorRTExecutionProvider {
 	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "tensorrt"))]
 		{
+			// The TensorRT execution provider specifically is pretty picky about requiring an environment to be initialized by the
+			// time we register it. This isn't always the case in `ort`, so if we get to this point, let's make sure we have an
+			// environment initialized.
+			let _ = crate::get_environment();
+
 			let mut trt_options: *mut ort_sys::OrtTensorRTProviderOptionsV2 = std::ptr::null_mut();
 			crate::error::status_to_result(crate::ortsys![unsafe CreateTensorRTProviderOptions(&mut trt_options)]).map_err(Error::ExecutionProvider)?;
 			let (key_ptrs, value_ptrs, len, keys, values) = super::map_keys! {

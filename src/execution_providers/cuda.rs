@@ -50,7 +50,9 @@ pub struct CUDAExecutionProvider {
 	cudnn_conv_use_max_workspace: Option<bool>,
 	cudnn_conv1d_pad_to_nc1d: Option<bool>,
 	enable_cuda_graph: Option<bool>,
-	enable_skip_layer_norm_strict_mode: Option<bool>
+	enable_skip_layer_norm_strict_mode: Option<bool>,
+	use_tf32: Option<bool>,
+	prefer_nhwc: Option<bool>
 }
 
 impl CUDAExecutionProvider {
@@ -156,6 +158,21 @@ impl CUDAExecutionProvider {
 		self
 	}
 
+	/// TF32 is a math mode available on NVIDIA GPUs since Ampere. It allows certain float32 matrix multiplications and
+	/// convolutions to run much faster on tensor cores with TensorFloat-32 reduced precision: float32 inputs are
+	/// rounded with 10 bits of mantissa and results are accumulated with float32 precision.
+	#[must_use]
+	pub fn with_tf32(mut self, enable: bool) -> Self {
+		self.use_tf32 = Some(enable);
+		self
+	}
+
+	#[must_use]
+	pub fn with_prefer_nhwc(mut self) -> Self {
+		self.prefer_nhwc = Some(true);
+		self
+	}
+
 	#[must_use]
 	pub fn build(self) -> ExecutionProviderDispatch {
 		self.into()
@@ -199,7 +216,9 @@ impl ExecutionProvider for CUDAExecutionProvider {
 				cudnn_conv_use_max_workspace = self.cudnn_conv_use_max_workspace.map(<bool as Into<i32>>::into),
 				cudnn_conv1d_pad_to_nc1d = self.cudnn_conv1d_pad_to_nc1d.map(<bool as Into<i32>>::into),
 				enable_cuda_graph = self.enable_cuda_graph.map(<bool as Into<i32>>::into),
-				enable_skip_layer_norm_strict_mode = self.enable_skip_layer_norm_strict_mode.map(<bool as Into<i32>>::into)
+				enable_skip_layer_norm_strict_mode = self.enable_skip_layer_norm_strict_mode.map(<bool as Into<i32>>::into),
+				use_tf32 = self.use_tf32.map(<bool as Into<i32>>::into),
+				prefer_nhwc = self.prefer_nhwc.map(<bool as Into<i32>>::into)
 			};
 			if let Err(e) =
 				crate::error::status_to_result(crate::ortsys![unsafe UpdateCUDAProviderOptions(cuda_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), len as _)])

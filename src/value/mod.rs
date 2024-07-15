@@ -365,7 +365,7 @@ impl TensorValueTypeMarker for DynValueTypeMarker {
 	crate::private_impl!();
 }
 
-unsafe impl Send for Value {}
+unsafe impl<Type: ValueTypeMarker + ?Sized> Send for Value<Type> {}
 
 impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	/// Returns the data type of this [`Value`].

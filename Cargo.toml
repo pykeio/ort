@@ -1,6 +1,7 @@
 [workspace]
 members = [
 	'ort-sys',
+	'examples/all-mini-lm-l6',
 	'examples/async-gpt2-api',
 	'examples/custom-ops',
 	'examples/gpt2',
@@ -12,6 +13,7 @@ members = [
 ]
 default-members = [
 	'.',
+	'examples/all-mini-lm-l6',
 	'examples/async-gpt2-api',
 	'examples/custom-ops',
 	'examples/gpt2',

@@ -1,25 +1,25 @@
 [workspace]
 members = [
 	'ort-sys',
-	'examples/all-mini-lm-l6',
 	'examples/async-gpt2-api',
 	'examples/custom-ops',
 	'examples/gpt2',
 	'examples/model-info',
 	'examples/yolov8',
 	'examples/modnet',
+	'examples/sentence-transformers',
 	'examples/training',
 	'examples/webassembly'
 ]
 default-members = [
 	'.',
-	'examples/all-mini-lm-l6',
 	'examples/async-gpt2-api',
 	'examples/custom-ops',
 	'examples/gpt2',
 	'examples/model-info',
 	'examples/yolov8',
-	'examples/modnet'
+	'examples/modnet',
+	'examples/sentence-transformers'
 ]
 exclude = [ 'examples/cudarc' ]
 

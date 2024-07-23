@@ -1,6 +1,6 @@
 [package]
 publish = false
-name = "example-all-mini-lm-l6"
+name = "sentence-transformers"
 version = "0.0.0"
 edition = "2021"
 

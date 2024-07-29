@@ -4,7 +4,8 @@ use ndarray::{s, Array1, Array2, Axis, Ix2};
 use ort::{CUDAExecutionProvider, GraphOptimizationLevel, Session};
 use tokenizers::Tokenizer;
 
-/// Example usage of a text embedding model like Sentence Transformers' `all-mini-lm-l6` model for semantic textual similarity.
+/// Example usage of a text embedding model like Sentence Transformers' `all-mini-lm-l6` model for semantic textual
+/// similarity.
 ///
 /// Text embedding models map sentences & paragraphs to an n-dimensional dense vector space, which can then be used for
 /// tasks like clustering or semantic search.

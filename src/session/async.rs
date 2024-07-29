@@ -153,6 +153,7 @@ crate::extern_system_fn! {
 		if let Err(e) = crate::error::status_to_result(status) {
 			ctx.inner.emplace_value(Err(Error::SessionRun(e)));
 			ctx.inner.wake();
+			return;
 		}
 
 		let outputs: Vec<Value> = ctx

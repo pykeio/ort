@@ -226,3 +226,104 @@ impl<'s> Drop for IoBinding<'s> {
 		ortsys![unsafe ReleaseIoBinding(self.ptr.as_ptr())];
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use std::cmp::Ordering;
+
+	use image::{ImageBuffer, Luma, Pixel};
+	use ndarray::{Array2, Array4, Axis};
+
+	use crate::{AllocationDevice, AllocatorType, ArrayExtensions, MemoryInfo, MemoryType, Result, Session, Tensor, TensorValueTypeMarker, Value};
+
+	fn get_image() -> Array4<f32> {
+		let image_buffer: ImageBuffer<Luma<u8>, Vec<u8>> = image::open("tests/data/mnist_5.jpg").expect("failed to load image").to_luma8();
+		ndarray::Array::from_shape_fn((1, 1, 28, 28), |(_, c, j, i)| {
+			let pixel = image_buffer.get_pixel(i as u32, j as u32);
+			let channels = pixel.channels();
+			(channels[c] as f32) / 255.0
+		})
+	}
+
+	fn extract_probabilities<T: TensorValueTypeMarker>(output: &Value<T>) -> Result<Vec<(usize, f32)>> {
+		let mut probabilities: Vec<(usize, f32)> = output
+			.try_extract_tensor()?
+			.softmax(Axis(1))
+			.iter()
+			.copied()
+			.enumerate()
+			.collect::<Vec<_>>();
+		probabilities.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+		Ok(probabilities)
+	}
+
+	// not terribly useful since CI is CPU-only, but it at least ensures the API won't segfault or something silly
+	#[test]
+	fn test_mnist_input_bound() -> Result<()> {
+		let session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
+
+		let array = get_image();
+
+		let mut binding = session.create_binding()?;
+		binding.bind_input(&session.inputs[0].name, &Tensor::from_array(array)?)?;
+		binding.bind_output_to_device(&session.outputs[0].name, &MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::CPUOutput)?)?;
+
+		let outputs = binding.run()?;
+		let probabilities = extract_probabilities(&outputs[0])?;
+		assert_eq!(probabilities[0].0, 5);
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_mnist_input_output_bound() -> Result<()> {
+		let session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
+
+		let array = get_image();
+
+		let mut binding = session.create_binding()?;
+		binding.bind_input(&session.inputs[0].name, &Tensor::from_array(array)?)?;
+
+		let output = Array2::from_shape_simple_fn((1, 10), || 0.0_f32);
+		binding.bind_output(&session.outputs[0].name, Tensor::from_array(output)?)?;
+
+		let outputs = binding.run()?;
+		let probabilities = extract_probabilities(&outputs[0])?;
+		assert_eq!(probabilities[0].0, 5);
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_mnist_clears_bound() -> Result<()> {
+		let session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
+
+		let array = get_image();
+
+		let mut binding = session.create_binding()?;
+		binding.bind_input(&session.inputs[0].name, &Tensor::from_array(array)?)?;
+
+		let output = Array2::from_shape_simple_fn((1, 10), || 0.0_f32);
+		binding.bind_output(&session.outputs[0].name, Tensor::from_array(output)?)?;
+
+		{
+			let outputs = binding.run()?;
+			let probabilities = extract_probabilities(&outputs[0])?;
+			assert_eq!(probabilities[0].0, 5);
+		}
+
+		binding.clear_outputs();
+		binding.bind_output_to_device(&session.outputs[0].name, &MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::CPUOutput)?)?;
+
+		{
+			let outputs = binding.run()?;
+			let probabilities = extract_probabilities(&outputs[0])?;
+			assert_eq!(probabilities[0].0, 5);
+		}
+
+		binding.clear_inputs();
+		assert!(binding.run().is_err());
+
+		Ok(())
+	}
+}

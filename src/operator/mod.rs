@@ -6,6 +6,8 @@ use std::{
 pub(crate) mod bound;
 pub(crate) mod io;
 pub(crate) mod kernel;
+#[cfg(test)]
+mod tests;
 
 use self::{
 	bound::{BoundOperator, ErasedBoundOperator},

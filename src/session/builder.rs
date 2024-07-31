@@ -519,8 +519,8 @@ pub enum GraphOptimizationLevel {
 	/// | GELU Approximation*             | CUDA      | Disabled by default; enable with `OrtSessionOptions::EnableGeluApproximation`  |
 	///
 	/// > **NOTE**: To optimize performance of the BERT model, approximation is used in GELU Approximation and Attention
-	/// Fusion for the CUDA execution provider. The impact on accuracy is negligible based on our evaluation; F1 score
-	/// for a BERT model on SQuAD v1.1 is almost the same (87.05 vs 87.03).
+	/// > Fusion for the CUDA execution provider. The impact on accuracy is negligible based on our evaluation; F1 score
+	/// > for a BERT model on SQuAD v1.1 is almost the same (87.05 vs 87.03).
 	Level2,
 	/// Level 3 optimizations include memory layout optimizations, which may optimize the graph to use the NCHWc memory
 	/// layout rather than NCHW to improve spatial locality for some targets.

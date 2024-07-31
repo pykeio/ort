@@ -55,6 +55,8 @@ impl TensorRTExecutionProvider {
 		self
 	}
 
+	/// # Safety
+	/// The provided `stream` must outlive the environment/session created with the execution provider.
 	#[must_use]
 	pub unsafe fn with_compute_stream(mut self, stream: *mut ()) -> Self {
 		self.user_compute_stream = Some(stream);

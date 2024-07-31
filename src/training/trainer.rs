@@ -1,8 +1,7 @@
 use std::{
 	ffi::CString,
 	path::Path,
-	ptr::{self, NonNull},
-	sync::Arc
+	ptr::{self, NonNull}
 };
 
 use ort_sys::c_char;

@@ -44,8 +44,7 @@ pub struct SessionBuilder {
 	memory_info: Option<Rc<MemoryInfo>>,
 	#[cfg(feature = "operator-libraries")]
 	custom_runtime_handles: Vec<Arc<LibHandle>>,
-	operator_domains: Vec<Arc<OperatorDomain>>,
-	execution_providers: Vec<ExecutionProviderDispatch>
+	operator_domains: Vec<Arc<OperatorDomain>>
 }
 
 impl Clone for SessionBuilder {
@@ -59,8 +58,7 @@ impl Clone for SessionBuilder {
 			memory_info: self.memory_info.clone(),
 			#[cfg(feature = "operator-libraries")]
 			custom_runtime_handles: self.custom_runtime_handles.clone(),
-			operator_domains: self.operator_domains.clone(),
-			execution_providers: self.execution_providers.clone()
+			operator_domains: self.operator_domains.clone()
 		}
 	}
 }
@@ -93,8 +91,7 @@ impl SessionBuilder {
 			memory_info: None,
 			#[cfg(feature = "operator-libraries")]
 			custom_runtime_handles: Vec::new(),
-			operator_domains: Vec::new(),
-			execution_providers: Vec::new()
+			operator_domains: Vec::new()
 		})
 	}
 

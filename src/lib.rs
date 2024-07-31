@@ -189,11 +189,13 @@ pub fn api() -> NonNull<ort_sys::OrtApi> {
 						let lib_minor_version = version_string.split('.').nth(1).map_or(0, |x| x.parse::<u32>().unwrap_or(0));
 						match lib_minor_version.cmp(&MINOR_VERSION) {
 							std::cmp::Ordering::Less => panic!(
-								"ort 2.0 is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
+								"ort {} is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
+								env!("CARGO_PKG_VERSION"),
 								dylib_path()
 							),
 							std::cmp::Ordering::Greater => tracing::warn!(
-								"ort 2.0 may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
+								"ort {} may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
+								env!("CARGO_PKG_VERSION"),
 								dylib_path()
 							),
 							std::cmp::Ordering::Equal => {}

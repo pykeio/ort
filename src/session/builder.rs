@@ -1,9 +1,9 @@
 #[cfg(any(feature = "operator-libraries", not(windows)))]
 use std::ffi::CString;
+#[cfg(feature = "fetch-models")]
+use std::fmt::Write;
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
-#[cfg(feature = "fetch-models")]
-use std::path::PathBuf;
 use std::{
 	any::Any,
 	marker::PhantomData,
@@ -259,7 +259,10 @@ impl SessionBuilder {
 		}
 
 		let url = model_url.as_ref();
-		let model_filename = PathBuf::from(url.split('/').last().expect("Missing filename in model URL"));
+		let model_filename = <sha2::Sha256 as sha2::Digest>::digest(url).into_iter().fold(String::new(), |mut s, b| {
+			let _ = write!(&mut s, "{:02x}", b);
+			s
+		});
 		let model_filepath = download_dir.join(model_filename);
 		let downloaded_path = if model_filepath.exists() {
 			tracing::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), "Model already exists, skipping download");

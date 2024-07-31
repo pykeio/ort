@@ -59,7 +59,7 @@ training = [ "ort-sys/training" ]
 
 operator-libraries = [ "libc", "winapi" ]
 
-fetch-models = [ "ureq" ]
+fetch-models = [ "ureq", "sha2" ]
 download-binaries = [ "ort-sys/download-binaries" ]
 load-dynamic = [ "libloading", "ort-sys/load-dynamic" ]
 copy-dylibs = [ "ort-sys/copy-dylibs" ]
@@ -89,6 +89,7 @@ ort-sys = { version = "2.0.0-rc.4", path = "ort-sys" }
 libloading = { version = "0.8", optional = true }
 
 ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }
+sha2 = { version = "0.10", optional = true }
 tracing = "0.1"
 half = { version = "2.1", optional = true }
 

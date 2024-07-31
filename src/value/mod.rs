@@ -221,7 +221,11 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 	#[inline]
 	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(self) -> Result<ValueRef<'v, OtherType>> {
 		let dt = self.dtype()?;
-		if OtherType::can_downcast(&dt) { Ok(unsafe { std::mem::transmute(self) }) } else { panic!() }
+		if OtherType::can_downcast(&dt) {
+			Ok(unsafe { std::mem::transmute::<ValueRef<'v, Type>, ValueRef<'v, OtherType>>(self) })
+		} else {
+			panic!()
+		}
 	}
 
 	pub fn into_dyn(self) -> ValueRef<'v, DynValueTypeMarker> {
@@ -254,7 +258,11 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 	#[inline]
 	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(self) -> Result<ValueRefMut<'v, OtherType>> {
 		let dt = self.dtype()?;
-		if OtherType::can_downcast(&dt) { Ok(unsafe { std::mem::transmute(self) }) } else { panic!() }
+		if OtherType::can_downcast(&dt) {
+			Ok(unsafe { std::mem::transmute::<ValueRefMut<'v, Type>, ValueRefMut<'v, OtherType>>(self) })
+		} else {
+			panic!()
+		}
 	}
 
 	pub fn into_dyn(self) -> ValueRefMut<'v, DynValueTypeMarker> {
@@ -457,7 +465,11 @@ impl Value<DynValueTypeMarker> {
 	#[inline]
 	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(self) -> Result<Value<OtherType>> {
 		let dt = self.dtype()?;
-		if OtherType::can_downcast(&dt) { Ok(unsafe { std::mem::transmute(self) }) } else { panic!() }
+		if OtherType::can_downcast(&dt) {
+			Ok(unsafe { std::mem::transmute::<Value<DynValueTypeMarker>, Value<OtherType>>(self) })
+		} else {
+			panic!()
+		}
 	}
 
 	/// Attempts to downcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed reference

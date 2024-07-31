@@ -365,7 +365,7 @@ impl Session {
 			// (performance-wise) for routines involving `tokio::select!` or timeouts
 			None => RunOptionsRef::Arc(Arc::new(unsafe {
 				// SAFETY: transmuting from `RunOptions<NoSelectedOutputs>` to `RunOptions<O>`; safe because its just a marker
-				std::mem::transmute(RunOptions::new()?)
+				std::mem::transmute::<RunOptions<NoSelectedOutputs>, RunOptions<O>>(RunOptions::new()?)
 			}))
 		};
 

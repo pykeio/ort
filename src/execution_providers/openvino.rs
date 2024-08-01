@@ -126,16 +126,16 @@ impl ExecutionProvider for OpenVINOExecutionProvider {
 			let openvino_options = ort_sys::OrtOpenVINOProviderOptions {
 				device_type: self
 					.device_type
-					.clone()
+					.as_ref()
 					.map_or_else(std::ptr::null, |x| x.as_bytes().as_ptr().cast::<std::ffi::c_char>()),
 				device_id: self
 					.device_id
-					.clone()
+					.as_ref()
 					.map_or_else(std::ptr::null, |x| x.as_bytes().as_ptr().cast::<std::ffi::c_char>()),
 				num_of_threads: self.num_threads,
 				cache_dir: self
 					.cache_dir
-					.clone()
+					.as_ref()
 					.map_or_else(std::ptr::null, |x| x.as_bytes().as_ptr().cast::<std::ffi::c_char>()),
 				context: self.context,
 				enable_opencl_throttling: self.enable_opencl_throttling.into(),

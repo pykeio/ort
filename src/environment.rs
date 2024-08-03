@@ -27,6 +27,17 @@ unsafe impl Sync for EnvironmentSingleton {}
 
 static G_ENV: EnvironmentSingleton = EnvironmentSingleton { cell: UnsafeCell::new(None) };
 
+/// An `Environment` is a process-global structure, under which [`Session`](crate::Session)s are created.
+///
+/// Environments can be used to [configure global thread pools](EnvironmentBuilder::with_global_thread_pool), in
+/// which all sessions share threads from the environment's pool, and configuring [default execution
+/// providers](EnvironmentBuilder::with_execution_providers) for all sessions. In the context of `ort` specifically,
+/// environments are also used to configure ONNX Runtime to send log messages through the [`tracing`] crate in Rust.
+///
+/// For ease of use, and since sessions require an environment to be created, `ort` will automatically create an
+/// environment if one is not configured via [`init`] (or [`init_from`]). [`init`] can be called at any point in the
+/// program (even after an environment has been automatically created), though every session created before the
+/// re-configuration would need to be re-created in order to use the config from the new environment.
 #[derive(Debug)]
 pub struct Environment {
 	pub(crate) execution_providers: Vec<ExecutionProviderDispatch>,

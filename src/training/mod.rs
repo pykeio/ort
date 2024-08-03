@@ -13,7 +13,10 @@ mod simple;
 mod trainer;
 
 pub use self::{
-	simple::{iterable_data_loader, CheckpointStrategy, DataLoader, EvaluationStrategy, IterableDataLoader, TrainingArguments},
+	simple::{
+		iterable_data_loader, CheckpointStrategy, DataLoader, EvaluationStrategy, IterableDataLoader, TrainerCallbacks, TrainerControl, TrainerState,
+		TrainingArguments
+	},
 	trainer::Trainer
 };
 

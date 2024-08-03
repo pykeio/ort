@@ -4,13 +4,35 @@ use std::{
 	path::Path
 };
 
+use kdam::BarExt;
 use ndarray::{concatenate, s, Array1, Array2, ArrayViewD, Axis};
-use ort::{Allocator, CUDAExecutionProvider, CheckpointStrategy, Session, SessionBuilder, Trainer, TrainingArguments};
+use ort::{Allocator, CUDAExecutionProvider, CheckpointStrategy, Session, SessionBuilder, Trainer, TrainerCallbacks, TrainingArguments};
 use rand::RngCore;
 use tokenizers::Tokenizer;
 
 const BATCH_SIZE: usize = 16;
 const SEQUENCE_LENGTH: usize = 256;
+
+struct LoggerCallback {
+	progress_bar: kdam::Bar
+}
+
+impl LoggerCallback {
+	pub fn new() -> Self {
+		Self {
+			progress_bar: kdam::Bar::builder().leave(true).build().unwrap()
+		}
+	}
+}
+
+impl TrainerCallbacks for LoggerCallback {
+	fn train_step(&mut self, train_loss: f32, state: &ort::TrainerState, _: &mut ort::TrainerControl<'_>) -> ort::Result<()> {
+		self.progress_bar.total = state.max_steps;
+		self.progress_bar.set_postfix(format!("loss={train_loss:.3}"));
+		let _ = self.progress_bar.update_to(state.iter_step);
+		Ok(())
+	}
+}
 
 fn main() -> ort::Result<()> {
 	tracing_subscriber::fmt::init();
@@ -78,6 +100,7 @@ fn main() -> ort::Result<()> {
 			.with_lr(7e-5)
 			.with_max_steps(5000)
 			.with_ckpt_strategy(CheckpointStrategy::Steps(500))
+			.with_callbacks(LoggerCallback::new())
 	)?;
 
 	trainer.export("trained-clm.onnx", ["probs"])?;

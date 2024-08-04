@@ -6,10 +6,10 @@ edition = "2021"
 
 [dependencies]
 ort = { path = "../../" }
-ndarray = "0.15"
+ndarray = "0.16"
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
-image = "0.24"
-show-image = { version = "0.13", features = [ "image", "raqote" ] }
+image = "0.25"
+show-image = { version = "0.14", features = [ "image", "raqote" ] }
 raqote = { version = "0.8", default-features = false }
 ureq = "2.1"
 tracing = "0.1"

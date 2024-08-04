@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 ort = { path = "../../" }
-ndarray = "0.15"
+ndarray = "0.16"
 wasm-bindgen = "0.2.92"
 web-sys = "0.3"
 tracing = "0.1"

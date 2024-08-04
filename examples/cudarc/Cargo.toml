@@ -5,10 +5,10 @@ edition = "2021"
 
 [dependencies]
 ort = { path = "../../", features = [ "cuda", "fetch-models" ] }
-cudarc = "0.10"
+cudarc = "0.11"
 anyhow = "1.0"
-ndarray = "0.15"
-image = "0.24"
+ndarray = "0.16"
+image = "0.25"
 tracing = "0.1"
-show-image = { version = "0.13", features = [ "image", "raqote" ] }
+show-image = { version = "0.14", features = [ "image", "raqote" ] }
 tracing-subscriber = { version = "0.3", features = [ "fmt" ] }

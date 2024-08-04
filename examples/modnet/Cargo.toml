@@ -6,11 +6,11 @@ edition = "2021"
 
 [dependencies]
 ort = { path = "../../" }
-ndarray = "0.15"
+ndarray = "0.16"
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
-image = "0.24"
+image = "0.25"
 tracing = "0.1"
-show-image = { version = "0.13", features = [ "image", "raqote" ] }
+show-image = { version = "0.14", features = [ "image", "raqote" ] }
 
 [features]
 load-dynamic = [ "ort/load-dynamic" ]

@@ -9,7 +9,7 @@ use std::{
 
 use super::{
 	impl_tensor::{calculate_tensor_size, DynTensor, Tensor},
-	DynValue, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker
+	DowncastableTarget, DynValue, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker
 };
 use crate::{
 	error::{Error, Result},
@@ -31,12 +31,31 @@ impl MapValueTypeMarker for DynMapValueType {
 	crate::private_impl!();
 }
 
+impl DowncastableTarget for DynMapValueType {
+	fn can_downcast(dtype: &ValueType) -> bool {
+		matches!(dtype, ValueType::Map { .. })
+	}
+
+	crate::private_impl!();
+}
+
 #[derive(Debug)]
 pub struct MapValueType<K: IntoTensorElementType + Clone + Hash + Eq, V: IntoTensorElementType + Debug>(PhantomData<(K, V)>);
 impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug> ValueTypeMarker for MapValueType<K, V> {
 	crate::private_impl!();
 }
 impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug> MapValueTypeMarker for MapValueType<K, V> {
+	crate::private_impl!();
+}
+
+impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug> DowncastableTarget for MapValueType<K, V> {
+	fn can_downcast(dtype: &ValueType) -> bool {
+		match dtype {
+			ValueType::Map { key, value } => *key == K::into_tensor_element_type() && *value == V::into_tensor_element_type(),
+			_ => false
+		}
+	}
+
 	crate::private_impl!();
 }
 
@@ -166,14 +185,14 @@ impl<V: PrimitiveTensorElementType + Debug + Clone + 'static> Value<MapValueType
 	/// # use std::collections::HashMap;
 	/// # use ort::Map;
 	/// # fn main() -> ort::Result<()> {
-	/// let mut map = HashMap::<i64, f32>::new();
-	/// map.insert(0, 1.0);
-	/// map.insert(1, 2.0);
-	/// map.insert(2, 3.0);
+	/// let mut map = HashMap::<String, f32>::new();
+	/// map.insert("one".to_string(), 1.0);
+	/// map.insert("two".to_string(), 2.0);
+	/// map.insert("three".to_string(), 3.0);
 	///
-	/// let value = Map::<i64, f32>::new(map)?;
+	/// let value = Map::<String, f32>::new(map)?;
 	///
-	/// assert_eq!(*value.extract_map().get(&0).unwrap(), 1.0);
+	/// assert_eq!(*value.extract_map().get("one").unwrap(), 1.0);
 	/// # 	Ok(())
 	/// # }
 	/// ```

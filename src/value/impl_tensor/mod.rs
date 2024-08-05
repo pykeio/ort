@@ -285,7 +285,7 @@ mod tests {
 
 	use ndarray::{ArcArray1, Array1, CowArray};
 
-	use crate::{Tensor, TensorElementType, ValueType};
+	use crate::{Allocator, Tensor, TensorElementType, ValueType};
 
 	#[test]
 	#[cfg(feature = "ndarray")]
@@ -384,6 +384,28 @@ mod tests {
 		assert_eq!(value_box.extract_raw_tensor().1, &v);
 		assert_eq!(value_vec.extract_raw_tensor().1, &v);
 		assert_eq!(value_slice.extract_raw_tensor().1, &v);
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_tensor_index() -> crate::Result<()> {
+		let mut tensor = Tensor::new(&Allocator::default(), [1, 3, 224, 224])?;
+
+		assert_eq!(tensor[[0, 2, 42, 42]], 0.0);
+		tensor[[0, 2, 42, 42]] = 1.0;
+		assert_eq!(tensor[[0, 2, 42, 42]], 1.0);
+
+		for y in 0..224 {
+			for x in 0..224 {
+				tensor[[0, 1, y, x]] = -1.0;
+			}
+		}
+		assert_eq!(tensor[[0, 1, 0, 0]], -1.0);
+		assert_eq!(tensor[[0, 1, 223, 223]], -1.0);
+
+		assert_eq!(tensor[[0, 0, 0, 0]], 0.0);
+		assert_eq!(tensor[[0, 2, 42, 42]], 1.0);
 
 		Ok(())
 	}

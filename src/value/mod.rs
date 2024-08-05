@@ -583,3 +583,71 @@ pub(crate) unsafe fn extract_data_type_from_map_info(info_ptr: *const ort_sys::O
 		value: value_type_sys.into()
 	})
 }
+
+#[cfg(test)]
+mod tests {
+	use super::{DynTensorValueType, Map, Sequence, Tensor, TensorRef, TensorValueType};
+	use crate::{Allocator, TensorRefMut};
+
+	#[test]
+	fn test_casting_tensor() -> crate::Result<()> {
+		let tensor: Tensor<i32> = Tensor::from_array((vec![5], vec![1, 2, 3, 4, 5]))?;
+
+		let dyn_tensor = tensor.into_dyn();
+		let mut tensor: Tensor<i32> = dyn_tensor.downcast()?;
+
+		{
+			let dyn_tensor_ref = tensor.view().into_dyn();
+			let tensor_ref: TensorRef<i32> = dyn_tensor_ref.downcast()?;
+			assert_eq!(tensor_ref.extract_raw_tensor(), tensor.extract_raw_tensor());
+		}
+		{
+			let dyn_tensor_ref = tensor.view().into_dyn();
+			let tensor_ref: TensorRef<i32> = dyn_tensor_ref.downcast_ref()?;
+			assert_eq!(tensor_ref.extract_raw_tensor(), tensor.extract_raw_tensor());
+		}
+
+		// Ensure mutating a TensorRefMut mutates the original tensor.
+		{
+			let mut dyn_tensor_ref = tensor.view_mut().into_dyn();
+			let mut tensor_ref: TensorRefMut<i32> = dyn_tensor_ref.downcast_mut()?;
+			let (_, data) = tensor_ref.extract_raw_tensor_mut();
+			data[2] = 42;
+		}
+		{
+			let (_, data) = tensor.extract_raw_tensor_mut();
+			assert_eq!(data[2], 42);
+		}
+
+		// chain a bunch of up/downcasts
+		{
+			let tensor = tensor
+				.into_dyn()
+				.downcast::<DynTensorValueType>()?
+				.into_dyn()
+				.downcast::<TensorValueType<i32>>()?
+				.upcast()
+				.into_dyn();
+			let tensor = tensor.view();
+			let tensor = tensor.downcast_ref::<TensorValueType<i32>>()?;
+			let (_, data) = tensor.extract_raw_tensor();
+			assert_eq!(data, [1, 2, 42, 4, 5]);
+		}
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_sequence_map() -> crate::Result<()> {
+		let map_contents = [("meaning".to_owned(), 42.0), ("pi".to_owned(), std::f32::consts::PI)];
+		let value = Sequence::new([Map::<String, f32>::new(map_contents)?])?;
+
+		for map in value.extract_sequence(&Allocator::default()) {
+			let map = map.extract_map();
+			assert_eq!(map["meaning"], 42.0);
+			assert_eq!(map["pi"], std::f32::consts::PI);
+		}
+
+		Ok(())
+	}
+}

@@ -10,7 +10,7 @@
 #[doc(hidden)]
 pub mod internal;
 
-pub const ORT_API_VERSION: u32 = 18;
+pub const ORT_API_VERSION: u32 = 19;
 
 pub use std::ffi::{c_char, c_int, c_ulong, c_ulonglong, c_ushort, c_void};
 
@@ -80,7 +80,9 @@ pub enum ONNXTensorElementDataType {
 	ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E4M3FN = 17,
 	ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E4M3FNUZ = 18,
 	ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E5M2 = 19,
-	ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E5M2FNUZ = 20
+	ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E5M2FNUZ = 20,
+	ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT4 = 21,
+	ONNX_TENSOR_ELEMENT_DATA_TYPE_INT4 = 22
 }
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
@@ -722,7 +724,11 @@ pub struct OrtMIGraphXProviderOptions {
 	pub migraphx_fp16_enable: ::std::os::raw::c_int,
 	pub migraphx_int8_enable: ::std::os::raw::c_int,
 	pub migraphx_use_native_calibration_table: ::std::os::raw::c_int,
-	pub migraphx_int8_calibration_table_name: *const ::std::os::raw::c_char
+	pub migraphx_int8_calibration_table_name: *const ::std::os::raw::c_char,
+	pub migraphx_save_compiled_model: ::std::os::raw::c_int,
+	pub migraphx_save_model_path: *const ::std::os::raw::c_char,
+	pub migraphx_load_compiled_model: ::std::os::raw::c_int,
+	pub migraphx_load_model_path: *const ::std::os::raw::c_char
 }
 #[test]
 fn bindgen_test_layout_OrtMIGraphXProviderOptions() {

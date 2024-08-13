@@ -12,7 +12,9 @@ pub struct MIGraphXExecutionProvider {
 	enable_fp16: bool,
 	enable_int8: bool,
 	use_native_calibration_table: bool,
-	int8_calibration_table_name: Option<CString>
+	int8_calibration_table_name: Option<CString>,
+	save_model_path: Option<CString>,
+	load_model_path: Option<CString>
 }
 
 impl MIGraphXExecutionProvider {
@@ -38,6 +40,18 @@ impl MIGraphXExecutionProvider {
 	pub fn with_native_calibration_table(mut self, table_name: Option<impl AsRef<str>>) -> Self {
 		self.use_native_calibration_table = true;
 		self.int8_calibration_table_name = table_name.map(|c| CString::new(c.as_ref()).expect("invalid string"));
+		self
+	}
+
+	#[must_use]
+	pub fn with_save_model(mut self, path: impl AsRef<str>) -> Self {
+		self.save_model_path = Some(CString::new(path.as_ref()).expect("invalid string"));
+		self
+	}
+
+	#[must_use]
+	pub fn with_load_model(mut self, path: impl AsRef<str>) -> Self {
+		self.load_model_path = Some(CString::new(path.as_ref()).expect("invalid string"));
 		self
 	}
 
@@ -75,7 +89,11 @@ impl ExecutionProvider for MIGraphXExecutionProvider {
 					.int8_calibration_table_name
 					.as_ref()
 					.map(|c| c.as_ptr())
-					.unwrap_or_else(std::ptr::null)
+					.unwrap_or_else(std::ptr::null),
+				migraphx_load_compiled_model: self.load_model_path.is_some().into(),
+				migraphx_load_model_path: self.load_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(std::ptr::null),
+				migraphx_save_compiled_model: self.save_model_path.is_some().into(),
+				migraphx_save_model_path: self.save_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(std::ptr::null),
 			};
 			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_MIGraphX(session_builder.session_options_ptr.as_ptr(), &options) -> Error::ExecutionProvider];
 			return Ok(());

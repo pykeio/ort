@@ -8,8 +8,7 @@ members = [
 	'examples/yolov8',
 	'examples/modnet',
 	'examples/sentence-transformers',
-	'examples/training',
-	'examples/webassembly'
+	'examples/training'
 ]
 default-members = [
 	'.',
@@ -49,7 +48,7 @@ codegen-units = 1
 
 [package.metadata.docs.rs]
 features = [ "ndarray", "half", "training", "operator-libraries", "fetch-models", "load-dynamic", "copy-dylibs" ]
-targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
+targets = ["x86_64-unknown-linux-gnu"]
 rustdoc-args = [ "--cfg", "docsrs" ]
 
 [features]
@@ -99,10 +98,6 @@ libc = { version = "0.2", optional = true }
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", optional = true, features = [ "std", "libloaderapi" ] }
 
-[target.'cfg(target_family = "wasm")'.dependencies]
-js-sys = "0.3"
-web-sys = "0.3"
-
 [dev-dependencies]
 anyhow = "1.0"
 ureq = "2.1"
@@ -112,7 +107,6 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [ "
 glassbench = "0.4"
 tokio = { version = "1.36", features = [ "test-util" ] }
 tokio-test = "0.4.3"
-wasm-bindgen-test = "0.3"
 
 [[bench]]
 name = "squeezenet"

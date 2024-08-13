@@ -53,19 +53,6 @@ jobs:
           cargo test -p ort --verbose --features fetch-models -- --test-threads 1
           # Test examples that use in-tree graphs (do NOT run any of the examples that download ~700 MB graphs from pyke parcel...)
           cargo run --example custom-ops
-  test-wasm:
-    name: Test WebAssembly
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install nightly Rust toolchain
-        uses: dtolnay/rust-toolchain@nightly
-      - name: Install wasm-pack
-        run: cargo install wasm-pack
-      - name: Run tests
-        working-directory: examples/webassembly
-        run: |
-          wasm-pack test --node
   # Disable cross-compile until cross updates aarch64-unknown-linux-gnu to Ubuntu 22.04
   # ref https://github.com/cross-rs/cross/pull/973
   #cross-compile:

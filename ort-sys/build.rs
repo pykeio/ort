@@ -215,15 +215,6 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 						println!("cargo:rustc-link-lib=static=noexcep_operators");
 					}
 
-					if target_arch == "wasm32" {
-						for lib in &["webassembly", "providers_js"] {
-							let lib_path = lib_dir.join(platform_format_lib(&format!("onnxruntime_{lib}")));
-							if lib_path.exists() {
-								println!("cargo:rustc-link-lib=static=onnxruntime_{lib}");
-							}
-						}
-					}
-
 					let protobuf_build = transform_dep(external_lib_dir.join("protobuf-build"), &profile);
 					add_search_dir(&protobuf_build);
 					for lib in ["protobuf-lited", "protobuf-lite", "protobuf"] {
@@ -245,17 +236,15 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 						println!("cargo:rustc-link-lib=static=nsync_cpp");
 					}
 
-					if target_arch != "wasm32" {
-						add_search_dir(transform_dep(external_lib_dir.join("pytorch_cpuinfo-build"), &profile));
-						let clog_path = transform_dep(external_lib_dir.join("pytorch_cpuinfo-build").join("deps").join("clog"), &profile);
-						if clog_path.exists() {
-							add_search_dir(clog_path);
-						} else {
-							add_search_dir(transform_dep(external_lib_dir.join("pytorch_clog-build"), &profile));
-						}
-						println!("cargo:rustc-link-lib=static=cpuinfo");
-						println!("cargo:rustc-link-lib=static=clog");
+					add_search_dir(transform_dep(external_lib_dir.join("pytorch_cpuinfo-build"), &profile));
+					let clog_path = transform_dep(external_lib_dir.join("pytorch_cpuinfo-build").join("deps").join("clog"), &profile);
+					if clog_path.exists() {
+						add_search_dir(clog_path);
+					} else {
+						add_search_dir(transform_dep(external_lib_dir.join("pytorch_clog-build"), &profile));
 					}
+					println!("cargo:rustc-link-lib=static=cpuinfo");
+					println!("cargo:rustc-link-lib=static=clog");
 
 					add_search_dir(transform_dep(external_lib_dir.join("re2-build"), &profile));
 					println!("cargo:rustc-link-lib=static=re2");

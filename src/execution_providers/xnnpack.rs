@@ -39,8 +39,7 @@ impl ExecutionProvider for XNNPACKExecutionProvider {
 		cfg!(any(
 			target_arch = "aarch64",
 			all(target_arch = "arm", any(target_os = "linux", target_os = "android")),
-			target_arch = "x86_64",
-			target_arch = "wasm32"
+			target_arch = "x86_64"
 		))
 	}
 

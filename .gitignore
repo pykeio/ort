@@ -187,7 +187,6 @@ WixTools/
 **/*.onnx
 **/*.ort
 **/*.pbseq
-!examples/webassembly/**/*.ort
 !tests/data/*.onnx
 !tests/data/*.ort
 

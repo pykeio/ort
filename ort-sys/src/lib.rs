@@ -19,7 +19,7 @@ pub type ortchar = c_ushort;
 #[cfg(not(target_os = "windows"))]
 pub type ortchar = c_char;
 
-#[cfg(any(target_arch = "x86_64", target_arch = "x86", target_arch = "wasm32"))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 pub type size_t = usize;
 #[cfg(all(target_arch = "aarch64", target_os = "windows"))]
 pub type size_t = c_ulonglong;

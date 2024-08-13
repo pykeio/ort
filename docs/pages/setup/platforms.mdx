@@ -12,21 +12,19 @@ Here are the supported platforms and binary availability status, as of v2.0.0-rc
 * ⭕ - Supported. Precompiled binaries not available.
 * ❌ - Not supported.
 
-| Platform | x86 | x86-64 | ARMv7 | ARM64 | WASM32 |
-|:-------- |:------- |:------ |:------ |:------ |:------ |
-| **Windows** | ⭕ | 🟢<sup>\*</sup> | ⭕ | 🔷<sup>\*</sup> | ❌ |
-| **Linux** | ⭕ | 🟢† | ⭕ | 🔷‡ | ❌ |
-| **macOS** | ❌ | 🔷§ | ❌ | 🔷 | ❌ |
-| **iOS** | ❌ | ❌ | ❌ | ⭕ | ❌ |
-| **Android** | ❌ | ❌ | ⭕ | ⭕ | ❌ |
-| **Web** | ❌ | ❌ | ❌ | ❌ | 🔷¶ |
+| Platform | x86 | x86-64 | ARMv7 | ARM64 |
+|:-------- |:------- |:------ |:------ |:------ |
+| **Windows** | ⭕ | 🟢<sup>\*</sup> | ⭕ | 🔷<sup>\*</sup> |
+| **Linux** | ⭕ | 🟢† | ⭕ | 🔷‡ |
+| **macOS** | ❌ | 🔷§ | ❌ | 🔷 |
+| **iOS** | ❌ | ❌ | ❌ | ⭕ |
+| **Android** | ❌ | ❌ | ⭕ | ⭕ |
 
 <div style={{ opacity: 0.5, display: 'flex', flexDirection: 'column', fontSize: '0.75rem' }}>
 <p>\* A recent version of Windows 10/11 & Visual Studio 2022 are required for pyke binaries.</p>
 <p>† glibc ≥ 2.31 (Ubuntu ≥ 20.04) required for pyke binaries.</p>
 <p>‡ glibc ≥ 2.35 (Ubuntu ≥ 22.04) required for pyke binaries.</p>
 <p>§ macOS ≥ 10.15 required.</p>
-<p>¶ WASM supports a limited subset of ONNX Runtime features. For more info, see [the docs on WebAssembly support](/setup/webassembly).</p>
 </div>
 
 If your platform is marked as 🟢 or 🔷, you're in luck! Almost no setup will be required to get `ort` up and running.

@@ -27,9 +27,6 @@ pub(crate) mod tensor;
 pub(crate) mod training;
 pub(crate) mod util;
 pub(crate) mod value;
-#[cfg_attr(docsrs, doc(cfg(target_arch = "wasm32")))]
-#[cfg(target_arch = "wasm32")]
-pub mod wasm;
 
 #[cfg(feature = "load-dynamic")]
 use std::sync::Arc;

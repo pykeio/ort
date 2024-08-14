@@ -36,11 +36,7 @@ impl ExecutionProvider for XNNPACKExecutionProvider {
 	}
 
 	fn supported_by_platform(&self) -> bool {
-		cfg!(any(
-			target_arch = "aarch64",
-			all(target_arch = "arm", any(target_os = "linux", target_os = "android")),
-			target_arch = "x86_64"
-		))
+		cfg!(any(target_arch = "aarch64", all(target_arch = "arm", any(target_os = "linux", target_os = "android")), target_arch = "x86_64"))
 	}
 
 	#[allow(unused, unreachable_code)]

@@ -93,7 +93,7 @@ impl ExecutionProvider for MIGraphXExecutionProvider {
 				migraphx_load_compiled_model: self.load_model_path.is_some().into(),
 				migraphx_load_model_path: self.load_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(std::ptr::null),
 				migraphx_save_compiled_model: self.save_model_path.is_some().into(),
-				migraphx_save_model_path: self.save_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(std::ptr::null),
+				migraphx_save_model_path: self.save_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(std::ptr::null)
 			};
 			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_MIGraphX(session_builder.session_options_ptr.as_ptr(), &options) -> Error::ExecutionProvider];
 			return Ok(());

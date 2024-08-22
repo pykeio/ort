@@ -29,11 +29,6 @@ impl<T> IntoStatus for Result<T, Error> {
 #[non_exhaustive]
 #[derive(Error, Debug)]
 pub enum Error {
-	/// Workaround to get [`crate::inputs`] to accept `Value`s, since it will attempt to `Value::try_from` on provided
-	/// values, and the implementation `TryFrom<T> for T` uses `Infallible` as the error type.
-	#[error("unreachable")]
-	#[doc(hidden)]
-	Infallible,
 	/// An error occurred when converting an FFI C string to a Rust `String`.
 	#[error("Failed to construct Rust String")]
 	FfiStringConversion(ErrorInternal),
@@ -278,8 +273,8 @@ impl Error {
 }
 
 impl From<Infallible> for Error {
-	fn from(_: Infallible) -> Self {
-		Error::Infallible
+	fn from(e: Infallible) -> Self {
+		match e {}
 	}
 }
 

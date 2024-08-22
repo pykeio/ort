@@ -325,7 +325,7 @@ impl_to_dimensions!(<N> for [usize; N], for [i32; N], for [i64; N]);
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<'i, 'v, T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for &'i CowArray<'v, T, D>
 where
-	'i: 'v
+	'v: 'i
 {
 	type Item = T;
 
@@ -502,7 +502,7 @@ impl<T: Clone + Debug + 'static, D: ToDimensions> IntoValueTensor for (D, Arc<Bo
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<'i, 'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for Tensor<T>
 where
-	'i: 'v
+	'v: 'i
 {
 	type Error = Error;
 	fn try_from(arr: &'i CowArray<'v, T, D>) -> Result<Self, Self::Error> {
@@ -523,7 +523,7 @@ impl<'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension +
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<'i, 'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for DynTensor
 where
-	'i: 'v
+	'v: 'i
 {
 	type Error = Error;
 	fn try_from(arr: &'i CowArray<'v, T, D>) -> Result<Self, Self::Error> {
@@ -544,7 +544,7 @@ impl<'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension +
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<'i, 'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for DynValue
 where
-	'i: 'v
+	'v: 'i
 {
 	type Error = Error;
 	fn try_from(arr: &'i CowArray<'v, T, D>) -> Result<Self, Self::Error> {

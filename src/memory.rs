@@ -148,6 +148,7 @@ pub enum AllocationDevice {
 	OpenVINOGPU,
 	// these aren't defined in allocator.h and are instead scattered all over. fun!
 	DirectMLCPU,
+	XNNPACK,
 	TVM
 }
 
@@ -165,6 +166,7 @@ impl AllocationDevice {
 			Self::HIPPinned => "HipPinned",
 			Self::OpenVINOCPU => "OpenVINO_CPU",
 			Self::OpenVINOGPU => "OpenVINO_GPU",
+			Self::XNNPACK => "XnnpackExecutionProvider",
 			Self::TVM => "TVM"
 		}
 	}
@@ -172,7 +174,7 @@ impl AllocationDevice {
 	/// Returns `true` if this memory is accessible by the CPU; meaning that, if a value were allocated on this device,
 	/// it could be extracted to an `ndarray` or slice.
 	pub fn is_cpu_accessible(&self) -> bool {
-		matches!(self, Self::CPU | Self::CUDAPinned | Self::CANNPinned | Self::HIPPinned | Self::OpenVINOCPU | Self::DirectMLCPU | Self::TVM)
+		matches!(self, Self::CPU | Self::CUDAPinned | Self::CANNPinned | Self::HIPPinned | Self::OpenVINOCPU | Self::DirectMLCPU | Self::XNNPACK | Self::TVM)
 	}
 }
 
@@ -192,6 +194,7 @@ impl TryFrom<String> for AllocationDevice {
 			"HipPinned" => Ok(AllocationDevice::HIPPinned),
 			"OpenVINO_CPU" => Ok(AllocationDevice::OpenVINOCPU),
 			"OpenVINO_GPU" => Ok(AllocationDevice::OpenVINOGPU),
+			"XnnpackExecutionProvider" => Ok(AllocationDevice::XNNPACK),
 			"TVM" => Ok(AllocationDevice::TVM),
 			_ => Err(value)
 		}

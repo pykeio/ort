@@ -258,7 +258,9 @@ pub enum Error {
 	#[error("Could't get device ID from memory info: {0}")]
 	GetDeviceId(ErrorInternal),
 	#[error("Training API is not enabled in this build of ONNX Runtime.")]
-	TrainingNotEnabled
+	TrainingNotEnabled,
+	#[error("{got} inputs were provided, but the model only accepts {expected}.")]
+	MismatchedInputCount { got: usize, expected: usize }
 }
 
 impl Error {

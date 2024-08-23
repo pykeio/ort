@@ -250,6 +250,16 @@ impl Session {
 
 		// The C API expects pointers for the arrays (pointers to C-arrays)
 		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.map(|input_array_ort| input_array_ort.ptr().cast_const()).collect();
+		if input_ort_values.len() > input_names.len() {
+			// If we provide more inputs than the model expects with `ort::inputs![a, b, c]`, then we get an `input_names` shorter
+			// than `inputs`. ONNX Runtime will attempt to look up the name of all inputs before doing any checks, thus going out of
+			// bounds of `input_names` and triggering a segfault, so we check that condition here. This will never trip for
+			// `ValueMap` inputs since the number of names & values are always equal as its a vec of tuples.
+			return Err(Error::MismatchedInputCount {
+				got: input_ort_values.len(),
+				expected: input_names.len()
+			});
+		}
 
 		let run_options_ptr = if let Some(run_options) = &run_options {
 			run_options.run_options_ptr.as_ptr()

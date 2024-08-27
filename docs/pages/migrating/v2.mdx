@@ -23,7 +23,7 @@ Values returned by session inference are now `DynValue`s, which behave exactly t
 
 Tensors created from Rust, like via the new `Tensor::new` function, can be directly and infallibly extracted into its underlying data via `extract_tensor` (no `try_`):
 ```rust
-let allocator = Allocator::new(&session, MemoryInfo::new(AllocationDevice::CUDAPinned, 0, AllocatorType::Device, MemoryType::CPUInput)?)?;
+let allocator = Allocator::new(&session, MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?)?;
 let tensor = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
 
 let array = tensor.extract_array();

@@ -57,7 +57,7 @@ use crate::{
 ///
 /// let input_allocator = Allocator::new(
 /// 	&unet,
-/// 	MemoryInfo::new(AllocationDevice::CUDAPinned, 0, AllocatorType::Device, MemoryType::CPUInput)?
+/// 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
 /// )?;
 /// let mut latents = Tensor::<f32>::new(&input_allocator, [1, 4, 64, 64])?;
 ///
@@ -66,7 +66,7 @@ use crate::{
 ///
 /// let output_allocator = Allocator::new(
 /// 	&unet,
-/// 	MemoryInfo::new(AllocationDevice::CUDAPinned, 0, AllocatorType::Device, MemoryType::CPUOutput)?
+/// 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUOutput)?
 /// )?;
 /// io_binding.bind_output("noise_pred", Tensor::<f32>::new(&output_allocator, [1, 4, 64, 64])?)?;
 ///

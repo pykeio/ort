@@ -50,7 +50,7 @@ use crate::{
 /// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// let allocator = Allocator::new(
 /// 	&session,
-/// 	MemoryInfo::new(AllocationDevice::CUDAPinned, 0, AllocatorType::Device, MemoryType::CPUInput)?
+/// 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
 /// )?;
 ///
 /// // Create a tensor with our pinned allocator.

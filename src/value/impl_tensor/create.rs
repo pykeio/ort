@@ -98,7 +98,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let allocator = Allocator::new(
 	/// 	&session,
-	/// 	MemoryInfo::new(AllocationDevice::CUDAPinned, 0, AllocatorType::Device, MemoryType::CPUInput)?
+	/// 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
 	/// )?;
 	///
 	/// let mut img_input = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;

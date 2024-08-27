@@ -5,7 +5,6 @@ use std::{
 };
 
 use crate::{
-	char_p_to_string,
 	error::{status_to_result, Error, Result},
 	ortsys,
 	session::{Session, SharedSessionInner}
@@ -133,71 +132,45 @@ impl Drop for Allocator {
 
 /// Represents possible devices that have their own device allocator.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum AllocationDevice {
-	// https://github.com/microsoft/onnxruntime/blob/v1.19.0/include/onnxruntime/core/framework/allocator.h#L43-L53
-	// ort will likely never support WebGPU, so I think it's best to leave `WebGPU_Buffer` out entirely to reduce confusion
-	CPU,
-	CUDA,
-	CUDAPinned,
-	CANN,
-	CANNPinned,
-	DirectML,
-	HIP,
-	HIPPinned,
-	OpenVINOCPU,
-	OpenVINOGPU,
-	// these aren't defined in allocator.h and are instead scattered all over. fun!
-	DirectMLCPU,
-	XNNPACK,
-	TVM
-}
+// &'static str should be valid here since they're only ever defined in C++ with `const char *` literals
+pub struct AllocationDevice(&'static str);
 
 impl AllocationDevice {
+	pub const CPU: AllocationDevice = AllocationDevice("Cpu");
+	pub const CUDA: AllocationDevice = AllocationDevice("Cuda");
+	pub const CUDA_PINNED: AllocationDevice = AllocationDevice("CudaPinned");
+	pub const CANN: AllocationDevice = AllocationDevice("Cann");
+	pub const CANN_PINNED: AllocationDevice = AllocationDevice("CannPinned");
+	pub const DIRECTML: AllocationDevice = AllocationDevice("Dml");
+	pub const DIRECTML_CPU: AllocationDevice = AllocationDevice("DML CPU");
+	pub const HIP: AllocationDevice = AllocationDevice("Hip");
+	pub const HIP_PINNED: AllocationDevice = AllocationDevice("HipPinned");
+	pub const OPENVINO_CPU: AllocationDevice = AllocationDevice("OpenVINO_CPU");
+	pub const OPENVINO_GPU: AllocationDevice = AllocationDevice("OpenVINO_GPU");
+	pub const XNNPACK: AllocationDevice = AllocationDevice("XnnpackExecutionProvider");
+	pub const TVM: AllocationDevice = AllocationDevice("TVM");
+
 	pub fn as_str(&self) -> &'static str {
-		match self {
-			Self::CPU => "Cpu",
-			Self::CUDA => "Cuda",
-			Self::CUDAPinned => "CudaPinned",
-			Self::CANN => "Cann",
-			Self::CANNPinned => "CannPinned",
-			Self::DirectML => "Dml",
-			Self::DirectMLCPU => "DML CPU", // yes, caps & space
-			Self::HIP => "Hip",
-			Self::HIPPinned => "HipPinned",
-			Self::OpenVINOCPU => "OpenVINO_CPU",
-			Self::OpenVINOGPU => "OpenVINO_GPU",
-			Self::XNNPACK => "XnnpackExecutionProvider",
-			Self::TVM => "TVM"
-		}
+		self.0
 	}
 
 	/// Returns `true` if this memory is accessible by the CPU; meaning that, if a value were allocated on this device,
 	/// it could be extracted to an `ndarray` or slice.
 	pub fn is_cpu_accessible(&self) -> bool {
-		matches!(self, Self::CPU | Self::CUDAPinned | Self::CANNPinned | Self::HIPPinned | Self::OpenVINOCPU | Self::DirectMLCPU | Self::XNNPACK | Self::TVM)
+		self == &Self::CPU
+			|| self == &Self::CUDA_PINNED
+			|| self == &Self::CANN_PINNED
+			|| self == &Self::HIP_PINNED
+			|| self == &Self::OPENVINO_CPU
+			|| self == &Self::DIRECTML_CPU
+			|| self == &Self::XNNPACK
+			|| self == &Self::TVM
 	}
 }
 
-impl TryFrom<String> for AllocationDevice {
-	type Error = String;
-
-	fn try_from(value: String) -> Result<Self, String> {
-		match value.as_str() {
-			"Cpu" | "CUDA_CPU" => Ok(AllocationDevice::CPU),
-			"Cuda" => Ok(AllocationDevice::CUDA),
-			"CudaPinned" => Ok(AllocationDevice::CUDAPinned),
-			"Cann" => Ok(AllocationDevice::CANN),
-			"CannPinned" => Ok(AllocationDevice::CANNPinned),
-			"Dml" => Ok(AllocationDevice::DirectML),
-			"DML CPU" => Ok(AllocationDevice::DirectMLCPU),
-			"Hip" => Ok(AllocationDevice::HIP),
-			"HipPinned" => Ok(AllocationDevice::HIPPinned),
-			"OpenVINO_CPU" => Ok(AllocationDevice::OpenVINOCPU),
-			"OpenVINO_GPU" => Ok(AllocationDevice::OpenVINOGPU),
-			"XnnpackExecutionProvider" => Ok(AllocationDevice::XNNPACK),
-			"TVM" => Ok(AllocationDevice::TVM),
-			_ => Err(value)
-		}
+impl PartialEq<str> for AllocationDevice {
+	fn eq(&self, other: &str) -> bool {
+		self.0 == other
 	}
 }
 
@@ -351,10 +324,16 @@ impl MemoryInfo {
 	pub fn allocation_device(&self) -> Result<AllocationDevice> {
 		let mut name_ptr: *const c_char = std::ptr::null_mut();
 		ortsys![unsafe MemoryInfoGetName(self.ptr.as_ptr(), &mut name_ptr) -> Error::GetAllocationDevice; nonNull(name_ptr)];
-		// no need to free: "Do NOT free the returned pointer. It is valid for the lifetime of the OrtMemoryInfo"
 
-		let name: String = char_p_to_string(name_ptr)?;
-		AllocationDevice::try_from(name).map_err(Error::UnknownAllocationDevice)
+		let mut len = 0;
+		while unsafe { *name_ptr.add(len) } != 0x00 {
+			len += 1;
+		}
+
+		// SAFETY: ONNX Runtime internally only ever defines allocation device names as ASCII. can't wait for this to blow up
+		// one day regardless
+		let name = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr.cast::<u8>(), len)) };
+		Ok(AllocationDevice(name))
 	}
 
 	/// Returns the ID of the [`AllocationDevice`] described by this struct.

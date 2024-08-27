@@ -199,8 +199,6 @@ pub enum Error {
 	GetAllocationDevice(ErrorInternal),
 	#[error("Failed to get available execution providers: {0}")]
 	GetAvailableProviders(ErrorInternal),
-	#[error("Unknown allocation device `{0}`")]
-	UnknownAllocationDevice(String),
 	#[error("Error when binding input: {0}")]
 	BindInput(ErrorInternal),
 	#[error("Error when binding output: {0}")]

@@ -352,10 +352,33 @@ impl MemoryInfo {
 	}
 }
 
+impl PartialEq<MemoryInfo> for MemoryInfo {
+	fn eq(&self, other: &MemoryInfo) -> bool {
+		let mut out = 0;
+		ortsys![unsafe CompareMemoryInfo(self.ptr.as_ptr(), other.ptr.as_ptr(), &mut out)]; // implementation always returns ok status
+		out == 0
+	}
+}
+
 impl Drop for MemoryInfo {
 	fn drop(&mut self) {
 		if self.should_release {
 			ortsys![unsafe ReleaseMemoryInfo(self.ptr.as_ptr())];
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType};
+
+	#[test]
+	fn test_memory_info_eq() -> crate::Result<()> {
+		let a = MemoryInfo::new(AllocationDevice::CUDA, 1, AllocatorType::Device, MemoryType::Default)?;
+		let b = MemoryInfo::new(AllocationDevice::CUDA, 1, AllocatorType::Device, MemoryType::Default)?;
+		assert_eq!(a, b);
+		let c = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?;
+		assert_ne!(a, c);
+		Ok(())
 	}
 }

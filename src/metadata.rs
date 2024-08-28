@@ -92,6 +92,26 @@ impl<'s> ModelMetadata<'s> {
 			Ok(None)
 		}
 	}
+
+	pub fn custom_keys(&self) -> Result<Vec<String>> {
+		let mut keys: *mut *mut c_char = std::ptr::null_mut();
+		let mut key_len = 0;
+		ortsys![unsafe ModelMetadataGetCustomMetadataMapKeys(self.metadata_ptr.as_ptr(), self.allocator.ptr.as_ptr(), &mut keys, &mut key_len) -> Error::GetModelMetadata];
+		if key_len != 0 && !keys.is_null() {
+			let res = unsafe { std::slice::from_raw_parts(keys, key_len as usize) }
+				.iter()
+				.map(|c| {
+					let res = char_p_to_string(*c);
+					unsafe { self.allocator.free(*c) };
+					res
+				})
+				.collect();
+			unsafe { self.allocator.free(keys) };
+			res
+		} else {
+			Ok(vec![])
+		}
+	}
 }
 
 impl<'s> Drop for ModelMetadata<'s> {

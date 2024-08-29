@@ -8,7 +8,7 @@ use std::{
 	path::Path,
 	ptr::{self, NonNull},
 	rc::Rc,
-	sync::{atomic::Ordering, Arc}
+	sync::Arc
 };
 
 use super::{dangerous, InMemorySession, Input, Output, Session, SharedSessionInner};
@@ -312,10 +312,8 @@ impl SessionBuilder {
 			ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr.as_ptr()) -> Error::CreateSessionOptions];
 		}
 
-		let env_ptr = env.env_ptr.load(Ordering::Relaxed);
-
 		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
-		ortsys![unsafe CreateSession(env_ptr, model_path.as_ptr(), self.session_options_ptr.as_ptr(), &mut session_ptr) -> Error::CreateSession; nonNull(session_ptr)];
+		ortsys![unsafe CreateSession(env.env_ptr.as_ptr(), model_path.as_ptr(), self.session_options_ptr.as_ptr(), &mut session_ptr) -> Error::CreateSession; nonNull(session_ptr)];
 
 		let session_ptr = unsafe { NonNull::new_unchecked(session_ptr) };
 
@@ -348,7 +346,7 @@ impl SessionBuilder {
 				session_ptr,
 				allocator,
 				_extras: extras,
-				_environment: Arc::clone(env)
+				_environment: env
 			}),
 			inputs,
 			outputs
@@ -389,12 +387,10 @@ impl SessionBuilder {
 			ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr.as_ptr()) -> Error::CreateSessionOptions];
 		}
 
-		let env_ptr = env.env_ptr.load(Ordering::Relaxed);
-
 		let model_data = model_bytes.as_ptr().cast::<std::ffi::c_void>();
 		let model_data_length = model_bytes.len();
 		ortsys![
-			unsafe CreateSessionFromArray(env_ptr, model_data, model_data_length as _, self.session_options_ptr.as_ptr(), &mut session_ptr) -> Error::CreateSession;
+			unsafe CreateSessionFromArray(env.env_ptr.as_ptr(), model_data, model_data_length as _, self.session_options_ptr.as_ptr(), &mut session_ptr) -> Error::CreateSession;
 			nonNull(session_ptr)
 		];
 
@@ -429,7 +425,7 @@ impl SessionBuilder {
 				session_ptr,
 				allocator,
 				_extras: extras,
-				_environment: Arc::clone(env)
+				_environment: env
 			}),
 			inputs,
 			outputs

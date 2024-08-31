@@ -1,3 +1,5 @@
+#[cfg(any(feature = "operator-libraries", not(windows)))]
+use std::ffi::CString;
 use std::{rc::Rc, sync::Arc};
 
 use super::SessionBuilder;
@@ -117,8 +119,6 @@ impl SessionBuilder {
 	#[cfg(feature = "operator-libraries")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "operator-libraries")))]
 	pub fn with_operator_library(mut self, lib_path: impl AsRef<str>) -> Result<Self> {
-		use std::ffi::CString;
-
 		use crate::error::status_to_result;
 
 		let path_cstr = CString::new(lib_path.as_ref())?;

@@ -1,6 +1,5 @@
-#[cfg(any(feature = "operator-libraries", not(windows)))]
-use std::ffi::CString;
 use std::{
+	ffi::CString,
 	ptr::{self, NonNull},
 	rc::Rc,
 	sync::Arc

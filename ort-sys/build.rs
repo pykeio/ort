@@ -114,18 +114,6 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 			}
 		}
 
-		#[cfg(target_os = "linux")]
-		{
-			let main_dy = lib_dir.join("libonnxruntime.so");
-			let versioned_dy = out_dir.join(format!("libonnxruntime.so.{}", ONNXRUNTIME_VERSION));
-			if main_dy.exists() && !versioned_dy.exists() {
-				if versioned_dy.is_symlink() {
-					fs::remove_file(&versioned_dy).unwrap();
-				}
-				std::os::unix::fs::symlink(main_dy, versioned_dy).unwrap();
-			}
-		}
-
 		// If we had to fallback to copying files on Windows, break early to avoid copying to 3 different directories
 		if copy_fallback {
 			break;

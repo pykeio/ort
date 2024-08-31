@@ -1,99 +1,13 @@
-#[cfg(any(feature = "operator-libraries", not(windows)))]
-use std::ffi::CString;
-#[cfg(feature = "fetch-models")]
-use std::fmt::Write;
-use std::{
-	any::Any,
-	marker::PhantomData,
-	path::Path,
-	ptr::{self, NonNull},
-	rc::Rc,
-	sync::Arc
-};
+use std::{rc::Rc, sync::Arc};
 
-use super::{dangerous, InMemorySession, Input, Output, Session, SharedSessionInner};
-#[cfg(feature = "fetch-models")]
-use crate::error::FetchModelError;
+use super::SessionBuilder;
 use crate::{
-	environment::get_environment,
-	error::{assert_non_null_pointer, status_to_result, Error, Result},
+	error::{Error, Result},
 	execution_providers::{apply_execution_providers, ExecutionProviderDispatch},
-	memory::{Allocator, MemoryInfo},
-	operator::OperatorDomain,
-	ortsys
+	ortsys, MemoryInfo, OperatorDomain
 };
-
-/// Creates a session using the builder pattern.
-///
-/// Once configured, use the [`SessionBuilder::commit_from_file`](crate::SessionBuilder::commit_from_file)
-/// method to 'commit' the builder configuration into a [`Session`].
-///
-/// ```
-/// # use ort::{GraphOptimizationLevel, Session};
-/// # fn main() -> ort::Result<()> {
-/// let session = Session::builder()?
-/// 	.with_optimization_level(GraphOptimizationLevel::Level1)?
-/// 	.with_intra_threads(1)?
-/// 	.commit_from_file("tests/data/upsample.onnx")?;
-/// # Ok(())
-/// # }
-/// ```
-pub struct SessionBuilder {
-	pub(crate) session_options_ptr: NonNull<ort_sys::OrtSessionOptions>,
-	memory_info: Option<Rc<MemoryInfo>>,
-	#[cfg(feature = "operator-libraries")]
-	custom_runtime_handles: Vec<Arc<LibHandle>>,
-	operator_domains: Vec<Arc<OperatorDomain>>
-}
-
-impl Clone for SessionBuilder {
-	fn clone(&self) -> Self {
-		let mut session_options_ptr = ptr::null_mut();
-		status_to_result(ortsys![unsafe CloneSessionOptions(self.session_options_ptr.as_ptr(), ptr::addr_of_mut!(session_options_ptr))])
-			.expect("error cloning session options");
-		assert_non_null_pointer(session_options_ptr, "OrtSessionOptions").expect("Cloned session option pointer is null");
-		Self {
-			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },
-			memory_info: self.memory_info.clone(),
-			#[cfg(feature = "operator-libraries")]
-			custom_runtime_handles: self.custom_runtime_handles.clone(),
-			operator_domains: self.operator_domains.clone()
-		}
-	}
-}
-
-impl Drop for SessionBuilder {
-	fn drop(&mut self) {
-		ortsys![unsafe ReleaseSessionOptions(self.session_options_ptr.as_ptr())];
-	}
-}
 
 impl SessionBuilder {
-	/// Creates a new session builder.
-	///
-	/// ```
-	/// # use ort::{GraphOptimizationLevel, Session};
-	/// # fn main() -> ort::Result<()> {
-	/// let session = Session::builder()?
-	/// 	.with_optimization_level(GraphOptimizationLevel::Level1)?
-	/// 	.with_intra_threads(1)?
-	/// 	.commit_from_file("tests/data/upsample.onnx")?;
-	/// # Ok(())
-	/// # }
-	/// ```
-	pub fn new() -> Result<Self> {
-		let mut session_options_ptr: *mut ort_sys::OrtSessionOptions = std::ptr::null_mut();
-		ortsys![unsafe CreateSessionOptions(&mut session_options_ptr) -> Error::CreateSessionOptions; nonNull(session_options_ptr)];
-
-		Ok(Self {
-			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },
-			memory_info: None,
-			#[cfg(feature = "operator-libraries")]
-			custom_runtime_handles: Vec::new(),
-			operator_domains: Vec::new()
-		})
-	}
-
 	/// Registers a list of execution providers for this session. Execution providers are registered in the order they
 	/// are provided.
 	///
@@ -203,6 +117,10 @@ impl SessionBuilder {
 	#[cfg(feature = "operator-libraries")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "operator-libraries")))]
 	pub fn with_operator_library(mut self, lib_path: impl AsRef<str>) -> Result<Self> {
+		use std::ffi::CString;
+
+		use crate::error::status_to_result;
+
 		let path_cstr = CString::new(lib_path.as_ref())?;
 
 		let mut handle: *mut ::std::os::raw::c_void = std::ptr::null_mut();
@@ -228,8 +146,7 @@ impl SessionBuilder {
 
 	/// Enables [`onnxruntime-extensions`](https://github.com/microsoft/onnxruntime-extensions) custom operators.
 	pub fn with_extensions(self) -> Result<Self> {
-		let status = ortsys![unsafe EnableOrtCustomOps(self.session_options_ptr.as_ptr())];
-		status_to_result(status).map_err(Error::CreateSessionOptions)?;
+		ortsys![unsafe EnableOrtCustomOps(self.session_options_ptr.as_ptr()) -> Error::EnableExtensions];
 		Ok(self)
 	}
 
@@ -238,199 +155,6 @@ impl SessionBuilder {
 		ortsys![unsafe AddCustomOpDomain(self.session_options_ptr.as_ptr(), domain.ptr()) -> Error::AddCustomOperatorDomain];
 		self.operator_domains.push(domain);
 		Ok(self)
-	}
-
-	/// Downloads a pre-trained ONNX model from the given URL and builds the session.
-	#[cfg(feature = "fetch-models")]
-	#[cfg_attr(docsrs, doc(cfg(feature = "fetch-models")))]
-	pub fn commit_from_url(self, model_url: impl AsRef<str>) -> Result<Session> {
-		let mut download_dir = ort_sys::internal::dirs::cache_dir()
-			.expect("could not determine cache directory")
-			.join("models");
-		if std::fs::create_dir_all(&download_dir).is_err() {
-			download_dir = std::env::current_dir().expect("Failed to obtain current working directory");
-		}
-
-		let url = model_url.as_ref();
-		let model_filename = <sha2::Sha256 as sha2::Digest>::digest(url).into_iter().fold(String::new(), |mut s, b| {
-			let _ = write!(&mut s, "{:02x}", b);
-			s
-		});
-		let model_filepath = download_dir.join(model_filename);
-		let downloaded_path = if model_filepath.exists() {
-			tracing::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), "Model already exists, skipping download");
-			model_filepath
-		} else {
-			tracing::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), url = format!("{url:?}").as_str(), "Downloading model");
-
-			let resp = ureq::get(url).call().map_err(Box::new).map_err(FetchModelError::FetchError)?;
-
-			let len = resp
-				.header("Content-Length")
-				.and_then(|s| s.parse::<usize>().ok())
-				.expect("Missing Content-Length header");
-			tracing::info!(len, "Downloading {} bytes", len);
-
-			let mut reader = resp.into_reader();
-
-			let f = std::fs::File::create(&model_filepath).expect("Failed to create model file");
-			let mut writer = std::io::BufWriter::new(f);
-
-			let bytes_io_count = std::io::copy(&mut reader, &mut writer).map_err(FetchModelError::IoError)?;
-			if bytes_io_count == len as u64 {
-				model_filepath
-			} else {
-				return Err(FetchModelError::CopyError {
-					expected: len as u64,
-					io: bytes_io_count
-				}
-				.into());
-			}
-		};
-
-		self.commit_from_file(downloaded_path)
-	}
-
-	/// Loads an ONNX model from a file and builds the session.
-	pub fn commit_from_file<P>(mut self, model_filepath_ref: P) -> Result<Session>
-	where
-		P: AsRef<Path>
-	{
-		let model_filepath = model_filepath_ref.as_ref();
-		if !model_filepath.exists() {
-			return Err(Error::FileDoesNotExist {
-				filename: model_filepath.to_path_buf()
-			});
-		}
-
-		let model_path = crate::util::path_to_os_char(model_filepath);
-
-		let env = get_environment()?;
-		apply_execution_providers(&self, env.execution_providers.iter().cloned())?;
-
-		if env.has_global_threadpool {
-			ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr.as_ptr()) -> Error::CreateSessionOptions];
-		}
-
-		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
-		ortsys![unsafe CreateSession(env.env_ptr.as_ptr(), model_path.as_ptr(), self.session_options_ptr.as_ptr(), &mut session_ptr) -> Error::CreateSession; nonNull(session_ptr)];
-
-		let session_ptr = unsafe { NonNull::new_unchecked(session_ptr) };
-
-		let allocator = match &self.memory_info {
-			Some(info) => {
-				let mut allocator_ptr: *mut ort_sys::OrtAllocator = std::ptr::null_mut();
-				ortsys![unsafe CreateAllocator(session_ptr.as_ptr(), info.ptr.as_ptr(), &mut allocator_ptr) -> Error::CreateAllocator; nonNull(allocator_ptr)];
-				unsafe { Allocator::from_raw_unchecked(allocator_ptr) }
-			}
-			None => Allocator::default()
-		};
-
-		// Extract input and output properties
-		let num_input_nodes = dangerous::extract_inputs_count(session_ptr)?;
-		let num_output_nodes = dangerous::extract_outputs_count(session_ptr)?;
-		let inputs = (0..num_input_nodes)
-			.map(|i| dangerous::extract_input(session_ptr, &allocator, i))
-			.collect::<Result<Vec<Input>>>()?;
-		let outputs = (0..num_output_nodes)
-			.map(|i| dangerous::extract_output(session_ptr, &allocator, i))
-			.collect::<Result<Vec<Output>>>()?;
-
-		let extras = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>);
-		#[cfg(feature = "operator-libraries")]
-		let extras = extras.chain(self.custom_runtime_handles.drain(..).map(|d| Box::new(d) as Box<dyn Any>));
-		let extras: Vec<Box<dyn Any>> = extras.collect();
-
-		Ok(Session {
-			inner: Arc::new(SharedSessionInner {
-				session_ptr,
-				allocator,
-				_extras: extras,
-				_environment: env
-			}),
-			inputs,
-			outputs
-		})
-	}
-
-	/// Load an ONNX graph from memory and commit the session
-	/// For `.ort` models, we enable `session.use_ort_model_bytes_directly`.
-	/// For more information, check [Load ORT format model from an in-memory byte array](https://onnxruntime.ai/docs/performance/model-optimizations/ort-format-models.html#load-ort-format-model-from-an-in-memory-byte-array).
-	///
-	/// If you wish to store the model bytes and the [`InMemorySession`] in the same struct, look for crates that
-	/// facilitate creating self-referential structs, such as [`ouroboros`](https://github.com/joshua-maros/ouroboros).
-	pub fn commit_from_memory_directly(self, model_bytes: &[u8]) -> Result<InMemorySession<'_>> {
-		let str_to_char = |s: &str| {
-			s.as_bytes()
-				.iter()
-				.chain(std::iter::once(&b'\0')) // Make sure we have a null terminated string
-				.map(|b| *b as std::os::raw::c_char)
-				.collect::<Vec<std::os::raw::c_char>>()
-		};
-		// Enable zero-copy deserialization for models in `.ort` format.
-		ortsys![unsafe AddSessionConfigEntry(self.session_options_ptr.as_ptr(), str_to_char("session.use_ort_model_bytes_directly").as_ptr(), str_to_char("1").as_ptr())];
-		ortsys![unsafe AddSessionConfigEntry(self.session_options_ptr.as_ptr(), str_to_char("session.use_ort_model_bytes_for_initializers").as_ptr(), str_to_char("1").as_ptr())];
-
-		let session = self.commit_from_memory(model_bytes)?;
-
-		Ok(InMemorySession { session, phantom: PhantomData })
-	}
-
-	/// Load an ONNX graph from memory and commit the session.
-	pub fn commit_from_memory(mut self, model_bytes: &[u8]) -> Result<Session> {
-		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
-
-		let env = get_environment()?;
-		apply_execution_providers(&self, env.execution_providers.iter().cloned())?;
-
-		if env.has_global_threadpool {
-			ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr.as_ptr()) -> Error::CreateSessionOptions];
-		}
-
-		let model_data = model_bytes.as_ptr().cast::<std::ffi::c_void>();
-		let model_data_length = model_bytes.len();
-		ortsys![
-			unsafe CreateSessionFromArray(env.env_ptr.as_ptr(), model_data, model_data_length as _, self.session_options_ptr.as_ptr(), &mut session_ptr) -> Error::CreateSession;
-			nonNull(session_ptr)
-		];
-
-		let session_ptr = unsafe { NonNull::new_unchecked(session_ptr) };
-
-		let allocator = match &self.memory_info {
-			Some(info) => {
-				let mut allocator_ptr: *mut ort_sys::OrtAllocator = std::ptr::null_mut();
-				ortsys![unsafe CreateAllocator(session_ptr.as_ptr(), info.ptr.as_ptr(), &mut allocator_ptr) -> Error::CreateAllocator; nonNull(allocator_ptr)];
-				unsafe { Allocator::from_raw_unchecked(allocator_ptr) }
-			}
-			None => Allocator::default()
-		};
-
-		// Extract input and output properties
-		let num_input_nodes = dangerous::extract_inputs_count(session_ptr)?;
-		let num_output_nodes = dangerous::extract_outputs_count(session_ptr)?;
-		let inputs = (0..num_input_nodes)
-			.map(|i| dangerous::extract_input(session_ptr, &allocator, i))
-			.collect::<Result<Vec<Input>>>()?;
-		let outputs = (0..num_output_nodes)
-			.map(|i| dangerous::extract_output(session_ptr, &allocator, i))
-			.collect::<Result<Vec<Output>>>()?;
-
-		let extras = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>);
-		#[cfg(feature = "operator-libraries")]
-		let extras = extras.chain(self.custom_runtime_handles.drain(..).map(|d| Box::new(d) as Box<dyn Any>));
-		let extras: Vec<Box<dyn Any>> = extras.collect();
-
-		let session = Session {
-			inner: Arc::new(SharedSessionInner {
-				session_ptr,
-				allocator,
-				_extras: extras,
-				_environment: env
-			}),
-			inputs,
-			outputs
-		};
-		Ok(session)
 	}
 }
 
@@ -526,7 +250,7 @@ impl From<GraphOptimizationLevel> for ort_sys::GraphOptimizationLevel {
 }
 
 #[cfg(feature = "operator-libraries")]
-struct LibHandle(*mut std::os::raw::c_void);
+pub(super) struct LibHandle(*mut std::os::raw::c_void);
 
 #[cfg(feature = "operator-libraries")]
 impl LibHandle {

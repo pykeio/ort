@@ -217,10 +217,9 @@ impl ExecutionProvider for QNNExecutionProvider {
 				key_ptrs.as_ptr(),
 				value_ptrs.as_ptr(),
 				len as _,
-			)])
-			.map_err(Error::ExecutionProvider);
+			)]);
 		}
 
-		Err(Error::ExecutionProviderNotRegistered(self.as_str()))
+		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
 	}
 }

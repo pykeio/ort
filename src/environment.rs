@@ -9,11 +9,7 @@ use tracing::{debug, Level};
 
 #[cfg(feature = "load-dynamic")]
 use crate::G_ORT_DYLIB_PATH;
-use crate::{
-	error::{Error, Result},
-	execution_providers::ExecutionProviderDispatch,
-	extern_system_fn, ortsys
-};
+use crate::{error::Result, execution_providers::ExecutionProviderDispatch, extern_system_fn, ortsys};
 
 struct EnvironmentSingleton {
 	lock: RwLock<Option<Arc<Environment>>>
@@ -154,19 +150,19 @@ impl EnvironmentBuilder {
 			let cname = CString::new(self.name.clone()).unwrap_or_else(|_| unreachable!());
 
 			let mut thread_options: *mut ort_sys::OrtThreadingOptions = std::ptr::null_mut();
-			ortsys![unsafe CreateThreadingOptions(&mut thread_options) -> Error::CreateEnvironment; nonNull(thread_options)];
+			ortsys![unsafe CreateThreadingOptions(&mut thread_options)?; nonNull(thread_options)];
 			if let Some(inter_op_parallelism) = global_thread_pool.inter_op_parallelism {
-				ortsys![unsafe SetGlobalInterOpNumThreads(thread_options, inter_op_parallelism) -> Error::CreateEnvironment];
+				ortsys![unsafe SetGlobalInterOpNumThreads(thread_options, inter_op_parallelism)?];
 			}
 			if let Some(intra_op_parallelism) = global_thread_pool.intra_op_parallelism {
-				ortsys![unsafe SetGlobalIntraOpNumThreads(thread_options, intra_op_parallelism) -> Error::CreateEnvironment];
+				ortsys![unsafe SetGlobalIntraOpNumThreads(thread_options, intra_op_parallelism)?];
 			}
 			if let Some(spin_control) = global_thread_pool.spin_control {
-				ortsys![unsafe SetGlobalSpinControl(thread_options, i32::from(spin_control)) -> Error::CreateEnvironment];
+				ortsys![unsafe SetGlobalSpinControl(thread_options, i32::from(spin_control))?];
 			}
 			if let Some(intra_op_thread_affinity) = global_thread_pool.intra_op_thread_affinity {
 				let cstr = CString::new(intra_op_thread_affinity).unwrap_or_else(|_| unreachable!());
-				ortsys![unsafe SetGlobalIntraOpThreadAffinity(thread_options, cstr.as_ptr()) -> Error::CreateEnvironment];
+				ortsys![unsafe SetGlobalIntraOpThreadAffinity(thread_options, cstr.as_ptr())?];
 			}
 
 			ortsys![
@@ -177,7 +173,7 @@ impl EnvironmentBuilder {
 					cname.as_ptr(),
 					thread_options,
 					&mut env_ptr
-				) -> Error::CreateEnvironment;
+				)?;
 				nonNull(env_ptr)
 			];
 			ortsys![unsafe ReleaseThreadingOptions(thread_options)];
@@ -195,7 +191,7 @@ impl EnvironmentBuilder {
 					ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
 					cname.as_ptr(),
 					&mut env_ptr
-				) -> Error::CreateEnvironment;
+				)?;
 				nonNull(env_ptr)
 			];
 			(env_ptr, false)
@@ -203,9 +199,9 @@ impl EnvironmentBuilder {
 		debug!(env_ptr = format!("{env_ptr:?}").as_str(), "Environment created");
 
 		if self.telemetry {
-			ortsys![unsafe EnableTelemetryEvents(env_ptr) -> Error::CreateEnvironment];
+			ortsys![unsafe EnableTelemetryEvents(env_ptr)?];
 		} else {
-			ortsys![unsafe DisableTelemetryEvents(env_ptr) -> Error::CreateEnvironment];
+			ortsys![unsafe DisableTelemetryEvents(env_ptr)?];
 		}
 
 		let mut env_lock = G_ENV.lock.write().expect("poisoned lock");

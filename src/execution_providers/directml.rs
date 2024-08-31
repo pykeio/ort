@@ -49,10 +49,9 @@ impl ExecutionProvider for DirectMLExecutionProvider {
 			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_DML(options: *mut ort_sys::OrtSessionOptions, device_id: std::os::raw::c_int) -> ort_sys::OrtStatusPtr);
 			return crate::error::status_to_result(unsafe {
 				OrtSessionOptionsAppendExecutionProvider_DML(session_builder.session_options_ptr.as_ptr(), self.device_id as _)
-			})
-			.map_err(Error::ExecutionProvider);
+			});
 		}
 
-		Err(Error::ExecutionProviderNotRegistered(self.as_str()))
+		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
 	}
 }

@@ -15,7 +15,8 @@ use crate::{
 	error::{Error, Result},
 	memory::Allocator,
 	ortsys,
-	tensor::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType}
+	tensor::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType},
+	ErrorCode
 };
 
 pub trait MapValueTypeMarker: ValueTypeMarker {
@@ -73,17 +74,20 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 			ValueType::Map { key, value } => {
 				let k_type = K::into_tensor_element_type();
 				if k_type != key {
-					return Err(Error::InvalidMapKeyType { expected: k_type, actual: key });
+					return Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot extract Map<{:?}, _> (value has K type {:?})", k_type, key)));
 				}
 				let v_type = V::into_tensor_element_type();
 				if v_type != value {
-					return Err(Error::InvalidMapValueType { expected: v_type, actual: value });
+					return Err(Error::new_with_code(
+						ErrorCode::InvalidArgument,
+						format!("Cannot extract Map<_, {:?}> (value has V type {:?})", v_type, value)
+					));
 				}
 
 				let allocator = Allocator::default();
 
 				let mut key_tensor_ptr = ptr::null_mut();
-				ortsys![unsafe GetValue(self.ptr(), 0, allocator.ptr.as_ptr(), &mut key_tensor_ptr) -> Error::ExtractMap; nonNull(key_tensor_ptr)];
+				ortsys![unsafe GetValue(self.ptr(), 0, allocator.ptr.as_ptr(), &mut key_tensor_ptr)?; nonNull(key_tensor_ptr)];
 				let key_value: DynTensor = unsafe { Value::from_ptr(NonNull::new_unchecked(key_tensor_ptr), None) };
 				if K::into_tensor_element_type() != TensorElementType::String {
 					let dtype = key_value.dtype()?;
@@ -91,29 +95,29 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 						ValueType::Tensor { ty, dimensions } => {
 							let device = key_value.memory_info()?.allocation_device()?;
 							if !device.is_cpu_accessible() {
-								return Err(Error::TensorNotOnCpu(device.as_str()));
+								return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", device.as_str())));
 							}
 
 							if ty == K::into_tensor_element_type() {
 								let mut output_array_ptr: *mut K = ptr::null_mut();
 								let output_array_ptr_ptr: *mut *mut K = &mut output_array_ptr;
 								let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
-								ortsys![unsafe GetTensorMutableData(key_tensor_ptr, output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
+								ortsys![unsafe GetTensorMutableData(key_tensor_ptr, output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
 								let len = calculate_tensor_size(&dimensions);
 								(dimensions, unsafe { std::slice::from_raw_parts(output_array_ptr, len) })
 							} else {
-								return Err(Error::DataTypeMismatch {
-									actual: ty,
-									requested: K::into_tensor_element_type()
-								});
+								return Err(Error::new_with_code(
+									ErrorCode::InvalidArgument,
+									format!("Cannot extract Map<{:?}, _> (value has K type {:?})", K::into_tensor_element_type(), ty)
+								));
 							}
 						}
 						_ => unreachable!()
 					};
 
 					let mut value_tensor_ptr = ptr::null_mut();
-					ortsys![unsafe GetValue(self.ptr(), 1, allocator.ptr.as_ptr(), &mut value_tensor_ptr) -> Error::ExtractMap; nonNull(value_tensor_ptr)];
+					ortsys![unsafe GetValue(self.ptr(), 1, allocator.ptr.as_ptr(), &mut value_tensor_ptr)?; nonNull(value_tensor_ptr)];
 					let value_value: DynTensor = unsafe { Value::from_ptr(NonNull::new_unchecked(value_tensor_ptr), None) };
 					let (value_tensor_shape, value_tensor) = value_value.try_extract_raw_tensor::<V>()?;
 
@@ -134,7 +138,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 					let key_tensor: Vec<K> = unsafe { std::mem::transmute(key_tensor) };
 
 					let mut value_tensor_ptr = ptr::null_mut();
-					ortsys![unsafe GetValue(self.ptr(), 1, allocator.ptr.as_ptr(), &mut value_tensor_ptr) -> Error::ExtractMap; nonNull(value_tensor_ptr)];
+					ortsys![unsafe GetValue(self.ptr(), 1, allocator.ptr.as_ptr(), &mut value_tensor_ptr)?; nonNull(value_tensor_ptr)];
 					let value_value: DynTensor = unsafe { Value::from_ptr(NonNull::new_unchecked(value_tensor_ptr), None) };
 					let (value_tensor_shape, value_tensor) = value_value.try_extract_raw_tensor::<V>()?;
 
@@ -149,7 +153,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 					Ok(vec.into_iter().collect())
 				}
 			}
-			t => Err(Error::NotMap(t))
+			t => Err(Error::new(format!("Cannot extract a Map from a value which is actually a {t:?}")))
 		}
 	}
 }
@@ -223,8 +227,7 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq + 'static, V: IntoTens
 		let values: [DynValue; 2] = [keys.into_dyn(), values.into_dyn()];
 		let value_ptrs: Vec<*const ort_sys::OrtValue> = values.iter().map(|c| c.ptr().cast_const()).collect();
 		ortsys![
-			unsafe CreateValue(value_ptrs.as_ptr(), 2, ort_sys::ONNXType::ONNX_TYPE_MAP, &mut value_ptr)
-				-> Error::CreateMap;
+			unsafe CreateValue(value_ptrs.as_ptr(), 2, ort_sys::ONNXType::ONNX_TYPE_MAP, &mut value_ptr)?;
 			nonNull(value_ptr)
 		];
 		Ok(Value {

@@ -9,7 +9,7 @@ use super::{DowncastableTarget, Value, ValueInner, ValueRef, ValueRefMut, ValueT
 use crate::{
 	error::{Error, Result},
 	memory::Allocator,
-	ortsys
+	ortsys, ErrorCode
 };
 
 pub trait SequenceValueTypeMarker: ValueTypeMarker {
@@ -50,12 +50,12 @@ impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
 		match self.dtype()? {
 			ValueType::Sequence(_) => {
 				let mut len: ort_sys::size_t = 0;
-				ortsys![unsafe GetValueCount(self.ptr(), &mut len) -> Error::ExtractSequence];
+				ortsys![unsafe GetValueCount(self.ptr(), &mut len)?];
 
 				let mut vec = Vec::with_capacity(len as usize);
 				for i in 0..len {
 					let mut value_ptr = ptr::null_mut();
-					ortsys![unsafe GetValue(self.ptr(), i as _, allocator.ptr.as_ptr(), &mut value_ptr) -> Error::ExtractSequence; nonNull(value_ptr)];
+					ortsys![unsafe GetValue(self.ptr(), i as _, allocator.ptr.as_ptr(), &mut value_ptr)?; nonNull(value_ptr)];
 
 					let value = ValueRef {
 						inner: unsafe { Value::from_ptr(NonNull::new_unchecked(value_ptr), None) },
@@ -63,14 +63,17 @@ impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
 					};
 					let value_type = value.dtype()?;
 					if !OtherType::can_downcast(&value.dtype()?) {
-						return Err(Error::InvalidSequenceElementType { actual: value_type });
+						return Err(Error::new_with_code(
+							ErrorCode::InvalidArgument,
+							format!("Cannot extract Sequence<T> (downcast of T from {value_type:?} failed)")
+						));
 					}
 
 					vec.push(value);
 				}
 				Ok(vec)
 			}
-			t => Err(Error::NotSequence(t))
+			t => Err(Error::new(format!("Cannot extract a Sequence from a value which is actually a {t:?}")))
 		}
 	}
 }
@@ -99,8 +102,7 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized + 'static> Value<Se
 		let values: Vec<Value<T>> = values.into_iter().collect();
 		let value_ptrs: Vec<*const ort_sys::OrtValue> = values.iter().map(|c| c.ptr().cast_const()).collect();
 		ortsys![
-			unsafe CreateValue(value_ptrs.as_ptr(), values.len() as _, ort_sys::ONNXType::ONNX_TYPE_SEQUENCE, &mut value_ptr)
-				-> Error::CreateSequence;
+			unsafe CreateValue(value_ptrs.as_ptr(), values.len() as _, ort_sys::ONNXType::ONNX_TYPE_SEQUENCE, &mut value_ptr)?;
 			nonNull(value_ptr)
 		];
 		Ok(Value {

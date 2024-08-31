@@ -83,7 +83,6 @@ qnn = [ "ort-sys/qnn" ]
 
 [dependencies]
 ndarray = { version = "0.16", optional = true }
-thiserror = "1.0"
 ort-sys = { version = "2.0.0-rc.5", path = "ort-sys" }
 libloading = { version = "0.8", optional = true }
 

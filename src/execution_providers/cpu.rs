@@ -1,5 +1,5 @@
 use crate::{
-	error::{status_to_result, Error, Result},
+	error::Result,
 	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
 	ortsys,
 	session::SessionBuilder
@@ -45,9 +45,10 @@ impl ExecutionProvider for CPUExecutionProvider {
 
 	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
 		if self.use_arena {
-			status_to_result(ortsys![unsafe EnableCpuMemArena(session_builder.session_options_ptr.as_ptr())]).map_err(Error::ExecutionProvider)
+			ortsys![unsafe EnableCpuMemArena(session_builder.session_options_ptr.as_ptr())?];
 		} else {
-			status_to_result(ortsys![unsafe DisableCpuMemArena(session_builder.session_options_ptr.as_ptr())]).map_err(Error::ExecutionProvider)
+			ortsys![unsafe DisableCpuMemArena(session_builder.session_options_ptr.as_ptr())?];
 		}
+		Ok(())
 	}
 }

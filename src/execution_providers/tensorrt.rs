@@ -322,7 +322,7 @@ impl ExecutionProvider for TensorRTExecutionProvider {
 			let _ = crate::get_environment();
 
 			let mut trt_options: *mut ort_sys::OrtTensorRTProviderOptionsV2 = std::ptr::null_mut();
-			crate::error::status_to_result(crate::ortsys![unsafe CreateTensorRTProviderOptions(&mut trt_options)]).map_err(Error::ExecutionProvider)?;
+			crate::ortsys![unsafe CreateTensorRTProviderOptions(&mut trt_options)?];
 			let (key_ptrs, value_ptrs, len, keys, values) = super::map_keys! {
 				device_id = self.device_id,
 				// has_user_compute_stream = self.user_compute_stream.as_ref().map(|_| 1),
@@ -368,9 +368,7 @@ impl ExecutionProvider for TensorRTExecutionProvider {
 			};
 			if let Err(e) = crate::error::status_to_result(
 				crate::ortsys![unsafe UpdateTensorRTProviderOptions(trt_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), len as _)]
-			)
-			.map_err(Error::ExecutionProvider)
-			{
+			) {
 				crate::ortsys![unsafe ReleaseTensorRTProviderOptions(trt_options)];
 				std::mem::drop((keys, values));
 				return Err(e);
@@ -379,9 +377,9 @@ impl ExecutionProvider for TensorRTExecutionProvider {
 			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_TensorRT_V2(session_builder.session_options_ptr.as_ptr(), trt_options)];
 			crate::ortsys![unsafe ReleaseTensorRTProviderOptions(trt_options)];
 			std::mem::drop((keys, values));
-			return crate::error::status_to_result(status).map_err(Error::ExecutionProvider);
+			return crate::error::status_to_result(status);
 		}
 
-		Err(Error::ExecutionProviderNotRegistered(self.as_str()))
+		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
 	}
 }

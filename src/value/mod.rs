@@ -19,7 +19,7 @@ pub use self::{
 	impl_tensor::{DynTensor, DynTensorRef, DynTensorRefMut, DynTensorValueType, Tensor, TensorRef, TensorRefMut, TensorValueType, TensorValueTypeMarker}
 };
 use crate::{
-	error::{status_to_result, Error, Result},
+	error::{status_to_result, Result},
 	memory::MemoryInfo,
 	ortsys,
 	session::SharedSessionInner,
@@ -93,21 +93,21 @@ pub enum ValueType {
 impl ValueType {
 	pub(crate) fn from_type_info(typeinfo_ptr: *mut ort_sys::OrtTypeInfo) -> Result<Self> {
 		let mut ty: ort_sys::ONNXType = ort_sys::ONNXType::ONNX_TYPE_UNKNOWN;
-		ortsys![unsafe GetOnnxTypeFromTypeInfo(typeinfo_ptr, &mut ty) -> Error::GetOnnxTypeFromTypeInfo];
+		ortsys![unsafe GetOnnxTypeFromTypeInfo(typeinfo_ptr, &mut ty)?];
 		let io_type = match ty {
 			ort_sys::ONNXType::ONNX_TYPE_TENSOR | ort_sys::ONNXType::ONNX_TYPE_SPARSETENSOR => {
 				let mut info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-				ortsys![unsafe CastTypeInfoToTensorInfo(typeinfo_ptr, &mut info_ptr) -> Error::CastTypeInfoToTensorInfo; nonNull(info_ptr)];
+				ortsys![unsafe CastTypeInfoToTensorInfo(typeinfo_ptr, &mut info_ptr)?; nonNull(info_ptr)];
 				unsafe { extract_data_type_from_tensor_info(info_ptr)? }
 			}
 			ort_sys::ONNXType::ONNX_TYPE_SEQUENCE => {
 				let mut info_ptr: *const ort_sys::OrtSequenceTypeInfo = std::ptr::null_mut();
-				ortsys![unsafe CastTypeInfoToSequenceTypeInfo(typeinfo_ptr, &mut info_ptr) -> Error::CastTypeInfoToSequenceTypeInfo; nonNull(info_ptr)];
+				ortsys![unsafe CastTypeInfoToSequenceTypeInfo(typeinfo_ptr, &mut info_ptr)?; nonNull(info_ptr)];
 				unsafe { extract_data_type_from_sequence_info(info_ptr)? }
 			}
 			ort_sys::ONNXType::ONNX_TYPE_MAP => {
 				let mut info_ptr: *const ort_sys::OrtMapTypeInfo = std::ptr::null_mut();
-				ortsys![unsafe CastTypeInfoToMapTypeInfo(typeinfo_ptr, &mut info_ptr) -> Error::CastTypeInfoToMapTypeInfo; nonNull(info_ptr)];
+				ortsys![unsafe CastTypeInfoToMapTypeInfo(typeinfo_ptr, &mut info_ptr)?; nonNull(info_ptr)];
 				unsafe { extract_data_type_from_map_info(info_ptr)? }
 			}
 			_ => unreachable!()
@@ -379,7 +379,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	/// Returns the data type of this [`Value`].
 	pub fn dtype(&self) -> Result<ValueType> {
 		let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
-		ortsys![unsafe GetTypeInfo(self.ptr(), &mut typeinfo_ptr) -> Error::GetTypeInfo; nonNull(typeinfo_ptr)];
+		ortsys![unsafe GetTypeInfo(self.ptr(), &mut typeinfo_ptr)?; nonNull(typeinfo_ptr)];
 		ValueType::from_type_info(typeinfo_ptr)
 	}
 
@@ -449,7 +449,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	pub fn is_tensor(&self) -> Result<bool> {
 		let mut result = 0;
-		ortsys![unsafe IsTensor(self.ptr(), &mut result) -> Error::GetTensorElementType];
+		ortsys![unsafe IsTensor(self.ptr(), &mut result)?];
 		Ok(result == 1)
 	}
 
@@ -525,14 +525,14 @@ impl Drop for ValueInner {
 
 pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo) -> Result<ValueType> {
 	let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-	ortsys![GetTensorElementType(info_ptr, &mut type_sys) -> Error::GetTensorElementType];
+	ortsys![GetTensorElementType(info_ptr, &mut type_sys)?];
 	assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 	// This transmute should be safe since its value is read from GetTensorElementType, which we must trust
 	let mut num_dims = 0;
-	ortsys![GetDimensionsCount(info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
+	ortsys![GetDimensionsCount(info_ptr, &mut num_dims)?];
 
 	let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-	ortsys![GetDimensions(info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
+	ortsys![GetDimensions(info_ptr, node_dims.as_mut_ptr(), num_dims as _)?];
 
 	Ok(ValueType::Tensor {
 		ty: type_sys.into(),
@@ -542,22 +542,22 @@ pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys
 
 pub(crate) unsafe fn extract_data_type_from_sequence_info(info_ptr: *const ort_sys::OrtSequenceTypeInfo) -> Result<ValueType> {
 	let mut element_type_info: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
-	ortsys![GetSequenceElementType(info_ptr, &mut element_type_info) -> Error::GetSequenceElementType];
+	ortsys![GetSequenceElementType(info_ptr, &mut element_type_info)?];
 
 	let mut ty: ort_sys::ONNXType = ort_sys::ONNXType::ONNX_TYPE_UNKNOWN;
 	let status = ortsys![unsafe GetOnnxTypeFromTypeInfo(element_type_info, &mut ty)];
-	status_to_result(status).map_err(Error::GetOnnxTypeFromTypeInfo)?;
+	status_to_result(status)?;
 
 	match ty {
 		ort_sys::ONNXType::ONNX_TYPE_TENSOR => {
 			let mut info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-			ortsys![unsafe CastTypeInfoToTensorInfo(element_type_info, &mut info_ptr) -> Error::CastTypeInfoToTensorInfo; nonNull(info_ptr)];
+			ortsys![unsafe CastTypeInfoToTensorInfo(element_type_info, &mut info_ptr)?; nonNull(info_ptr)];
 			let ty = unsafe { extract_data_type_from_tensor_info(info_ptr)? };
 			Ok(ValueType::Sequence(Box::new(ty)))
 		}
 		ort_sys::ONNXType::ONNX_TYPE_MAP => {
 			let mut info_ptr: *const ort_sys::OrtMapTypeInfo = std::ptr::null_mut();
-			ortsys![unsafe CastTypeInfoToMapTypeInfo(element_type_info, &mut info_ptr) -> Error::CastTypeInfoToMapTypeInfo; nonNull(info_ptr)];
+			ortsys![unsafe CastTypeInfoToMapTypeInfo(element_type_info, &mut info_ptr)?; nonNull(info_ptr)];
 			let ty = unsafe { extract_data_type_from_map_info(info_ptr)? };
 			Ok(ValueType::Sequence(Box::new(ty)))
 		}
@@ -567,15 +567,15 @@ pub(crate) unsafe fn extract_data_type_from_sequence_info(info_ptr: *const ort_s
 
 pub(crate) unsafe fn extract_data_type_from_map_info(info_ptr: *const ort_sys::OrtMapTypeInfo) -> Result<ValueType> {
 	let mut key_type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-	ortsys![GetMapKeyType(info_ptr, &mut key_type_sys) -> Error::GetMapKeyType];
+	ortsys![GetMapKeyType(info_ptr, &mut key_type_sys)?];
 	assert_ne!(key_type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 
 	let mut value_type_info: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
-	ortsys![GetMapValueType(info_ptr, &mut value_type_info) -> Error::GetMapValueType];
+	ortsys![GetMapValueType(info_ptr, &mut value_type_info)?];
 	let mut value_info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-	ortsys![unsafe CastTypeInfoToTensorInfo(value_type_info, &mut value_info_ptr) -> Error::CastTypeInfoToTensorInfo; nonNull(value_info_ptr)];
+	ortsys![unsafe CastTypeInfoToTensorInfo(value_type_info, &mut value_info_ptr)?; nonNull(value_info_ptr)];
 	let mut value_type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-	ortsys![GetTensorElementType(value_info_ptr, &mut value_type_sys) -> Error::GetTensorElementType];
+	ortsys![GetTensorElementType(value_info_ptr, &mut value_type_sys)?];
 	assert_ne!(value_type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 
 	Ok(ValueType::Map {

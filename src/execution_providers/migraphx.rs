@@ -95,10 +95,10 @@ impl ExecutionProvider for MIGraphXExecutionProvider {
 				migraphx_save_compiled_model: self.save_model_path.is_some().into(),
 				migraphx_save_model_path: self.save_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(std::ptr::null)
 			};
-			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_MIGraphX(session_builder.session_options_ptr.as_ptr(), &options) -> Error::ExecutionProvider];
+			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_MIGraphX(session_builder.session_options_ptr.as_ptr(), &options)?];
 			return Ok(());
 		}
 
-		Err(Error::ExecutionProviderNotRegistered(self.as_str()))
+		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
 	}
 }

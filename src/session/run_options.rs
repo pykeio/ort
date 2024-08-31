@@ -1,7 +1,7 @@
 use std::{collections::HashMap, ffi::CString, marker::PhantomData, ptr::NonNull, sync::Arc};
 
 use crate::{
-	error::{Error, Result},
+	error::Result,
 	ortsys,
 	session::Output,
 	value::{DynValue, Value, ValueTypeMarker}
@@ -171,7 +171,7 @@ impl RunOptions {
 	/// Creates a new [`RunOptions`] struct.
 	pub fn new() -> Result<RunOptions<NoSelectedOutputs>> {
 		let mut run_options_ptr: *mut ort_sys::OrtRunOptions = std::ptr::null_mut();
-		ortsys![unsafe CreateRunOptions(&mut run_options_ptr) -> Error::CreateRunOptions; nonNull(run_options_ptr)];
+		ortsys![unsafe CreateRunOptions(&mut run_options_ptr)?; nonNull(run_options_ptr)];
 		Ok(RunOptions {
 			run_options_ptr: unsafe { NonNull::new_unchecked(run_options_ptr) },
 			outputs: OutputSelector::default(),
@@ -220,7 +220,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// Sets a tag to identify this run in logs.
 	pub fn set_tag(&mut self, tag: impl AsRef<str>) -> Result<()> {
 		let tag = CString::new(tag.as_ref())?;
-		ortsys![unsafe RunOptionsSetRunTag(self.run_options_ptr.as_ptr(), tag.as_ptr()) -> Error::RunOptionsSetTag];
+		ortsys![unsafe RunOptionsSetRunTag(self.run_options_ptr.as_ptr(), tag.as_ptr())?];
 		Ok(())
 	}
 
@@ -253,7 +253,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// # }
 	/// ```
 	pub fn terminate(&self) -> Result<()> {
-		ortsys![unsafe RunOptionsSetTerminate(self.run_options_ptr.as_ptr()) -> Error::RunOptionsSetTerminate];
+		ortsys![unsafe RunOptionsSetTerminate(self.run_options_ptr.as_ptr())?];
 		Ok(())
 	}
 
@@ -280,7 +280,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// # }
 	/// ```
 	pub fn unterminate(&self) -> Result<()> {
-		ortsys![unsafe RunOptionsUnsetTerminate(self.run_options_ptr.as_ptr()) -> Error::RunOptionsUnsetTerminate];
+		ortsys![unsafe RunOptionsUnsetTerminate(self.run_options_ptr.as_ptr())?];
 		Ok(())
 	}
 }

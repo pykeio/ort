@@ -5,7 +5,7 @@ use std::{any::Any, ffi::CString, marker::PhantomData, ops::Deref, os::raw::c_ch
 use crate::{
 	char_p_to_string,
 	environment::Environment,
-	error::{assert_non_null_pointer, assert_null_pointer, status_to_result, Error, ErrorInternal, Result},
+	error::{assert_non_null_pointer, status_to_result, Error, ErrorCode, Result},
 	extern_system_fn,
 	io_binding::IoBinding,
 	memory::Allocator,
@@ -255,10 +255,10 @@ impl Session {
 			// than `inputs`. ONNX Runtime will attempt to look up the name of all inputs before doing any checks, thus going out of
 			// bounds of `input_names` and triggering a segfault, so we check that condition here. This will never trip for
 			// `ValueMap` inputs since the number of names & values are always equal as its a vec of tuples.
-			return Err(Error::MismatchedInputCount {
-				got: input_ort_values.len(),
-				expected: input_names.len()
-			});
+			return Err(Error::new_with_code(
+				ErrorCode::InvalidArgument,
+				format!("{} inputs were provided, but the model only accepts {}.", input_ort_values.len(), input_names.len())
+			));
 		}
 
 		let run_options_ptr = if let Some(run_options) = &run_options {
@@ -277,7 +277,7 @@ impl Session {
 				output_names_ptr.as_ptr(),
 				output_names_ptr.len() as _,
 				output_tensor_ptrs.as_mut_ptr()
-			) -> Error::SessionRun
+			)?
 		];
 
 		let outputs: Vec<Value> = output_tensors
@@ -425,7 +425,7 @@ impl Session {
 				ctx.output_value_ptrs.as_mut_ptr(),
 				Some(self::r#async::async_callback),
 				ctx as *mut _ as *mut ort_sys::c_void
-			) -> Error::SessionRun
+			)?
 		];
 
 		Ok(InferenceFut::new(async_inner, run_options))
@@ -434,7 +434,7 @@ impl Session {
 	/// Gets the session model metadata. See [`ModelMetadata`] for more info.
 	pub fn metadata(&self) -> Result<ModelMetadata<'_>> {
 		let mut metadata_ptr: *mut ort_sys::OrtModelMetadata = std::ptr::null_mut();
-		ortsys![unsafe SessionGetModelMetadata(self.inner.session_ptr.as_ptr(), &mut metadata_ptr) -> Error::GetModelMetadata; nonNull(metadata_ptr)];
+		ortsys![unsafe SessionGetModelMetadata(self.inner.session_ptr.as_ptr(), &mut metadata_ptr)?; nonNull(metadata_ptr)];
 		Ok(ModelMetadata::new(unsafe { NonNull::new_unchecked(metadata_ptr) }, &self.inner.allocator))
 	}
 
@@ -475,11 +475,7 @@ mod dangerous {
 	) -> Result<usize> {
 		let mut num_nodes = 0;
 		let status = unsafe { f(session_ptr.as_ptr(), &mut num_nodes) };
-		status_to_result(status).map_err(Error::GetInOutCount)?;
-		assert_null_pointer(status, "SessionStatus")?;
-		(num_nodes != 0)
-			.then_some(())
-			.ok_or_else(|| Error::GetInOutCount(ErrorInternal::Msg("No nodes in model".to_owned())))?;
+		status_to_result(status)?;
 		Ok(num_nodes as _)
 	}
 
@@ -519,7 +515,7 @@ mod dangerous {
 		let mut name_bytes: *mut c_char = std::ptr::null_mut();
 
 		let status = unsafe { f(session_ptr.as_ptr(), i, allocator.ptr.as_ptr(), &mut name_bytes) };
-		status_to_result(status).map_err(Error::GetInputName)?;
+		status_to_result(status)?;
 		assert_non_null_pointer(name_bytes, "InputName")?;
 
 		raw_pointer_to_string(allocator, name_bytes)
@@ -551,7 +547,7 @@ mod dangerous {
 		let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
 
 		let status = unsafe { f(session_ptr.as_ptr(), i, &mut typeinfo_ptr) };
-		status_to_result(status).map_err(Error::GetTypeInfo)?;
+		status_to_result(status)?;
 		assert_non_null_pointer(typeinfo_ptr, "TypeInfo")?;
 
 		ValueType::from_type_info(typeinfo_ptr)

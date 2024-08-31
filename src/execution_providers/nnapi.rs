@@ -95,10 +95,9 @@ impl ExecutionProvider for NNAPIExecutionProvider {
 			}
 			return crate::error::status_to_result(unsafe {
 				OrtSessionOptionsAppendExecutionProvider_Nnapi(session_builder.session_options_ptr.as_ptr(), flags)
-			})
-			.map_err(Error::ExecutionProvider);
+			});
 		}
 
-		Err(Error::ExecutionProviderNotRegistered(self.as_str()))
+		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
 	}
 }

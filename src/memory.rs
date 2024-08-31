@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-	error::{status_to_result, Error, Result},
+	error::{status_to_result, Result},
 	ortsys,
 	session::{Session, SharedSessionInner}
 };
@@ -93,7 +93,7 @@ impl Allocator {
 	/// [`MemoryInfo`].
 	pub fn new(session: &Session, memory_info: MemoryInfo) -> Result<Self> {
 		let mut allocator_ptr: *mut ort_sys::OrtAllocator = std::ptr::null_mut();
-		ortsys![unsafe CreateAllocator(session.ptr(), memory_info.ptr.as_ptr(), &mut allocator_ptr) -> Error::CreateAllocator; nonNull(allocator_ptr)];
+		ortsys![unsafe CreateAllocator(session.ptr(), memory_info.ptr.as_ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
 		Ok(Self {
 			ptr: unsafe { NonNull::new_unchecked(allocator_ptr) },
 			is_default: false,
@@ -264,8 +264,7 @@ impl MemoryInfo {
 		let mut memory_info_ptr: *mut ort_sys::OrtMemoryInfo = std::ptr::null_mut();
 		let allocator_name = CString::new(allocation_device.as_str()).unwrap_or_else(|_| unreachable!());
 		ortsys![
-			unsafe CreateMemoryInfo(allocator_name.as_ptr(), allocator_type.into(), device_id, memory_type.into(), &mut memory_info_ptr)
-				-> Error::CreateMemoryInfo;
+			unsafe CreateMemoryInfo(allocator_name.as_ptr(), allocator_type.into(), device_id, memory_type.into(), &mut memory_info_ptr)?;
 			nonNull(memory_info_ptr)
 		];
 		Ok(Self {
@@ -289,7 +288,7 @@ impl MemoryInfo {
 	/// ```
 	pub fn memory_type(&self) -> Result<MemoryType> {
 		let mut raw_type: ort_sys::OrtMemType = ort_sys::OrtMemType::OrtMemTypeDefault;
-		ortsys![unsafe MemoryInfoGetMemType(self.ptr.as_ptr(), &mut raw_type) -> Error::GetMemoryType];
+		ortsys![unsafe MemoryInfoGetMemType(self.ptr.as_ptr(), &mut raw_type)?];
 		Ok(MemoryType::from(raw_type))
 	}
 
@@ -304,7 +303,7 @@ impl MemoryInfo {
 	/// ```
 	pub fn allocator_type(&self) -> Result<AllocatorType> {
 		let mut raw_type: ort_sys::OrtAllocatorType = ort_sys::OrtAllocatorType::OrtInvalidAllocator;
-		ortsys![unsafe MemoryInfoGetType(self.ptr.as_ptr(), &mut raw_type) -> Error::GetAllocatorType];
+		ortsys![unsafe MemoryInfoGetType(self.ptr.as_ptr(), &mut raw_type)?];
 		Ok(match raw_type {
 			ort_sys::OrtAllocatorType::OrtArenaAllocator => AllocatorType::Arena,
 			ort_sys::OrtAllocatorType::OrtDeviceAllocator => AllocatorType::Device,
@@ -323,7 +322,7 @@ impl MemoryInfo {
 	/// ```
 	pub fn allocation_device(&self) -> Result<AllocationDevice> {
 		let mut name_ptr: *const c_char = std::ptr::null_mut();
-		ortsys![unsafe MemoryInfoGetName(self.ptr.as_ptr(), &mut name_ptr) -> Error::GetAllocationDevice; nonNull(name_ptr)];
+		ortsys![unsafe MemoryInfoGetName(self.ptr.as_ptr(), &mut name_ptr)?; nonNull(name_ptr)];
 
 		let mut len = 0;
 		while unsafe { *name_ptr.add(len) } != 0x00 {
@@ -347,7 +346,7 @@ impl MemoryInfo {
 	/// ```
 	pub fn device_id(&self) -> Result<i32> {
 		let mut raw: ort_sys::c_int = 0;
-		ortsys![unsafe MemoryInfoGetId(self.ptr.as_ptr(), &mut raw) -> Error::GetDeviceId];
+		ortsys![unsafe MemoryInfoGetId(self.ptr.as_ptr(), &mut raw)?];
 		Ok(raw as _)
 	}
 }

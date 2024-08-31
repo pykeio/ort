@@ -12,7 +12,7 @@ use ndarray::{ArcArray, Array, ArrayView, CowArray, Dimension};
 
 use super::{calculate_tensor_size, DynTensor, Tensor, TensorRefMut};
 use crate::{
-	error::{assert_non_null_pointer, Error, Result},
+	error::{assert_non_null_pointer, Error, ErrorCode, Result},
 	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
 	ortsys,
 	tensor::{PrimitiveTensorElementType, TensorElementType, Utf8Data},
@@ -56,8 +56,7 @@ impl Tensor<String> {
 
 		// create tensor without data -- data is filled in later
 		ortsys![
-			unsafe CreateTensorAsOrtValue(Allocator::default().ptr.as_ptr(), shape_ptr, shape_len as _, TensorElementType::String.into(), &mut value_ptr)
-				-> Error::CreateTensor;
+			unsafe CreateTensorAsOrtValue(Allocator::default().ptr.as_ptr(), shape_ptr, shape_len as _, TensorElementType::String.into(), &mut value_ptr)?;
 			nonNull(value_ptr)
 		];
 
@@ -69,11 +68,11 @@ impl Tensor<String> {
 				ffi::CString::new(slice)
 			})
 			.collect::<Result<Vec<_>, _>>()
-			.map_err(Error::FfiStringNull)?;
+			.map_err(Error::wrap)?;
 
 		let string_pointers = null_terminated_copies.iter().map(|cstring| cstring.as_ptr()).collect::<Vec<_>>();
 
-		ortsys![unsafe FillStringTensor(value_ptr, string_pointers.as_ptr(), string_pointers.len() as _) -> Error::FillStringTensor];
+		ortsys![unsafe FillStringTensor(value_ptr, string_pointers.as_ptr(), string_pointers.len() as _)?];
 
 		Ok(Value {
 			inner: Arc::new(ValueInner::RustOwned {
@@ -119,7 +118,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 				shape_len as _,
 				T::into_tensor_element_type().into(),
 				&mut value_ptr
-			) -> Error::CreateTensorWithData;
+			)?;
 			nonNull(value_ptr)
 		];
 
@@ -190,7 +189,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 				shape_len as _,
 				T::into_tensor_element_type().into(),
 				&mut value_ptr
-			) -> Error::CreateTensorWithData;
+			)?;
 			nonNull(value_ptr)
 		];
 
@@ -247,7 +246,7 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 				shape_len as _,
 				T::into_tensor_element_type().into(),
 				&mut value_ptr
-			) -> Error::CreateTensorWithData;
+			)?;
 			nonNull(value_ptr)
 		];
 
@@ -280,16 +279,24 @@ macro_rules! impl_to_dimensions {
 			let v: Vec<i64> = self
 				.iter()
 				.enumerate()
-				.map(|(i, c)| if *c >= 1 { Ok(*c as i64) } else { Err(Error::InvalidDimension(i)) })
+				.map(|(i, c)| {
+					if *c >= 1 {
+						Ok(*c as i64)
+					} else {
+						Err(Error::new_with_code(
+							ErrorCode::InvalidArgument,
+							format!("Invalid dimension at {}; all dimensions must be >= 1 when creating a tensor from raw data", i)
+						))
+					}
+				})
 				.collect::<Result<_>>()?;
 			let sum = calculate_tensor_size(&v);
 			if let Some(expected_size) = expected_size {
 				if sum != expected_size {
-					Err(Error::TensorShapeMismatch {
-						input: v,
-						total: sum,
-						expected: expected_size
-					})
+					Err(Error::new_with_code(
+						ErrorCode::InvalidArgument,
+						format!("Cannot create a tensor from raw data; shape {:?} ({}) is larger than the length of the data provided ({})", v, sum, expected_size)
+					))
 				} else {
 					Ok(v)
 				}
@@ -314,7 +321,7 @@ impl ToDimensions for () {
 	fn to_dimensions(&self, expected_size: Option<usize>) -> Result<Vec<i64>> {
 		match expected_size {
 			Some(1) | None => Ok(vec![]),
-			Some(x) => Err(Error::TensorShapeMismatch { input: vec![], total: 1, expected: x })
+			Some(_) => Err(Error::new_with_code(ErrorCode::InvalidArgument, "Expected data to have a length of exactly 1 for scalar shape"))
 		}
 	}
 }
@@ -331,7 +338,9 @@ where
 
 	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
 		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
-		let data = self.as_slice().ok_or(Error::TensorDataNotContiguous)?;
+		let data = self
+			.as_slice()
+			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
 		Ok((shape, data))
 	}
 
@@ -353,7 +362,9 @@ impl<T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for &mut ArcArr
 
 	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
 		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
-		let data = self.as_slice().ok_or(Error::TensorDataNotContiguous)?;
+		let data = self
+			.as_slice()
+			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
 		Ok((shape, data))
 	}
 
@@ -384,7 +395,9 @@ impl<T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for Array<T, D>
 
 	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
 		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
-		let data = self.as_slice().ok_or(Error::TensorDataNotContiguous)?;
+		let data = self
+			.as_slice()
+			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
 		Ok((shape, data))
 	}
 
@@ -414,7 +427,9 @@ impl<'v, T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for ArrayVi
 
 	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
 		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
-		let data = self.as_slice().ok_or(Error::TensorDataNotContiguous)?;
+		let data = self
+			.as_slice()
+			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
 		Ok((shape, data))
 	}
 

@@ -144,10 +144,9 @@ impl ExecutionProvider for OpenVINOExecutionProvider {
 			};
 			return crate::error::status_to_result(
 				crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO(session_builder.session_options_ptr.as_ptr(), std::ptr::addr_of!(openvino_options))]
-			)
-			.map_err(Error::ExecutionProvider);
+			);
 		}
 
-		Err(Error::ExecutionProviderNotRegistered(self.as_str()))
+		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
 	}
 }

@@ -7,7 +7,7 @@ use std::{
 
 use image::{imageops::FilterType, ImageBuffer, Pixel, Rgb};
 use ndarray::s;
-use ort::{inputs, ArrayExtensions, FetchModelError, GraphOptimizationLevel, Session};
+use ort::{inputs, ArrayExtensions, Error, GraphOptimizationLevel, Session};
 use test_log::test;
 
 #[test]
@@ -86,7 +86,7 @@ fn squeezenet_mushroom() -> ort::Result<()> {
 	Ok(())
 }
 
-fn get_imagenet_labels() -> Result<Vec<String>, FetchModelError> {
+fn get_imagenet_labels() -> ort::Result<Vec<String>> {
 	// Download the ImageNet class labels, matching SqueezeNet's classes.
 	let labels_path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("synset.txt");
 	if !labels_path.exists() {
@@ -95,8 +95,7 @@ fn get_imagenet_labels() -> Result<Vec<String>, FetchModelError> {
 		let resp = ureq::get(url)
             .timeout(Duration::from_secs(180)) // 3 minutes
             .call()
-            .map_err(Box::new)
-            .map_err(FetchModelError::FetchError)?;
+            .map_err(Error::wrap)?;
 
 		assert!(resp.has("Content-Length"));
 		let len = resp.header("Content-Length").and_then(|s| s.parse::<usize>().ok()).unwrap();
@@ -111,5 +110,5 @@ fn get_imagenet_labels() -> Result<Vec<String>, FetchModelError> {
 	}
 
 	let file = BufReader::new(fs::File::open(labels_path).unwrap());
-	file.lines().map(|line| line.map_err(FetchModelError::IoError)).collect()
+	file.lines().map(|line| line.map_err(Error::wrap)).collect()
 }

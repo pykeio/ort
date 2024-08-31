@@ -12,7 +12,7 @@ use std::{
 use ort_sys::{c_void, OrtStatus};
 
 use crate::{
-	error::{assert_non_null_pointer, Error, Result},
+	error::{assert_non_null_pointer, Result},
 	session::{RunOptions, SelectedOutputMarker, SessionInputValue, SessionOutputs, SharedSessionInner},
 	value::Value
 };
@@ -151,7 +151,7 @@ crate::extern_system_fn! {
 		);
 
 		if let Err(e) = crate::error::status_to_result(status) {
-			ctx.inner.emplace_value(Err(Error::SessionRun(e)));
+			ctx.inner.emplace_value(Err(e));
 			ctx.inner.wake();
 			return;
 		}

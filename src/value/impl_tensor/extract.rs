@@ -48,19 +48,16 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 			ValueType::Tensor { ty, dimensions } => {
 				let device = self.memory_info()?.allocation_device()?;
 				if !device.is_cpu_accessible() {
-					return Err(Error::TensorNotOnCpu(device.as_str()));
+					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", device.as_str())));
 				}
 
 				if ty == T::into_tensor_element_type() {
 					Ok(extract_primitive_array(IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>()), self.ptr())?)
 				} else {
-					Err(Error::DataTypeMismatch {
-						actual: ty,
-						requested: T::into_tensor_element_type()
-					})
+					Err(Error::new(format!("Cannot extract Tensor<{:?}> from tensor whose actual element type is {:?}", T::into_tensor_element_type(), ty)))
 				}
 			}
-			t => Err(Error::NotTensor(t))
+			t => Err(Error::new(format!("Cannot extract a Sequence from a value which is actually a {t:?}")))
 		}
 	}
 
@@ -91,28 +88,25 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 			ValueType::Tensor { ty, dimensions } => {
 				let device = self.memory_info()?.allocation_device()?;
 				if !device.is_cpu_accessible() {
-					return Err(Error::TensorNotOnCpu(device.as_str()));
+					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", device.as_str())));
 				}
 
 				if !dimensions.is_empty() {
-					return Err(Error::TensorNot0Dimensional(dimensions.len()));
+					return Err(Error::new(format!("Cannot extract scalar value from a tensor of dimensionality {}", dimensions.len())));
 				}
 
 				if ty == T::into_tensor_element_type() {
 					let mut output_array_ptr: *mut T = ptr::null_mut();
 					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
 					let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
-					ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
+					ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
 					Ok(unsafe { *output_array_ptr })
 				} else {
-					Err(Error::DataTypeMismatch {
-						actual: ty,
-						requested: T::into_tensor_element_type()
-					})
+					Err(Error::new(format!("Cannot extract {:?} from tensor whose actual element type is {:?}", T::into_tensor_element_type(), ty)))
 				}
 			}
-			t => Err(Error::NotTensor(t))
+			t => Err(Error::new(format!("Cannot extract a Sequence from a value which is actually a {t:?}")))
 		}
 	}
 
@@ -151,19 +145,16 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 			ValueType::Tensor { ty, dimensions } => {
 				let device = self.memory_info()?.allocation_device()?;
 				if !device.is_cpu_accessible() {
-					return Err(Error::TensorNotOnCpu(device.as_str()));
+					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", device.as_str())));
 				}
 
 				if ty == T::into_tensor_element_type() {
 					Ok(extract_primitive_array_mut(IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>()), self.ptr())?)
 				} else {
-					Err(Error::DataTypeMismatch {
-						actual: ty,
-						requested: T::into_tensor_element_type()
-					})
+					Err(Error::new(format!("Cannot extract Tensor<{:?}> from tensor whose actual element type is {:?}", T::into_tensor_element_type(), ty)))
 				}
 			}
-			t => Err(Error::NotTensor(t))
+			t => Err(Error::new(format!("Cannot extract a Sequence from a value which is actually a {t:?}")))
 		}
 	}
 
@@ -199,25 +190,22 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 			ValueType::Tensor { ty, dimensions } => {
 				let device = self.memory_info()?.allocation_device()?;
 				if !device.is_cpu_accessible() {
-					return Err(Error::TensorNotOnCpu(device.as_str()));
+					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", device.as_str())));
 				}
 
 				if ty == T::into_tensor_element_type() {
 					let mut output_array_ptr: *mut T = ptr::null_mut();
 					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
 					let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
-					ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
+					ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
 					let len = calculate_tensor_size(&dimensions);
 					Ok((dimensions, unsafe { std::slice::from_raw_parts(output_array_ptr, len) }))
 				} else {
-					Err(Error::DataTypeMismatch {
-						actual: ty,
-						requested: T::into_tensor_element_type()
-					})
+					Err(Error::new(format!("Cannot extract Tensor<{:?}> from tensor whose actual element type is {:?}", T::into_tensor_element_type(), ty)))
 				}
 			}
-			t => Err(Error::NotTensor(t))
+			t => Err(Error::new(format!("Cannot extract a Sequence from a value which is actually a {t:?}")))
 		}
 	}
 
@@ -250,25 +238,22 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 			ValueType::Tensor { ty, dimensions } => {
 				let device = self.memory_info()?.allocation_device()?;
 				if !device.is_cpu_accessible() {
-					return Err(Error::TensorNotOnCpu(device.as_str()));
+					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", device.as_str())));
 				}
 
 				if ty == T::into_tensor_element_type() {
 					let mut output_array_ptr: *mut T = ptr::null_mut();
 					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
 					let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
-					ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
+					ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
 					let len = calculate_tensor_size(&dimensions);
 					Ok((dimensions, unsafe { std::slice::from_raw_parts_mut(output_array_ptr, len) }))
 				} else {
-					Err(Error::DataTypeMismatch {
-						actual: ty,
-						requested: T::into_tensor_element_type()
-					})
+					Err(Error::new(format!("Cannot extract Tensor<{:?}> from tensor whose actual element type is {:?}", T::into_tensor_element_type(), ty)))
 				}
 			}
-			t => Err(Error::NotTensor(t))
+			t => Err(Error::new(format!("Cannot extract a Sequence from a value which is actually a {t:?}")))
 		}
 	}
 
@@ -293,7 +278,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 			ValueType::Tensor { ty, dimensions } => {
 				let device = self.memory_info()?.allocation_device()?;
 				if !device.is_cpu_accessible() {
-					return Err(Error::TensorNotOnCpu(device.as_str()));
+					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", device.as_str())));
 				}
 
 				if ty == TensorElementType::String {
@@ -301,7 +286,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 
 					// Total length of string data, not including \0 suffix
 					let mut total_length: ort_sys::size_t = 0;
-					ortsys![unsafe GetStringTensorDataLength(self.ptr(), &mut total_length) -> Error::GetStringTensorDataLength];
+					ortsys![unsafe GetStringTensorDataLength(self.ptr(), &mut total_length)?];
 
 					// In the JNI impl of this, tensor_element_len was included in addition to total_length,
 					// but that seems contrary to the docs of GetStringTensorDataLength, and those extra bytes
@@ -313,7 +298,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 					// length calculations easy
 					let mut offsets = vec![0; (len + 1) as _];
 
-					ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len as _) -> Error::GetStringTensorContent];
+					ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len as _)?];
 
 					// final offset = overall length so that per-string length calculations work for the last string
 					debug_assert_eq!(0, offsets[len]);
@@ -327,18 +312,15 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 							String::from_utf8(slice.into())
 						})
 						.collect::<Result<Vec<String>, FromUtf8Error>>()
-						.map_err(Error::StringFromUtf8Error)?;
+						.map_err(Error::wrap)?;
 
 					Ok(ndarray::Array::from_shape_vec(IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>()), strings)
 						.expect("Shape extracted from tensor didn't match tensor contents"))
 				} else {
-					Err(Error::DataTypeMismatch {
-						actual: ty,
-						requested: TensorElementType::String
-					})
+					Err(Error::new(format!("Cannot extract Tensor<String> from tensor whose actual element type is {:?}", ty)))
 				}
 			}
-			t => Err(Error::NotTensor(t))
+			t => Err(Error::new(format!("Cannot extract a Sequence from a value which is actually a {t:?}")))
 		}
 	}
 
@@ -363,7 +345,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 			ValueType::Tensor { ty, dimensions } => {
 				let device = self.memory_info()?.allocation_device()?;
 				if !device.is_cpu_accessible() {
-					return Err(Error::TensorNotOnCpu(device.as_str()));
+					return Err(Error::new("Cannot extract from a non-CPU value"));
 				}
 
 				if ty == TensorElementType::String {
@@ -371,7 +353,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 
 					// Total length of string data, not including \0 suffix
 					let mut total_length: ort_sys::size_t = 0;
-					ortsys![unsafe GetStringTensorDataLength(self.ptr(), &mut total_length) -> Error::GetStringTensorDataLength];
+					ortsys![unsafe GetStringTensorDataLength(self.ptr(), &mut total_length)?];
 
 					// In the JNI impl of this, tensor_element_len was included in addition to total_length,
 					// but that seems contrary to the docs of GetStringTensorDataLength, and those extra bytes
@@ -383,7 +365,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 					// length calculations easy
 					let mut offsets = vec![0; (len + 1) as _];
 
-					ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len as _) -> Error::GetStringTensorContent];
+					ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len as _)?];
 
 					// final offset = overall length so that per-string length calculations work for the last string
 					debug_assert_eq!(0, offsets[len]);
@@ -397,17 +379,14 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 							String::from_utf8(slice.into())
 						})
 						.collect::<Result<Vec<String>, FromUtf8Error>>()
-						.map_err(Error::StringFromUtf8Error)?;
+						.map_err(Error::wrap)?;
 
 					Ok((dimensions, strings))
 				} else {
-					Err(Error::DataTypeMismatch {
-						actual: ty,
-						requested: TensorElementType::String
-					})
+					Err(Error::new(format!("Cannot extract Tensor<String> from tensor whose actual element type is {:?}", ty)))
 				}
 			}
-			t => Err(Error::NotTensor(t))
+			t => Err(Error::new(format!("Cannot extract a Sequence from a value which is actually a {t:?}")))
 		}
 	}
 
@@ -425,14 +404,14 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	pub fn shape(&self) -> Result<Vec<i64>> {
 		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr) -> Error::GetTensorTypeAndShape];
+		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr)?];
 
 		let res = {
 			let mut num_dims = 0;
-			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims) -> Error::GetDimensionsCount];
+			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims)?];
 
 			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _) -> Error::GetDimensions];
+			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _)?];
 
 			Ok(node_dims)
 		};

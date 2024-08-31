@@ -2,10 +2,7 @@
 use std::ptr;
 
 #[cfg(feature = "ndarray")]
-use crate::{
-	error::{Error, Result},
-	ortsys
-};
+use crate::{error::Result, ortsys};
 
 /// Enum mapping ONNX Runtime's supported tensor data types.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -172,7 +169,7 @@ pub(crate) fn extract_primitive_array<'t, T>(shape: ndarray::IxDyn, tensor: *mut
 	let mut output_array_ptr: *mut T = ptr::null_mut();
 	let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
 	let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
-	ortsys![unsafe GetTensorMutableData(tensor, output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
+	ortsys![unsafe GetTensorMutableData(tensor, output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
 	let array_view = unsafe { ndarray::ArrayView::from_shape_ptr(shape, output_array_ptr) };
 	Ok(array_view)
@@ -188,7 +185,7 @@ pub(crate) fn extract_primitive_array_mut<'t, T>(shape: ndarray::IxDyn, tensor: 
 	let mut output_array_ptr: *mut T = ptr::null_mut();
 	let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
 	let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
-	ortsys![unsafe GetTensorMutableData(tensor, output_array_ptr_ptr_void) -> Error::GetTensorMutableData; nonNull(output_array_ptr)];
+	ortsys![unsafe GetTensorMutableData(tensor, output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
 	let array_view = unsafe { ndarray::ArrayViewMut::from_shape_ptr(shape, output_array_ptr) };
 	Ok(array_view)

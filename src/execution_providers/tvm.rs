@@ -114,10 +114,9 @@ impl ExecutionProvider for TVMExecutionProvider {
 			let options_string = std::ffi::CString::new(option_string.join(",")).unwrap_or_else(|_| unreachable!());
 			return crate::error::status_to_result(unsafe {
 				OrtSessionOptionsAppendExecutionProvider_Tvm(session_builder.session_options_ptr.as_ptr(), options_string.as_ptr())
-			})
-			.map_err(Error::ExecutionProvider);
+			});
 		}
 
-		Err(Error::ExecutionProviderNotRegistered(self.as_str()))
+		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
 	}
 }

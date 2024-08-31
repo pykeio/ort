@@ -199,7 +199,7 @@ impl ExecutionProvider for CUDAExecutionProvider {
 		#[cfg(any(feature = "load-dynamic", feature = "cuda"))]
 		{
 			let mut cuda_options: *mut ort_sys::OrtCUDAProviderOptionsV2 = std::ptr::null_mut();
-			crate::error::status_to_result(crate::ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)]).map_err(Error::ExecutionProvider)?;
+			crate::ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)?];
 			let (key_ptrs, value_ptrs, len, keys, values) = super::map_keys! {
 				device_id = self.device_id,
 				arena_extend_strategy = self.arena_extend_strategy.as_ref().map(|v| match v {
@@ -222,7 +222,6 @@ impl ExecutionProvider for CUDAExecutionProvider {
 			};
 			if let Err(e) =
 				crate::error::status_to_result(crate::ortsys![unsafe UpdateCUDAProviderOptions(cuda_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), len as _)])
-					.map_err(Error::ExecutionProvider)
 			{
 				crate::ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
 				std::mem::drop((keys, values));
@@ -232,9 +231,9 @@ impl ExecutionProvider for CUDAExecutionProvider {
 			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(session_builder.session_options_ptr.as_ptr(), cuda_options)];
 			crate::ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
 			std::mem::drop((keys, values));
-			return crate::error::status_to_result(status).map_err(Error::ExecutionProvider);
+			return crate::error::status_to_result(status);
 		}
 
-		Err(Error::ExecutionProviderNotRegistered(self.as_str()))
+		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
 	}
 }

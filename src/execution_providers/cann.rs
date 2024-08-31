@@ -130,7 +130,7 @@ impl ExecutionProvider for CANNExecutionProvider {
 		#[cfg(any(feature = "load-dynamic", feature = "cann"))]
 		{
 			let mut cann_options: *mut ort_sys::OrtCANNProviderOptions = std::ptr::null_mut();
-			crate::error::status_to_result(crate::ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)]).map_err(Error::ExecutionProvider)?;
+			crate::ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)?];
 			let (key_ptrs, value_ptrs, len, keys, values) = super::map_keys! {
 				device_id = self.device_id,
 				npu_mem_limit = self.npu_mem_limit,
@@ -155,7 +155,6 @@ impl ExecutionProvider for CANNExecutionProvider {
 			};
 			if let Err(e) =
 				crate::error::status_to_result(crate::ortsys![unsafe UpdateCANNProviderOptions(cann_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), len as _)])
-					.map_err(Error::ExecutionProvider)
 			{
 				crate::ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
 				std::mem::drop((keys, values));
@@ -165,9 +164,9 @@ impl ExecutionProvider for CANNExecutionProvider {
 			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_CANN(session_builder.session_options_ptr.as_ptr(), cann_options)];
 			crate::ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
 			std::mem::drop((keys, values));
-			return crate::error::status_to_result(status).map_err(Error::ExecutionProvider);
+			return crate::error::status_to_result(status);
 		}
 
-		Err(Error::ExecutionProviderNotRegistered(self.as_str()))
+		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
 	}
 }

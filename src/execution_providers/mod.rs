@@ -1,11 +1,6 @@
 use std::{fmt::Debug, os::raw::c_char, sync::Arc};
 
-use crate::{
-	char_p_to_string,
-	error::{Error, Result},
-	ortsys,
-	session::SessionBuilder
-};
+use crate::{char_p_to_string, error::Result, ortsys, session::SessionBuilder};
 
 mod cpu;
 pub use self::cpu::CPUExecutionProvider;
@@ -81,7 +76,7 @@ pub trait ExecutionProvider {
 	fn is_available(&self) -> Result<bool> {
 		let mut providers: *mut *mut c_char = std::ptr::null_mut();
 		let mut num_providers = 0;
-		ortsys![unsafe GetAvailableProviders(&mut providers, &mut num_providers) -> Error::GetAvailableProviders];
+		ortsys![unsafe GetAvailableProviders(&mut providers, &mut num_providers)?];
 		if providers.is_null() {
 			return Ok(false);
 		}
@@ -199,7 +194,7 @@ macro_rules! get_ep_register {
 			match symbol {
 				Ok(symbol) => symbol.into_raw(),
 				Err(e) => {
-					return ::std::result::Result::Err($crate::Error::DlLoad { symbol: stringify!($symbol), error: e.to_string() });
+					return ::std::result::Result::Err($crate::Error::new(format!("Error attempting to load symbol `{}` from dynamic library: {}", stringify!($symbol), e)));
 				}
 			}
 		};
@@ -218,11 +213,13 @@ pub(crate) fn apply_execution_providers(session_builder: &SessionBuilder, execut
 				return Err(e);
 			}
 
-			if let &Error::ExecutionProviderNotRegistered(ep_name) = &e {
+			if e.message()
+				.ends_with("was not registered because its corresponding Cargo feature is not enabled.")
+			{
 				if ex.inner.supported_by_platform() {
 					tracing::warn!("{e}");
 				} else {
-					tracing::debug!("{e} (note: additionally, `{ep_name}` is not supported on this platform)");
+					tracing::debug!("{e} (note: additionally, `{}` is not supported on this platform)", ex.inner.as_str());
 				}
 			} else {
 				tracing::error!("An error occurred when attempting to register `{}`: {e}", ex.inner.as_str());

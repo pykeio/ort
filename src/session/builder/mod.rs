@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-	error::{assert_non_null_pointer, status_to_result, Error, Result},
+	error::{assert_non_null_pointer, status_to_result, Result},
 	memory::MemoryInfo,
 	operator::OperatorDomain,
 	ortsys
@@ -80,7 +80,7 @@ impl SessionBuilder {
 	/// ```
 	pub fn new() -> Result<Self> {
 		let mut session_options_ptr: *mut ort_sys::OrtSessionOptions = std::ptr::null_mut();
-		ortsys![unsafe CreateSessionOptions(&mut session_options_ptr) -> Error::CreateSessionOptions; nonNull(session_options_ptr)];
+		ortsys![unsafe CreateSessionOptions(&mut session_options_ptr)?; nonNull(session_options_ptr)];
 
 		Ok(Self {
 			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },
@@ -94,7 +94,7 @@ impl SessionBuilder {
 	pub(crate) fn add_config_entry(&mut self, key: &str, value: &str) -> Result<()> {
 		let key = CString::new(key)?;
 		let value = CString::new(value)?;
-		ortsys![unsafe AddSessionConfigEntry(self.session_options_ptr.as_ptr(), key.as_ptr(), value.as_ptr()) -> Error::AddSessionConfigEntry];
+		ortsys![unsafe AddSessionConfigEntry(self.session_options_ptr.as_ptr(), key.as_ptr(), value.as_ptr())?];
 		Ok(())
 	}
 }

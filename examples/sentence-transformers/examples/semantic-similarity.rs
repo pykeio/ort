@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use ndarray::{s, Array1, Array2, Axis, Ix2};
-use ort::{CUDAExecutionProvider, GraphOptimizationLevel, Session};
+use ort::{CUDAExecutionProvider, Error, GraphOptimizationLevel, Session};
 use tokenizers::Tokenizer;
 
 /// Example usage of a text embedding model like Sentence Transformers' `all-mini-lm-l6` model for semantic textual
@@ -31,7 +31,7 @@ fn main() -> ort::Result<()> {
 	let inputs = vec!["The weather outside is lovely.", "It's so sunny outside!", "She drove to the stadium."];
 
 	// Encode our input strings. `encode_batch` will pad each input to be the same length.
-	let encodings = tokenizer.encode_batch(inputs.clone(), false)?;
+	let encodings = tokenizer.encode_batch(inputs.clone(), false).map_err(|e| Error::new(e.to_string()))?;
 
 	// Get the padded length of each encoding.
 	let padded_token_length = encodings[0].len();

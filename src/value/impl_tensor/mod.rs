@@ -9,12 +9,7 @@ use std::{
 };
 
 use super::{DowncastableTarget, DynValue, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker};
-use crate::{
-	error::{Error, Result},
-	memory::MemoryInfo,
-	ortsys,
-	tensor::IntoTensorElementType
-};
+use crate::{error::Result, memory::MemoryInfo, ortsys, tensor::IntoTensorElementType};
 
 pub trait TensorValueTypeMarker: ValueTypeMarker {
 	crate::private_trait!();
@@ -85,7 +80,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	pub fn data_ptr_mut(&mut self) -> Result<*mut ort_sys::c_void> {
 		let mut buffer_ptr: *mut ort_sys::c_void = std::ptr::null_mut();
-		ortsys![unsafe GetTensorMutableData(self.ptr(), &mut buffer_ptr) -> Error::GetTensorMutableData; nonNull(buffer_ptr)];
+		ortsys![unsafe GetTensorMutableData(self.ptr(), &mut buffer_ptr)?; nonNull(buffer_ptr)];
 		Ok(buffer_ptr)
 	}
 
@@ -108,7 +103,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	pub fn data_ptr(&self) -> Result<*const ort_sys::c_void> {
 		let mut buffer_ptr: *mut ort_sys::c_void = std::ptr::null_mut();
-		ortsys![unsafe GetTensorMutableData(self.ptr(), &mut buffer_ptr) -> Error::GetTensorMutableData; nonNull(buffer_ptr)];
+		ortsys![unsafe GetTensorMutableData(self.ptr(), &mut buffer_ptr)?; nonNull(buffer_ptr)];
 		Ok(buffer_ptr)
 	}
 
@@ -135,7 +130,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	pub fn memory_info(&self) -> Result<MemoryInfo> {
 		let mut memory_info_ptr: *const ort_sys::OrtMemoryInfo = std::ptr::null_mut();
-		ortsys![unsafe GetTensorMemoryInfo(self.ptr(), &mut memory_info_ptr) -> Error::GetTensorMemoryInfo; nonNull(memory_info_ptr)];
+		ortsys![unsafe GetTensorMemoryInfo(self.ptr(), &mut memory_info_ptr)?; nonNull(memory_info_ptr)];
 		Ok(MemoryInfo::from_raw(unsafe { NonNull::new_unchecked(memory_info_ptr.cast_mut()) }, false))
 	}
 }

@@ -4,7 +4,7 @@ use std::{rc::Rc, sync::Arc};
 
 use super::SessionBuilder;
 use crate::{
-	error::{Error, Result},
+	error::Result,
 	execution_providers::{apply_execution_providers, ExecutionProviderDispatch},
 	ortsys, MemoryInfo, OperatorDomain
 };
@@ -35,7 +35,7 @@ impl SessionBuilder {
 	/// For configuring the number of threads used when the session execution mode is set to `Parallel`, see
 	/// [`SessionBuilder::with_inter_threads()`].
 	pub fn with_intra_threads(self, num_threads: usize) -> Result<Self> {
-		ortsys![unsafe SetIntraOpNumThreads(self.session_options_ptr.as_ptr(), num_threads as _) -> Error::CreateSessionOptions];
+		ortsys![unsafe SetIntraOpNumThreads(self.session_options_ptr.as_ptr(), num_threads as _)?];
 		Ok(self)
 	}
 
@@ -47,7 +47,7 @@ impl SessionBuilder {
 	/// For configuring the number of threads used to parallelize the execution within nodes, see
 	/// [`SessionBuilder::with_intra_threads()`].
 	pub fn with_inter_threads(self, num_threads: usize) -> Result<Self> {
-		ortsys![unsafe SetInterOpNumThreads(self.session_options_ptr.as_ptr(), num_threads as _) -> Error::CreateSessionOptions];
+		ortsys![unsafe SetInterOpNumThreads(self.session_options_ptr.as_ptr(), num_threads as _)?];
 		Ok(self)
 	}
 
@@ -62,14 +62,14 @@ impl SessionBuilder {
 		} else {
 			ort_sys::ExecutionMode::ORT_SEQUENTIAL
 		};
-		ortsys![unsafe SetSessionExecutionMode(self.session_options_ptr.as_ptr(), execution_mode) -> Error::CreateSessionOptions];
+		ortsys![unsafe SetSessionExecutionMode(self.session_options_ptr.as_ptr(), execution_mode)?];
 		Ok(self)
 	}
 
 	/// Set the session's optimization level. See [`GraphOptimizationLevel`] for more information on the different
 	/// optimization levels.
 	pub fn with_optimization_level(self, opt_level: GraphOptimizationLevel) -> Result<Self> {
-		ortsys![unsafe SetSessionGraphOptimizationLevel(self.session_options_ptr.as_ptr(), opt_level.into()) -> Error::CreateSessionOptions];
+		ortsys![unsafe SetSessionGraphOptimizationLevel(self.session_options_ptr.as_ptr(), opt_level.into())?];
 		Ok(self)
 	}
 
@@ -82,7 +82,7 @@ impl SessionBuilder {
 		let path = path.as_ref().encode_utf16().chain([0]).collect::<Vec<_>>();
 		#[cfg(not(windows))]
 		let path = CString::new(path.as_ref())?;
-		ortsys![unsafe SetOptimizedModelFilePath(self.session_options_ptr.as_ptr(), path.as_ptr()) -> Error::CreateSessionOptions];
+		ortsys![unsafe SetOptimizedModelFilePath(self.session_options_ptr.as_ptr(), path.as_ptr())?];
 		Ok(self)
 	}
 
@@ -93,16 +93,16 @@ impl SessionBuilder {
 		let profiling_file = profiling_file.as_ref().encode_utf16().chain([0]).collect::<Vec<_>>();
 		#[cfg(not(windows))]
 		let profiling_file = CString::new(profiling_file.as_ref())?;
-		ortsys![unsafe EnableProfiling(self.session_options_ptr.as_ptr(), profiling_file.as_ptr()) -> Error::CreateSessionOptions];
+		ortsys![unsafe EnableProfiling(self.session_options_ptr.as_ptr(), profiling_file.as_ptr())?];
 		Ok(self)
 	}
 
 	/// Enables/disables memory pattern optimization. Disable it if the input size varies, i.e., dynamic batch
 	pub fn with_memory_pattern(self, enable: bool) -> Result<Self> {
 		if enable {
-			ortsys![unsafe EnableMemPattern(self.session_options_ptr.as_ptr()) -> Error::CreateSessionOptions];
+			ortsys![unsafe EnableMemPattern(self.session_options_ptr.as_ptr())?];
 		} else {
-			ortsys![unsafe DisableMemPattern(self.session_options_ptr.as_ptr()) -> Error::CreateSessionOptions];
+			ortsys![unsafe DisableMemPattern(self.session_options_ptr.as_ptr())?];
 		}
 		Ok(self)
 	}
@@ -130,7 +130,7 @@ impl SessionBuilder {
 		let handle = LibHandle(handle);
 		// per RegisterCustomOpsLibrary docs, release handle if there was an error and the handle
 		// is non-null
-		if let Err(e) = status_to_result(status).map_err(Error::CreateSessionOptions) {
+		if let Err(e) = status_to_result(status) {
 			if !handle.is_null() {
 				// handle was written to, should release it
 				drop(handle);
@@ -146,13 +146,13 @@ impl SessionBuilder {
 
 	/// Enables [`onnxruntime-extensions`](https://github.com/microsoft/onnxruntime-extensions) custom operators.
 	pub fn with_extensions(self) -> Result<Self> {
-		ortsys![unsafe EnableOrtCustomOps(self.session_options_ptr.as_ptr()) -> Error::EnableExtensions];
+		ortsys![unsafe EnableOrtCustomOps(self.session_options_ptr.as_ptr())?];
 		Ok(self)
 	}
 
 	pub fn with_operators(mut self, domain: impl Into<Arc<OperatorDomain>>) -> Result<Self> {
 		let domain = domain.into();
-		ortsys![unsafe AddCustomOpDomain(self.session_options_ptr.as_ptr(), domain.ptr()) -> Error::AddCustomOperatorDomain];
+		ortsys![unsafe AddCustomOpDomain(self.session_options_ptr.as_ptr(), domain.ptr())?];
 		self.operator_domains.push(domain);
 		Ok(self)
 	}

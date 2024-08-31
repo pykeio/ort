@@ -37,7 +37,7 @@ pub fn training_api() -> Result<NonNull<ort_sys::OrtTrainingApi>> {
 			})
 			.load(Ordering::Relaxed)
 	)
-	.ok_or(Error::TrainingNotEnabled)
+	.ok_or_else(|| Error::new("Training is not enbled in this build of ONNX Runtime."))
 }
 
 macro_rules! trainsys {
@@ -68,18 +68,18 @@ macro_rules! trainsys {
 		$($crate::error::assert_non_null_pointer($check, stringify!($method)).unwrap();)+
 		_x
 	}};
-	($method:ident($($n:expr),+ $(,)?) -> $err:expr$(;)?) => {
-		$crate::error::status_to_result($crate::training_api()?.as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+)).map_err($err)?;
+	($method:ident($($n:expr),+ $(,)?)?) => {
+		$crate::error::status_to_result($crate::training_api()?.as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+))?;
 	};
-	(unsafe $method:ident($($n:expr),+ $(,)?) -> $err:expr$(;)?) => {
-		$crate::error::status_to_result(unsafe { $crate::training_api()?.as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) }).map_err($err)?;
+	(unsafe $method:ident($($n:expr),+ $(,)?)?) => {
+		$crate::error::status_to_result(unsafe { $crate::training_api()?.as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) })?;
 	};
-	($method:ident($($n:expr),+ $(,)?) -> $err:expr; nonNull($($check:expr),+ $(,)?)$(;)?) => {
-		$crate::error::status_to_result($crate::training_api()?.as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+)).map_err($err)?;
+	($method:ident($($n:expr),+ $(,)?)?; nonNull($($check:expr),+ $(,)?)$(;)?) => {
+		$crate::error::status_to_result($crate::training_api()?.as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+))?;
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	};
-	(unsafe $method:ident($($n:expr),+ $(,)?) -> $err:expr; nonNull($($check:expr),+ $(,)?)$(;)?) => {{
-		$crate::error::status_to_result(unsafe { $crate::training_api()?.as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) }).map_err($err)?;
+	(unsafe $method:ident($($n:expr),+ $(,)?)?; nonNull($($check:expr),+ $(,)?)$(;)?) => {{
+		$crate::error::status_to_result(unsafe { $crate::training_api()?.as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) })?;
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	}};
 }
@@ -94,7 +94,7 @@ impl Checkpoint {
 	pub fn load(path: impl AsRef<Path>) -> Result<Self> {
 		let path = crate::util::path_to_os_char(path);
 		let mut ptr: *mut ort_sys::OrtCheckpointState = ptr::null_mut();
-		trainsys![unsafe LoadCheckpoint(path.as_ptr(), &mut ptr) -> Error::CreateSession; nonNull(ptr)];
+		trainsys![unsafe LoadCheckpoint(path.as_ptr(), &mut ptr)?; nonNull(ptr)];
 		Ok(Checkpoint {
 			ptr: unsafe { NonNull::new_unchecked(ptr) }
 		})
@@ -102,7 +102,7 @@ impl Checkpoint {
 
 	pub fn save(&self, path: impl AsRef<Path>, include_optimizer_state: bool) -> Result<()> {
 		let path = crate::util::path_to_os_char(path);
-		trainsys![unsafe SaveCheckpoint(self.ptr.as_ptr(), path.as_ptr(), include_optimizer_state) -> Error::CreateSession];
+		trainsys![unsafe SaveCheckpoint(self.ptr.as_ptr(), path.as_ptr(), include_optimizer_state)?];
 		Ok(())
 	}
 }
@@ -119,18 +119,18 @@ pub struct Optimizer(NonNull<ort_sys::OrtTrainingSession>);
 
 impl Optimizer {
 	pub fn reset_grad(&self) -> Result<()> {
-		trainsys![unsafe LazyResetGrad(self.0.as_ptr()) -> Error::CreateSession];
+		trainsys![unsafe LazyResetGrad(self.0.as_ptr())?];
 		Ok(())
 	}
 
 	pub fn lr(&self) -> Result<f32> {
 		let mut lr = f32::NAN;
-		trainsys![unsafe GetLearningRate(self.0.as_ptr(), &mut lr) -> Error::CreateSession];
+		trainsys![unsafe GetLearningRate(self.0.as_ptr(), &mut lr)?];
 		Ok(lr)
 	}
 
 	pub fn set_lr(&self, lr: f32) -> Result<()> {
-		trainsys![unsafe SetLearningRate(self.0.as_ptr(), lr) -> Error::CreateSession];
+		trainsys![unsafe SetLearningRate(self.0.as_ptr(), lr)?];
 		Ok(())
 	}
 
@@ -139,7 +139,7 @@ impl Optimizer {
 	}
 
 	pub fn step_with_options(&self, options: RunOptions) -> Result<()> {
-		trainsys![unsafe OptimizerStep(self.0.as_ptr(), options.run_options_ptr.as_ptr()) -> Error::CreateSession];
+		trainsys![unsafe OptimizerStep(self.0.as_ptr(), options.run_options_ptr.as_ptr())?];
 		Ok(())
 	}
 }

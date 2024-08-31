@@ -10,7 +10,7 @@ use super::{trainsys, Checkpoint, Optimizer};
 use crate::{
 	char_p_to_string,
 	error::{assert_non_null_pointer, status_to_result},
-	Allocator, Error, Result, RunOptions, SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs, Value
+	Allocator, Result, RunOptions, SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs, Value
 };
 
 #[derive(Debug)]
@@ -38,16 +38,16 @@ impl Trainer {
 		let env = crate::get_environment()?;
 
 		let mut ptr: *mut ort_sys::OrtTrainingSession = ptr::null_mut();
-		trainsys![unsafe CreateTrainingSession(env.ptr(), session_options.session_options_ptr.as_ptr(), ckpt.ptr.as_ptr(), training_model_path.as_ptr(), eval_model_path.as_ptr(), optimizer_model_path.as_ptr(), &mut ptr) -> Error::CreateSession; nonNull(ptr)];
+		trainsys![unsafe CreateTrainingSession(env.ptr(), session_options.session_options_ptr.as_ptr(), ckpt.ptr.as_ptr(), training_model_path.as_ptr(), eval_model_path.as_ptr(), optimizer_model_path.as_ptr(), &mut ptr)?; nonNull(ptr)];
 
 		let ptr = unsafe { NonNull::new_unchecked(ptr) };
 
 		let mut train_output_len = 0;
-		trainsys![unsafe TrainingSessionGetTrainingModelOutputCount(ptr.as_ptr(), &mut train_output_len) -> Error::CreateSession];
+		trainsys![unsafe TrainingSessionGetTrainingModelOutputCount(ptr.as_ptr(), &mut train_output_len)?];
 		let train_output_names = (0..train_output_len)
 			.map(|i| {
 				let mut name_bytes: *mut c_char = std::ptr::null_mut();
-				trainsys![unsafe TrainingSessionGetTrainingModelOutputName(ptr.as_ptr(), i, allocator.ptr.as_ptr(), &mut name_bytes) -> Error::CreateSession];
+				trainsys![unsafe TrainingSessionGetTrainingModelOutputName(ptr.as_ptr(), i, allocator.ptr.as_ptr(), &mut name_bytes)?];
 				let name = match char_p_to_string(name_bytes) {
 					Ok(name) => name,
 					Err(e) => {
@@ -126,7 +126,7 @@ impl Trainer {
 			std::ptr::null_mut()
 		};
 
-		trainsys![unsafe TrainStep(self.ptr.as_ptr(), run_options_ptr, input_ort_values.len(), input_ort_values.as_ptr(), output_tensor_ptrs.len(), output_tensor_ptrs.as_mut_ptr()) -> Error::SessionRun];
+		trainsys![unsafe TrainStep(self.ptr.as_ptr(), run_options_ptr, input_ort_values.len(), input_ort_values.as_ptr(), output_tensor_ptrs.len(), output_tensor_ptrs.as_mut_ptr())?];
 
 		let outputs: Vec<Value> = output_tensor_ptrs
 			.into_iter()
@@ -175,7 +175,7 @@ impl Trainer {
 			std::ptr::null_mut()
 		};
 
-		trainsys![unsafe EvalStep(self.ptr.as_ptr(), run_options_ptr, input_ort_values.len(), input_ort_values.as_ptr(), output_tensor_ptrs.len(), output_tensor_ptrs.as_mut_ptr()) -> Error::SessionRun];
+		trainsys![unsafe EvalStep(self.ptr.as_ptr(), run_options_ptr, input_ort_values.len(), input_ort_values.as_ptr(), output_tensor_ptrs.len(), output_tensor_ptrs.as_mut_ptr())?];
 
 		let outputs: Vec<Value> = output_tensor_ptrs
 			.into_iter()
@@ -212,7 +212,7 @@ impl Trainer {
 				.collect::<Result<Vec<_>>>()?
 		);
 
-		status_to_result(res).map_err(Error::CreateSession)?;
+		status_to_result(res)?;
 
 		Ok(())
 	}

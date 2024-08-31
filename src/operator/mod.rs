@@ -14,10 +14,7 @@ use self::{
 	io::{OperatorInput, OperatorOutput},
 	kernel::{DummyKernel, Kernel, KernelAttributes}
 };
-use crate::{
-	error::{Error, Result},
-	ortsys
-};
+use crate::{error::Result, ortsys};
 
 pub type InferShapeFn = dyn FnMut(*mut ort_sys::OrtShapeInferContext) -> crate::Result<()>;
 
@@ -92,7 +89,7 @@ impl OperatorDomain {
 	pub fn new(name: impl AsRef<str>) -> Result<Self> {
 		let name = CString::new(name.as_ref())?;
 		let mut ptr: *mut ort_sys::OrtCustomOpDomain = ptr::null_mut();
-		ortsys![unsafe CreateCustomOpDomain(name.as_ptr(), &mut ptr) -> Error::CreateOperatorDomain; nonNull(ptr)];
+		ortsys![unsafe CreateCustomOpDomain(name.as_ptr(), &mut ptr)?; nonNull(ptr)];
 		Ok(Self {
 			_name: name,
 			ptr: NonNull::from(unsafe { &mut *ptr }),
@@ -110,7 +107,7 @@ impl OperatorDomain {
 
 		let bound = BoundOperator::<O>::new(CString::new(name)?, O::execution_provider_type().map(CString::new).transpose()?);
 		let bound = ErasedBoundOperator::new(bound);
-		ortsys![unsafe CustomOpDomain_Add(self.ptr.as_ptr(), bound.op_ptr()) -> Error::AddCustomOperator];
+		ortsys![unsafe CustomOpDomain_Add(self.ptr.as_ptr(), bound.op_ptr())?];
 
 		self.operators.push(bound);
 

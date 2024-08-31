@@ -3,11 +3,9 @@ use std::fmt::Write;
 use std::{any::Any, marker::PhantomData, path::Path, ptr::NonNull, sync::Arc};
 
 use super::SessionBuilder;
-#[cfg(feature = "fetch-models")]
-use crate::error::FetchModelError;
 use crate::{
 	environment::get_environment,
-	error::{Error, Result},
+	error::{Error, ErrorCode, Result},
 	execution_providers::apply_execution_providers,
 	memory::Allocator,
 	ortsys,
@@ -38,7 +36,7 @@ impl SessionBuilder {
 		} else {
 			tracing::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), url = format!("{url:?}").as_str(), "Downloading model");
 
-			let resp = ureq::get(url).call().map_err(Box::new).map_err(FetchModelError::FetchError)?;
+			let resp = ureq::get(url).call().map_err(|e| Error::new(format!("Error downloading to file: {e}")))?;
 
 			let len = resp
 				.header("Content-Length")
@@ -51,15 +49,11 @@ impl SessionBuilder {
 			let f = std::fs::File::create(&model_filepath).expect("Failed to create model file");
 			let mut writer = std::io::BufWriter::new(f);
 
-			let bytes_io_count = std::io::copy(&mut reader, &mut writer).map_err(FetchModelError::IoError)?;
+			let bytes_io_count = std::io::copy(&mut reader, &mut writer).map_err(Error::wrap)?;
 			if bytes_io_count == len as u64 {
 				model_filepath
 			} else {
-				return Err(FetchModelError::CopyError {
-					expected: len as u64,
-					io: bytes_io_count
-				}
-				.into());
+				return Err(Error::new(format!("Failed to download entire model; file only has {bytes_io_count} bytes, expected {len}")));
 			}
 		};
 
@@ -73,9 +67,7 @@ impl SessionBuilder {
 	{
 		let model_filepath = model_filepath_ref.as_ref();
 		if !model_filepath.exists() {
-			return Err(Error::FileDoesNotExist {
-				filename: model_filepath.to_path_buf()
-			});
+			return Err(Error::new_with_code(ErrorCode::NoSuchFile, format!("File at `{}` does not exist", model_filepath.display())));
 		}
 
 		let model_path = crate::util::path_to_os_char(model_filepath);
@@ -84,18 +76,18 @@ impl SessionBuilder {
 		apply_execution_providers(&self, env.execution_providers.iter().cloned())?;
 
 		if env.has_global_threadpool {
-			ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr.as_ptr()) -> Error::CreateSessionOptions];
+			ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr.as_ptr())?];
 		}
 
 		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
-		ortsys![unsafe CreateSession(env.env_ptr.as_ptr(), model_path.as_ptr(), self.session_options_ptr.as_ptr(), &mut session_ptr) -> Error::CreateSession; nonNull(session_ptr)];
+		ortsys![unsafe CreateSession(env.env_ptr.as_ptr(), model_path.as_ptr(), self.session_options_ptr.as_ptr(), &mut session_ptr)?; nonNull(session_ptr)];
 
 		let session_ptr = unsafe { NonNull::new_unchecked(session_ptr) };
 
 		let allocator = match &self.memory_info {
 			Some(info) => {
 				let mut allocator_ptr: *mut ort_sys::OrtAllocator = std::ptr::null_mut();
-				ortsys![unsafe CreateAllocator(session_ptr.as_ptr(), info.ptr.as_ptr(), &mut allocator_ptr) -> Error::CreateAllocator; nonNull(allocator_ptr)];
+				ortsys![unsafe CreateAllocator(session_ptr.as_ptr(), info.ptr.as_ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
 				unsafe { Allocator::from_raw_unchecked(allocator_ptr) }
 			}
 			None => Allocator::default()
@@ -152,13 +144,13 @@ impl SessionBuilder {
 		apply_execution_providers(&self, env.execution_providers.iter().cloned())?;
 
 		if env.has_global_threadpool {
-			ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr.as_ptr()) -> Error::CreateSessionOptions];
+			ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr.as_ptr())?];
 		}
 
 		let model_data = model_bytes.as_ptr().cast::<std::ffi::c_void>();
 		let model_data_length = model_bytes.len();
 		ortsys![
-			unsafe CreateSessionFromArray(env.env_ptr.as_ptr(), model_data, model_data_length as _, self.session_options_ptr.as_ptr(), &mut session_ptr) -> Error::CreateSession;
+			unsafe CreateSessionFromArray(env.env_ptr.as_ptr(), model_data, model_data_length as _, self.session_options_ptr.as_ptr(), &mut session_ptr)?;
 			nonNull(session_ptr)
 		];
 
@@ -167,7 +159,7 @@ impl SessionBuilder {
 		let allocator = match &self.memory_info {
 			Some(info) => {
 				let mut allocator_ptr: *mut ort_sys::OrtAllocator = std::ptr::null_mut();
-				ortsys![unsafe CreateAllocator(session_ptr.as_ptr(), info.ptr.as_ptr(), &mut allocator_ptr) -> Error::CreateAllocator; nonNull(allocator_ptr)];
+				ortsys![unsafe CreateAllocator(session_ptr.as_ptr(), info.ptr.as_ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
 				unsafe { Allocator::from_raw_unchecked(allocator_ptr) }
 			}
 			None => Allocator::default()

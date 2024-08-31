@@ -45,10 +45,7 @@ pub use ort_sys as sys;
 #[cfg(feature = "load-dynamic")]
 pub use self::environment::init_from;
 pub use self::environment::{get_environment, init, Environment, EnvironmentBuilder, EnvironmentGlobalThreadPoolOptions};
-#[cfg(feature = "fetch-models")]
-#[cfg_attr(docsrs, doc(cfg(feature = "fetch-models")))]
-pub use self::error::FetchModelError;
-pub use self::error::{Error, ErrorInternal, Result};
+pub use self::error::{Error, ErrorCode, Result};
 pub use self::execution_providers::*;
 pub use self::io_binding::IoBinding;
 pub use self::memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType};
@@ -247,18 +244,18 @@ macro_rules! ortsys {
 		$($crate::error::assert_non_null_pointer($check, stringify!($method)).unwrap();)+
 		_x
 	}};
-	($method:ident($($n:expr),+ $(,)?) -> $err:expr$(;)?) => {
-		$crate::error::status_to_result($crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+)).map_err($err)?;
+	($method:ident($($n:expr),+ $(,)?)?) => {
+		$crate::error::status_to_result($crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+))?;
 	};
-	(unsafe $method:ident($($n:expr),+ $(,)?) -> $err:expr$(;)?) => {
-		$crate::error::status_to_result(unsafe { $crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) }).map_err($err)?;
+	(unsafe $method:ident($($n:expr),+ $(,)?)?) => {
+		$crate::error::status_to_result(unsafe { $crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) })?;
 	};
-	($method:ident($($n:expr),+ $(,)?) -> $err:expr; nonNull($($check:expr),+ $(,)?)$(;)?) => {
-		$crate::error::status_to_result($crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+)).map_err($err)?;
+	($method:ident($($n:expr),+ $(,)?)?; nonNull($($check:expr),+ $(,)?)$(;)?) => {
+		$crate::error::status_to_result($crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+))?;
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	};
-	(unsafe $method:ident($($n:expr),+ $(,)?) -> $err:expr; nonNull($($check:expr),+ $(,)?)$(;)?) => {{
-		$crate::error::status_to_result(unsafe { $crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) }).map_err($err)?;
+	(unsafe $method:ident($($n:expr),+ $(,)?)?; nonNull($($check:expr),+ $(,)?)$(;)?) => {{
+		$crate::error::status_to_result(unsafe { $crate::api().as_ref().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) })?;
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	}};
 }
@@ -269,9 +266,9 @@ pub(crate) fn char_p_to_string(raw: *const c_char) -> Result<String> {
 	let c_string = unsafe { CStr::from_ptr(raw.cast_mut()).to_owned() };
 	match c_string.into_string() {
 		Ok(string) => Ok(string),
-		Err(e) => Err(ErrorInternal::IntoStringError(e))
+		Err(e) => Err(Error::wrap(e))
 	}
-	.map_err(Error::FfiStringConversion)
+	.map_err(Error::wrap)
 }
 
 pub(crate) struct PrivateTraitMarker;

@@ -49,10 +49,9 @@ impl ExecutionProvider for ArmNNExecutionProvider {
 			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_ArmNN(options: *mut ort_sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> ort_sys::OrtStatusPtr);
 			return crate::error::status_to_result(unsafe {
 				OrtSessionOptionsAppendExecutionProvider_ArmNN(session_builder.session_options_ptr.as_ptr(), self.use_arena.into())
-			})
-			.map_err(Error::ExecutionProvider);
+			});
 		}
 
-		Err(Error::ExecutionProviderNotRegistered(self.as_str()))
+		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
 	}
 }

@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-	error::{status_to_result, Error, ErrorInternal, Result},
+	error::{status_to_result, Error, Result},
 	memory::{Allocator, MemoryInfo},
 	ortsys,
 	session::{Input, Output},
@@ -39,20 +39,20 @@ impl KernelAttributes {
 
 	pub fn inputs(&self) -> Result<Vec<Input>> {
 		let mut num_inputs: ort_sys::size_t = 0;
-		ortsys![unsafe KernelInfo_GetInputCount(self.0.as_ptr(), &mut num_inputs) -> Error::GetOperatorInput];
+		ortsys![unsafe KernelInfo_GetInputCount(self.0.as_ptr(), &mut num_inputs)?];
 
 		let mut inputs = Vec::with_capacity(num_inputs as _);
 		for idx in 0..num_inputs as usize {
 			let mut name_len: ort_sys::size_t = 0;
-			ortsys![unsafe KernelInfo_GetInputName(self.0.as_ptr(), idx as _, ptr::null_mut(), &mut name_len) -> Error::GetOperatorInput];
+			ortsys![unsafe KernelInfo_GetInputName(self.0.as_ptr(), idx as _, ptr::null_mut(), &mut name_len)?];
 			let mut name = vec![0u8; name_len as _];
-			ortsys![unsafe KernelInfo_GetInputName(self.0.as_ptr(), idx as _, name.as_mut_ptr().cast::<c_char>(), &mut name_len) -> Error::GetOperatorInput];
+			ortsys![unsafe KernelInfo_GetInputName(self.0.as_ptr(), idx as _, name.as_mut_ptr().cast::<c_char>(), &mut name_len)?];
 			let name = CString::from_vec_with_nul(name)
-				.map_err(|e| Error::FfiStringConversion(ErrorInternal::Msg(e.to_string())))?
+				.map_err(Error::wrap)?
 				.into_string()
-				.map_err(|e| Error::FfiStringConversion(ErrorInternal::IntoStringError(e)))?;
+				.map_err(Error::wrap)?;
 			let mut type_info = ptr::null_mut();
-			ortsys![unsafe KernelInfo_GetInputTypeInfo(self.0.as_ptr(), idx as _, &mut type_info) -> Error::GetOperatorInput; nonNull(type_info)];
+			ortsys![unsafe KernelInfo_GetInputTypeInfo(self.0.as_ptr(), idx as _, &mut type_info)?; nonNull(type_info)];
 			let input_type = ValueType::from_type_info(type_info)?;
 			inputs.push(Input { name, input_type })
 		}
@@ -61,20 +61,20 @@ impl KernelAttributes {
 
 	pub fn outputs(&self) -> Result<Vec<Output>> {
 		let mut num_outputs: ort_sys::size_t = 0;
-		ortsys![unsafe KernelInfo_GetOutputCount(self.0.as_ptr(), &mut num_outputs) -> Error::GetOperatorOutput];
+		ortsys![unsafe KernelInfo_GetOutputCount(self.0.as_ptr(), &mut num_outputs)?];
 
 		let mut outputs = Vec::with_capacity(num_outputs as _);
 		for idx in 0..num_outputs as usize {
 			let mut name_len: ort_sys::size_t = 0;
-			ortsys![unsafe KernelInfo_GetOutputName(self.0.as_ptr(), idx as _, ptr::null_mut(), &mut name_len) -> Error::GetOperatorOutput];
+			ortsys![unsafe KernelInfo_GetOutputName(self.0.as_ptr(), idx as _, ptr::null_mut(), &mut name_len)?];
 			let mut name = vec![0u8; name_len as _];
-			ortsys![unsafe KernelInfo_GetOutputName(self.0.as_ptr(), idx as _, name.as_mut_ptr().cast::<c_char>(), &mut name_len) -> Error::GetOperatorOutput];
+			ortsys![unsafe KernelInfo_GetOutputName(self.0.as_ptr(), idx as _, name.as_mut_ptr().cast::<c_char>(), &mut name_len)?];
 			let name = CString::from_vec_with_nul(name)
-				.map_err(|e| Error::FfiStringConversion(ErrorInternal::Msg(e.to_string())))?
+				.map_err(Error::wrap)?
 				.into_string()
-				.map_err(|e| Error::FfiStringConversion(ErrorInternal::IntoStringError(e)))?;
+				.map_err(Error::wrap)?;
 			let mut type_info = ptr::null_mut();
-			ortsys![unsafe KernelInfo_GetOutputTypeInfo(self.0.as_ptr(), idx as _, &mut type_info) -> Error::GetOperatorOutput; nonNull(type_info)];
+			ortsys![unsafe KernelInfo_GetOutputTypeInfo(self.0.as_ptr(), idx as _, &mut type_info)?; nonNull(type_info)];
 			let output_type = ValueType::from_type_info(type_info)?;
 			outputs.push(Output { name, output_type })
 		}
@@ -83,13 +83,10 @@ impl KernelAttributes {
 
 	pub fn node_name(&self) -> Result<String> {
 		let mut name_len: ort_sys::size_t = 0;
-		ortsys![unsafe KernelInfo_GetNodeName(self.0.as_ptr(), ptr::null_mut(), &mut name_len) -> Error::GetOperatorNodeName];
+		ortsys![unsafe KernelInfo_GetNodeName(self.0.as_ptr(), ptr::null_mut(), &mut name_len)?];
 		let mut name = vec![0u8; name_len as _];
-		ortsys![unsafe KernelInfo_GetNodeName(self.0.as_ptr(), name.as_mut_ptr().cast::<c_char>(), &mut name_len) -> Error::GetOperatorNodeName];
-		CString::from_vec_with_nul(name)
-			.map_err(|e| Error::FfiStringConversion(ErrorInternal::Msg(e.to_string())))?
-			.into_string()
-			.map_err(|e| Error::FfiStringConversion(ErrorInternal::IntoStringError(e)))
+		ortsys![unsafe KernelInfo_GetNodeName(self.0.as_ptr(), name.as_mut_ptr().cast::<c_char>(), &mut name_len)?];
+		CString::from_vec_with_nul(name).map_err(Error::wrap)?.into_string().map_err(Error::wrap)
 	}
 }
 
@@ -217,39 +214,39 @@ impl KernelContext {
 
 	pub fn input(&self, idx: usize) -> Result<Option<ValueRef<'_>>> {
 		let mut value_ptr: *const ort_sys::OrtValue = ptr::null();
-		ortsys![unsafe KernelContext_GetInput(self.ptr.as_ptr(), idx as ort_sys::size_t, &mut value_ptr) -> Error::GetOperatorInput];
+		ortsys![unsafe KernelContext_GetInput(self.ptr.as_ptr(), idx as ort_sys::size_t, &mut value_ptr)?];
 		Ok(NonNull::new(value_ptr.cast_mut()).map(|c| ValueRef::new(unsafe { Value::from_ptr_nodrop(c, None) })))
 	}
 
 	pub fn output(&self, idx: usize, shape: impl IntoIterator<Item = i64>) -> Result<Option<ValueRefMut<'_>>> {
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 		let shape = shape.into_iter().collect::<Vec<i64>>();
-		ortsys![unsafe KernelContext_GetOutput(self.ptr.as_ptr(), idx as ort_sys::size_t, shape.as_ptr(), shape.len() as _, &mut value_ptr) -> Error::GetOperatorOutput];
+		ortsys![unsafe KernelContext_GetOutput(self.ptr.as_ptr(), idx as ort_sys::size_t, shape.as_ptr(), shape.len() as _, &mut value_ptr)?];
 		Ok(NonNull::new(value_ptr).map(|c| ValueRefMut::new(unsafe { Value::from_ptr_nodrop(c, None) })))
 	}
 
 	pub fn num_inputs(&self) -> Result<usize> {
 		let mut num: ort_sys::size_t = 0;
-		ortsys![unsafe KernelContext_GetInputCount(self.ptr.as_ptr(), &mut num) -> Error::GetOperatorInput];
+		ortsys![unsafe KernelContext_GetInputCount(self.ptr.as_ptr(), &mut num)?];
 		Ok(num as _)
 	}
 
 	pub fn num_outputs(&self) -> Result<usize> {
 		let mut num: ort_sys::size_t = 0;
-		ortsys![unsafe KernelContext_GetOutputCount(self.ptr.as_ptr(), &mut num) -> Error::GetOperatorOutput];
+		ortsys![unsafe KernelContext_GetOutputCount(self.ptr.as_ptr(), &mut num)?];
 		Ok(num as _)
 	}
 
 	pub fn allocator(&self, memory_info: &MemoryInfo) -> Result<Allocator> {
 		let mut allocator_ptr = ptr::null_mut();
-		ortsys![unsafe KernelContext_GetAllocator(self.ptr.as_ptr(), memory_info.ptr.as_ptr(), &mut allocator_ptr) -> Error::GetKernelAllocator];
+		ortsys![unsafe KernelContext_GetAllocator(self.ptr.as_ptr(), memory_info.ptr.as_ptr(), &mut allocator_ptr)?];
 		println!("allocator ptr {allocator_ptr:?}");
 		Ok(unsafe { Allocator::from_raw_unchecked(allocator_ptr) })
 	}
 
 	pub fn get_resource(&self, id: ort_sys::c_int, version: ort_sys::c_int) -> Result<Option<NonNull<ort_sys::c_void>>> {
 		let mut resource_ptr: *mut ort_sys::c_void = ptr::null_mut();
-		ortsys![unsafe KernelContext_GetResource(self.ptr.as_ptr(), version, id, &mut resource_ptr) -> Error::GetKernelResource];
+		ortsys![unsafe KernelContext_GetResource(self.ptr.as_ptr(), version, id, &mut resource_ptr)?];
 		Ok(NonNull::new(resource_ptr))
 	}
 
@@ -265,7 +262,7 @@ impl KernelContext {
 	// 			memory_info.ptr.as_ptr(),
 	// 			(len * std::mem::size_of::<T>()) as ort_sys::size_t,
 	// 			&mut buffer
-	// 		) -> Error::GetKernelBuffer;
+	// 		)?;
 	// 		nonNull(buffer)
 	// 	];
 	// 	Ok(ScratchBuffer {
@@ -280,7 +277,7 @@ impl KernelContext {
 	/// [`super::Operator::execution_provider_type`]).
 	pub fn compute_stream(&self) -> Result<Option<NonNull<ort_sys::c_void>>> {
 		let mut stream_ptr: *mut ort_sys::c_void = ptr::null_mut();
-		ortsys![unsafe KernelContext_GetGPUComputeStream(self.ptr.as_ptr(), &mut stream_ptr) -> Error::GetKernelGPUComputeStream];
+		ortsys![unsafe KernelContext_GetGPUComputeStream(self.ptr.as_ptr(), &mut stream_ptr)?];
 		Ok(NonNull::new(stream_ptr))
 	}
 }

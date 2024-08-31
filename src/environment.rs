@@ -45,10 +45,8 @@ impl Environment {
 }
 
 impl Drop for Environment {
-	#[tracing::instrument]
 	fn drop(&mut self) {
-		debug!("Releasing environment");
-
+		debug!(ptr = ?self.env_ptr.as_ptr(), "Releasing environment");
 		ortsys![unsafe ReleaseEnv(self.env_ptr.as_ptr())];
 	}
 }

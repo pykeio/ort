@@ -203,7 +203,6 @@ macro_rules! get_ep_register {
 #[allow(unused)]
 pub(crate) use get_ep_register;
 
-#[tracing::instrument(skip_all)]
 pub(crate) fn apply_execution_providers(session_builder: &SessionBuilder, execution_providers: impl Iterator<Item = ExecutionProviderDispatch>) -> Result<()> {
 	let execution_providers: Vec<_> = execution_providers.collect();
 	let mut fallback_to_cpu = !execution_providers.is_empty();

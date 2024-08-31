@@ -53,9 +53,8 @@ unsafe impl Send for SharedSessionInner {}
 unsafe impl Sync for SharedSessionInner {}
 
 impl Drop for SharedSessionInner {
-	#[tracing::instrument]
 	fn drop(&mut self) {
-		tracing::debug!("dropping SharedSessionInner");
+		tracing::debug!(ptr = ?self.session_ptr.as_ptr(), "dropping SharedSessionInner");
 		ortsys![unsafe ReleaseSession(self.session_ptr.as_ptr())];
 	}
 }

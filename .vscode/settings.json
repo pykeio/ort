@@ -8,5 +8,8 @@
 	},
 	"rust-analyzer.cachePriming.enable": true,
 	"rust-analyzer.diagnostics.experimental.enable": true,
-	"rust-analyzer.showUnlinkedFileNotification": false
+	"rust-analyzer.showUnlinkedFileNotification": false,
+	"deno.enablePaths": [
+		"tools/api-coverage.ts"
+	]
 }

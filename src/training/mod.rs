@@ -1,10 +1,7 @@
 use std::{
 	path::Path,
 	ptr::{self, NonNull},
-	sync::{
-		atomic::{AtomicPtr, Ordering},
-		OnceLock
-	}
+	sync::OnceLock
 };
 
 use crate::{ortsys, Error, Result, RunOptions};
@@ -20,8 +17,6 @@ pub use self::{
 	trainer::Trainer
 };
 
-pub(crate) static TRAINING_API: OnceLock<AtomicPtr<ort_sys::OrtTrainingApi>> = OnceLock::new();
-
 /// Returns a pointer to the global [`ort_sys::OrtTrainingApi`] object, or errors if the Training API is not enabled.
 ///
 /// # Panics
@@ -29,13 +24,20 @@ pub(crate) static TRAINING_API: OnceLock<AtomicPtr<ort_sys::OrtTrainingApi>> = O
 /// - Getting the `OrtApi` struct fails, due to `ort` loading an unsupported version of ONNX Runtime.
 /// - Loading the ONNX Runtime dynamic library fails if the `load-dynamic` feature is enabled.
 pub fn training_api() -> Result<NonNull<ort_sys::OrtTrainingApi>> {
+	struct TrainingApiPointer(*const ort_sys::OrtTrainingApi);
+	unsafe impl Send for TrainingApiPointer {}
+	unsafe impl Sync for TrainingApiPointer {}
+
+	static TRAINING_API: OnceLock<TrainingApiPointer> = OnceLock::new();
+
 	NonNull::new(
 		TRAINING_API
 			.get_or_init(|| {
 				let training_api = ortsys![unsafe GetTrainingApi(ort_sys::ORT_API_VERSION)];
-				AtomicPtr::new(training_api.cast_mut())
+				TrainingApiPointer(training_api)
 			})
-			.load(Ordering::Relaxed)
+			.0
+			.cast_mut()
 	)
 	.ok_or_else(|| Error::new("Training is not enbled in this build of ONNX Runtime."))
 }

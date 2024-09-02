@@ -34,10 +34,7 @@ use std::{
 	ffi::CStr,
 	os::raw::c_char,
 	ptr::{self, NonNull},
-	sync::{
-		atomic::{AtomicPtr, Ordering},
-		OnceLock
-	}
+	sync::OnceLock
 };
 
 pub use ort_sys as sys;
@@ -135,8 +132,6 @@ pub(crate) fn lib_handle() -> &'static libloading::Library {
 	})
 }
 
-pub(crate) static G_ORT_API: OnceLock<AtomicPtr<ort_sys::OrtApi>> = OnceLock::new();
-
 /// Returns a pointer to the global [`ort_sys::OrtApi`] object.
 ///
 /// # Panics
@@ -161,59 +156,59 @@ pub(crate) static G_ORT_API: OnceLock<AtomicPtr<ort_sys::OrtApi>> = OnceLock::ne
 ///
 /// For the full list of ONNX Runtime APIs, consult the [`ort_sys::OrtApi`] struct and the [ONNX Runtime C API](https://onnxruntime.ai/docs/api/c/struct_ort_api.html).
 pub fn api() -> NonNull<ort_sys::OrtApi> {
-	unsafe {
-		NonNull::new_unchecked(
-			G_ORT_API
-				.get_or_init(|| {
-					#[cfg(feature = "load-dynamic")]
-					{
-						let dylib = lib_handle();
-						let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const ort_sys::OrtApiBase> = dylib
-							.get(b"OrtGetApiBase")
-							.expect("`OrtGetApiBase` must be present in ONNX Runtime dylib");
-						let base: *const ort_sys::OrtApiBase = base_getter();
-						assert_ne!(base, ptr::null());
+	struct ApiPointer(NonNull<ort_sys::OrtApi>);
+	unsafe impl Send for ApiPointer {}
+	unsafe impl Sync for ApiPointer {}
 
-						let get_version_string: extern_system_fn! { unsafe fn () -> *const c_char } =
-							(*base).GetVersionString.expect("`GetVersionString` must be present in `OrtApiBase`");
-						let version_string = get_version_string();
-						let version_string = CStr::from_ptr(version_string).to_string_lossy();
-						tracing::info!("Loaded ONNX Runtime dylib with version '{version_string}'");
+	static G_ORT_API: OnceLock<ApiPointer> = OnceLock::new();
 
-						let lib_minor_version = version_string.split('.').nth(1).map_or(0, |x| x.parse::<u32>().unwrap_or(0));
-						match lib_minor_version.cmp(&MINOR_VERSION) {
-							std::cmp::Ordering::Less => panic!(
-								"ort {} is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
-								env!("CARGO_PKG_VERSION"),
-								dylib_path()
-							),
-							std::cmp::Ordering::Greater => tracing::warn!(
-								"ort {} may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
-								env!("CARGO_PKG_VERSION"),
-								dylib_path()
-							),
-							std::cmp::Ordering::Equal => {}
-						};
-						let get_api: extern_system_fn! { unsafe fn(u32) -> *const ort_sys::OrtApi } =
-							(*base).GetApi.expect("`GetApi` must be present in `OrtApiBase`");
-						let api: *const ort_sys::OrtApi = get_api(ort_sys::ORT_API_VERSION);
-						assert!(!api.is_null());
-						AtomicPtr::new(api.cast_mut())
-					}
-					#[cfg(not(feature = "load-dynamic"))]
-					{
-						let base: *const ort_sys::OrtApiBase = ort_sys::OrtGetApiBase();
-						assert_ne!(base, ptr::null());
-						let get_api: extern_system_fn! { unsafe fn(u32) -> *const ort_sys::OrtApi } =
-							(*base).GetApi.expect("`GetApi` must be present in `OrtApiBase`");
-						let api: *const ort_sys::OrtApi = get_api(ort_sys::ORT_API_VERSION);
-						assert!(!api.is_null());
-						AtomicPtr::new(api.cast_mut())
-					}
-				})
-				.load(Ordering::Relaxed)
-		)
-	}
+	G_ORT_API
+		.get_or_init(|| {
+			#[cfg(feature = "load-dynamic")]
+			unsafe {
+				let dylib = lib_handle();
+				let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const ort_sys::OrtApiBase> = dylib
+					.get(b"OrtGetApiBase")
+					.expect("`OrtGetApiBase` must be present in ONNX Runtime dylib");
+				let base: *const ort_sys::OrtApiBase = base_getter();
+				assert_ne!(base, ptr::null());
+
+				let get_version_string: extern_system_fn! { unsafe fn () -> *const c_char } =
+					(*base).GetVersionString.expect("`GetVersionString` must be present in `OrtApiBase`");
+				let version_string = get_version_string();
+				let version_string = CStr::from_ptr(version_string).to_string_lossy();
+				tracing::info!("Loaded ONNX Runtime dylib with version '{version_string}'");
+
+				let lib_minor_version = version_string.split('.').nth(1).map_or(0, |x| x.parse::<u32>().unwrap_or(0));
+				match lib_minor_version.cmp(&MINOR_VERSION) {
+					std::cmp::Ordering::Less => panic!(
+						"ort {} is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
+						env!("CARGO_PKG_VERSION"),
+						dylib_path()
+					),
+					std::cmp::Ordering::Greater => tracing::warn!(
+						"ort {} may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
+						env!("CARGO_PKG_VERSION"),
+						dylib_path()
+					),
+					std::cmp::Ordering::Equal => {}
+				};
+				let get_api: extern_system_fn! { unsafe fn(u32) -> *const ort_sys::OrtApi } =
+					(*base).GetApi.expect("`GetApi` must be present in `OrtApiBase`");
+				let api: *const ort_sys::OrtApi = get_api(ort_sys::ORT_API_VERSION);
+				ApiPointer(NonNull::new(api.cast_mut()).expect("Failed to initialize ORT API"))
+			}
+			#[cfg(not(feature = "load-dynamic"))]
+			unsafe {
+				let base: *const ort_sys::OrtApiBase = ort_sys::OrtGetApiBase();
+				assert_ne!(base, ptr::null());
+				let get_api: extern_system_fn! { unsafe fn(u32) -> *const ort_sys::OrtApi } =
+					(*base).GetApi.expect("`GetApi` must be present in `OrtApiBase`");
+				let api: *const ort_sys::OrtApi = get_api(ort_sys::ORT_API_VERSION);
+				ApiPointer(NonNull::new(api.cast_mut()).expect("Failed to initialize ORT API"))
+			}
+		})
+		.0
 }
 
 macro_rules! ortsys {

@@ -8,6 +8,27 @@ const SYMBOL_USAGE_REGEX = /ortsys!\[\s*(?:unsafe\s+)?([A-Za-z_][A-Za-z0-9_]+)/g
 
 const IGNORED_SYMBOLS = new Set<string>([
 	'CreateEnv', // we will always create an env with a custom logger for integration w/ tracing
+	'CreateEnvWithGlobalThreadPools',
+	'KernelContext_GetScratchBuffer', // implemented in src/operator/kernel.rs but impl appears to be broken so ignoring
+	'RegisterCustomOpsLibrary', // we use RegisterCustomOpsLibrary_V2
+	'RegisterCustomOpsUsingFunction',
+	'SessionOptionsAppendExecutionProvider_CUDA', // we use V2
+	'SessionOptionsAppendExecutionProvider_TensorRT', // we use V2
+	'SetLanguageProjection', // someday we shall have `ORT_PROJECTION_RUST`, but alas, today is not that day...
+
+	// we use allocator APIs directly on the Allocator struct
+	'AllocatorAlloc',
+	'AllocatorFree',
+	'AllocatorGetInfo',
+
+	// functions that don't make sense with SessionBuilder API
+	'HasSessionConfigEntry',
+	'GetSessionConfigEntry',
+	'DisableProfiling',
+	'GetCUDAProviderOptionsAsString',
+	'GetTensorRTProviderOptionsAsString',
+	'GetCANNProviderOptionsAsString',
+	'GetDnnlProviderOptionsAsString'
 ]);
 
 const sysSymbols = new Set<string>();
@@ -45,10 +66,9 @@ for await (const sourceFile of walk(join(PROJECT_ROOT, 'src'))) {
 	}
 }
 
-const unusedSymbols = sysSymbols
-	.difference(usedSymbols)
-	.difference(IGNORED_SYMBOLS);
+const nonIgnoredSymbols = sysSymbols.difference(IGNORED_SYMBOLS);
+const unusedSymbols = nonIgnoredSymbols.difference(usedSymbols);
 for (const symbol of unusedSymbols) {
 	console.log(`%c\t${symbol}`, 'color: red');
 }
-console.log(`%cCoverage: ${usedSymbols.size}/${sysSymbols.size} (${((usedSymbols.size / sysSymbols.size) * 100).toFixed(2)}%)`, 'color: green; font-weight: bold');
+console.log(`%cCoverage: ${usedSymbols.size}/${nonIgnoredSymbols.size} (${((usedSymbols.size / nonIgnoredSymbols.size) * 100).toFixed(2)}%)`, 'color: green; font-weight: bold');

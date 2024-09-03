@@ -240,7 +240,6 @@ impl KernelContext {
 	pub fn allocator(&self, memory_info: &MemoryInfo) -> Result<Allocator> {
 		let mut allocator_ptr = ptr::null_mut();
 		ortsys![unsafe KernelContext_GetAllocator(self.ptr.as_ptr(), memory_info.ptr.as_ptr(), &mut allocator_ptr)?];
-		println!("allocator ptr {allocator_ptr:?}");
 		Ok(unsafe { Allocator::from_raw_unchecked(allocator_ptr) })
 	}
 

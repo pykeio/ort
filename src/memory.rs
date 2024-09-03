@@ -1,5 +1,6 @@
 use std::{
-	ffi::{c_char, c_int, CString},
+	ffi::{c_char, c_int, c_void, CString},
+	mem,
 	ptr::NonNull,
 	sync::Arc
 };
@@ -84,9 +85,58 @@ impl Allocator {
 		}
 	}
 
+	/// Allocates a block of memory, of size `size_of::<T>() * len` bytes, using this allocator.
+	/// The memory will be automatically freed when the returned `AllocatedBlock` goes out of scope.
+	///
+	/// May return `None` if the allocation fails.
+	///
+	/// # Example
+	/// ```
+	/// # use ort::Allocator;
+	/// let allocator = Allocator::default();
+	/// let mut mem = allocator.alloc::<i32>(5).unwrap();
+	/// unsafe {
+	/// 	let ptr = mem.as_mut_ptr().cast::<i32>();
+	/// 	*ptr.add(3) = 42;
+	/// };
+	/// ```
+	pub fn alloc<T>(&self, len: usize) -> Option<AllocatedBlock<'_>> {
+		let ptr = unsafe {
+			self.ptr
+				.as_ref()
+				.Alloc
+				.unwrap_or_else(|| unreachable!("Allocator method `Alloc` is null"))(self.ptr.as_ptr(), (len * mem::size_of::<T>()) as _)
+		};
+		if !ptr.is_null() { Some(AllocatedBlock { ptr, allocator: self }) } else { None }
+	}
+
 	/// Frees an object allocated by this allocator, given the object's C pointer.
-	pub(crate) unsafe fn free<T>(&self, ptr: *mut T) {
+	///
+	/// # Safety
+	/// The pointer **must** have been allocated using this exact allocator's [`alloc`](Allocator::alloc) function.
+	///
+	/// This function is meant to be used in situations where the lifetime restrictions of [`AllocatedBlock`] are hard
+	/// to work with.
+	///
+	/// ```
+	/// # use ort::Allocator;
+	/// let allocator = Allocator::default();
+	/// let mut mem = allocator.alloc::<i32>(5).unwrap();
+	/// unsafe {
+	/// 	let ptr = mem.as_mut_ptr().cast::<i32>();
+	/// 	*ptr.add(3) = 42;
+	///
+	/// 	allocator.free(mem.into_raw());
+	/// };
+	/// ```
+	pub unsafe fn free<T>(&self, ptr: *mut T) {
 		self.ptr.as_ref().Free.unwrap_or_else(|| unreachable!("Allocator method `Free` is null"))(self.ptr.as_ptr(), ptr.cast());
+	}
+
+	/// Returns the [`MemoryInfo`] describing this allocator.
+	pub fn memory_info(&self) -> MemoryInfo {
+		let memory_info_ptr = unsafe { self.ptr.as_ref().Info.unwrap_or_else(|| unreachable!("Allocator method `Info` is null"))(self.ptr.as_ptr()) };
+		MemoryInfo::from_raw(unsafe { NonNull::new_unchecked(memory_info_ptr.cast_mut()) }, false)
 	}
 
 	/// Creates a new [`Allocator`] for the given session, to allocate memory on the device described in the
@@ -127,6 +177,50 @@ impl Drop for Allocator {
 		if !self.is_default {
 			ortsys![unsafe ReleaseAllocator(self.ptr.as_ptr())];
 		}
+	}
+}
+
+/// A block of memory allocated by an [`Allocator`].
+pub struct AllocatedBlock<'a> {
+	ptr: *mut c_void,
+	allocator: &'a Allocator
+}
+
+impl<'a> AllocatedBlock<'a> {
+	/// Returns a pointer to the allocated memory.
+	///
+	/// Note that, depending on the exact allocator used, this may not a pointer to memory accessible by the CPU.
+	pub fn as_ptr(&self) -> *const c_void {
+		self.ptr
+	}
+
+	/// Returns a mutable pointer to the allocated memory.
+	///
+	/// Note that, depending on the exact allocator used, this may not a pointer to memory accessible by the CPU.
+	pub fn as_mut_ptr(&mut self) -> *mut c_void {
+		self.ptr
+	}
+
+	/// Returns the [`Allocator`] that allocated this block of memory.
+	pub fn allocator(&self) -> &Allocator {
+		self.allocator
+	}
+
+	/// Consumes the [`AllocatedBlock`], returning the pointer to its data.
+	///
+	/// The pointer must be freed with [`Allocator::free`], using the allocator that initially created it. Not doing so
+	/// will cause a memory leak.
+	#[must_use = "the returned pointer must be freed with the allocator that created it"]
+	pub fn into_raw(self) -> *mut c_void {
+		let ptr = self.ptr;
+		mem::forget(self);
+		ptr
+	}
+}
+
+impl<'a> Drop for AllocatedBlock<'a> {
+	fn drop(&mut self) {
+		unsafe { self.allocator.free(self.ptr) };
 	}
 }
 

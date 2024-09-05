@@ -35,7 +35,8 @@ fn display_value_type(value: &ValueType) -> String {
 			)
 		}
 		ValueType::Map { key, value } => format!("Map<{}, {}>", display_element_type(*key), display_element_type(*value)),
-		ValueType::Sequence(inner) => format!("Sequence<{}>", display_value_type(inner))
+		ValueType::Sequence(inner) => format!("Sequence<{}>", display_value_type(inner)),
+		ValueType::Optional(inner) => format!("Option<{}>", display_value_type(inner))
 	}
 }
 

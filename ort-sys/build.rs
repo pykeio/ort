@@ -5,7 +5,7 @@ use std::{
 };
 
 #[allow(unused)]
-const ONNXRUNTIME_VERSION: &str = "1.19.0";
+const ONNXRUNTIME_VERSION: &str = "1.19.2";
 
 const ORT_ENV_SYSTEM_LIB_LOCATION: &str = "ORT_LIB_LOCATION";
 const ORT_ENV_SYSTEM_LIB_PROFILE: &str = "ORT_LIB_PROFILE";

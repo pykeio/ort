@@ -87,7 +87,9 @@ pub enum ValueType {
 		key: TensorElementType,
 		/// The map value type.
 		value: TensorElementType
-	}
+	},
+	/// An optional value, which may or may not contain a [`Value`].
+	Optional(Box<ValueType>)
 }
 
 impl ValueType {
@@ -109,6 +111,15 @@ impl ValueType {
 				let mut info_ptr: *const ort_sys::OrtMapTypeInfo = std::ptr::null_mut();
 				ortsys![unsafe CastTypeInfoToMapTypeInfo(typeinfo_ptr, &mut info_ptr)?; nonNull(info_ptr)];
 				unsafe { extract_data_type_from_map_info(info_ptr)? }
+			}
+			ort_sys::ONNXType::ONNX_TYPE_OPTIONAL => {
+				let mut info_ptr: *const ort_sys::OrtOptionalTypeInfo = std::ptr::null_mut();
+				ortsys![unsafe CastTypeInfoToOptionalTypeInfo(typeinfo_ptr, &mut info_ptr)?; nonNull(info_ptr)];
+
+				let mut contained_type: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
+				ortsys![unsafe GetOptionalContainedTypeInfo(info_ptr, &mut contained_type)?; nonNull(contained_type)];
+
+				ValueType::Optional(Box::new(ValueType::from_type_info(contained_type)?))
 			}
 			_ => unreachable!()
 		};

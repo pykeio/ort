@@ -132,6 +132,21 @@ pub(crate) fn lib_handle() -> &'static libloading::Library {
 	})
 }
 
+/// Returns information about the build of ONNX Runtime used, including version, Git commit, and compile flags.
+///
+/// ```
+/// println!("{}", ort::info());
+/// // ORT Build Info: git-branch=rel-1.19.0, git-commit-id=26250ae, build type=Release, cmake cxx flags: /DWIN32 /D_WINDOWS /EHsc /Zc:__cplusplus /EHsc /wd26812 -DEIGEN_HAS_C99_MATH -DCPUINFO_SUPPORTED
+/// ```
+pub fn info() -> &'static str {
+	let str = unsafe { ortsys![GetBuildInfoString]() };
+	let mut len = 0;
+	while unsafe { *str.add(len) } != 0x00 {
+		len += 1;
+	}
+	unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(str.cast::<u8>(), len)) }
+}
+
 /// Returns a pointer to the global [`ort_sys::OrtApi`] object.
 ///
 /// # Panics

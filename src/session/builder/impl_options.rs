@@ -1,3 +1,5 @@
+#[cfg(not(windows))]
+use std::ffi::CString;
 use std::{path::Path, rc::Rc, sync::Arc};
 
 use super::SessionBuilder;

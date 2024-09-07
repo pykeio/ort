@@ -1,12 +1,12 @@
-#[cfg(any(feature = "operator-libraries", not(windows)))]
-use std::ffi::CString;
-use std::{rc::Rc, sync::Arc};
+use std::{path::Path, rc::Rc, sync::Arc};
 
 use super::SessionBuilder;
 use crate::{
 	error::Result,
 	execution_providers::{apply_execution_providers, ExecutionProviderDispatch},
-	ortsys, MemoryInfo, OperatorDomain
+	ortsys,
+	util::path_to_os_char,
+	MemoryInfo, OperatorDomain
 };
 
 impl SessionBuilder {
@@ -116,31 +116,9 @@ impl SessionBuilder {
 	}
 
 	/// Registers a custom operator library at the given library path.
-	#[cfg(feature = "operator-libraries")]
-	#[cfg_attr(docsrs, doc(cfg(feature = "operator-libraries")))]
-	pub fn with_operator_library(mut self, lib_path: impl AsRef<str>) -> Result<Self> {
-		use crate::error::status_to_result;
-
-		let path_cstr = CString::new(lib_path.as_ref())?;
-
-		let mut handle: *mut ::std::os::raw::c_void = std::ptr::null_mut();
-
-		let status = ortsys![unsafe RegisterCustomOpsLibrary(self.session_options_ptr.as_ptr(), path_cstr.as_ptr(), &mut handle)];
-
-		let handle = LibHandle(handle);
-		// per RegisterCustomOpsLibrary docs, release handle if there was an error and the handle
-		// is non-null
-		if let Err(e) = status_to_result(status) {
-			if !handle.is_null() {
-				// handle was written to, should release it
-				drop(handle);
-			}
-
-			return Err(e);
-		}
-
-		self.custom_runtime_handles.push(Arc::new(handle));
-
+	pub fn with_operator_library(self, lib_path: impl AsRef<Path>) -> Result<Self> {
+		let path_cstr = path_to_os_char(lib_path);
+		ortsys![unsafe RegisterCustomOpsLibrary_V2(self.session_options_ptr.as_ptr(), path_cstr.as_ptr())?];
 		Ok(self)
 	}
 
@@ -246,29 +224,5 @@ impl From<GraphOptimizationLevel> for ort_sys::GraphOptimizationLevel {
 			GraphOptimizationLevel::Level2 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_EXTENDED,
 			GraphOptimizationLevel::Level3 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_ALL
 		}
-	}
-}
-
-#[cfg(feature = "operator-libraries")]
-pub(super) struct LibHandle(*mut std::os::raw::c_void);
-
-#[cfg(feature = "operator-libraries")]
-impl LibHandle {
-	pub(self) fn is_null(&self) -> bool {
-		self.0.is_null()
-	}
-}
-
-#[cfg(feature = "operator-libraries")]
-impl Drop for LibHandle {
-	fn drop(&mut self) {
-		#[cfg(unix)]
-		unsafe {
-			libc::dlclose(self.0)
-		};
-		#[cfg(windows)]
-		unsafe {
-			winapi::um::libloaderapi::FreeLibrary(self.0 as winapi::shared::minwindef::HINSTANCE)
-		};
 	}
 }

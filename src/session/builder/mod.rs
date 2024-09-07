@@ -17,8 +17,6 @@ mod impl_config_keys;
 mod impl_options;
 
 pub use self::impl_options::GraphOptimizationLevel;
-#[cfg(feature = "operator-libraries")]
-use self::impl_options::LibHandle;
 
 /// Creates a session using the builder pattern.
 ///
@@ -38,8 +36,6 @@ use self::impl_options::LibHandle;
 pub struct SessionBuilder {
 	pub(crate) session_options_ptr: NonNull<ort_sys::OrtSessionOptions>,
 	memory_info: Option<Rc<MemoryInfo>>,
-	#[cfg(feature = "operator-libraries")]
-	custom_runtime_handles: Vec<Arc<LibHandle>>,
 	operator_domains: Vec<Arc<OperatorDomain>>
 }
 
@@ -52,8 +48,6 @@ impl Clone for SessionBuilder {
 		Self {
 			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },
 			memory_info: self.memory_info.clone(),
-			#[cfg(feature = "operator-libraries")]
-			custom_runtime_handles: self.custom_runtime_handles.clone(),
 			operator_domains: self.operator_domains.clone()
 		}
 	}
@@ -85,8 +79,6 @@ impl SessionBuilder {
 		Ok(Self {
 			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },
 			memory_info: None,
-			#[cfg(feature = "operator-libraries")]
-			custom_runtime_handles: Vec::new(),
 			operator_domains: Vec::new()
 		})
 	}

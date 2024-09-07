@@ -103,10 +103,7 @@ impl SessionBuilder {
 			.map(|i| dangerous::extract_output(session_ptr, &allocator, i))
 			.collect::<Result<Vec<Output>>>()?;
 
-		let extras = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>);
-		#[cfg(feature = "operator-libraries")]
-		let extras = extras.chain(self.custom_runtime_handles.drain(..).map(|d| Box::new(d) as Box<dyn Any>));
-		let extras: Vec<Box<dyn Any>> = extras.collect();
+		let extras = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>).collect();
 
 		Ok(Session {
 			inner: Arc::new(SharedSessionInner {
@@ -175,10 +172,7 @@ impl SessionBuilder {
 			.map(|i| dangerous::extract_output(session_ptr, &allocator, i))
 			.collect::<Result<Vec<Output>>>()?;
 
-		let extras = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>);
-		#[cfg(feature = "operator-libraries")]
-		let extras = extras.chain(self.custom_runtime_handles.drain(..).map(|d| Box::new(d) as Box<dyn Any>));
-		let extras: Vec<Box<dyn Any>> = extras.collect();
+		let extras = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>).collect();
 
 		let session = Session {
 			inner: Arc::new(SharedSessionInner {

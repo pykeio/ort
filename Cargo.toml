@@ -56,8 +56,6 @@ default = [ "ndarray", "half", "download-binaries", "copy-dylibs" ]
 
 training = [ "ort-sys/training" ]
 
-operator-libraries = [ "libc", "winapi" ]
-
 fetch-models = [ "ureq", "sha2" ]
 download-binaries = [ "ort-sys/download-binaries" ]
 load-dynamic = [ "libloading", "ort-sys/load-dynamic" ]
@@ -90,12 +88,6 @@ ureq = { version = "2.1", optional = true, default-features = false, features = 
 sha2 = { version = "0.10", optional = true }
 tracing = { version = "0.1", default-features = false, features = [ "std" ] }
 half = { version = "2.1", optional = true }
-
-[target.'cfg(unix)'.dependencies]
-libc = { version = "0.2", optional = true }
-
-[target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", optional = true, features = [ "std", "libloaderapi" ] }
 
 [dev-dependencies]
 anyhow = "1.0"

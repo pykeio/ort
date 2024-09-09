@@ -36,6 +36,8 @@ mod migraphx;
 pub use self::migraphx::MIGraphXExecutionProvider;
 mod vitis;
 pub use self::vitis::VitisAIExecutionProvider;
+mod rknpu;
+pub use self::rknpu::RKNPUExecutionProvider;
 
 /// ONNX Runtime works with different hardware acceleration libraries through its extensible **Execution Providers**
 /// (EP) framework to optimally execute the ONNX models on the hardware platform. This interface enables flexibility for

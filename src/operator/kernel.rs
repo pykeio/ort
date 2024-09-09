@@ -1,5 +1,5 @@
 use std::{
-	ffi::{c_char, CString},
+	ffi::{c_char, c_void, CString},
 	ops::{Deref, DerefMut},
 	ptr::{self, NonNull}
 };
@@ -249,6 +249,15 @@ impl KernelContext {
 		Ok(NonNull::new(resource_ptr))
 	}
 
+	pub fn par_for<F>(&self, total: usize, max_num_batches: usize, f: F) -> Result<()>
+	where
+		F: Fn(usize) + Sync + Send
+	{
+		let executor = Box::new(f) as Box<dyn Fn(usize) + Sync + Send>;
+		ortsys![unsafe KernelContext_ParallelFor(self.ptr.as_ptr(), Some(parallel_for_cb), total as _, max_num_batches as _, &executor as *const _ as *mut c_void)?];
+		Ok(())
+	}
+
 	// TODO: STATUS_ACCESS_VIOLATION inside `KernelContext_GetScratchBuffer`. gonna assume this one is just an internal ONNX
 	// Runtime bug.
 	//
@@ -279,4 +288,9 @@ impl KernelContext {
 		ortsys![unsafe KernelContext_GetGPUComputeStream(self.ptr.as_ptr(), &mut stream_ptr)?];
 		Ok(NonNull::new(stream_ptr))
 	}
+}
+
+extern "C" fn parallel_for_cb(user_data: *mut c_void, iterator: ort_sys::size_t) {
+	let executor = unsafe { &*user_data.cast::<Box<dyn Fn(usize) + Sync + Send>>() };
+	executor(iterator as _)
 }

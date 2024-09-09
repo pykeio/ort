@@ -14,6 +14,7 @@ const IGNORED_SYMBOLS = new Set<string>([
 	'RegisterCustomOpsUsingFunction',
 	'SessionOptionsAppendExecutionProvider_CUDA', // we use V2
 	'SessionOptionsAppendExecutionProvider_TensorRT', // we use V2
+	'GetValueType', // we get value types via GetTypeInfo -> GetOnnxTypeFromTypeInfo, which is equivalent
 	'SetLanguageProjection', // someday we shall have `ORT_PROJECTION_RUST`, but alas, today is not that day...
 
 	// we use allocator APIs directly on the Allocator struct

@@ -1,7 +1,7 @@
 [package]
 name = "ort-sys"
-description = "Unsafe Rust bindings for ONNX Runtime 1.18 - Optimize and Accelerate Machine Learning Inferencing"
-version = "2.0.0-rc.5"
+description = "Unsafe Rust bindings for ONNX Runtime 1.19 - Optimize and Accelerate Machine Learning Inferencing"
+version = "2.0.0-rc.6"
 edition = "2021"
 rust-version = "1.70"
 license = "MIT OR Apache-2.0"

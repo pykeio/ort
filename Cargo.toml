@@ -47,7 +47,7 @@ strip = true
 codegen-units = 1
 
 [package.metadata.docs.rs]
-features = [ "ndarray", "half", "training", "operator-libraries", "fetch-models", "load-dynamic", "copy-dylibs" ]
+features = [ "ndarray", "half", "training", "fetch-models", "load-dynamic", "copy-dylibs" ]
 targets = ["x86_64-unknown-linux-gnu"]
 rustdoc-args = [ "--cfg", "docsrs" ]
 

@@ -71,7 +71,7 @@ let (raw_shape, raw_data) = tensor.extract_raw_tensor_mut();
 You can now create a tensor on device memory with `Tensor::new` & an allocator:
 
 ```rust
-let allocator = Allocator::new(&session, MemoryInfo::new(AllocationDevice::CUDAPinned, 0, AllocatorType::Device, MemoryType::CPUInput)?)?;
+let allocator = Allocator::new(&session, MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?)?;
 let tensor = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
 ```
 

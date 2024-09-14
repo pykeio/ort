@@ -29,6 +29,7 @@
 - **[Supabase](https://supabase.com/)** uses `ort` to remove cold starts for their edge functions.
 - **[Lantern](https://github.com/lanterndata/lantern_extras)** uses `ort` to provide embedding model inference inside Postgres.
 - **[Magika](https://github.com/google/magika)** uses `ort` for content type detection.
+- **[`sbv2-api`](https://github.com/tuna2134/sbv2-api)** is a fast implementation of Style-BERT-VITS2 text-to-speech using `ort`.
 
 ## 🌠 Sponsor `ort`
 <a href="https://opencollective.com/pyke-osai">

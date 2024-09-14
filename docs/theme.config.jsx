@@ -11,8 +11,9 @@ const config = {
 	docsRepositoryBase: 'https://github.com/pykeio/ort/blob/main/docs',
 	useNextSeoProps() {
 		return {
-			titleTemplate: '%s | ort'
-		}
+			titleTemplate: '%s | ort',
+			description: 'ort is a community-maintained ONNX Runtime binding for Rust, enabling fast ML inference & training for a wide range of devices.'
+		};
 	},
 	logo: <img src="/assets/banner.png" style={{ height: '34px' }} />,
 	darkMode: true,

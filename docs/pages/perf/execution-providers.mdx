@@ -9,29 +9,32 @@ Execution providers (EPs) enable ONNX Runtime to execute ONNX graphs with hardwa
 
 ONNX Runtime must be compiled with support for each execution provider. pyke provides precompiled binaries for some of the most common EPs, so you won't need to compile ONNX Runtime from source. Below is a table showing available EPs, their support in `ort`, and their binary availability status.
 
-| EP | Supported | Binaries | Static linking
-|:-------- |:------- |:------ |:------ |
-| NVIDIA CUDA | 🟢 | 🟢 | ❌ |
-| NVIDIA TensorRT | 🟢 | 🟢 | ❌ |
-| Microsoft DirectML | 🟢 | 🟢 | 🟢 |
-| Apple CoreML | 🟢 | 🟢 | 🟢 |
-| AMD ROCm | 🟢 | 🟢 | ❌ |
-| Intel OpenVINO | 🟢 | ❌ | ❓ |
-| Intel oneDNN | 🟢 | ❌ | ❓ |
-| XNNPACK | 🟢 | 🟢 | 🟢 |
-| Qualcomm QNN | 🟢 | ❌ | ❓ |
-| Huawei CANN | 🟢 | ❌ | ❓ |
-| Android NNAPI | 🟢 | ❌ | ❓ |
-| Apache TVM | 🟢 | ❌ | ❓ |
-| Arm ACL | 🟢 | ❌ | ❓ |
-| ArmNN | 🟢 | ❌ | ❓ |
-| AMD MIGraphX | 🟢 | ❌ | ❓ |
-| AMD Vitis AI | 🟢 | ❌ | ❓ |
-| Rockchip RKNPU | 🟢 | ❌ | ❓ |
-| Microsoft Azure | ❌ | ❌ | ❓ |
+* ✅ - Static binaries provided by pyke.
+* 🟢 - Dynamic binaries provided by pyke.
+
+| EP | Supported | Binaries |
+|:-------- |:------- |:------ |
+| [NVIDIA CUDA](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html) | 🟢 | 🟢 |
+| [NVIDIA TensorRT](https://onnxruntime.ai/docs/execution-providers/TensorRT-ExecutionProvider.html) | 🟢 | 🟢 |
+| [Microsoft DirectML](https://onnxruntime.ai/docs/execution-providers/DirectML-ExecutionProvider.html) | 🟢 | ✅ |
+| [Apple CoreML](https://onnxruntime.ai/docs/execution-providers/CoreML-ExecutionProvider.html) | 🟢 | ✅ |
+| [AMD ROCm](https://onnxruntime.ai/docs/execution-providers/ROCm-ExecutionProvider.html) | 🟢 | ❌ |
+| [Intel OpenVINO](https://onnxruntime.ai/docs/execution-providers/OpenVINO-ExecutionProvider.html) | 🟢 | ❌ |
+| [Intel oneDNN](https://onnxruntime.ai/docs/execution-providers/oneDNN-ExecutionProvider.html) | 🟢 | ❌ |
+| [XNNPACK](https://onnxruntime.ai/docs/execution-providers/Xnnpack-ExecutionProvider.html) | 🟢 | ✅ |
+| [Qualcomm QNN](https://onnxruntime.ai/docs/execution-providers/QNN-ExecutionProvider.html) | 🟢 | ❌ |
+| [Huawei CANN](https://onnxruntime.ai/docs/execution-providers/community-maintained/CANN-ExecutionProvider.html) | 🟢 | ❌ |
+| [Android NNAPI](https://onnxruntime.ai/docs/execution-providers/NNAPI-ExecutionProvider.html) | 🟢 | ❌ |
+| [Apache TVM](https://onnxruntime.ai/docs/execution-providers/community-maintained/TVM-ExecutionProvider.html) | 🟢 | ❌ |
+| [Arm ACL](https://onnxruntime.ai/docs/execution-providers/community-maintained/ACL-ExecutionProvider.html) | 🟢 | ❌ |
+| [ArmNN](https://onnxruntime.ai/docs/execution-providers/community-maintained/ArmNN-ExecutionProvider.html) | 🟢 | ❌ |
+| [AMD MIGraphX](https://onnxruntime.ai/docs/execution-providers/MIGraphX-ExecutionProvider.html) | 🟢 | ❌ |
+| [AMD Vitis AI](https://onnxruntime.ai/docs/execution-providers/Vitis-AI-ExecutionProvider.html) | 🟢 | ❌ |
+| [Rockchip RKNPU](https://onnxruntime.ai/docs/execution-providers/community-maintained/RKNPU-ExecutionProvider.html) | 🟢 | ❌ |
+| [Microsoft Azure](https://onnxruntime.ai/docs/execution-providers/Azure-ExecutionProvider.html) | ❌ | ❌ |
 
 <Callout type='default'>
-    Some EPs supported by ONNX Runtime are not supported by `ort` due to a lack of hardware for testing. If your preferred EP is missing support and you've got the hardware, please [open an issue](https://github.com/pykeio/ort/issues/new)!
+    Note that a few execution providers (notably CUDA, TensorRT, and ROCm) are only available with **dynamic linking**. Dynamic linking may require additional setup to get working; see [Linking > Dynamic linking](/setup/linking#dynamic-linking).
 </Callout>
 
 ## Registering execution providers
@@ -199,9 +202,21 @@ If it seems like the execution provider is not registering properly, or you are 
 `ort` provides binaries for CUDA 12 with cuDNN 9.x only. Make sure the correct version of CUDA & cuDNN are installed and available on the `PATH`.
 
 ### CoreML
-Statically linking to CoreML (the default behavior when using downloaded binaries + the `coreml` Cargo feature) requires an additional Rust flag in order to link properly. You'll need to provide the flag `-C link-arg=-fapple-link-rtlib` to `rustc`. You can do this via an entry in [`.cargo/config.toml`](https://doc.rust-lang.org/cargo/reference/config.html#hierarchical-structure), in a build script, or in an environment variable.
+Statically linking to CoreML (the default behavior when using downloaded binaries + the `coreml` Cargo feature) requires an additional Rust flag in order to link properly. You'll need to provide the flag `-C link-arg=-fapple-link-rtlib` to `rustc`. You can do this via a build script, an entry in [`.cargo/config.toml`](https://doc.rust-lang.org/cargo/reference/config.html), or an environment variable.
 
-<Tabs items={['Cargo config', 'Build script', 'Environment variable']}>
+<Tabs items={['Build script', 'Cargo config', 'Environment variable']}>
+    <Tabs.Tab title="Build script">
+        Add the following to the `build.rs` script of any **binary** crate that uses `ort`.
+
+        ```rust filename="build.rs" copy
+        fn main() {
+	        #[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
+            println!("cargo:rustc-link-arg=-fapple-link-rtlib");
+        }
+        ```
+
+        Library crates do not need this flag, and the usage of it in a library crate will not transitively apply to any binary crates dependent on it.
+    </Tabs.Tab>
     <Tabs.Tab title="Cargo config">
         See [Configuration: Hierarchical structure](https://doc.rust-lang.org/cargo/reference/config.html#hierarchical-structure) for more information on where the configuration file can be placed.
 
@@ -212,17 +227,6 @@ Statically linking to CoreML (the default behavior when using downloaded binarie
         [target.x86_64-apple-darwin]
         rustflags = ["-Clink-arg=-fapple-link-rtlib"]
         ```
-    </Tabs.Tab>
-    <Tabs.Tab title="Build script">
-        Add the following to the `build.rs` script of any **binary** crate that uses `ort`.
-
-        ```rust filename="build.rs" copy
-        fn main() {
-            println!("cargo:rustc-link-arg=-fapple-link-rtlib");
-        }
-        ```
-
-        Library crates do not need this flag, and the usage of it in a library crate will not transitively apply to any binary crates dependent on it.
     </Tabs.Tab>
     <Tabs.Tab title="Environment variable">
         ```shell copy

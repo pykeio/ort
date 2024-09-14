@@ -26,6 +26,10 @@ pub trait MapValueTypeMarker: ValueTypeMarker {
 #[derive(Debug)]
 pub struct DynMapValueType;
 impl ValueTypeMarker for DynMapValueType {
+	fn format() -> String {
+		"DynMap".to_string()
+	}
+
 	crate::private_impl!();
 }
 impl MapValueTypeMarker for DynMapValueType {
@@ -43,6 +47,10 @@ impl DowncastableTarget for DynMapValueType {
 #[derive(Debug)]
 pub struct MapValueType<K: IntoTensorElementType + Clone + Hash + Eq, V: IntoTensorElementType + Debug>(PhantomData<(K, V)>);
 impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug> ValueTypeMarker for MapValueType<K, V> {
+	fn format() -> String {
+		format!("Map<{}, {}>", K::into_tensor_element_type(), V::into_tensor_element_type())
+	}
+
 	crate::private_impl!();
 }
 impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug> MapValueTypeMarker for MapValueType<K, V> {
@@ -70,7 +78,7 @@ pub type MapRefMut<'v, K, V> = ValueRefMut<'v, MapValueType<K, V>>;
 
 impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 	pub fn try_extract_map<K: IntoTensorElementType + Clone + Hash + Eq, V: PrimitiveTensorElementType + Clone>(&self) -> Result<HashMap<K, V>> {
-		match self.dtype()? {
+		match self.dtype() {
 			ValueType::Map { key, value } => {
 				let k_type = K::into_tensor_element_type();
 				if k_type != key {
@@ -80,7 +88,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 				if v_type != value {
 					return Err(Error::new_with_code(
 						ErrorCode::InvalidArgument,
-						format!("Cannot extract Map<_, {:?}> (value has V type {:?})", v_type, value)
+						format!("Cannot extract Map<{}, {}> from Map<{}, {}>", K::into_tensor_element_type(), V::into_tensor_element_type(), k_type, v_type)
 					));
 				}
 
@@ -90,12 +98,15 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 				ortsys![unsafe GetValue(self.ptr(), 0, allocator.ptr.as_ptr(), &mut key_tensor_ptr)?; nonNull(key_tensor_ptr)];
 				let key_value: DynTensor = unsafe { Value::from_ptr(NonNull::new_unchecked(key_tensor_ptr), None) };
 				if K::into_tensor_element_type() != TensorElementType::String {
-					let dtype = key_value.dtype()?;
+					let dtype = key_value.dtype();
 					let (key_tensor_shape, key_tensor) = match dtype {
 						ValueType::Tensor { ty, dimensions } => {
-							let device = key_value.memory_info()?.allocation_device()?;
-							if !device.is_cpu_accessible() {
-								return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", device.as_str())));
+							let mem = key_value.memory_info();
+							if !mem.is_cpu_accessible() {
+								return Err(Error::new(format!(
+									"Cannot extract from value on device `{}`, which is not CPU accessible",
+									mem.allocation_device().as_str()
+								)));
 							}
 
 							if ty == K::into_tensor_element_type() {
@@ -109,7 +120,13 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 							} else {
 								return Err(Error::new_with_code(
 									ErrorCode::InvalidArgument,
-									format!("Cannot extract Map<{:?}, _> (value has K type {:?})", K::into_tensor_element_type(), ty)
+									format!(
+										"Cannot extract Map<{}, {}> from Map<{}, {}>",
+										K::into_tensor_element_type(),
+										V::into_tensor_element_type(),
+										k_type,
+										v_type
+									)
 								));
 							}
 						}
@@ -153,7 +170,10 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 					Ok(vec.into_iter().collect())
 				}
 			}
-			t => Err(Error::new(format!("Cannot extract a Map from a value which is actually a {t:?}")))
+			t => Err(Error::new_with_code(
+				ErrorCode::InvalidArgument,
+				format!("Cannot extract Map<{}, {}> from {t}", K::into_tensor_element_type(), V::into_tensor_element_type())
+			))
 		}
 	}
 }

@@ -168,7 +168,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// Raw data provided as a `Arc<Box<[T]>>`, `Box<[T]>`, or `Vec<T>` will never be copied. Raw data is expected to be
 	/// in standard, contigous layout.
 	pub fn from_array(input: impl IntoValueTensor<Item = T>) -> Result<Tensor<T>> {
-		let memory_info = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Arena, MemoryType::Default)?;
+		let memory_info = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Arena, MemoryType::CPUInput)?;
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 

@@ -18,6 +18,10 @@ pub trait TensorValueTypeMarker: ValueTypeMarker {
 #[derive(Debug)]
 pub struct DynTensorValueType;
 impl ValueTypeMarker for DynTensorValueType {
+	fn format() -> String {
+		"DynTensor".to_string()
+	}
+
 	crate::private_impl!();
 }
 impl TensorValueTypeMarker for DynTensorValueType {
@@ -27,6 +31,10 @@ impl TensorValueTypeMarker for DynTensorValueType {
 #[derive(Debug)]
 pub struct TensorValueType<T: IntoTensorElementType + Debug>(PhantomData<T>);
 impl<T: IntoTensorElementType + Debug> ValueTypeMarker for TensorValueType<T> {
+	fn format() -> String {
+		format!("Tensor<{}>", T::into_tensor_element_type())
+	}
+
 	crate::private_impl!();
 }
 impl<T: IntoTensorElementType + Debug> TensorValueTypeMarker for TensorValueType<T> {
@@ -114,7 +122,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # fn main() -> ort::Result<()> {
 	/// let tensor = Tensor::<f32>::new(&Allocator::default(), [1, 3, 224, 224])?;
 	/// // Tensors are allocated on CPU by default.
-	/// assert_eq!(tensor.memory_info()?.allocation_device()?, AllocationDevice::CPU);
+	/// assert_eq!(tensor.memory_info().allocation_device(), AllocationDevice::CPU);
 	///
 	/// # if false {
 	/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
@@ -123,15 +131,16 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// 	MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?
 	/// )?;
 	/// let tensor = Tensor::<f32>::new(&cuda_allocator, [1, 3, 224, 224])?;
-	/// assert_eq!(tensor.memory_info()?.allocation_device()?, AllocationDevice::CUDA);
+	/// assert_eq!(tensor.memory_info().allocation_device(), AllocationDevice::CUDA);
 	/// # }
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub fn memory_info(&self) -> Result<MemoryInfo> {
+	pub fn memory_info(&self) -> MemoryInfo {
 		let mut memory_info_ptr: *const ort_sys::OrtMemoryInfo = std::ptr::null_mut();
-		ortsys![unsafe GetTensorMemoryInfo(self.ptr(), &mut memory_info_ptr)?; nonNull(memory_info_ptr)];
-		Ok(MemoryInfo::from_raw(unsafe { NonNull::new_unchecked(memory_info_ptr.cast_mut()) }, false))
+		// infallible, and `memory_info_ptr` will never be null
+		ortsys![unsafe GetTensorMemoryInfo(self.ptr(), &mut memory_info_ptr)];
+		MemoryInfo::from_raw(unsafe { NonNull::new_unchecked(memory_info_ptr.cast_mut()) }, false)
 	}
 }
 
@@ -230,13 +239,7 @@ impl<T: IntoTensorElementType + Clone + Debug, const N: usize> Index<[i64; N]> f
 	type Output = T;
 	fn index(&self, index: [i64; N]) -> &Self::Output {
 		// Interestingly, the `TensorAt` API doesn't check if the tensor is on CPU, so we have to perform the check ourselves.
-		if !self
-			.memory_info()
-			.expect("could not retrieve tensor memory info")
-			.allocation_device()
-			.expect("could not retrieve tensor allocation device")
-			.is_cpu_accessible()
-		{
+		if !self.memory_info().is_cpu_accessible() {
 			panic!("Cannot directly index a tensor which is not allocated on the CPU.");
 		}
 
@@ -247,13 +250,7 @@ impl<T: IntoTensorElementType + Clone + Debug, const N: usize> Index<[i64; N]> f
 }
 impl<T: IntoTensorElementType + Clone + Debug, const N: usize> IndexMut<[i64; N]> for Tensor<T> {
 	fn index_mut(&mut self, index: [i64; N]) -> &mut Self::Output {
-		if !self
-			.memory_info()
-			.expect("could not retrieve tensor memory info")
-			.allocation_device()
-			.expect("could not retrieve tensor allocation device")
-			.is_cpu_accessible()
-		{
+		if !self.memory_info().is_cpu_accessible() {
 			panic!("Cannot directly index a tensor which is not allocated on the CPU.");
 		}
 
@@ -288,9 +285,9 @@ mod tests {
 		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
 		let value = Tensor::from_array(Array1::from_vec(v.clone()))?;
 		assert!(value.is_tensor()?);
-		assert_eq!(value.dtype()?.tensor_type(), Some(TensorElementType::Float32));
+		assert_eq!(value.dtype().tensor_type(), Some(TensorElementType::Float32));
 		assert_eq!(
-			value.dtype()?,
+			value.dtype(),
 			ValueType::Tensor {
 				ty: TensorElementType::Float32,
 				dimensions: vec![v.len() as i64]

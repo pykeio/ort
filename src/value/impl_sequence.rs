@@ -19,6 +19,10 @@ pub trait SequenceValueTypeMarker: ValueTypeMarker {
 #[derive(Debug)]
 pub struct DynSequenceValueType;
 impl ValueTypeMarker for DynSequenceValueType {
+	fn format() -> String {
+		"DynSequence".to_string()
+	}
+
 	crate::private_impl!();
 }
 impl SequenceValueTypeMarker for DynSequenceValueType {
@@ -28,6 +32,10 @@ impl SequenceValueTypeMarker for DynSequenceValueType {
 #[derive(Debug)]
 pub struct SequenceValueType<T: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(PhantomData<T>);
 impl<T: ValueTypeMarker + DowncastableTarget + Debug + ?Sized> ValueTypeMarker for SequenceValueType<T> {
+	fn format() -> String {
+		format!("Sequence<{}>", T::format())
+	}
+
 	crate::private_impl!();
 }
 impl<T: ValueTypeMarker + DowncastableTarget + Debug + ?Sized> SequenceValueTypeMarker for SequenceValueType<T> {
@@ -47,7 +55,7 @@ impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
 		&'s self,
 		allocator: &Allocator
 	) -> Result<Vec<ValueRef<'s, OtherType>>> {
-		match self.dtype()? {
+		match self.dtype() {
 			ValueType::Sequence(_) => {
 				let mut len: ort_sys::size_t = 0;
 				ortsys![unsafe GetValueCount(self.ptr(), &mut len)?];
@@ -61,11 +69,11 @@ impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
 						inner: unsafe { Value::from_ptr(NonNull::new_unchecked(value_ptr), None) },
 						lifetime: PhantomData
 					};
-					let value_type = value.dtype()?;
-					if !OtherType::can_downcast(&value.dtype()?) {
+					let value_type = value.dtype();
+					if !OtherType::can_downcast(&value.dtype()) {
 						return Err(Error::new_with_code(
 							ErrorCode::InvalidArgument,
-							format!("Cannot extract Sequence<T> (downcast of T from {value_type:?} failed)")
+							format!("Cannot extract Sequence<{}> from {value_type:?}", OtherType::format())
 						));
 					}
 
@@ -73,7 +81,7 @@ impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
 				}
 				Ok(vec)
 			}
-			t => Err(Error::new(format!("Cannot extract a Sequence from a value which is actually a {t:?}")))
+			t => Err(Error::new(format!("Cannot extract Sequence<{}> from {t}", OtherType::format())))
 		}
 	}
 }

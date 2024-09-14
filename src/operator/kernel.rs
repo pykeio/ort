@@ -53,7 +53,7 @@ impl KernelAttributes {
 				.map_err(Error::wrap)?;
 			let mut type_info = ptr::null_mut();
 			ortsys![unsafe KernelInfo_GetInputTypeInfo(self.0.as_ptr(), idx as _, &mut type_info)?; nonNull(type_info)];
-			let input_type = ValueType::from_type_info(type_info)?;
+			let input_type = ValueType::from_type_info(type_info);
 			inputs.push(Input { name, input_type })
 		}
 		Ok(inputs)
@@ -75,7 +75,7 @@ impl KernelAttributes {
 				.map_err(Error::wrap)?;
 			let mut type_info = ptr::null_mut();
 			ortsys![unsafe KernelInfo_GetOutputTypeInfo(self.0.as_ptr(), idx as _, &mut type_info)?; nonNull(type_info)];
-			let output_type = ValueType::from_type_info(type_info)?;
+			let output_type = ValueType::from_type_info(type_info);
 			outputs.push(Output { name, output_type })
 		}
 		Ok(outputs)

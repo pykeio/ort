@@ -1,6 +1,6 @@
 use std::{
 	any::Any,
-	fmt::Debug,
+	fmt::{self, Debug},
 	marker::PhantomData,
 	ops::{Deref, DerefMut},
 	ptr::NonNull,
@@ -19,7 +19,7 @@ pub use self::{
 	impl_tensor::{DynTensor, DynTensorRef, DynTensorRefMut, DynTensorValueType, Tensor, TensorRef, TensorRefMut, TensorValueType, TensorValueTypeMarker}
 };
 use crate::{
-	error::{status_to_result, Result},
+	error::{Error, ErrorCode, Result},
 	memory::MemoryInfo,
 	ortsys,
 	session::SharedSessionInner,
@@ -47,7 +47,7 @@ use crate::{
 /// // Or by `Value`s created in Rust or output by a session.
 /// let value = Tensor::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
 /// assert_eq!(
-/// 	value.dtype()?,
+/// 	value.dtype(),
 /// 	ValueType::Tensor {
 /// 		ty: TensorElementType::Int64,
 /// 		dimensions: vec![5]
@@ -93,38 +93,38 @@ pub enum ValueType {
 }
 
 impl ValueType {
-	pub(crate) fn from_type_info(typeinfo_ptr: *mut ort_sys::OrtTypeInfo) -> Result<Self> {
+	pub(crate) fn from_type_info(typeinfo_ptr: *mut ort_sys::OrtTypeInfo) -> Self {
 		let mut ty: ort_sys::ONNXType = ort_sys::ONNXType::ONNX_TYPE_UNKNOWN;
-		ortsys![unsafe GetOnnxTypeFromTypeInfo(typeinfo_ptr, &mut ty)?];
+		ortsys![unsafe GetOnnxTypeFromTypeInfo(typeinfo_ptr, &mut ty)]; // infallible
 		let io_type = match ty {
 			ort_sys::ONNXType::ONNX_TYPE_TENSOR | ort_sys::ONNXType::ONNX_TYPE_SPARSETENSOR => {
 				let mut info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-				ortsys![unsafe CastTypeInfoToTensorInfo(typeinfo_ptr, &mut info_ptr)?; nonNull(info_ptr)];
-				unsafe { extract_data_type_from_tensor_info(info_ptr)? }
+				ortsys![unsafe CastTypeInfoToTensorInfo(typeinfo_ptr, &mut info_ptr)]; // infallible
+				unsafe { extract_data_type_from_tensor_info(info_ptr) }
 			}
 			ort_sys::ONNXType::ONNX_TYPE_SEQUENCE => {
 				let mut info_ptr: *const ort_sys::OrtSequenceTypeInfo = std::ptr::null_mut();
-				ortsys![unsafe CastTypeInfoToSequenceTypeInfo(typeinfo_ptr, &mut info_ptr)?; nonNull(info_ptr)];
-				unsafe { extract_data_type_from_sequence_info(info_ptr)? }
+				ortsys![unsafe CastTypeInfoToSequenceTypeInfo(typeinfo_ptr, &mut info_ptr)]; // infallible
+				unsafe { extract_data_type_from_sequence_info(info_ptr) }
 			}
 			ort_sys::ONNXType::ONNX_TYPE_MAP => {
 				let mut info_ptr: *const ort_sys::OrtMapTypeInfo = std::ptr::null_mut();
-				ortsys![unsafe CastTypeInfoToMapTypeInfo(typeinfo_ptr, &mut info_ptr)?; nonNull(info_ptr)];
-				unsafe { extract_data_type_from_map_info(info_ptr)? }
+				ortsys![unsafe CastTypeInfoToMapTypeInfo(typeinfo_ptr, &mut info_ptr)]; // infallible
+				unsafe { extract_data_type_from_map_info(info_ptr) }
 			}
 			ort_sys::ONNXType::ONNX_TYPE_OPTIONAL => {
 				let mut info_ptr: *const ort_sys::OrtOptionalTypeInfo = std::ptr::null_mut();
-				ortsys![unsafe CastTypeInfoToOptionalTypeInfo(typeinfo_ptr, &mut info_ptr)?; nonNull(info_ptr)];
+				ortsys![unsafe CastTypeInfoToOptionalTypeInfo(typeinfo_ptr, &mut info_ptr)]; // infallible
 
 				let mut contained_type: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
-				ortsys![unsafe GetOptionalContainedTypeInfo(info_ptr, &mut contained_type)?; nonNull(contained_type)];
+				ortsys![unsafe GetOptionalContainedTypeInfo(info_ptr, &mut contained_type)]; // infallible
 
-				ValueType::Optional(Box::new(ValueType::from_type_info(contained_type)?))
+				ValueType::Optional(Box::new(ValueType::from_type_info(contained_type)))
 			}
 			_ => unreachable!()
 		};
 		ortsys![unsafe ReleaseTypeInfo(typeinfo_ptr)];
-		Ok(io_type)
+		io_type
 	}
 	/// Returns the dimensions of this value type if it is a tensor, or `None` if it is a sequence or map.
 	///
@@ -132,7 +132,7 @@ impl ValueType {
 	/// # use ort::{Value, ValueType, TensorElementType};
 	/// # fn main() -> ort::Result<()> {
 	/// let value = Value::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
-	/// assert_eq!(value.dtype()?.tensor_dimensions(), Some(&vec![5]));
+	/// assert_eq!(value.dtype().tensor_dimensions(), Some(&vec![5]));
 	/// # 	Ok(())
 	/// # }
 	/// ```
@@ -150,7 +150,7 @@ impl ValueType {
 	/// # use ort::{Value, ValueType, TensorElementType};
 	/// # fn main() -> ort::Result<()> {
 	/// let value = Value::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
-	/// assert_eq!(value.dtype()?.tensor_type(), Some(TensorElementType::Int64));
+	/// assert_eq!(value.dtype().tensor_type(), Some(TensorElementType::Int64));
 	/// # 	Ok(())
 	/// # }
 	/// ```
@@ -181,6 +181,27 @@ impl ValueType {
 	#[must_use]
 	pub fn is_map(&self) -> bool {
 		matches!(self, ValueType::Map { .. })
+	}
+}
+
+impl fmt::Display for ValueType {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			ValueType::Tensor { ty, dimensions } => {
+				write!(
+					f,
+					"Tensor<{ty}>({})",
+					dimensions
+						.iter()
+						.map(|c| if *c == -1 { "dyn".to_string() } else { c.to_string() })
+						.collect::<Vec<_>>()
+						.join(", ")
+				)
+			}
+			ValueType::Map { key, value } => write!(f, "Map<{key}, {value}>"),
+			ValueType::Sequence(inner) => write!(f, "Sequence<{inner}>"),
+			ValueType::Optional(inner) => write!(f, "Option<{inner}>")
+		}
 	}
 }
 
@@ -230,12 +251,12 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 	/// Attempts to downcast a temporary dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed
 	/// variant, like [`TensorRef<T>`].
 	#[inline]
-	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(self) -> Result<ValueRef<'v, OtherType>> {
-		let dt = self.dtype()?;
+	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + ?Sized>(self) -> Result<ValueRef<'v, OtherType>> {
+		let dt = self.dtype();
 		if OtherType::can_downcast(&dt) {
 			Ok(unsafe { std::mem::transmute::<ValueRef<'v, Type>, ValueRef<'v, OtherType>>(self) })
 		} else {
-			panic!()
+			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &{dt} to &{}", OtherType::format())))
 		}
 	}
 
@@ -267,12 +288,12 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 	/// Attempts to downcast a temporary mutable dynamic value (like [`DynValue`] or [`DynTensor`]) to a more
 	/// strongly typed variant, like [`TensorRefMut<T>`].
 	#[inline]
-	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(self) -> Result<ValueRefMut<'v, OtherType>> {
-		let dt = self.dtype()?;
+	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + ?Sized>(self) -> Result<ValueRefMut<'v, OtherType>> {
+		let dt = self.dtype();
 		if OtherType::can_downcast(&dt) {
 			Ok(unsafe { std::mem::transmute::<ValueRefMut<'v, Type>, ValueRefMut<'v, OtherType>>(self) })
 		} else {
-			panic!()
+			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &mut {dt} to &mut {}", OtherType::format())))
 		}
 	}
 
@@ -348,7 +369,10 @@ pub type DynValue = Value<DynValueTypeMarker>;
 ///
 /// For example, [`Tensor::try_extract_tensor`] can only be used on [`Value`]s with the [`TensorValueTypeMarker`] (which
 /// inherits this trait), i.e. [`Tensor`]s, [`DynTensor`]s, and [`DynValue`]s.
-pub trait ValueTypeMarker: Debug {
+pub trait ValueTypeMarker {
+	#[doc(hidden)]
+	fn format() -> String;
+
 	crate::private_trait!();
 }
 
@@ -372,6 +396,10 @@ impl DowncastableTarget for DynValueTypeMarker {
 #[derive(Debug)]
 pub struct DynValueTypeMarker;
 impl ValueTypeMarker for DynValueTypeMarker {
+	fn format() -> String {
+		"DynValue".to_string()
+	}
+
 	crate::private_impl!();
 }
 impl MapValueTypeMarker for DynValueTypeMarker {
@@ -388,9 +416,13 @@ unsafe impl<Type: ValueTypeMarker + ?Sized> Send for Value<Type> {}
 
 impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	/// Returns the data type of this [`Value`].
-	pub fn dtype(&self) -> Result<ValueType> {
+	pub fn dtype(&self) -> ValueType {
 		let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
-		ortsys![unsafe GetTypeInfo(self.ptr(), &mut typeinfo_ptr)?; nonNull(typeinfo_ptr)];
+		ortsys![unsafe GetTypeInfo(self.ptr(), &mut typeinfo_ptr)]; // infallible
+		// `typeinfo_ptr` may be null in exceptionally rare cases
+		if typeinfo_ptr.is_null() {
+			panic!("unexpected UNKNOWN value type info");
+		}
 		ValueType::from_type_info(typeinfo_ptr)
 	}
 
@@ -474,20 +506,20 @@ impl Value<DynValueTypeMarker> {
 	/// Attempts to downcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed variant,
 	/// like [`Tensor<T>`].
 	#[inline]
-	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(self) -> Result<Value<OtherType>> {
-		let dt = self.dtype()?;
+	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + ?Sized>(self) -> Result<Value<OtherType>> {
+		let dt = self.dtype();
 		if OtherType::can_downcast(&dt) {
 			Ok(unsafe { std::mem::transmute::<Value<DynValueTypeMarker>, Value<OtherType>>(self) })
 		} else {
-			panic!()
+			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast {dt} to {}", OtherType::format())))
 		}
 	}
 
 	/// Attempts to downcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed reference
 	/// variant, like [`TensorRef<T>`].
 	#[inline]
-	pub fn downcast_ref<OtherType: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(&self) -> Result<ValueRef<'_, OtherType>> {
-		let dt = self.dtype()?;
+	pub fn downcast_ref<OtherType: ValueTypeMarker + DowncastableTarget + ?Sized>(&self) -> Result<ValueRef<'_, OtherType>> {
+		let dt = self.dtype();
 		if OtherType::can_downcast(&dt) {
 			Ok(ValueRef::new(unsafe {
 				Value::from_ptr_nodrop(
@@ -496,15 +528,15 @@ impl Value<DynValueTypeMarker> {
 				)
 			}))
 		} else {
-			panic!()
+			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &{dt} to &{}", OtherType::format())))
 		}
 	}
 
 	/// Attempts to downcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed
 	/// mutable-reference variant, like [`TensorRefMut<T>`].
 	#[inline]
-	pub fn downcast_mut<OtherType: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(&mut self) -> Result<ValueRefMut<'_, OtherType>> {
-		let dt = self.dtype()?;
+	pub fn downcast_mut<OtherType: ValueTypeMarker + DowncastableTarget + ?Sized>(&mut self) -> Result<ValueRefMut<'_, OtherType>> {
+		let dt = self.dtype();
 		if OtherType::can_downcast(&dt) {
 			Ok(ValueRefMut::new(unsafe {
 				Value::from_ptr_nodrop(
@@ -513,7 +545,7 @@ impl Value<DynValueTypeMarker> {
 				)
 			}))
 		} else {
-			panic!()
+			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &mut {dt} to &mut {}", OtherType::format())))
 		}
 	}
 }
@@ -534,65 +566,64 @@ impl Drop for ValueInner {
 	}
 }
 
-pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo) -> Result<ValueType> {
+pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo) -> ValueType {
 	let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-	ortsys![GetTensorElementType(info_ptr, &mut type_sys)?];
+	ortsys![GetTensorElementType(info_ptr, &mut type_sys)];
 	assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 	// This transmute should be safe since its value is read from GetTensorElementType, which we must trust
 	let mut num_dims = 0;
-	ortsys![GetDimensionsCount(info_ptr, &mut num_dims)?];
+	ortsys![GetDimensionsCount(info_ptr, &mut num_dims)];
 
 	let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-	ortsys![GetDimensions(info_ptr, node_dims.as_mut_ptr(), num_dims as _)?];
+	ortsys![GetDimensions(info_ptr, node_dims.as_mut_ptr(), num_dims as _)];
 
-	Ok(ValueType::Tensor {
+	ValueType::Tensor {
 		ty: type_sys.into(),
 		dimensions: node_dims
-	})
+	}
 }
 
-pub(crate) unsafe fn extract_data_type_from_sequence_info(info_ptr: *const ort_sys::OrtSequenceTypeInfo) -> Result<ValueType> {
+pub(crate) unsafe fn extract_data_type_from_sequence_info(info_ptr: *const ort_sys::OrtSequenceTypeInfo) -> ValueType {
 	let mut element_type_info: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
-	ortsys![GetSequenceElementType(info_ptr, &mut element_type_info)?];
+	ortsys![GetSequenceElementType(info_ptr, &mut element_type_info)]; // infallible
 
 	let mut ty: ort_sys::ONNXType = ort_sys::ONNXType::ONNX_TYPE_UNKNOWN;
-	let status = ortsys![unsafe GetOnnxTypeFromTypeInfo(element_type_info, &mut ty)];
-	status_to_result(status)?;
+	ortsys![GetOnnxTypeFromTypeInfo(element_type_info, &mut ty)]; // infallible
 
 	match ty {
 		ort_sys::ONNXType::ONNX_TYPE_TENSOR => {
 			let mut info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-			ortsys![unsafe CastTypeInfoToTensorInfo(element_type_info, &mut info_ptr)?; nonNull(info_ptr)];
-			let ty = unsafe { extract_data_type_from_tensor_info(info_ptr)? };
-			Ok(ValueType::Sequence(Box::new(ty)))
+			ortsys![CastTypeInfoToTensorInfo(element_type_info, &mut info_ptr)]; // infallible
+			let ty = extract_data_type_from_tensor_info(info_ptr);
+			ValueType::Sequence(Box::new(ty))
 		}
 		ort_sys::ONNXType::ONNX_TYPE_MAP => {
 			let mut info_ptr: *const ort_sys::OrtMapTypeInfo = std::ptr::null_mut();
-			ortsys![unsafe CastTypeInfoToMapTypeInfo(element_type_info, &mut info_ptr)?; nonNull(info_ptr)];
-			let ty = unsafe { extract_data_type_from_map_info(info_ptr)? };
-			Ok(ValueType::Sequence(Box::new(ty)))
+			ortsys![CastTypeInfoToMapTypeInfo(element_type_info, &mut info_ptr)]; // infallible
+			let ty = extract_data_type_from_map_info(info_ptr);
+			ValueType::Sequence(Box::new(ty))
 		}
 		_ => unreachable!()
 	}
 }
 
-pub(crate) unsafe fn extract_data_type_from_map_info(info_ptr: *const ort_sys::OrtMapTypeInfo) -> Result<ValueType> {
+pub(crate) unsafe fn extract_data_type_from_map_info(info_ptr: *const ort_sys::OrtMapTypeInfo) -> ValueType {
 	let mut key_type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-	ortsys![GetMapKeyType(info_ptr, &mut key_type_sys)?];
+	ortsys![GetMapKeyType(info_ptr, &mut key_type_sys)]; // infallible
 	assert_ne!(key_type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 
 	let mut value_type_info: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
-	ortsys![GetMapValueType(info_ptr, &mut value_type_info)?];
+	ortsys![GetMapValueType(info_ptr, &mut value_type_info)]; // infallible
 	let mut value_info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
-	ortsys![unsafe CastTypeInfoToTensorInfo(value_type_info, &mut value_info_ptr)?; nonNull(value_info_ptr)];
+	ortsys![unsafe CastTypeInfoToTensorInfo(value_type_info, &mut value_info_ptr)]; // infallible
 	let mut value_type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-	ortsys![GetTensorElementType(value_info_ptr, &mut value_type_sys)?];
+	ortsys![GetTensorElementType(value_info_ptr, &mut value_type_sys)]; // infallible
 	assert_ne!(value_type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 
-	Ok(ValueType::Map {
+	ValueType::Map {
 		key: key_type_sys.into(),
 		value: value_type_sys.into()
-	})
+	}
 }
 
 #[cfg(test)]

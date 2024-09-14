@@ -158,7 +158,7 @@ impl Session {
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn run<'s, 'i, 'v: 'i, const N: usize>(&'s self, input_values: impl Into<SessionInputs<'i, 'v, N>>) -> Result<SessionOutputs<'_, 's>> {
+	pub fn run<'s, 'i, 'v: 'i, const N: usize>(&'s self, input_values: impl Into<SessionInputs<'i, 'v, N>>) -> Result<SessionOutputs<'s, 's>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
 				self.run_inner::<NoSelectedOutputs>(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values.iter(), None)
@@ -330,7 +330,7 @@ impl Session {
 	pub fn run_async<'s, 'i, 'v: 'i + 's, const N: usize>(
 		&'s self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>> + 'static
-	) -> Result<InferenceFut<'s, '_, NoSelectedOutputs>> {
+	) -> Result<InferenceFut<'s, 's, NoSelectedOutputs>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(_) => unimplemented!("slices cannot be used in `run_async`"),
 			SessionInputs::ValueArray(input_values) => {
@@ -549,6 +549,6 @@ mod dangerous {
 		status_to_result(status)?;
 		assert_non_null_pointer(typeinfo_ptr, "TypeInfo")?;
 
-		ValueType::from_type_info(typeinfo_ptr)
+		Ok(ValueType::from_type_info(typeinfo_ptr))
 	}
 }

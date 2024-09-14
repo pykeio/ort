@@ -247,19 +247,6 @@ impl AllocationDevice {
 	pub fn as_str(&self) -> &'static str {
 		self.0
 	}
-
-	/// Returns `true` if this memory is accessible by the CPU; meaning that, if a value were allocated on this device,
-	/// it could be extracted to an `ndarray` or slice.
-	pub fn is_cpu_accessible(&self) -> bool {
-		self == &Self::CPU
-			|| self == &Self::CUDA_PINNED
-			|| self == &Self::CANN_PINNED
-			|| self == &Self::HIP_PINNED
-			|| self == &Self::OPENVINO_CPU
-			|| self == &Self::DIRECTML_CPU
-			|| self == &Self::XNNPACK
-			|| self == &Self::TVM
-	}
 }
 
 impl PartialEq<str> for AllocationDevice {
@@ -293,7 +280,7 @@ pub enum MemoryType {
 	CPUInput,
 	/// CPU-accessible memory output by a non-CPU execution provider, i.e. [`AllocatorDevice::CUDAPinned`].
 	CPUOutput,
-	/// The default allocator for an execution provider.
+	/// The default (typically device memory) allocator for an execution provider.
 	#[default]
 	Default
 }
@@ -323,8 +310,7 @@ impl From<ort_sys::OrtMemType> for MemoryType {
 	}
 }
 
-/// Structure describing a memory location - the device on which the memory resides, the type of allocator (device
-/// default, or arena) used, and the type of memory allocated (device-only, or CPU accessible).
+/// Describes allocation properties for value memory.
 ///
 /// `MemoryInfo` is used in the creation of [`Session`]s, [`Allocator`]s, and [`crate::Value`]s to describe on which
 /// device value data should reside, and how that data should be accessible with regard to the CPU (if a non-CPU device
@@ -371,19 +357,23 @@ impl MemoryInfo {
 		MemoryInfo { ptr, should_release }
 	}
 
+	// All getter functions are (at least currently) infallible - they simply just dereference the corresponding fields,
+	// and always return `nullptr` for the status; so none of these have to return `Result`s.
+	// https://github.com/microsoft/onnxruntime/blob/v1.19.2/onnxruntime/core/framework/allocator.cc#L166
+
 	/// Returns the [`MemoryType`] described by this struct.
 	/// ```
 	/// # use ort::{MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
 	/// # fn main() -> ort::Result<()> {
 	/// let mem = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?;
-	/// assert_eq!(mem.memory_type()?, MemoryType::Default);
+	/// assert_eq!(mem.memory_type(), MemoryType::Default);
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub fn memory_type(&self) -> Result<MemoryType> {
+	pub fn memory_type(&self) -> MemoryType {
 		let mut raw_type: ort_sys::OrtMemType = ort_sys::OrtMemType::OrtMemTypeDefault;
-		ortsys![unsafe MemoryInfoGetMemType(self.ptr.as_ptr(), &mut raw_type)?];
-		Ok(MemoryType::from(raw_type))
+		ortsys![unsafe MemoryInfoGetMemType(self.ptr.as_ptr(), &mut raw_type)];
+		MemoryType::from(raw_type)
 	}
 
 	/// Returns the [`AllocatorType`] described by this struct.
@@ -391,18 +381,18 @@ impl MemoryInfo {
 	/// # use ort::{MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
 	/// # fn main() -> ort::Result<()> {
 	/// let mem = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?;
-	/// assert_eq!(mem.allocator_type()?, AllocatorType::Device);
+	/// assert_eq!(mem.allocator_type(), AllocatorType::Device);
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub fn allocator_type(&self) -> Result<AllocatorType> {
+	pub fn allocator_type(&self) -> AllocatorType {
 		let mut raw_type: ort_sys::OrtAllocatorType = ort_sys::OrtAllocatorType::OrtInvalidAllocator;
-		ortsys![unsafe MemoryInfoGetType(self.ptr.as_ptr(), &mut raw_type)?];
-		Ok(match raw_type {
+		ortsys![unsafe MemoryInfoGetType(self.ptr.as_ptr(), &mut raw_type)];
+		match raw_type {
 			ort_sys::OrtAllocatorType::OrtArenaAllocator => AllocatorType::Arena,
 			ort_sys::OrtAllocatorType::OrtDeviceAllocator => AllocatorType::Device,
 			_ => unreachable!()
-		})
+		}
 	}
 
 	/// Returns the [`AllocationDevice`] this struct was created with.
@@ -410,13 +400,16 @@ impl MemoryInfo {
 	/// # use ort::{MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
 	/// # fn main() -> ort::Result<()> {
 	/// let mem = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?;
-	/// assert_eq!(mem.allocation_device()?, AllocationDevice::CPU);
+	/// assert_eq!(mem.allocation_device(), AllocationDevice::CPU);
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub fn allocation_device(&self) -> Result<AllocationDevice> {
+	pub fn allocation_device(&self) -> AllocationDevice {
 		let mut name_ptr: *const c_char = std::ptr::null_mut();
-		ortsys![unsafe MemoryInfoGetName(self.ptr.as_ptr(), &mut name_ptr)?; nonNull(name_ptr)];
+		ortsys![unsafe MemoryInfoGetName(self.ptr.as_ptr(), &mut name_ptr)];
+
+		// SAFETY: `name_ptr` can never be null - `CreateMemoryInfo` internally checks against builtin device names, erroring
+		// if a non-builtin device is passed, and ONNX Runtime will never supply a pointer to the C++ constructor
 
 		let mut len = 0;
 		while unsafe { *name_ptr.add(len) } != 0x00 {
@@ -426,7 +419,7 @@ impl MemoryInfo {
 		// SAFETY: ONNX Runtime internally only ever defines allocation device names as ASCII. can't wait for this to blow up
 		// one day regardless
 		let name = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr.cast::<u8>(), len)) };
-		Ok(AllocationDevice(name))
+		AllocationDevice(name)
 	}
 
 	/// Returns the ID of the [`AllocationDevice`] described by this struct.
@@ -434,14 +427,20 @@ impl MemoryInfo {
 	/// # use ort::{MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
 	/// # fn main() -> ort::Result<()> {
 	/// let mem = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?;
-	/// assert_eq!(mem.device_id()?, 0);
+	/// assert_eq!(mem.device_id(), 0);
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub fn device_id(&self) -> Result<i32> {
+	pub fn device_id(&self) -> i32 {
 		let mut raw: ort_sys::c_int = 0;
-		ortsys![unsafe MemoryInfoGetId(self.ptr.as_ptr(), &mut raw)?];
-		Ok(raw as _)
+		ortsys![unsafe MemoryInfoGetId(self.ptr.as_ptr(), &mut raw)];
+		raw as _
+	}
+
+	/// Returns `true` if this memory is accessible by the CPU; meaning that, if a value were allocated on this device,
+	/// it could be extracted to an `ndarray` or slice.
+	pub fn is_cpu_accessible(&self) -> bool {
+		self.allocation_device() == AllocationDevice::CPU || matches!(self.memory_type(), MemoryType::CPUInput | MemoryType::CPUOutput)
 	}
 }
 

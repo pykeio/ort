@@ -1,3 +1,4 @@
+use std::fmt;
 #[cfg(feature = "ndarray")]
 use std::ptr;
 
@@ -39,6 +40,27 @@ pub enum TensorElementType {
 	#[cfg(feature = "half")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "half")))]
 	Bfloat16
+}
+
+impl fmt::Display for TensorElementType {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.write_str(match self {
+			TensorElementType::Bfloat16 => "bf16",
+			TensorElementType::Bool => "bool",
+			TensorElementType::Float16 => "f16",
+			TensorElementType::Float32 => "f32",
+			TensorElementType::Float64 => "f64",
+			TensorElementType::Int16 => "i16",
+			TensorElementType::Int32 => "i32",
+			TensorElementType::Int64 => "i64",
+			TensorElementType::Int8 => "i8",
+			TensorElementType::String => "String",
+			TensorElementType::Uint16 => "u16",
+			TensorElementType::Uint32 => "u32",
+			TensorElementType::Uint64 => "u64",
+			TensorElementType::Uint8 => "u8"
+		})
+	}
 }
 
 impl From<TensorElementType> for ort_sys::ONNXTensorElementDataType {

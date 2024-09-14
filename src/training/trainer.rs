@@ -95,7 +95,7 @@ impl Trainer {
 		&'s self,
 		inputs: impl Into<SessionInputs<'i1, 'v1, N1>>,
 		labels: impl Into<SessionInputs<'i2, 'v2, N2>>
-	) -> Result<SessionOutputs<'_, 's>> {
+	) -> Result<SessionOutputs<'s, 's>> {
 		match inputs.into() {
 			SessionInputs::ValueSlice(input_values) => match labels.into() {
 				SessionInputs::ValueSlice(labels) => self.step_inner(input_values.iter().chain(labels), None),
@@ -144,7 +144,7 @@ impl Trainer {
 		&'s self,
 		inputs: impl Into<SessionInputs<'i1, 'v1, N1>>,
 		labels: impl Into<SessionInputs<'i2, 'v2, N2>>
-	) -> Result<SessionOutputs<'_, 's>> {
+	) -> Result<SessionOutputs<'s, 's>> {
 		match inputs.into() {
 			SessionInputs::ValueSlice(input_values) => match labels.into() {
 				SessionInputs::ValueSlice(labels) => self.eval_step_inner(input_values.iter().chain(labels), None),

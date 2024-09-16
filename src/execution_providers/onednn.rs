@@ -4,23 +4,15 @@ use crate::{
 	session::SessionBuilder
 };
 
-#[cfg(all(not(feature = "load-dynamic"), feature = "onednn"))]
-extern "C" {
-	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_Dnnl(
-		options: *mut ort_sys::OrtSessionOptions,
-		use_arena: std::os::raw::c_int
-	) -> ort_sys::OrtStatusPtr;
-}
-
 #[derive(Debug, Default, Clone)]
 pub struct OneDNNExecutionProvider {
-	use_arena: bool
+	use_arena: Option<bool>
 }
 
 impl OneDNNExecutionProvider {
 	#[must_use]
-	pub fn with_arena_allocator(mut self) -> Self {
-		self.use_arena = true;
+	pub fn with_use_arena(mut self, enable: bool) -> Self {
+		self.use_arena = Some(enable);
 		self
 	}
 
@@ -49,10 +41,23 @@ impl ExecutionProvider for OneDNNExecutionProvider {
 	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "onednn"))]
 		{
-			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Dnnl(options: *mut ort_sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> ort_sys::OrtStatusPtr);
-			return crate::error::status_to_result(unsafe {
-				OrtSessionOptionsAppendExecutionProvider_Dnnl(session_builder.session_options_ptr.as_ptr(), self.use_arena.into())
-			});
+			let mut dnnl_options: *mut ort_sys::OrtDnnlProviderOptions = std::ptr::null_mut();
+			crate::ortsys![unsafe CreateDnnlProviderOptions(&mut dnnl_options)?];
+			let (key_ptrs, value_ptrs, len, keys, values) = super::map_keys! {
+				use_arena = self.use_arena.map(<bool as Into<i32>>::into)
+			};
+			if let Err(e) =
+				crate::error::status_to_result(crate::ortsys![unsafe UpdateDnnlProviderOptions(dnnl_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), len as _)])
+			{
+				crate::ortsys![unsafe ReleaseDnnlProviderOptions(dnnl_options)];
+				std::mem::drop((keys, values));
+				return Err(e);
+			}
+
+			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_Dnnl(session_builder.session_options_ptr.as_ptr(), dnnl_options)];
+			crate::ortsys![unsafe ReleaseDnnlProviderOptions(dnnl_options)];
+			std::mem::drop((keys, values));
+			return Ok(());
 		}
 
 		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))

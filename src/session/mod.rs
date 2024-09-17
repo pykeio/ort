@@ -1,6 +1,14 @@
 //! Contains the [`Session`] and [`SessionBuilder`] types for managing ONNX Runtime sessions and performing inference.
 
-use std::{any::Any, ffi::CString, marker::PhantomData, ops::Deref, os::raw::c_char, ptr::NonNull, sync::Arc};
+use std::{
+	any::Any,
+	ffi::{CStr, CString},
+	marker::PhantomData,
+	ops::Deref,
+	os::raw::c_char,
+	ptr::NonNull,
+	sync::Arc
+};
 
 use crate::{
 	char_p_to_string,
@@ -140,6 +148,28 @@ impl Session {
 	#[must_use]
 	pub fn inner(&self) -> Arc<SharedSessionInner> {
 		Arc::clone(&self.inner)
+	}
+
+	/// Returns a list of initializers which are overridable (i.e. also graph inputs).
+	#[must_use]
+	pub fn overridable_initializers(&self) -> Vec<OverridableInitializer> {
+		// can only fail if:
+		// - index is out of bounds (impossible because of the loop)
+		// - the model is not loaded (how could this even be possible?)
+		let mut size = 0;
+		ortsys![unsafe SessionGetOverridableInitializerCount(self.ptr(), &mut size).expect("infallible")];
+		let allocator = Allocator::default();
+		(0..size)
+			.map(|i| {
+				let mut name: *mut c_char = std::ptr::null_mut();
+				ortsys![unsafe SessionGetOverridableInitializerName(self.ptr(), i, allocator.ptr.as_ptr(), &mut name).expect("infallible")];
+				let name = unsafe { CStr::from_ptr(name) }.to_string_lossy().into_owned();
+				let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
+				ortsys![unsafe SessionGetOverridableInitializerTypeInfo(self.ptr(), i, &mut typeinfo_ptr).expect("infallible")];
+				let dtype = ValueType::from_type_info(typeinfo_ptr);
+				OverridableInitializer { name, dtype }
+			})
+			.collect()
 	}
 
 	/// Run input data through the ONNX graph, performing inference.
@@ -454,6 +484,22 @@ unsafe impl Send for Session {}
 // Allowing `Sync` segfaults with CUDA, DirectML, and seemingly any EP other than the CPU EP. I'm not certain if it's a
 // temporary bug in ONNX Runtime or a wontfix. Maybe this impl should be removed just to be safe?
 unsafe impl Sync for Session {}
+
+#[derive(Debug, Clone)]
+pub struct OverridableInitializer {
+	name: String,
+	dtype: ValueType
+}
+
+impl OverridableInitializer {
+	pub fn name(&self) -> &str {
+		&self.name
+	}
+
+	pub fn dtype(&self) -> &ValueType {
+		&self.dtype
+	}
+}
 
 mod dangerous {
 	use super::*;

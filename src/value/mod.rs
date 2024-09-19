@@ -413,6 +413,7 @@ impl TensorValueTypeMarker for DynValueTypeMarker {
 }
 
 unsafe impl<Type: ValueTypeMarker + ?Sized> Send for Value<Type> {}
+unsafe impl<Type: ValueTypeMarker + ?Sized> Sync for Value<Type> {}
 
 impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	/// Returns the data type of this [`Value`].

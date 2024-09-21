@@ -1,5 +1,6 @@
 use std::ops::BitOr;
 
+use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
 use crate::{
 	error::{Error, Result},
 	execution_providers::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderDispatch},
@@ -83,26 +84,13 @@ impl Default for CUDAExecutionProviderCuDNNConvAlgoSearch {
 
 #[derive(Debug, Default, Clone)]
 pub struct CUDAExecutionProvider {
-	device_id: Option<i32>,
-	gpu_mem_limit: Option<usize>,
-	user_compute_stream: Option<*mut ()>,
-	arena_extend_strategy: Option<ArenaExtendStrategy>,
-	cudnn_conv_algo_search: Option<CUDAExecutionProviderCuDNNConvAlgoSearch>,
-	do_copy_in_default_stream: Option<bool>,
-	cudnn_conv_use_max_workspace: Option<bool>,
-	cudnn_conv1d_pad_to_nc1d: Option<bool>,
-	enable_cuda_graph: Option<bool>,
-	enable_skip_layer_norm_strict_mode: Option<bool>,
-	use_tf32: Option<bool>,
-	prefer_nhwc: Option<bool>,
-	sdpa_kernel: Option<u32>,
-	fuse_conv_bias: Option<bool>
+	options: ExecutionProviderOptions
 }
 
 impl CUDAExecutionProvider {
 	#[must_use]
 	pub fn with_device_id(mut self, device_id: i32) -> Self {
-		self.device_id = Some(device_id);
+		self.options.set("device_id", device_id.to_string());
 		self
 	}
 
@@ -110,14 +98,20 @@ impl CUDAExecutionProvider {
 	/// provider’s arena. The total device memory usage may be higher.
 	#[must_use]
 	pub fn with_memory_limit(mut self, limit: usize) -> Self {
-		self.gpu_mem_limit = Some(limit as _);
+		self.options.set("gpu_mem_limit", limit.to_string());
 		self
 	}
 
 	/// Confiure the strategy for extending the device's memory arena.
 	#[must_use]
 	pub fn with_arena_extend_strategy(mut self, strategy: ArenaExtendStrategy) -> Self {
-		self.arena_extend_strategy = Some(strategy);
+		self.options.set(
+			"arena_extend_strategy",
+			match strategy {
+				ArenaExtendStrategy::NextPowerOfTwo => "kNextPowerOfTwo",
+				ArenaExtendStrategy::SameAsRequested => "kSameAsRequested"
+			}
+		);
 		self
 	}
 
@@ -127,7 +121,14 @@ impl CUDAExecutionProvider {
 	/// done for cuDNN convolution algorithms. See [`CUDAExecutionProviderCuDNNConvAlgoSearch`] for more info.
 	#[must_use]
 	pub fn with_conv_algorithm_search(mut self, search: CUDAExecutionProviderCuDNNConvAlgoSearch) -> Self {
-		self.cudnn_conv_algo_search = Some(search);
+		self.options.set(
+			"cudnn_conv_algo_search",
+			match search {
+				CUDAExecutionProviderCuDNNConvAlgoSearch::Exhaustive => "EXHAUSTIVE",
+				CUDAExecutionProviderCuDNNConvAlgoSearch::Heuristic => "HEURISTIC",
+				CUDAExecutionProviderCuDNNConvAlgoSearch::Default => "DEFAULT"
+			}
+		);
 		self
 	}
 
@@ -135,7 +136,7 @@ impl CUDAExecutionProvider {
 	/// there are race conditions and possibly better performance.
 	#[must_use]
 	pub fn with_copy_in_default_stream(mut self, enable: bool) -> Self {
-		self.do_copy_in_default_stream = Some(enable);
+		self.options.set("do_copy_in_default_stream", if enable { "1" } else { "0" });
 		self
 	}
 
@@ -149,7 +150,7 @@ impl CUDAExecutionProvider {
 	/// cuDNN selecting a suboptimal convolution algorithm. The recommended (and default) value is `true`.
 	#[must_use]
 	pub fn with_conv_max_workspace(mut self, enable: bool) -> Self {
-		self.cudnn_conv_use_max_workspace = Some(enable);
+		self.options.set("cudnn_conv_use_max_workspace", if enable { "1" } else { "0" });
 		self
 	}
 
@@ -161,7 +162,7 @@ impl CUDAExecutionProvider {
 	/// true to instead use `[N, C, 1, D]`.
 	#[must_use]
 	pub fn with_conv1d_pad_to_nc1d(mut self, enable: bool) -> Self {
-		self.cudnn_conv1d_pad_to_nc1d = Some(enable);
+		self.options.set("cudnn_conv1d_pad_to_nc1d", if enable { "1" } else { "0" });
 		self
 	}
 
@@ -190,7 +191,7 @@ impl CUDAExecutionProvider {
 	/// > `run()`s only perform graph replays of the graph captured and cached in the first `run()`.
 	#[must_use]
 	pub fn with_cuda_graph(mut self) -> Self {
-		self.enable_cuda_graph = Some(true);
+		self.options.set("enable_cuda_graph", "1");
 		self
 	}
 
@@ -198,7 +199,7 @@ impl CUDAExecutionProvider {
 	/// is `false`. If enabled, accuracy may improve slightly, but performance may decrease.
 	#[must_use]
 	pub fn with_skip_layer_norm_strict_mode(mut self) -> Self {
-		self.enable_skip_layer_norm_strict_mode = Some(true);
+		self.options.set("enable_skip_layer_norm_strict_mode", "1");
 		self
 	}
 
@@ -207,13 +208,13 @@ impl CUDAExecutionProvider {
 	/// rounded with 10 bits of mantissa and results are accumulated with float32 precision.
 	#[must_use]
 	pub fn with_tf32(mut self, enable: bool) -> Self {
-		self.use_tf32 = Some(enable);
+		self.options.set("use_tf32", if enable { "1" } else { "0" });
 		self
 	}
 
 	#[must_use]
 	pub fn with_prefer_nhwc(mut self) -> Self {
-		self.prefer_nhwc = Some(true);
+		self.options.set("prefer_nhwc", "1");
 		self
 	}
 
@@ -221,19 +222,19 @@ impl CUDAExecutionProvider {
 	/// The provided `stream` must outlive the environment/session created with the execution provider.
 	#[must_use]
 	pub unsafe fn with_compute_stream(mut self, stream: *mut ()) -> Self {
-		self.user_compute_stream = Some(stream);
+		self.options.set("user_compute_stream", (stream as usize).to_string());
 		self
 	}
 
 	#[must_use]
 	pub fn with_attention_backend(mut self, flags: CUDAExecutionProviderAttentionBackend) -> Self {
-		self.sdpa_kernel = Some(flags.0);
+		self.options.set("sdpa_kernel", flags.0.to_string());
 		self
 	}
 
 	#[must_use]
 	pub fn with_fuse_conv_bias(mut self, enable: bool) -> Self {
-		self.fuse_conv_bias = Some(enable);
+		self.options.set("fuse_conv_bias", if enable { "1" } else { "0" });
 		self
 	}
 
@@ -243,6 +244,13 @@ impl CUDAExecutionProvider {
 	#[must_use]
 	pub fn build(self) -> ExecutionProviderDispatch {
 		self.into()
+	}
+}
+
+impl ArbitrarilyConfigurableExecutionProvider for CUDAExecutionProvider {
+	fn with_arbitrary_config(mut self, key: impl ToString, value: impl ToString) -> Self {
+		self.options.set(key.to_string(), value.to_string());
+		self
 	}
 }
 
@@ -267,41 +275,16 @@ impl ExecutionProvider for CUDAExecutionProvider {
 		{
 			let mut cuda_options: *mut ort_sys::OrtCUDAProviderOptionsV2 = std::ptr::null_mut();
 			crate::ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)?];
-			let (key_ptrs, value_ptrs, len, keys, values) = super::map_keys! {
-				device_id = self.device_id,
-				arena_extend_strategy = self.arena_extend_strategy.as_ref().map(|v| match v {
-					ArenaExtendStrategy::NextPowerOfTwo => "kNextPowerOfTwo",
-					ArenaExtendStrategy::SameAsRequested => "kSameAsRequested"
-				}),
-				cudnn_conv_algo_search = self.cudnn_conv_algo_search.as_ref().map(|v| match v {
-					CUDAExecutionProviderCuDNNConvAlgoSearch::Exhaustive => "EXHAUSTIVE",
-					CUDAExecutionProviderCuDNNConvAlgoSearch::Heuristic => "HEURISTIC",
-					CUDAExecutionProviderCuDNNConvAlgoSearch::Default => "DEFAULT"
-				}),
-				// has_user_compute_stream = self.user_compute_stream.as_ref().map(|_| 1),
-				user_compute_stream = self.user_compute_stream.map(|x| x as usize),
-				gpu_mem_limit = self.gpu_mem_limit,
-				do_copy_in_default_stream = self.do_copy_in_default_stream.map(<bool as Into<i32>>::into),
-				cudnn_conv_use_max_workspace = self.cudnn_conv_use_max_workspace.map(<bool as Into<i32>>::into),
-				cudnn_conv1d_pad_to_nc1d = self.cudnn_conv1d_pad_to_nc1d.map(<bool as Into<i32>>::into),
-				enable_cuda_graph = self.enable_cuda_graph.map(<bool as Into<i32>>::into),
-				enable_skip_layer_norm_strict_mode = self.enable_skip_layer_norm_strict_mode.map(<bool as Into<i32>>::into),
-				use_tf32 = self.use_tf32.map(<bool as Into<i32>>::into),
-				prefer_nhwc = self.prefer_nhwc.map(<bool as Into<i32>>::into),
-				sdpa_kernel = self.sdpa_kernel,
-				fuse_conv_bias = self.fuse_conv_bias.map(<bool as Into<i32>>::into)
-			};
-			if let Err(e) =
-				crate::error::status_to_result(crate::ortsys![unsafe UpdateCUDAProviderOptions(cuda_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), len as _)])
-			{
+			let ffi_options = self.options.to_ffi();
+			if let Err(e) = crate::error::status_to_result(
+				crate::ortsys![unsafe UpdateCUDAProviderOptions(cuda_options, ffi_options.key_ptrs(), ffi_options.value_ptrs(), ffi_options.len())]
+			) {
 				crate::ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
-				std::mem::drop((keys, values));
 				return Err(e);
 			}
 
 			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(session_builder.session_options_ptr.as_ptr(), cuda_options)];
 			crate::ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
-			std::mem::drop((keys, values));
 			return crate::error::status_to_result(status);
 		}
 

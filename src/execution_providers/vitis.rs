@@ -1,3 +1,4 @@
+use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
 use crate::{
 	error::{Error, Result},
 	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
@@ -6,30 +7,35 @@ use crate::{
 
 #[derive(Debug, Default, Clone)]
 pub struct VitisAIExecutionProvider {
-	config_file: Option<String>,
-	cache_dir: Option<String>,
-	cache_key: Option<String>
+	options: ExecutionProviderOptions
 }
 
 impl VitisAIExecutionProvider {
 	pub fn with_config_file(mut self, config_file: impl ToString) -> Self {
-		self.config_file = Some(config_file.to_string());
+		self.options.set("config_file", config_file.to_string());
 		self
 	}
 
 	pub fn with_cache_dir(mut self, cache_dir: impl ToString) -> Self {
-		self.cache_dir = Some(cache_dir.to_string());
+		self.options.set("cache_dir", cache_dir.to_string());
 		self
 	}
 
 	pub fn with_cache_key(mut self, cache_key: impl ToString) -> Self {
-		self.cache_key = Some(cache_key.to_string());
+		self.options.set("cache_key", cache_key.to_string());
 		self
 	}
 
 	#[must_use]
 	pub fn build(self) -> ExecutionProviderDispatch {
 		self.into()
+	}
+}
+
+impl ArbitrarilyConfigurableExecutionProvider for VitisAIExecutionProvider {
+	fn with_arbitrary_config(mut self, key: impl ToString, value: impl ToString) -> Self {
+		self.options.set(key.to_string(), value.to_string());
+		self
 	}
 }
 
@@ -52,21 +58,15 @@ impl ExecutionProvider for VitisAIExecutionProvider {
 	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "vitis"))]
 		{
-			let (key_ptrs, value_ptrs, len, keys, values) = super::map_keys! {
-				config_file = self.config_file.clone(),
-				cacheDir = self.cache_dir.clone(),
-				cacheKey = self.cache_key.clone()
-			};
-
+			let ffi_options = self.options.to_ffi();
 			let status = crate::ortsys![
 				unsafe SessionOptionsAppendExecutionProvider_VitisAI(
 					session_builder.session_options_ptr.as_ptr(),
-					key_ptrs.as_ptr(),
-					value_ptrs.as_ptr(),
-					len as _
+					ffi_options.key_ptrs(),
+					ffi_options.value_ptrs(),
+					ffi_options.len()
 				)
 			];
-			std::mem::drop((keys, values));
 			return crate::error::status_to_result(status);
 		}
 

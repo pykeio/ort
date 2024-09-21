@@ -1,3 +1,4 @@
+use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
 use crate::{
 	error::{Error, Result},
 	execution_providers::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderDispatch},
@@ -28,20 +29,13 @@ pub enum CANNExecutionProviderImplementationMode {
 
 #[derive(Default, Debug, Clone)]
 pub struct CANNExecutionProvider {
-	device_id: Option<i32>,
-	npu_mem_limit: Option<usize>,
-	arena_extend_strategy: Option<ArenaExtendStrategy>,
-	enable_cann_graph: Option<bool>,
-	dump_graphs: Option<bool>,
-	precision_mode: Option<CANNExecutionProviderPrecisionMode>,
-	op_select_impl_mode: Option<CANNExecutionProviderImplementationMode>,
-	optypelist_for_impl_mode: Option<String>
+	options: ExecutionProviderOptions
 }
 
 impl CANNExecutionProvider {
 	#[must_use]
 	pub fn with_device_id(mut self, device_id: i32) -> Self {
-		self.device_id = Some(device_id);
+		self.options.set("device_id", device_id.to_string());
 		self
 	}
 
@@ -49,14 +43,20 @@ impl CANNExecutionProvider {
 	/// provider’s arena. The total device memory usage may be higher.
 	#[must_use]
 	pub fn with_memory_limit(mut self, limit: usize) -> Self {
-		self.npu_mem_limit = Some(limit);
+		self.options.set("npu_mem_limit", limit.to_string());
 		self
 	}
 
 	/// Configure the strategy for extending the device's memory arena.
 	#[must_use]
 	pub fn with_arena_extend_strategy(mut self, strategy: ArenaExtendStrategy) -> Self {
-		self.arena_extend_strategy = Some(strategy);
+		self.options.set(
+			"arena_extend_strategy",
+			match strategy {
+				ArenaExtendStrategy::NextPowerOfTwo => "kNextPowerOfTwo",
+				ArenaExtendStrategy::SameAsRequested => "kSameAsRequested"
+			}
+		);
 		self
 	}
 
@@ -64,21 +64,30 @@ impl CANNExecutionProvider {
 	/// is true. If false, it will fall back to the single-operator inference engine.
 	#[must_use]
 	pub fn with_cann_graph(mut self, enable: bool) -> Self {
-		self.enable_cann_graph = Some(enable);
+		self.options.set("enable_cann_graph", if enable { "1" } else { "0" });
 		self
 	}
 
 	/// Configure whether to dump the subgraph into ONNX format for analysis of subgraph segmentation.
 	#[must_use]
 	pub fn with_dump_graphs(mut self) -> Self {
-		self.dump_graphs = Some(true);
+		self.options.set("dump_graphs", "1");
 		self
 	}
 
 	/// Set the precision mode of the operator. See [`CANNExecutionProviderPrecisionMode`].
 	#[must_use]
 	pub fn with_precision_mode(mut self, mode: CANNExecutionProviderPrecisionMode) -> Self {
-		self.precision_mode = Some(mode);
+		self.options.set(
+			"precision_mode",
+			match mode {
+				CANNExecutionProviderPrecisionMode::ForceFP32 => "force_fp32",
+				CANNExecutionProviderPrecisionMode::ForceFP16 => "force_fp16",
+				CANNExecutionProviderPrecisionMode::AllowFP32ToFP16 => "allow_fp32_to_fp16",
+				CANNExecutionProviderPrecisionMode::MustKeepOrigin => "must_keep_origin_dtype",
+				CANNExecutionProviderPrecisionMode::AllowMixedPrecision => "allow_mix_precision"
+			}
+		);
 		self
 	}
 
@@ -86,7 +95,13 @@ impl CANNExecutionProvider {
 	/// high-performance implementations.
 	#[must_use]
 	pub fn with_implementation_mode(mut self, mode: CANNExecutionProviderImplementationMode) -> Self {
-		self.op_select_impl_mode = Some(mode);
+		self.options.set(
+			"op_select_impl_mode",
+			match mode {
+				CANNExecutionProviderImplementationMode::HighPrecision => "high_precision",
+				CANNExecutionProviderImplementationMode::HighPerformance => "high_performance"
+			}
+		);
 		self
 	}
 
@@ -100,13 +115,20 @@ impl CANNExecutionProvider {
 	/// - `ROIAlign`
 	#[must_use]
 	pub fn with_implementation_mode_oplist(mut self, list: impl ToString) -> Self {
-		self.optypelist_for_impl_mode = Some(list.to_string());
+		self.options.set("optypelist_for_impl_mode", list.to_string());
 		self
 	}
 
 	#[must_use]
 	pub fn build(self) -> ExecutionProviderDispatch {
 		self.into()
+	}
+}
+
+impl ArbitrarilyConfigurableExecutionProvider for CANNExecutionProvider {
+	fn with_arbitrary_config(mut self, key: impl ToString, value: impl ToString) -> Self {
+		self.options.set(key.to_string(), value.to_string());
+		self
 	}
 }
 
@@ -131,39 +153,16 @@ impl ExecutionProvider for CANNExecutionProvider {
 		{
 			let mut cann_options: *mut ort_sys::OrtCANNProviderOptions = std::ptr::null_mut();
 			crate::ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)?];
-			let (key_ptrs, value_ptrs, len, keys, values) = super::map_keys! {
-				device_id = self.device_id,
-				npu_mem_limit = self.npu_mem_limit,
-				arena_extend_strategy = self.arena_extend_strategy.as_ref().map(|v| match v {
-					ArenaExtendStrategy::NextPowerOfTwo => "kNextPowerOfTwo",
-					ArenaExtendStrategy::SameAsRequested => "kSameAsRequested"
-				}),
-				enable_cann_graph = self.enable_cann_graph.map(<bool as Into<i32>>::into),
-				dump_graphs = self.dump_graphs.map(<bool as Into<i32>>::into),
-				precision_mode = self.precision_mode.as_ref().map(|v| match v {
-					CANNExecutionProviderPrecisionMode::ForceFP32 => "force_fp32",
-					CANNExecutionProviderPrecisionMode::ForceFP16 => "force_fp16",
-					CANNExecutionProviderPrecisionMode::AllowFP32ToFP16 => "allow_fp32_to_fp16",
-					CANNExecutionProviderPrecisionMode::MustKeepOrigin => "must_keep_origin_dtype",
-					CANNExecutionProviderPrecisionMode::AllowMixedPrecision => "allow_mix_precision"
-				}),
-				op_select_impl_mode = self.op_select_impl_mode.as_ref().map(|v| match v {
-					CANNExecutionProviderImplementationMode::HighPrecision => "high_precision",
-					CANNExecutionProviderImplementationMode::HighPerformance => "high_performance"
-				}),
-				optypelist_for_impl_mode = self.optypelist_for_impl_mode.clone()
-			};
-			if let Err(e) =
-				crate::error::status_to_result(crate::ortsys![unsafe UpdateCANNProviderOptions(cann_options, key_ptrs.as_ptr(), value_ptrs.as_ptr(), len as _)])
-			{
+			let ffi_options = self.options.to_ffi();
+			if let Err(e) = crate::error::status_to_result(
+				crate::ortsys![unsafe UpdateCANNProviderOptions(cann_options, ffi_options.key_ptrs(), ffi_options.value_ptrs(), ffi_options.len())]
+			) {
 				crate::ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
-				std::mem::drop((keys, values));
 				return Err(e);
 			}
 
 			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_CANN(session_builder.session_options_ptr.as_ptr(), cann_options)];
 			crate::ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
-			std::mem::drop((keys, values));
 			return crate::error::status_to_result(status);
 		}
 

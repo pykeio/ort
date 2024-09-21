@@ -1,5 +1,6 @@
 use std::num::NonZeroUsize;
 
+use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
 use crate::{
 	error::{Error, Result},
 	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
@@ -8,19 +9,26 @@ use crate::{
 
 #[derive(Debug, Default, Clone)]
 pub struct XNNPACKExecutionProvider {
-	intra_op_num_threads: Option<NonZeroUsize>
+	options: ExecutionProviderOptions
 }
 
 impl XNNPACKExecutionProvider {
 	#[must_use]
 	pub fn with_intra_op_num_threads(mut self, num_threads: NonZeroUsize) -> Self {
-		self.intra_op_num_threads = Some(num_threads);
+		self.options.set("intra_op_num_threads", num_threads.to_string());
 		self
 	}
 
 	#[must_use]
 	pub fn build(self) -> ExecutionProviderDispatch {
 		self.into()
+	}
+}
+
+impl ArbitrarilyConfigurableExecutionProvider for XNNPACKExecutionProvider {
+	fn with_arbitrary_config(mut self, key: impl ToString, value: impl ToString) -> Self {
+		self.options.set(key.to_string(), value.to_string());
+		self
 	}
 }
 
@@ -43,16 +51,14 @@ impl ExecutionProvider for XNNPACKExecutionProvider {
 	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "xnnpack"))]
 		{
-			let (key_ptrs, value_ptrs, len, _keys, _values) = super::map_keys! {
-				intra_op_num_threads = self.intra_op_num_threads.as_ref()
-			};
+			let ffi_options = self.options.to_ffi();
 			let ep_name = std::ffi::CString::new("XNNPACK").unwrap_or_else(|_| unreachable!());
 			return crate::error::status_to_result(crate::ortsys![unsafe SessionOptionsAppendExecutionProvider(
 				session_builder.session_options_ptr.as_ptr(),
 				ep_name.as_ptr(),
-				key_ptrs.as_ptr(),
-				value_ptrs.as_ptr(),
-				len as _,
+				ffi_options.key_ptrs(),
+				ffi_options.value_ptrs(),
+				ffi_options.len(),
 			)]);
 		}
 

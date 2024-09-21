@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::ffi::CString;
 use std::{fmt::Debug, os::raw::c_char, sync::Arc};
 
 use crate::{char_p_to_string, error::Result, ortsys, session::SessionBuilder};
@@ -107,6 +109,15 @@ pub trait ExecutionProvider {
 	fn register(&self, session_builder: &SessionBuilder) -> Result<()>;
 }
 
+/// Trait used for execution providers that can have arbitrary configuration keys applied.
+///
+/// Most execution providers have a small set of configuration options which don't change between ONNX Runtime releases;
+/// others, like the CUDA execution provider, often have options added that go undocumented and thus unimplemented by
+/// `ort`. This allows you to configure these options regardless.
+pub trait ArbitrarilyConfigurableExecutionProvider {
+	fn with_arbitrary_config(self, key: impl ToString, value: impl ToString) -> Self;
+}
+
 /// The strategy for extending the device memory arena.
 #[derive(Debug, Default, Clone)]
 pub enum ArenaExtendStrategy {
@@ -162,27 +173,39 @@ impl Debug for ExecutionProviderDispatch {
 	}
 }
 
-#[allow(unused)]
-macro_rules! map_keys {
-	($($fn_name:ident = $ex:expr),*) => {
-		{
-			let mut keys = ::std::vec::Vec::<std::ffi::CString>::new();
-			let mut values = ::std::vec::Vec::<std::ffi::CString>::new();
-			$(
-				if let Some(v) = $ex {
-					keys.push(::std::ffi::CString::new(stringify!($fn_name)).unwrap_or_else(|_| unreachable!()));
-					values.push(::std::ffi::CString::new(v.to_string().as_str()).unwrap_or_else(|_| unreachable!()));
-				}
-			)*
-			assert_eq!(keys.len(), values.len()); // sanity check
-			let key_ptrs: ::std::vec::Vec<*const ::std::ffi::c_char> = keys.iter().map(|k| k.as_ptr()).collect();
-			let value_ptrs: ::std::vec::Vec<*const ::std::ffi::c_char> = values.iter().map(|v| v.as_ptr()).collect();
-			(key_ptrs, value_ptrs, keys.len(), keys, values)
-		}
-	};
+#[derive(Default, Debug, Clone)]
+pub(crate) struct ExecutionProviderOptions(HashMap<CString, CString>);
+
+impl ExecutionProviderOptions {
+	pub fn set(&mut self, key: impl Into<Vec<u8>>, value: impl Into<Vec<u8>>) {
+		self.0
+			.insert(CString::new(key).expect("unexpected nul in key string"), CString::new(value).expect("unexpected nul in value string"));
+	}
+
+	pub fn to_ffi(&self) -> ExecutionProviderOptionsFFI {
+		let (key_ptrs, value_ptrs) = self.0.iter().map(|(k, v)| (k.as_ptr(), v.as_ptr())).unzip();
+		ExecutionProviderOptionsFFI { key_ptrs, value_ptrs }
+	}
 }
-#[allow(unused)]
-pub(crate) use map_keys;
+
+pub(crate) struct ExecutionProviderOptionsFFI {
+	key_ptrs: Vec<*const c_char>,
+	value_ptrs: Vec<*const c_char>
+}
+
+impl ExecutionProviderOptionsFFI {
+	pub fn key_ptrs(&self) -> *const *const c_char {
+		self.key_ptrs.as_ptr()
+	}
+
+	pub fn value_ptrs(&self) -> *const *const c_char {
+		self.value_ptrs.as_ptr()
+	}
+
+	pub fn len(&self) -> ort_sys::size_t {
+		self.key_ptrs.len() as _
+	}
+}
 
 #[allow(unused)]
 macro_rules! get_ep_register {

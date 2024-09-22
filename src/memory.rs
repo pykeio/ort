@@ -73,6 +73,10 @@ pub struct Allocator {
 	_session_inner: Option<Arc<SharedSessionInner>>
 }
 
+unsafe impl Send for Allocator {}
+// not all allocators appear to be Sync - specifically the CUDA allocator can sometimes crash when used on multiple
+// threads. CPU allocator doesn't seem to be affected though.
+
 impl Allocator {
 	pub(crate) unsafe fn from_raw_unchecked(ptr: *mut ort_sys::OrtAllocator) -> Allocator {
 		Allocator {

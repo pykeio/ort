@@ -1,6 +1,4 @@
-#[cfg(not(windows))]
-use std::ffi::CString;
-use std::{path::Path, rc::Rc, sync::Arc};
+use std::{borrow::Cow, path::Path, rc::Rc, sync::Arc};
 
 use super::SessionBuilder;
 use crate::{
@@ -8,7 +6,7 @@ use crate::{
 	execution_providers::{apply_execution_providers, ExecutionProviderDispatch},
 	ortsys,
 	util::path_to_os_char,
-	MemoryInfo, OperatorDomain
+	DynValue, MemoryInfo, OperatorDomain
 };
 
 impl SessionBuilder {
@@ -79,22 +77,16 @@ impl SessionBuilder {
 	/// newly optimized model to the given path (for 'offline' graph optimization).
 	///
 	/// Note that the file will only be created after the model is committed.
-	pub fn with_optimized_model_path<S: AsRef<str>>(self, path: S) -> Result<Self> {
-		#[cfg(windows)]
-		let path = path.as_ref().encode_utf16().chain([0]).collect::<Vec<_>>();
-		#[cfg(not(windows))]
-		let path = CString::new(path.as_ref())?;
+	pub fn with_optimized_model_path<S: AsRef<Path>>(self, path: S) -> Result<Self> {
+		let path = crate::util::path_to_os_char(path);
 		ortsys![unsafe SetOptimizedModelFilePath(self.session_options_ptr.as_ptr(), path.as_ptr())?];
 		Ok(self)
 	}
 
 	/// Enables profiling. Profile information will be writen to `profiling_file` after profiling completes.
 	/// See [`Session::end_profiling`].
-	pub fn with_profiling<S: AsRef<str>>(self, profiling_file: S) -> Result<Self> {
-		#[cfg(windows)]
-		let profiling_file = profiling_file.as_ref().encode_utf16().chain([0]).collect::<Vec<_>>();
-		#[cfg(not(windows))]
-		let profiling_file = CString::new(profiling_file.as_ref())?;
+	pub fn with_profiling<S: AsRef<Path>>(self, profiling_file: S) -> Result<Self> {
+		let profiling_file = crate::util::path_to_os_char(profiling_file);
 		ortsys![unsafe EnableProfiling(self.session_options_ptr.as_ptr(), profiling_file.as_ptr())?];
 		Ok(self)
 	}
@@ -134,6 +126,35 @@ impl SessionBuilder {
 		let domain = domain.into();
 		ortsys![unsafe AddCustomOpDomain(self.session_options_ptr.as_ptr(), domain.ptr())?];
 		self.operator_domains.push(domain);
+		Ok(self)
+	}
+
+	/// Enables/disables deterministic computation.
+	///
+	/// The default (non-deterministic) kernels will typically use faster algorithms that may introduce slight variance.
+	/// Enabling deterministic compute will output reproducible results, but may come at a performance penalty.
+	pub fn with_deterministic_compute(self, enable: bool) -> Result<Self> {
+		ortsys![unsafe SetDeterministicCompute(self.session_options_ptr.as_ptr(), enable)?];
+		Ok(self)
+	}
+
+	pub fn with_external_initializer(mut self, name: impl AsRef<str>, value: DynValue) -> Result<Self> {
+		let name = name.as_ref();
+		let value = Rc::new(value);
+		ortsys![unsafe AddExternalInitializers(self.session_options_ptr.as_ptr(), &name.as_ptr().cast::<i8>(), &value.ptr().cast_const(), 1)?];
+		self.external_initializers.push(value);
+		Ok(self)
+	}
+
+	pub fn with_external_initializer_file(mut self, file_name: impl AsRef<Path>, buffer: Cow<'static, [u8]>) -> Result<Self> {
+		// We need to hold onto `buffer` until the session is actually committed. This means `buffer` must outlive 'self (if
+		// SessionBuilder were to have a lifetime). Adding a lifetime to SessionBuilder would be breaking, so right now we
+		// either accept a &'static [u8] or Vec<u8> via Cow<'_, [u8]>, which still allows users to use include_bytes!.
+
+		let file_name = crate::util::path_to_os_char(file_name);
+		let sizes = [buffer.len() as ort_sys::size_t];
+		ortsys![unsafe AddExternalInitializersFromMemory(self.session_options_ptr.as_ptr(), &file_name.as_ptr(), &buffer.as_ptr().cast::<i8>().cast_mut(), sizes.as_ptr(), 1)?];
+		self.external_initializer_buffers.push(buffer);
 		Ok(self)
 	}
 }

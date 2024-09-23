@@ -1,4 +1,5 @@
 use std::{
+	borrow::Cow,
 	ffi::CString,
 	ptr::{self, NonNull},
 	rc::Rc,
@@ -9,7 +10,7 @@ use crate::{
 	error::{assert_non_null_pointer, status_to_result, Result},
 	memory::MemoryInfo,
 	operator::OperatorDomain,
-	ortsys
+	ortsys, DynValue
 };
 
 mod impl_commit;
@@ -36,7 +37,9 @@ pub use self::impl_options::GraphOptimizationLevel;
 pub struct SessionBuilder {
 	pub(crate) session_options_ptr: NonNull<ort_sys::OrtSessionOptions>,
 	memory_info: Option<Rc<MemoryInfo>>,
-	operator_domains: Vec<Arc<OperatorDomain>>
+	operator_domains: Vec<Arc<OperatorDomain>>,
+	external_initializers: Vec<Rc<DynValue>>,
+	external_initializer_buffers: Vec<Cow<'static, [u8]>>
 }
 
 impl Clone for SessionBuilder {
@@ -48,7 +51,9 @@ impl Clone for SessionBuilder {
 		Self {
 			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },
 			memory_info: self.memory_info.clone(),
-			operator_domains: self.operator_domains.clone()
+			operator_domains: self.operator_domains.clone(),
+			external_initializers: self.external_initializers.clone(),
+			external_initializer_buffers: self.external_initializer_buffers.clone()
 		}
 	}
 }
@@ -79,7 +84,9 @@ impl SessionBuilder {
 		Ok(Self {
 			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },
 			memory_info: None,
-			operator_domains: Vec::new()
+			operator_domains: Vec::new(),
+			external_initializers: Vec::new(),
+			external_initializer_buffers: Vec::new()
 		})
 	}
 

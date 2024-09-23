@@ -43,7 +43,7 @@ pub use self::{
 #[derive(Debug)]
 pub struct SharedSessionInner {
 	pub(crate) session_ptr: NonNull<ort_sys::OrtSession>,
-	allocator: Allocator,
+	pub(crate) allocator: Allocator,
 	/// Additional things we may need to hold onto for the duration of this session, like [`crate::OperatorDomain`]s and
 	/// DLL handles for operator libraries.
 	_extras: Vec<Box<dyn Any>>,

@@ -237,10 +237,17 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					add_search_dir(transform_dep(external_lib_dir.join("re2-build"), &profile));
 					println!("cargo:rustc-link-lib=static=re2");
 
+					add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("debugging"), &profile));
+					println!("cargo:rustc-link-lib=static=absl_examine_stack");
+					println!("cargo:rustc-link-lib=static=absl_demangle_internal");
+					println!("cargo:rustc-link-lib=static=absl_demangle_rust");
+					println!("cargo:rustc-link-lib=static=absl_decode_rust_punycode");
+					println!("cargo:rustc-link-lib=static=absl_utf8_for_code_point");
 					add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("base"), &profile));
 					println!("cargo:rustc-link-lib=static=absl_base");
 					println!("cargo:rustc-link-lib=static=absl_spinlock_wait");
 					println!("cargo:rustc-link-lib=static=absl_malloc_internal");
+					println!("cargo:rustc-link-lib=static=absl_strerror");
 					println!("cargo:rustc-link-lib=static=absl_raw_logging_internal");
 					println!("cargo:rustc-link-lib=static=absl_throw_delegate");
 					add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("hash"), &profile));
@@ -266,6 +273,14 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("debugging"), &profile));
 					println!("cargo:rustc-link-lib=static=absl_symbolize");
 					println!("cargo:rustc-link-lib=static=absl_stacktrace");
+					add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("log"), &profile));
+					println!("cargo:rustc-link-lib=static=absl_log_globals");
+					println!("cargo:rustc-link-lib=static=absl_log_internal_format");
+					println!("cargo:rustc-link-lib=static=absl_log_internal_proto");
+					println!("cargo:rustc-link-lib=static=absl_log_internal_globals");
+					println!("cargo:rustc-link-lib=static=absl_log_internal_log_sink_set");
+					println!("cargo:rustc-link-lib=static=absl_log_sink");
+					println!("cargo:rustc-link-lib=static=absl_log_internal_message");
 
 					if cfg!(feature = "coreml") && (target_os == "macos" || target_os == "ios") {
 						println!("cargo:rustc-link-lib=framework=CoreML");

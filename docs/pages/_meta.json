@@ -25,6 +25,9 @@
 	"setup": {
 		"title": "Setup"
 	},
+	"fundamentals": {
+		"title": "Fundamentals"
+	},
 	"perf": {
 		"title": "Performance"
 	},

@@ -123,6 +123,7 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 
 fn add_search_dir<P: AsRef<Path>>(base: P) {
 	let base = base.as_ref();
+	println!("cargo:warning={:?}", base);
 	if base.join("Release").is_dir() {
 		println!("cargo:rustc-link-search=native={}", base.join("Release").display());
 	} else if base.join("Debug").is_dir() {
@@ -239,9 +240,11 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 
 					add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("base"), &profile));
 					println!("cargo:rustc-link-lib=static=absl_base");
-					println!("cargo:rustc-link-lib=static=absl_spinlock_wait");
+					println!("cargo:rustc-link-lib=static=absl_log_severity");
 					println!("cargo:rustc-link-lib=static=absl_malloc_internal");
 					println!("cargo:rustc-link-lib=static=absl_raw_logging_internal");
+					println!("cargo:rustc-link-lib=static=absl_spinlock_wait");
+					println!("cargo:rustc-link-lib=static=absl_strerror");
 					println!("cargo:rustc-link-lib=static=absl_throw_delegate");
 					add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("hash"), &profile));
 					println!("cargo:rustc-link-lib=static=absl_hash");
@@ -266,6 +269,27 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("debugging"), &profile));
 					println!("cargo:rustc-link-lib=static=absl_symbolize");
 					println!("cargo:rustc-link-lib=static=absl_stacktrace");
+					println!("cargo:rustc-link-lib=static=absl_debugging_internal");
+					println!("cargo:rustc-link-lib=static=absl_decode_rust_punycode");
+					println!("cargo:rustc-link-lib=static=absl_demangle_internal");
+					println!("cargo:rustc-link-lib=static=absl_demangle_rust");
+					println!("cargo:rustc-link-lib=static=absl_examine_stack");
+					println!("cargo:rustc-link-lib=static=absl_failure_signal_handler");
+					println!("cargo:rustc-link-lib=static=absl_utf8_for_code_point");
+					add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("log"), &profile));
+					println!("cargo:rustc-link-lib=static=absl_log_entry");
+					println!("cargo:rustc-link-lib=static=absl_log_globals");
+					println!("cargo:rustc-link-lib=static=absl_log_internal_check_op");
+					println!("cargo:rustc-link-lib=static=absl_log_internal_conditions");
+					println!("cargo:rustc-link-lib=static=absl_log_internal_fnmatch");
+					println!("cargo:rustc-link-lib=static=absl_log_internal_format");
+					println!("cargo:rustc-link-lib=static=absl_log_internal_globals");
+					println!("cargo:rustc-link-lib=static=absl_log_internal_log_sink_set");
+					println!("cargo:rustc-link-lib=static=absl_log_internal_message");
+					println!("cargo:rustc-link-lib=static=absl_log_internal_nullguard");
+					println!("cargo:rustc-link-lib=static=absl_log_internal_proto");
+					println!("cargo:rustc-link-lib=static=absl_log_sink");
+					println!("cargo:rustc-link-lib=static=absl_vlog_config_internal");
 
 					if cfg!(feature = "coreml") && (target_os == "macos" || target_os == "ios") {
 						println!("cargo:rustc-link-lib=framework=CoreML");

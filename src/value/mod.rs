@@ -264,6 +264,20 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 		}
 	}
 
+	/// Attempts to upgrade this `ValueRef` to an owned [`Value`] holding the same data.
+	pub fn try_upgrade(self) -> Result<Value<Type>, Self> {
+		// We cannot upgade a value which we cannot drop, i.e. `ValueRef`s used in operator kernels. Those only last for the
+		// duration of the kernel, allowing an upgrade would allow a UAF.
+		if match &*self.inner.inner {
+			ValueInner::CppOwned { drop, .. } => !drop,
+			_ => false
+		} {
+			return Err(self);
+		}
+
+		Ok(ManuallyDrop::into_inner(self.inner))
+	}
+
 	pub fn into_dyn(self) -> ValueRef<'v, DynValueTypeMarker> {
 		unsafe { std::mem::transmute(self) }
 	}
@@ -302,6 +316,20 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 		} else {
 			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &mut {dt} to &mut {}", OtherType::format())))
 		}
+	}
+
+	/// Attempts to upgrade this `ValueRefMut` to an owned [`Value`] holding the same data.
+	pub fn try_upgrade(self) -> Result<Value<Type>, Self> {
+		// We cannot upgade a value which we cannot drop, i.e. `ValueRef`s used in operator kernels. Those only last for the
+		// duration of the kernel, allowing an upgrade would allow a UAF.
+		if match &*self.inner.inner {
+			ValueInner::CppOwned { drop, .. } => !drop,
+			_ => false
+		} {
+			return Err(self);
+		}
+
+		Ok(ManuallyDrop::into_inner(self.inner))
 	}
 
 	pub fn into_dyn(self) -> ValueRefMut<'v, DynValueTypeMarker> {

@@ -65,10 +65,7 @@ impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
 					let mut value_ptr = ptr::null_mut();
 					ortsys![unsafe GetValue(self.ptr(), i as _, allocator.ptr.as_ptr(), &mut value_ptr)?; nonNull(value_ptr)];
 
-					let value = ValueRef {
-						inner: unsafe { Value::from_ptr(NonNull::new_unchecked(value_ptr), None) },
-						lifetime: PhantomData
-					};
+					let value = ValueRef::new(unsafe { Value::from_ptr(NonNull::new_unchecked(value_ptr), None) });
 					let value_type = value.dtype();
 					if !OtherType::can_downcast(&value.dtype()) {
 						return Err(Error::new_with_code(
@@ -138,22 +135,18 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized> Value<SequenceValu
 	/// Converts from a strongly-typed [`Sequence<T>`] to a reference to a type-erased [`DynSequence`].
 	#[inline]
 	pub fn upcast_ref(&self) -> DynSequenceRef {
-		DynSequenceRef::new(unsafe {
-			Value::from_ptr_nodrop(
-				NonNull::new_unchecked(self.ptr()),
-				if let ValueInner::CppOwned { _session, .. } = &*self.inner { _session.clone() } else { None }
-			)
+		DynSequenceRef::new(Value {
+			inner: Arc::clone(&self.inner),
+			_markers: PhantomData
 		})
 	}
 
 	/// Converts from a strongly-typed [`Sequence<T>`] to a mutable reference to a type-erased [`DynSequence`].
 	#[inline]
 	pub fn upcast_mut(&mut self) -> DynSequenceRefMut {
-		DynSequenceRefMut::new(unsafe {
-			Value::from_ptr_nodrop(
-				NonNull::new_unchecked(self.ptr()),
-				if let ValueInner::CppOwned { _session, .. } = &*self.inner { _session.clone() } else { None }
-			)
+		DynSequenceRefMut::new(Value {
+			inner: Arc::clone(&self.inner),
+			_markers: PhantomData
 		})
 	}
 }

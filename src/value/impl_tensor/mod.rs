@@ -5,10 +5,11 @@ use std::{
 	fmt::Debug,
 	marker::PhantomData,
 	ops::{Index, IndexMut},
-	ptr::NonNull
+	ptr::NonNull,
+	sync::Arc
 };
 
-use super::{DowncastableTarget, DynValue, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker};
+use super::{DowncastableTarget, DynValue, Value, ValueRef, ValueRefMut, ValueType, ValueTypeMarker};
 use crate::{error::Result, memory::MemoryInfo, ortsys, tensor::IntoTensorElementType};
 
 pub trait TensorValueTypeMarker: ValueTypeMarker {
@@ -178,11 +179,9 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// ```
 	#[inline]
 	pub fn upcast_ref(&self) -> DynTensorRef {
-		DynTensorRef::new(unsafe {
-			Value::from_ptr_nodrop(
-				NonNull::new_unchecked(self.ptr()),
-				if let ValueInner::CppOwned { _session, .. } = &*self.inner { _session.clone() } else { None }
-			)
+		DynTensorRef::new(Value {
+			inner: Arc::clone(&self.inner),
+			_markers: PhantomData
 		})
 	}
 
@@ -204,11 +203,9 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// ```
 	#[inline]
 	pub fn upcast_mut(&mut self) -> DynTensorRefMut {
-		DynTensorRefMut::new(unsafe {
-			Value::from_ptr_nodrop(
-				NonNull::new_unchecked(self.ptr()),
-				if let ValueInner::CppOwned { _session, .. } = &*self.inner { _session.clone() } else { None }
-			)
+		DynTensorRefMut::new(Value {
+			inner: Arc::clone(&self.inner),
+			_markers: PhantomData
 		})
 	}
 }

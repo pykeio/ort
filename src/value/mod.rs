@@ -2,6 +2,7 @@ use std::{
 	any::Any,
 	fmt::{self, Debug},
 	marker::PhantomData,
+	mem::ManuallyDrop,
 	ops::{Deref, DerefMut},
 	ptr::NonNull,
 	sync::Arc
@@ -239,13 +240,16 @@ impl ValueInner {
 /// A temporary version of a [`Value`] with a lifetime specifier.
 #[derive(Debug)]
 pub struct ValueRef<'v, Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
-	inner: Value<Type>,
+	inner: ManuallyDrop<Value<Type>>,
 	lifetime: PhantomData<&'v ()>
 }
 
 impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 	pub(crate) fn new(inner: Value<Type>) -> Self {
-		ValueRef { inner, lifetime: PhantomData }
+		ValueRef {
+			inner: ManuallyDrop::new(inner),
+			lifetime: PhantomData
+		}
 	}
 
 	/// Attempts to downcast a temporary dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed
@@ -276,13 +280,16 @@ impl<'v, Type: ValueTypeMarker + ?Sized> Deref for ValueRef<'v, Type> {
 /// A mutable temporary version of a [`Value`] with a lifetime specifier.
 #[derive(Debug)]
 pub struct ValueRefMut<'v, Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
-	inner: Value<Type>,
+	inner: ManuallyDrop<Value<Type>>,
 	lifetime: PhantomData<&'v ()>
 }
 
 impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 	pub(crate) fn new(inner: Value<Type>) -> Self {
-		ValueRefMut { inner, lifetime: PhantomData }
+		ValueRefMut {
+			inner: ManuallyDrop::new(inner),
+			lifetime: PhantomData
+		}
 	}
 
 	/// Attempts to downcast a temporary mutable dynamic value (like [`DynValue`] or [`DynTensor`]) to a more
@@ -462,21 +469,17 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 
 	/// Create a view of this value's data.
 	pub fn view(&self) -> ValueRef<'_, Type> {
-		ValueRef::new(unsafe {
-			Value::from_ptr_nodrop(
-				NonNull::new_unchecked(self.ptr()),
-				if let ValueInner::CppOwned { _session, .. } = &*self.inner { _session.clone() } else { None }
-			)
+		ValueRef::new(Value {
+			inner: Arc::clone(&self.inner),
+			_markers: PhantomData
 		})
 	}
 
 	/// Create a mutable view of this value's data.
 	pub fn view_mut(&mut self) -> ValueRefMut<'_, Type> {
-		ValueRefMut::new(unsafe {
-			Value::from_ptr_nodrop(
-				NonNull::new_unchecked(self.ptr()),
-				if let ValueInner::CppOwned { _session, .. } = &*self.inner { _session.clone() } else { None }
-			)
+		ValueRefMut::new(Value {
+			inner: Arc::clone(&self.inner),
+			_markers: PhantomData
 		})
 	}
 
@@ -522,11 +525,9 @@ impl Value<DynValueTypeMarker> {
 	pub fn downcast_ref<OtherType: ValueTypeMarker + DowncastableTarget + ?Sized>(&self) -> Result<ValueRef<'_, OtherType>> {
 		let dt = self.dtype();
 		if OtherType::can_downcast(&dt) {
-			Ok(ValueRef::new(unsafe {
-				Value::from_ptr_nodrop(
-					NonNull::new_unchecked(self.ptr()),
-					if let ValueInner::CppOwned { _session, .. } = &*self.inner { _session.clone() } else { None }
-				)
+			Ok(ValueRef::new(Value {
+				inner: Arc::clone(&self.inner),
+				_markers: PhantomData
 			}))
 		} else {
 			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &{dt} to &{}", OtherType::format())))
@@ -539,11 +540,9 @@ impl Value<DynValueTypeMarker> {
 	pub fn downcast_mut<OtherType: ValueTypeMarker + DowncastableTarget + ?Sized>(&mut self) -> Result<ValueRefMut<'_, OtherType>> {
 		let dt = self.dtype();
 		if OtherType::can_downcast(&dt) {
-			Ok(ValueRefMut::new(unsafe {
-				Value::from_ptr_nodrop(
-					NonNull::new_unchecked(self.ptr()),
-					if let ValueInner::CppOwned { _session, .. } = &*self.inner { _session.clone() } else { None }
-				)
+			Ok(ValueRefMut::new(Value {
+				inner: Arc::clone(&self.inner),
+				_markers: PhantomData
 			}))
 		} else {
 			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &mut {dt} to &mut {}", OtherType::format())))

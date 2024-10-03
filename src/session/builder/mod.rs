@@ -96,4 +96,10 @@ impl SessionBuilder {
 		ortsys![unsafe AddSessionConfigEntry(self.session_options_ptr.as_ptr(), key.as_ptr(), value.as_ptr())?];
 		Ok(())
 	}
+
+	/// Adds a custom configuration entry to the session.
+	pub fn with_config_entry(mut self, key: impl AsRef<str>, value: impl AsRef<str>) -> Result<Self> {
+		self.add_config_entry(key.as_ref(), value.as_ref())?;
+		Ok(self)
+	}
 }

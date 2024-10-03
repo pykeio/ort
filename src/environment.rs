@@ -37,6 +37,9 @@ pub struct Environment {
 	pub(crate) has_global_threadpool: bool
 }
 
+unsafe impl Send for Environment {}
+unsafe impl Sync for Environment {}
+
 impl Environment {
 	/// Returns the underlying [`ort_sys::OrtEnv`] pointer.
 	pub fn ptr(&self) -> *mut ort_sys::OrtEnv {

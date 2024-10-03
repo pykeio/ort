@@ -47,7 +47,7 @@ pub use self::rknpu::RKNPUExecutionProvider;
 /// optimize the execution by taking advantage of the compute capabilities of the platform.
 ///
 /// ![](https://www.onnxruntime.ai/images/ONNX_Runtime_EP1.png)
-pub trait ExecutionProvider {
+pub trait ExecutionProvider: Send + Sync {
 	/// Returns the identifier of this execution provider used internally by ONNX Runtime.
 	///
 	/// This is the same as what's used in ONNX Runtime's Python API to register this execution provider, i.e.
@@ -144,7 +144,7 @@ pub struct ExecutionProviderDispatch {
 impl ExecutionProviderDispatch {
 	pub(crate) fn new<E: ExecutionProvider + 'static>(ep: E) -> Self {
 		ExecutionProviderDispatch {
-			inner: Arc::new(ep) as Arc<dyn ExecutionProvider>,
+			inner: Arc::new(ep) as _,
 			error_on_failure: false
 		}
 	}

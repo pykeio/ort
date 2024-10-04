@@ -1,0 +1,22 @@
+[package]
+publish = false
+name = "phi-3-vision"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.89"
+image = "0.25"
+ndarray = "0.16"
+ort = { path = "../../", features = ["fetch-models"] }
+tokio = { version = "1.40.0", features = ["full"] }
+tokenizers = "0.20"
+tracing-subscriber = { version = "0.3", default-features = false, features = [
+    "env-filter",
+    "fmt",
+] }
+tracing = "0.1"
+
+[features]
+load-dynamic = ["ort/load-dynamic"]
+cuda = ["ort/cuda"]

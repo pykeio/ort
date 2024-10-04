@@ -6,6 +6,7 @@ members = [
 	'examples/gpt2',
 	'examples/model-info',
 	'examples/yolov8',
+	'examples/phi-3-vision',
 	'examples/modnet',
 	'examples/sentence-transformers',
 	'examples/training'

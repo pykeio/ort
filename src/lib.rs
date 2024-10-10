@@ -273,12 +273,11 @@ macro_rules! ortsys {
 pub(crate) use ortsys;
 
 pub(crate) fn char_p_to_string(raw: *const c_char) -> Result<String> {
-	let c_string = unsafe { CStr::from_ptr(raw.cast_mut()).to_owned() };
-	match c_string.into_string() {
-		Ok(string) => Ok(string),
-		Err(e) => Err(Error::wrap(e))
+	if raw.is_null() {
+		return Ok(String::new());
 	}
-	.map_err(Error::wrap)
+	let c_string = unsafe { CStr::from_ptr(raw.cast_mut()).to_owned() };
+	Ok(c_string.to_string_lossy().to_string())
 }
 
 pub(crate) struct PrivateTraitMarker;

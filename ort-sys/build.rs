@@ -9,6 +9,7 @@ const ONNXRUNTIME_VERSION: &str = "1.19.2";
 
 const ORT_ENV_SYSTEM_LIB_LOCATION: &str = "ORT_LIB_LOCATION";
 const ORT_ENV_SYSTEM_LIB_PROFILE: &str = "ORT_LIB_PROFILE";
+const ORT_ENV_PREFER_DYNAMIC_LINK: &str = "ORT_PREFER_DYNAMIC_LINK";
 #[cfg(feature = "download-binaries")]
 const ORT_EXTRACT_DIR: &str = "onnxruntime";
 
@@ -148,6 +149,18 @@ fn static_link_prerequisites(using_pyke_libs: bool) {
 	}
 }
 
+fn prefer_dynamic_linking() -> bool {
+	// If the cuda or tensorrt features are enabled, we need to use dynamic linking.
+	if cfg!(feature = "cuda") || cfg!(feature = "tensorrt") {
+		return true;
+	}
+
+	match env::var(ORT_ENV_PREFER_DYNAMIC_LINK) {
+		Ok(val) => val == "1" || val.to_lowercase() == "true",
+		Err(_) => false,
+	}
+}
+
 fn prepare_libort_dir() -> (PathBuf, bool) {
 	if let Ok(lib_dir) = env::var(ORT_ENV_SYSTEM_LIB_LOCATION) {
 		let lib_dir = PathBuf::from(lib_dir);
@@ -174,7 +187,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 		if lib_dir.join(platform_format_lib("onnxruntime")).exists() {
 			println!("cargo:rustc-link-lib=static=onnxruntime");
 			needs_link = false;
-		} else {
+		} else if !prefer_dynamic_linking() {
 			#[allow(clippy::type_complexity)]
 			let static_configs: Vec<(PathBuf, PathBuf, PathBuf, Box<dyn Fn(PathBuf, &String) -> PathBuf>)> = vec![
 				(lib_dir.join(&profile), lib_dir.join("lib"), lib_dir.join("_deps"), Box::new(|p: PathBuf, profile| p.join(profile))),
@@ -415,6 +428,7 @@ fn try_setup_with_pkg_config() -> bool {
 fn real_main(link: bool) {
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_SYSTEM_LIB_LOCATION);
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_SYSTEM_LIB_PROFILE);
+	println!("cargo:rerun-if-env-changed={}", ORT_ENV_PREFER_DYNAMIC_LINK);
 
 	let (install_dir, needs_link) = prepare_libort_dir();
 
@@ -426,7 +440,7 @@ fn real_main(link: bool) {
 			let static_lib_file_name = if target_os.contains("windows") { "onnxruntime.lib" } else { "libonnxruntime.a" };
 
 			let static_lib_path = lib_dir.join(static_lib_file_name);
-			if static_lib_path.exists() {
+			if !prefer_dynamic_linking() && static_lib_path.exists() {
 				println!("cargo:rustc-link-lib=static=onnxruntime");
 			} else {
 				println!("cargo:rustc-link-lib=onnxruntime");

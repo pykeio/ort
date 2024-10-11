@@ -239,6 +239,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 
 					add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("debugging"), &profile));
 					println!("cargo:rustc-link-lib=static=absl_examine_stack");
+					println!("cargo:rustc-link-lib=static=absl_debugging_internal");
 					println!("cargo:rustc-link-lib=static=absl_demangle_internal");
 					println!("cargo:rustc-link-lib=static=absl_demangle_rust");
 					println!("cargo:rustc-link-lib=static=absl_decode_rust_punycode");

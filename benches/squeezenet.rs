@@ -1,8 +1,8 @@
 use std::{path::Path, sync::Arc};
 
-use glassbench::{pretend_used, Bench};
-use image::{imageops::FilterType, ImageBuffer, Pixel, Rgb};
-use ndarray::{s, Array4};
+use glassbench::{Bench, pretend_used};
+use image::{ImageBuffer, Pixel, Rgb, imageops::FilterType};
+use ndarray::{Array4, s};
 use ort::{GraphOptimizationLevel, Session};
 
 fn load_squeezenet_data() -> ort::Result<(Session, Array4<f32>)> {

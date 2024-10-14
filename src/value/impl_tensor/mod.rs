@@ -283,13 +283,10 @@ mod tests {
 		let value = Tensor::from_array(Array1::from_vec(v.clone()))?;
 		assert!(value.is_tensor()?);
 		assert_eq!(value.dtype().tensor_type(), Some(TensorElementType::Float32));
-		assert_eq!(
-			value.dtype(),
-			ValueType::Tensor {
-				ty: TensorElementType::Float32,
-				dimensions: vec![v.len() as i64]
-			}
-		);
+		assert_eq!(value.dtype(), ValueType::Tensor {
+			ty: TensorElementType::Float32,
+			dimensions: vec![v.len() as i64]
+		});
 
 		let (shape, data) = value.extract_raw_tensor();
 		assert_eq!(shape, vec![v.len() as i64]);

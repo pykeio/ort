@@ -6,11 +6,10 @@ use std::{
 
 use ort_sys::c_char;
 
-use super::{trainsys, Checkpoint, Optimizer};
+use super::{Checkpoint, Optimizer, trainsys};
 use crate::{
-	char_p_to_string,
-	error::{assert_non_null_pointer, status_to_result},
-	Allocator, Result, RunOptions, SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs, Value
+	Allocator, Result, RunOptions, SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs, Value, char_p_to_string,
+	error::{assert_non_null_pointer, status_to_result}
 };
 
 #[derive(Debug)]

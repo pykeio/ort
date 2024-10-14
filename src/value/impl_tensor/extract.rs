@@ -3,7 +3,7 @@ use std::{fmt::Debug, ptr, string::FromUtf8Error};
 #[cfg(feature = "ndarray")]
 use ndarray::IxDyn;
 
-use super::{calculate_tensor_size, Tensor, TensorValueTypeMarker};
+use super::{Tensor, TensorValueTypeMarker, calculate_tensor_size};
 #[cfg(feature = "ndarray")]
 use crate::tensor::{extract_primitive_array, extract_primitive_array_mut};
 use crate::{

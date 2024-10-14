@@ -157,7 +157,7 @@ fn prefer_dynamic_linking() -> bool {
 
 	match env::var(ORT_ENV_PREFER_DYNAMIC_LINK) {
 		Ok(val) => val == "1" || val.to_lowercase() == "true",
-		Err(_) => false,
+		Err(_) => false
 	}
 }
 

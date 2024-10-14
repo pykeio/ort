@@ -41,33 +41,35 @@ pub use ort_sys as sys;
 
 #[cfg(feature = "load-dynamic")]
 pub use self::environment::init_from;
-pub use self::environment::{get_environment, init, Environment, EnvironmentBuilder, EnvironmentGlobalThreadPoolOptions};
-pub use self::error::{Error, ErrorCode, Result};
-pub use self::execution_providers::*;
-pub use self::io_binding::IoBinding;
-pub use self::memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType};
-pub use self::metadata::ModelMetadata;
-pub use self::operator::{
-	io::{OperatorInput, OperatorOutput},
-	kernel::{Kernel, KernelAttributes, KernelContext},
-	InferShapeFn, Operator, OperatorDomain
-};
-pub use self::session::{
-	GraphOptimizationLevel, HasSelectedOutputs, InMemorySession, InferenceFut, Input, NoSelectedOutputs, Output, OutputSelector, OverridableInitializer,
-	RunOptions, SelectedOutputMarker, Session, SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs, SharedSessionInner
-};
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 pub use self::tensor::ArrayExtensions;
-pub use self::tensor::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType, Utf8Data};
 #[cfg(feature = "training")]
 #[cfg_attr(docsrs, doc(cfg(feature = "training")))]
 pub use self::training::*;
-pub use self::value::{
-	DowncastableTarget, DynMap, DynMapRef, DynMapRefMut, DynMapValueType, DynSequence, DynSequenceRef, DynSequenceRefMut, DynSequenceValueType, DynTensor,
-	DynTensorRef, DynTensorRefMut, DynTensorValueType, DynValue, DynValueTypeMarker, Map, MapRef, MapRefMut, MapValueType, MapValueTypeMarker, Sequence,
-	SequenceRef, SequenceRefMut, SequenceValueType, SequenceValueTypeMarker, Tensor, TensorRef, TensorRefMut, TensorValueType, TensorValueTypeMarker, Value,
-	ValueRef, ValueRefMut, ValueType, ValueTypeMarker
+pub use self::{
+	environment::{Environment, EnvironmentBuilder, EnvironmentGlobalThreadPoolOptions, get_environment, init},
+	error::{Error, ErrorCode, Result},
+	execution_providers::*,
+	io_binding::IoBinding,
+	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
+	metadata::ModelMetadata,
+	operator::{
+		InferShapeFn, Operator, OperatorDomain,
+		io::{OperatorInput, OperatorOutput},
+		kernel::{Kernel, KernelAttributes, KernelContext}
+	},
+	session::{
+		GraphOptimizationLevel, HasSelectedOutputs, InMemorySession, InferenceFut, Input, NoSelectedOutputs, Output, OutputSelector, OverridableInitializer,
+		RunOptions, SelectedOutputMarker, Session, SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs, SharedSessionInner
+	},
+	tensor::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType, Utf8Data},
+	value::{
+		DowncastableTarget, DynMap, DynMapRef, DynMapRefMut, DynMapValueType, DynSequence, DynSequenceRef, DynSequenceRefMut, DynSequenceValueType, DynTensor,
+		DynTensorRef, DynTensorRefMut, DynTensorValueType, DynValue, DynValueTypeMarker, Map, MapRef, MapRefMut, MapValueType, MapValueTypeMarker, Sequence,
+		SequenceRef, SequenceRefMut, SequenceValueType, SequenceValueTypeMarker, Tensor, TensorRef, TensorRefMut, TensorValueType, TensorValueTypeMarker,
+		Value, ValueRef, ValueRefMut, ValueType, ValueTypeMarker
+	}
 };
 
 #[cfg(not(all(target_arch = "x86", target_os = "windows")))]

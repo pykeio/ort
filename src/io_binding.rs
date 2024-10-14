@@ -8,12 +8,12 @@ use std::{
 };
 
 use crate::{
+	SharedSessionInner,
 	error::Result,
 	memory::MemoryInfo,
 	ortsys,
-	session::{output::SessionOutputs, NoSelectedOutputs, RunOptions, Session},
-	value::{DynValue, Value, ValueInner, ValueTypeMarker},
-	SharedSessionInner
+	session::{NoSelectedOutputs, RunOptions, Session, output::SessionOutputs},
+	value::{DynValue, Value, ValueInner, ValueTypeMarker}
 };
 
 /// Enables binding of session inputs and/or outputs to pre-allocated memory.

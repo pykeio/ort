@@ -3,7 +3,7 @@ use std::{collections::VecDeque, fs};
 use crate::{error::Result, session::input::SessionInputs, training::Trainer};
 
 mod dataloader;
-pub use self::dataloader::{iterable_data_loader, DataLoader, IterableDataLoader};
+pub use self::dataloader::{DataLoader, IterableDataLoader, iterable_data_loader};
 mod args;
 pub use self::args::{CheckpointStrategy, EvaluationStrategy, TrainingArguments};
 mod callbacks;

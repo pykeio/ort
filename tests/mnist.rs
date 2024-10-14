@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use image::{imageops::FilterType, ImageBuffer, Luma, Pixel};
-use ort::{inputs, ArrayExtensions, GraphOptimizationLevel, Session};
+use image::{ImageBuffer, Luma, Pixel, imageops::FilterType};
+use ort::{ArrayExtensions, GraphOptimizationLevel, Session, inputs};
 use test_log::test;
 
 #[test]

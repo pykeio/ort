@@ -1,11 +1,11 @@
 use std::{
-	ffi::{c_char, c_void, CString},
+	ffi::{CString, c_char, c_void},
 	ops::{Deref, DerefMut},
 	ptr::{self, NonNull}
 };
 
 use crate::{
-	error::{status_to_result, Error, Result},
+	error::{Error, Result, status_to_result},
 	memory::{Allocator, MemoryInfo},
 	ortsys,
 	session::{Input, Output},

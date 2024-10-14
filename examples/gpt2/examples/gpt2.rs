@@ -3,8 +3,8 @@ use std::{
 	path::Path
 };
 
-use ndarray::{array, concatenate, s, Array1, ArrayViewD, Axis};
-use ort::{inputs, CUDAExecutionProvider, GraphOptimizationLevel, Session};
+use ndarray::{Array1, ArrayViewD, Axis, array, concatenate, s};
+use ort::{CUDAExecutionProvider, GraphOptimizationLevel, Session, inputs};
 use rand::Rng;
 use tokenizers::Tokenizer;
 

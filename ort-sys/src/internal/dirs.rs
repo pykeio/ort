@@ -29,7 +29,7 @@ macro_rules! win32_extern {
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 mod windows {
 	use std::{
-		ffi::{c_void, OsString},
+		ffi::{OsString, c_void},
 		os::windows::prelude::OsStringExt,
 		path::PathBuf,
 		ptr, slice
@@ -102,7 +102,7 @@ pub fn cache_dir() -> Option<std::path::PathBuf> {
 mod unix {
 	use std::{
 		env,
-		ffi::{c_char, c_int, c_long, CStr, OsString},
+		ffi::{CStr, OsString, c_char, c_int, c_long},
 		mem,
 		os::unix::prelude::OsStringExt,
 		path::PathBuf,

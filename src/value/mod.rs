@@ -36,24 +36,18 @@ use crate::{
 /// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// // `ValueType`s can be obtained from session inputs/outputs:
 /// let input = &session.inputs[0];
-/// assert_eq!(
-/// 	input.input_type,
-/// 	ValueType::Tensor {
-/// 		ty: TensorElementType::Float32,
-/// 		// Our model has 3 dynamic dimensions, represented by -1
-/// 		dimensions: vec![-1, -1, -1, 3]
-/// 	}
-/// );
+/// assert_eq!(input.input_type, ValueType::Tensor {
+/// 	ty: TensorElementType::Float32,
+/// 	// Our model has 3 dynamic dimensions, represented by -1
+/// 	dimensions: vec![-1, -1, -1, 3]
+/// });
 ///
 /// // Or by `Value`s created in Rust or output by a session.
 /// let value = Tensor::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
-/// assert_eq!(
-/// 	value.dtype(),
-/// 	ValueType::Tensor {
-/// 		ty: TensorElementType::Int64,
-/// 		dimensions: vec![5]
-/// 	}
-/// );
+/// assert_eq!(value.dtype(), ValueType::Tensor {
+/// 	ty: TensorElementType::Int64,
+/// 	dimensions: vec![5]
+/// });
 /// # 	Ok(())
 /// # }
 /// ```
@@ -581,13 +575,10 @@ impl Value<DynValueTypeMarker> {
 impl Drop for ValueInner {
 	fn drop(&mut self) {
 		let ptr = self.ptr();
-		tracing::trace!(
-			"dropping {} value at {ptr:p}",
-			match self {
-				ValueInner::RustOwned { .. } => "rust-owned",
-				ValueInner::CppOwned { .. } => "cpp-owned"
-			}
-		);
+		tracing::trace!("dropping {} value at {ptr:p}", match self {
+			ValueInner::RustOwned { .. } => "rust-owned",
+			ValueInner::CppOwned { .. } => "cpp-owned"
+		});
 		if !matches!(self, ValueInner::CppOwned { drop: false, .. }) {
 			ortsys![unsafe ReleaseValue(ptr)];
 		}

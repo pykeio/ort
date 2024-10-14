@@ -9,7 +9,7 @@
 //! to be used with the Phi-3 vision model, adapting the original Python code to Rust.
 use anyhow::Result;
 use image::{DynamicImage, GenericImageView, ImageBuffer};
-use ndarray::{s, Array2, Array4, Array5, Axis};
+use ndarray::{Array2, Array4, Array5, Axis, s};
 
 /// see https://huggingface.co/microsoft/Phi-3-vision-128k-instruct-onnx-cpu/blob/main/cpu-int4-rtn-block-32-acc-level-4/processor_config.json
 /// NOTE: The default setting in processor_config.json is num_crops = 16,
@@ -24,7 +24,7 @@ pub struct Phi3VImageProcessor {
 	num_crops: usize,
 	image_mean: Vec<f32>,
 	image_std: Vec<f32>,
-	do_convert_rgb: bool,
+	do_convert_rgb: bool
 }
 
 impl Phi3VImageProcessor {
@@ -33,7 +33,7 @@ impl Phi3VImageProcessor {
 			num_crops: NUM_CROPS,
 			image_mean: OPENAI_CLIP_MEAN.to_vec(),
 			image_std: OPENAI_CLIP_STD.to_vec(),
-			do_convert_rgb: true,
+			do_convert_rgb: true
 		}
 	}
 
@@ -72,7 +72,7 @@ impl Phi3VImageProcessor {
 		Ok(BatchFeature {
 			pixel_values,
 			image_sizes,
-			num_img_tokens: vec![num_img_tokens as i64],
+			num_img_tokens: vec![num_img_tokens as i64]
 		})
 	}
 
@@ -99,11 +99,7 @@ impl Phi3VImageProcessor {
 		let resized = image.resize_exact(new_width, new_height, image::imageops::FilterType::Lanczos3);
 		let padded = self.padding_336(&resized);
 
-		if transposed {
-			padded.rotate90()
-		} else {
-			padded
-		}
+		if transposed { padded.rotate90() } else { padded }
 	}
 
 	fn padding_336(&self, image: &DynamicImage) -> DynamicImage {
@@ -188,5 +184,5 @@ impl Phi3VImageProcessor {
 pub struct BatchFeature {
 	pub pixel_values: Array5<f32>,
 	pub image_sizes: Array2<i64>,
-	pub num_img_tokens: Vec<i64>,
+	pub num_img_tokens: Vec<i64>
 }

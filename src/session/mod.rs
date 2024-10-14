@@ -13,7 +13,7 @@ use std::{
 use crate::{
 	char_p_to_string,
 	environment::Environment,
-	error::{assert_non_null_pointer, status_to_result, Error, ErrorCode, Result},
+	error::{Error, ErrorCode, Result, assert_non_null_pointer, status_to_result},
 	extern_system_fn,
 	io_binding::IoBinding,
 	memory::Allocator,

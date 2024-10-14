@@ -5,9 +5,9 @@ use std::{
 	time::Duration
 };
 
-use image::{imageops::FilterType, ImageBuffer, Pixel, Rgb};
+use image::{ImageBuffer, Pixel, Rgb, imageops::FilterType};
 use ndarray::s;
-use ort::{inputs, ArrayExtensions, Error, GraphOptimizationLevel, Session};
+use ort::{ArrayExtensions, Error, GraphOptimizationLevel, Session, inputs};
 use test_log::test;
 
 #[test]

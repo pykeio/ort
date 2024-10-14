@@ -76,13 +76,10 @@ impl ExecutionProvider for TVMExecutionProvider {
 				option_string.push(format!("check_hash:{}", if check_hash { "True" } else { "False" }));
 			}
 			if let Some(executor) = self.executor {
-				option_string.push(format!(
-					"executor:{}",
-					match executor {
-						TVMExecutorType::GraphExecutor => "graph",
-						TVMExecutorType::VirtualMachine => "vm"
-					}
-				));
+				option_string.push(format!("executor:{}", match executor {
+					TVMExecutorType::GraphExecutor => "graph",
+					TVMExecutorType::VirtualMachine => "vm"
+				}));
 			}
 			if let Some(freeze_weights) = self.freeze_weights {
 				option_string.push(format!("freeze_weights:{}", if freeze_weights { "True" } else { "False" }));

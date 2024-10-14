@@ -5,7 +5,7 @@ use std::{
 };
 
 use ort_sys::c_char;
-use tracing::{debug, Level};
+use tracing::{Level, debug};
 
 #[cfg(feature = "load-dynamic")]
 use crate::G_ORT_DYLIB_PATH;

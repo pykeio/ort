@@ -1,17 +1,17 @@
 use std::{path::Path, sync::Arc};
 
 use axum::{
+	Router,
 	extract::{FromRef, State},
 	response::{
-		sse::{Event, KeepAlive},
-		Sse
+		Sse,
+		sse::{Event, KeepAlive}
 	},
-	routing::post,
-	Router
+	routing::post
 };
 use futures::Stream;
-use ndarray::{array, concatenate, s, Array1, ArrayViewD, Axis};
-use ort::{inputs, CUDAExecutionProvider, GraphOptimizationLevel, Session};
+use ndarray::{Array1, ArrayViewD, Axis, array, concatenate, s};
+use ort::{CUDAExecutionProvider, GraphOptimizationLevel, Session, inputs};
 use rand::Rng;
 use tokenizers::Tokenizer;
 use tokio::net::TcpListener;

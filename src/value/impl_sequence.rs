@@ -7,9 +7,10 @@ use std::{
 
 use super::{DowncastableTarget, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker};
 use crate::{
+	ErrorCode,
 	error::{Error, Result},
 	memory::Allocator,
-	ortsys, ErrorCode
+	ortsys
 };
 
 pub trait SequenceValueTypeMarker: ValueTypeMarker {

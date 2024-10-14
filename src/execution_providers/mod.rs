@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-use std::ffi::CString;
-use std::{fmt::Debug, os::raw::c_char, sync::Arc};
+use std::{collections::HashMap, ffi::CString, fmt::Debug, os::raw::c_char, sync::Arc};
 
 use crate::{char_p_to_string, error::Result, ortsys, session::SessionBuilder};
 

@@ -4,15 +4,15 @@ use std::{
 	sync::OnceLock
 };
 
-use crate::{ortsys, Error, Result, RunOptions};
+use crate::{Error, Result, RunOptions, ortsys};
 
 mod simple;
 mod trainer;
 
 pub use self::{
 	simple::{
-		iterable_data_loader, CheckpointStrategy, DataLoader, EvaluationStrategy, IterableDataLoader, TrainerCallbacks, TrainerControl, TrainerState,
-		TrainingArguments
+		CheckpointStrategy, DataLoader, EvaluationStrategy, IterableDataLoader, TrainerCallbacks, TrainerControl, TrainerState, TrainingArguments,
+		iterable_data_loader
 	},
 	trainer::Trainer
 };

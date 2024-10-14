@@ -2,7 +2,7 @@ use std::path::Path;
 
 use image::RgbImage;
 use ndarray::{Array, ArrayViewD, CowArray, Ix4};
-use ort::{inputs, GraphOptimizationLevel, Session};
+use ort::{GraphOptimizationLevel, Session, inputs};
 use test_log::test;
 
 fn load_input_image<P: AsRef<Path>>(name: P) -> RgbImage {

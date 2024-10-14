@@ -1,4 +1,4 @@
-use ndarray::{arr2, Array2};
+use ndarray::{Array2, arr2};
 
 use crate::{Kernel, KernelAttributes, KernelContext, Operator, OperatorDomain, OperatorInput, OperatorOutput, Result, Session, TensorElementType};
 

@@ -2,11 +2,11 @@
 
 use std::path::Path;
 
-use image::{imageops::FilterType, GenericImageView};
-use ndarray::{s, Array, Axis};
-use ort::{inputs, CUDAExecutionProvider, Session, SessionOutputs};
+use image::{GenericImageView, imageops::FilterType};
+use ndarray::{Array, Axis, s};
+use ort::{CUDAExecutionProvider, Session, SessionOutputs, inputs};
 use raqote::{DrawOptions, DrawTarget, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle};
-use show_image::{event, AsImageView, WindowOptions};
+use show_image::{AsImageView, WindowOptions, event};
 
 #[derive(Debug, Clone, Copy)]
 struct BoundingBox {
@@ -137,13 +137,10 @@ fn main() -> ort::Result<()> {
 	let window = show_image::context()
 		.run_function_wait(move |context| -> Result<_, String> {
 			let mut window = context
-				.create_window(
-					"ort + YOLOv8",
-					WindowOptions {
-						size: Some([img_width, img_height]),
-						..WindowOptions::default()
-					}
-				)
+				.create_window("ort + YOLOv8", WindowOptions {
+					size: Some([img_width, img_height]),
+					..WindowOptions::default()
+				})
 				.map_err(|e| e.to_string())?;
 			window.set_image("baseball", &original_img.as_image_view().map_err(|e| e.to_string())?);
 			window.set_overlay("yolo", &overlay.as_image_view().map_err(|e| e.to_string())?, true);

@@ -1,5 +1,5 @@
 edition = "2021"
-version = "Two"
+style_edition = "2024"
 unstable_features = true
 
 max_width = 160
@@ -24,6 +24,7 @@ single_line_if_else_max_width = 96
 
 reorder_imports = true
 group_imports = "StdExternalCrate"
+imports_granularity = "Crate"
 reorder_modules = true
 trailing_comma = "Never"
 match_block_trailing_comma = false

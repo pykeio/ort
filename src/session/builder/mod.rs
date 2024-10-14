@@ -7,10 +7,11 @@ use std::{
 };
 
 use crate::{
-	error::{assert_non_null_pointer, status_to_result, Result},
+	DynValue,
+	error::{Result, assert_non_null_pointer, status_to_result},
 	memory::MemoryInfo,
 	operator::OperatorDomain,
-	ortsys, DynValue
+	ortsys
 };
 
 mod impl_commit;

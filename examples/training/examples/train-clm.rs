@@ -5,7 +5,7 @@ use std::{
 };
 
 use kdam::BarExt;
-use ndarray::{concatenate, s, Array1, Array2, ArrayViewD, Axis};
+use ndarray::{Array1, Array2, ArrayViewD, Axis, concatenate, s};
 use ort::{Allocator, CUDAExecutionProvider, Checkpoint, Session, SessionBuilder, Trainer};
 use rand::RngCore;
 use tokenizers::Tokenizer;

@@ -10,9 +10,9 @@ use std::{
 #[cfg(feature = "ndarray")]
 use ndarray::{ArcArray, Array, ArrayView, CowArray, Dimension};
 
-use super::{calculate_tensor_size, DynTensor, Tensor, TensorRefMut};
+use super::{DynTensor, Tensor, TensorRefMut, calculate_tensor_size};
 use crate::{
-	error::{assert_non_null_pointer, Error, ErrorCode, Result},
+	error::{Error, ErrorCode, Result, assert_non_null_pointer},
 	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
 	ortsys,
 	tensor::{PrimitiveTensorElementType, TensorElementType, Utf8Data},

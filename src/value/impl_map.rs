@@ -8,15 +8,15 @@ use std::{
 };
 
 use super::{
-	impl_tensor::{calculate_tensor_size, DynTensor, Tensor},
-	DowncastableTarget, DynValue, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker
+	DowncastableTarget, DynValue, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker,
+	impl_tensor::{DynTensor, Tensor, calculate_tensor_size}
 };
 use crate::{
+	ErrorCode,
 	error::{Error, Result},
 	memory::Allocator,
 	ortsys,
-	tensor::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType},
-	ErrorCode
+	tensor::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType}
 };
 
 pub trait MapValueTypeMarker: ValueTypeMarker {

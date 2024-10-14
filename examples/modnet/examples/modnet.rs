@@ -2,10 +2,10 @@
 
 use std::{ops::Mul, path::Path};
 
-use image::{imageops::FilterType, GenericImageView, ImageBuffer, Rgba};
+use image::{GenericImageView, ImageBuffer, Rgba, imageops::FilterType};
 use ndarray::Array;
-use ort::{inputs, CUDAExecutionProvider, Session};
-use show_image::{event, AsImageView, WindowOptions};
+use ort::{CUDAExecutionProvider, Session, inputs};
+use show_image::{AsImageView, WindowOptions, event};
 
 #[show_image::main]
 fn main() -> ort::Result<()> {
@@ -57,13 +57,10 @@ fn main() -> ort::Result<()> {
 	let window = show_image::context()
 		.run_function_wait(move |context| -> Result<_, String> {
 			let mut window = context
-				.create_window(
-					"ort + modnet",
-					WindowOptions {
-						size: Some([img_width, img_height]),
-						..WindowOptions::default()
-					}
-				)
+				.create_window("ort + modnet", WindowOptions {
+					size: Some([img_width, img_height]),
+					..WindowOptions::default()
+				})
 				.map_err(|e| e.to_string())?;
 			window.set_image("photo", &output.as_image_view().map_err(|e| e.to_string())?);
 			Ok(window.proxy())

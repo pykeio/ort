@@ -5,9 +5,9 @@ use std::{
 };
 
 use super::{
+	DummyOperator, Operator,
 	io::InputOutputCharacteristic,
-	kernel::{Kernel, KernelAttributes, KernelContext},
-	DummyOperator, Operator
+	kernel::{Kernel, KernelAttributes, KernelContext}
 };
 use crate::{error::IntoStatus, extern_system_fn};
 

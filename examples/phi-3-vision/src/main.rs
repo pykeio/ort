@@ -1,10 +1,10 @@
 mod image_process;
+use std::{path::Path, time::Instant};
+
 use anyhow::Result;
 use image::DynamicImage;
-use ndarray::{s, Array, Array2, Array3, Array4, ArrayView, Ix3, Ix4};
+use ndarray::{Array, Array2, Array3, Array4, ArrayView, Ix3, Ix4, s};
 use ort::{Session, Tensor};
-use std::path::Path;
-use std::time::Instant;
 use tokenizers::Tokenizer;
 
 const VISION_MODEL_NAME: &'static str = "phi-3-v-128k-instruct-vision.onnx";
@@ -59,7 +59,7 @@ fn merge_text_and_image_embeddings(
 	inputs_embeds: &Array3<f32>,
 	attention_mask: &Array2<i64>,
 	visual_features: &Array3<f32>,
-	image_token_position: usize,
+	image_token_position: usize
 ) -> (Array3<f32>, Array2<i64>) {
 	let mut combined_embeds = Array3::zeros((1, inputs_embeds.shape()[1] + visual_features.shape()[1], inputs_embeds.shape()[2]));
 
@@ -96,7 +96,7 @@ fn merge_text_and_image_embeddings(
 fn format_chat_template(img: &Option<DynamicImage>, txt: &str) -> String {
 	match img {
 		Some(_) => format!("<s><|user|>\n<|image_1|>\n{txt}<|end|>\n<|assistant|>\n", txt = txt),
-		None => format!("<s><|user|>\n{txt}<|end|>\n<|assistant|>\n", txt = txt),
+		None => format!("<s><|user|>\n{txt}<|end|>\n<|assistant|>\n", txt = txt)
 	}
 }
 
@@ -106,7 +106,7 @@ pub async fn generate_text(
 	text_embedding_model: &Session,
 	generation_model: &Session,
 	image: &Option<DynamicImage>,
-	text: &str,
+	text: &str
 ) -> Result<()> {
 	let (mut inputs_embeds, mut attention_mask) = {
 		let visual_features = get_image_embedding(&vision_model, &image)?;
@@ -161,9 +161,11 @@ pub async fn generate_text(
 		//
 		// The current implementation uses a simple greedy decoding strategy:
 		// - We select the token with the highest probability (argmax) from the logits.
-		// - This approach always chooses the most likely next token, which can lead to deterministic and potentially repetitive outputs.
+		// - This approach always chooses the most likely next token, which can lead to deterministic and potentially repetitive
+		//   outputs.
 		//
-		// Note: More advanced sampling strategies (e.g., temperature scaling, top-k, top-p sampling) are not implemented in the current version.
+		// Note: More advanced sampling strategies (e.g., temperature scaling, top-k, top-p sampling) are not implemented in the
+		// current version.
 		//
 		// The selected token ID will be in the range [0, VOCAB_SIZE - 1].
 		let logits: ArrayView<f32, _> = model_outputs["logits"].try_extract_tensor::<f32>()?.into_dimensionality::<Ix3>()?;

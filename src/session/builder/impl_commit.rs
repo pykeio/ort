@@ -9,7 +9,7 @@ use crate::{
 	execution_providers::apply_execution_providers,
 	memory::Allocator,
 	ortsys,
-	session::{dangerous, InMemorySession, Input, Output, Session, SharedSessionInner}
+	session::{InMemorySession, Input, Output, Session, SharedSessionInner, dangerous}
 };
 
 impl SessionBuilder {

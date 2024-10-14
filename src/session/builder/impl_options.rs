@@ -2,11 +2,11 @@ use std::{borrow::Cow, path::Path, rc::Rc, sync::Arc};
 
 use super::SessionBuilder;
 use crate::{
+	DynValue, MemoryInfo, OperatorDomain,
 	error::Result,
-	execution_providers::{apply_execution_providers, ExecutionProviderDispatch},
+	execution_providers::{ExecutionProviderDispatch, apply_execution_providers},
 	ortsys,
-	util::path_to_os_char,
-	DynValue, MemoryInfo, OperatorDomain
+	util::path_to_os_char
 };
 
 impl SessionBuilder {

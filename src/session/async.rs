@@ -1,6 +1,6 @@
 use std::{
 	cell::UnsafeCell,
-	ffi::{c_char, CString},
+	ffi::{CString, c_char},
 	future::Future,
 	ops::Deref,
 	pin::Pin,
@@ -9,10 +9,10 @@ use std::{
 	task::{Context, Poll, Waker}
 };
 
-use ort_sys::{c_void, OrtStatus};
+use ort_sys::{OrtStatus, c_void};
 
 use crate::{
-	error::{assert_non_null_pointer, Result},
+	error::{Result, assert_non_null_pointer},
 	session::{RunOptions, SelectedOutputMarker, SessionInputValue, SessionOutputs, SharedSessionInner},
 	value::Value
 };

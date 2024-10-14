@@ -1,12 +1,12 @@
 use std::{
-	ffi::{c_char, c_int, c_void, CString},
+	ffi::{CString, c_char, c_int, c_void},
 	mem,
 	ptr::NonNull,
 	sync::Arc
 };
 
 use crate::{
-	error::{status_to_result, Result},
+	error::{Result, status_to_result},
 	ortsys,
 	session::{Session, SharedSessionInner}
 };

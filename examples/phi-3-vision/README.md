@@ -35,8 +35,8 @@ This example currently only supports single image input.
 The performance of ONNX-based LLM inference can be relatively slow, especially on CPU:
 
 - On an Apple M1 Pro:
-  - For image+text input (about 300 tokens): ~5 seconds per output token
-  - For text-only input (about 10 tokens): ~200ms per output token
+  - For image+text input (about 300 tokens): ~7 tokens/s
+  - For text-only input (about 10 tokens): ~5 tokens/s
 
 ## Run this Example
 

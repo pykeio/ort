@@ -363,7 +363,7 @@ impl ExecutionProvider for TensorRTExecutionProvider {
 				trt_cuda_graph_enable = self.cuda_graph_enable.map(<bool as Into<i32>>::into),
 				trt_dump_ep_context_model = self.dump_ep_context_model.map(<bool as Into<i32>>::into),
 				trt_ep_context_file_path = self.ep_context_file_path.clone(),
-				trt_ep_context_embed_mode = self.cuda_graph_enable,
+				trt_ep_context_embed_mode = self.trt_ep_context_embed_mode,
 				trt_engine_hw_compatible = self.engine_hw_compatible.map(<bool as Into<i32>>::into)
 			};
 			if let Err(e) = crate::error::status_to_result(

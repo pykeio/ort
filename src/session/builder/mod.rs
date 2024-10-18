@@ -103,4 +103,8 @@ impl SessionBuilder {
 		self.add_config_entry(key.as_ref(), value.as_ref())?;
 		Ok(self)
 	}
+
+	pub fn ptr(&self) -> *mut ort_sys::OrtSessionOptions {
+		self.session_options_ptr.as_ptr()
+	}
 }

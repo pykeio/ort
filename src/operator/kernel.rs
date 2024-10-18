@@ -88,6 +88,10 @@ impl KernelAttributes {
 		ortsys![unsafe KernelInfo_GetNodeName(self.0.as_ptr(), name.as_mut_ptr().cast::<c_char>(), &mut name_len)?];
 		CString::from_vec_with_nul(name).map_err(Error::wrap)?.into_string().map_err(Error::wrap)
 	}
+
+	pub fn ptr(&self) -> *mut ort_sys::OrtKernelInfo {
+		self.0.as_ptr()
+	}
 }
 
 pub trait GetKernelAttribute<'s> {
@@ -287,6 +291,10 @@ impl KernelContext {
 		let mut stream_ptr: *mut ort_sys::c_void = ptr::null_mut();
 		ortsys![unsafe KernelContext_GetGPUComputeStream(self.ptr.as_ptr(), &mut stream_ptr)?];
 		Ok(NonNull::new(stream_ptr))
+	}
+
+	pub fn ptr(&self) -> *mut ort_sys::OrtKernelContext {
+		self.ptr.as_ptr()
 	}
 }
 

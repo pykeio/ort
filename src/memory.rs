@@ -155,6 +155,10 @@ impl Allocator {
 			_info: Some(memory_info)
 		})
 	}
+
+	pub fn ptr(&self) -> *mut ort_sys::OrtAllocator {
+		self.ptr.as_ptr()
+	}
 }
 
 impl Default for Allocator {
@@ -445,6 +449,10 @@ impl MemoryInfo {
 	/// it could be extracted to an `ndarray` or slice.
 	pub fn is_cpu_accessible(&self) -> bool {
 		self.allocation_device() == AllocationDevice::CPU || matches!(self.memory_type(), MemoryType::CPUInput | MemoryType::CPUOutput)
+	}
+
+	pub fn ptr(&self) -> *mut ort_sys::OrtMemoryInfo {
+		self.ptr.as_ptr()
 	}
 }
 

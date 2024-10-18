@@ -240,6 +240,10 @@ impl IoBinding {
 			Ok(SessionOutputs::new_empty())
 		}
 	}
+
+	pub fn ptr(&self) -> *mut ort_sys::OrtIoBinding {
+		self.ptr.as_ptr()
+	}
 }
 
 unsafe impl Send for IoBinding {}

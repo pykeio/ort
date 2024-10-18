@@ -107,6 +107,10 @@ impl<'s> ModelMetadata<'s> {
 			Ok(vec![])
 		}
 	}
+
+	pub fn ptr(&self) -> *mut ort_sys::OrtModelMetadata {
+		self.metadata_ptr.as_ptr()
+	}
 }
 
 impl Drop for ModelMetadata<'_> {

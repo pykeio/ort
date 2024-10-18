@@ -223,6 +223,10 @@ impl Trainer {
 	pub fn checkpoint(&self) -> &Checkpoint {
 		&self.ckpt
 	}
+
+	pub fn ptr(&self) -> *mut ort_sys::OrtTrainingSession {
+		self.ptr.as_ptr()
+	}
 }
 
 impl Drop for Trainer {

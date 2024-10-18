@@ -107,6 +107,10 @@ impl Checkpoint {
 		trainsys![unsafe SaveCheckpoint(self.ptr.as_ptr(), path.as_ptr(), include_optimizer_state)?];
 		Ok(())
 	}
+
+	pub fn ptr(&self) -> *mut ort_sys::OrtCheckpointState {
+		self.ptr.as_ptr()
+	}
 }
 
 impl Drop for Checkpoint {

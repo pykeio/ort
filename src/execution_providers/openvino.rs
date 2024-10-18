@@ -1,4 +1,4 @@
-use std::{ffi::CString, os::raw::c_void};
+use std::os::raw::c_void;
 
 use crate::{
 	error::{Error, Result},
@@ -123,6 +123,8 @@ impl ExecutionProvider for OpenVINOExecutionProvider {
 	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "openvino"))]
 		{
+			use std::ffi::CString;
+
 			let device_type = self.device_type.as_deref().map(CString::new).transpose()?;
 			let device_id = self.device_id.as_deref().map(CString::new).transpose()?;
 			let cache_dir = self.cache_dir.as_deref().map(CString::new).transpose()?;

@@ -96,7 +96,7 @@ pub trait GetKernelAttribute<'s> {
 		Self: Sized;
 }
 
-impl<'s> GetKernelAttribute<'s> for f32 {
+impl GetKernelAttribute<'_> for f32 {
 	fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
 	where
 		Self: Sized
@@ -107,7 +107,7 @@ impl<'s> GetKernelAttribute<'s> for f32 {
 	}
 }
 
-impl<'s> GetKernelAttribute<'s> for i64 {
+impl GetKernelAttribute<'_> for i64 {
 	fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
 	where
 		Self: Sized
@@ -118,7 +118,7 @@ impl<'s> GetKernelAttribute<'s> for i64 {
 	}
 }
 
-impl<'s> GetKernelAttribute<'s> for String {
+impl GetKernelAttribute<'_> for String {
 	fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
 	where
 		Self: Sized
@@ -131,7 +131,7 @@ impl<'s> GetKernelAttribute<'s> for String {
 	}
 }
 
-impl<'s> GetKernelAttribute<'s> for Vec<f32> {
+impl GetKernelAttribute<'_> for Vec<f32> {
 	fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
 	where
 		Self: Sized
@@ -144,7 +144,7 @@ impl<'s> GetKernelAttribute<'s> for Vec<f32> {
 	}
 }
 
-impl<'s> GetKernelAttribute<'s> for Vec<i64> {
+impl GetKernelAttribute<'_> for Vec<i64> {
 	fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
 	where
 		Self: Sized

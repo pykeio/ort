@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use ndarray::{Array1, Array2, Axis, Ix2, s};
+use ndarray::{Array2, Axis, Ix2};
 use ort::{CUDAExecutionProvider, Error, GraphOptimizationLevel, Session};
 use tokenizers::Tokenizer;
 

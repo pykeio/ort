@@ -277,7 +277,7 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 	}
 }
 
-impl<'v, Type: ValueTypeMarker + ?Sized> Deref for ValueRef<'v, Type> {
+impl<Type: ValueTypeMarker + ?Sized> Deref for ValueRef<'_, Type> {
 	type Target = Value<Type>;
 
 	fn deref(&self) -> &Self::Target {
@@ -331,7 +331,7 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 	}
 }
 
-impl<'v, Type: ValueTypeMarker + ?Sized> Deref for ValueRefMut<'v, Type> {
+impl<Type: ValueTypeMarker + ?Sized> Deref for ValueRefMut<'_, Type> {
 	type Target = Value<Type>;
 
 	fn deref(&self) -> &Self::Target {
@@ -339,7 +339,7 @@ impl<'v, Type: ValueTypeMarker + ?Sized> Deref for ValueRefMut<'v, Type> {
 	}
 }
 
-impl<'v, Type: ValueTypeMarker + ?Sized> DerefMut for ValueRefMut<'v, Type> {
+impl<Type: ValueTypeMarker + ?Sized> DerefMut for ValueRefMut<'_, Type> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		&mut self.inner
 	}

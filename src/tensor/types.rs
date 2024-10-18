@@ -175,7 +175,7 @@ impl Utf8Data for String {
 	}
 }
 
-impl<'a> Utf8Data for &'a str {
+impl Utf8Data for &str {
 	fn as_utf8_bytes(&self) -> &[u8] {
 		self.as_bytes()
 	}

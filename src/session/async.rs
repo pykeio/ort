@@ -50,15 +50,15 @@ impl<'r, 's> InferenceFutInner<'r, 's> {
 	}
 }
 
-unsafe impl<'r, 's> Send for InferenceFutInner<'r, 's> {}
-unsafe impl<'r, 's> Sync for InferenceFutInner<'r, 's> {}
+unsafe impl Send for InferenceFutInner<'_, '_> {}
+unsafe impl Sync for InferenceFutInner<'_, '_> {}
 
 pub enum RunOptionsRef<'r, O: SelectedOutputMarker> {
 	Arc(Arc<RunOptions<O>>),
 	Ref(&'r RunOptions<O>)
 }
 
-impl<'r, O: SelectedOutputMarker> From<&Arc<RunOptions<O>>> for RunOptionsRef<'r, O> {
+impl<O: SelectedOutputMarker> From<&Arc<RunOptions<O>>> for RunOptionsRef<'_, O> {
 	fn from(value: &Arc<RunOptions<O>>) -> Self {
 		Self::Arc(Arc::clone(value))
 	}
@@ -70,7 +70,7 @@ impl<'r, O: SelectedOutputMarker> From<&'r RunOptions<O>> for RunOptionsRef<'r, 
 	}
 }
 
-impl<'r, O: SelectedOutputMarker> Deref for RunOptionsRef<'r, O> {
+impl<O: SelectedOutputMarker> Deref for RunOptionsRef<'_, O> {
 	type Target = RunOptions<O>;
 
 	fn deref(&self) -> &Self::Target {
@@ -113,7 +113,7 @@ impl<'s, 'r, O: SelectedOutputMarker> Future for InferenceFut<'s, 'r, O> {
 	}
 }
 
-impl<'s, 'r, O: SelectedOutputMarker> Drop for InferenceFut<'s, 'r, O> {
+impl<O: SelectedOutputMarker> Drop for InferenceFut<'_, '_, O> {
 	fn drop(&mut self) {
 		if !self.did_receive {
 			let _ = self.run_options.terminate();

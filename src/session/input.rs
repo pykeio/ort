@@ -8,7 +8,7 @@ pub enum SessionInputValue<'v> {
 	Owned(Value<DynValueTypeMarker>)
 }
 
-impl<'v> Deref for SessionInputValue<'v> {
+impl Deref for SessionInputValue<'_> {
 	type Target = Value;
 
 	fn deref(&self) -> &Self::Target {
@@ -30,7 +30,7 @@ impl<'v, T: ValueTypeMarker + ?Sized> From<ValueRef<'v, T>> for SessionInputValu
 		SessionInputValue::View(value.into_dyn())
 	}
 }
-impl<'v, T: ValueTypeMarker + ?Sized> From<Value<T>> for SessionInputValue<'v> {
+impl<T: ValueTypeMarker + ?Sized> From<Value<T>> for SessionInputValue<'_> {
 	fn from(value: Value<T>) -> Self {
 		SessionInputValue::Owned(value.into_dyn())
 	}
@@ -61,7 +61,7 @@ impl<'i, 'v> From<&'i [SessionInputValue<'v>]> for SessionInputs<'i, 'v> {
 	}
 }
 
-impl<'i, 'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'i, 'v, N> {
+impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 'v, N> {
 	fn from(val: [SessionInputValue<'v>; N]) -> Self {
 		SessionInputs::ValueArray(val)
 	}

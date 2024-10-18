@@ -190,7 +190,7 @@ pub struct AllocatedBlock<'a> {
 	allocator: &'a Allocator
 }
 
-impl<'a> AllocatedBlock<'a> {
+impl AllocatedBlock<'_> {
 	/// Returns a pointer to the allocated memory.
 	///
 	/// Note that, depending on the exact allocator used, this may not a pointer to memory accessible by the CPU.
@@ -222,7 +222,7 @@ impl<'a> AllocatedBlock<'a> {
 	}
 }
 
-impl<'a> Drop for AllocatedBlock<'a> {
+impl Drop for AllocatedBlock<'_> {
 	fn drop(&mut self) {
 		unsafe { self.allocator.free(self.ptr) };
 	}

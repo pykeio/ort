@@ -109,7 +109,7 @@ impl<'s> ModelMetadata<'s> {
 	}
 }
 
-impl<'s> Drop for ModelMetadata<'s> {
+impl Drop for ModelMetadata<'_> {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleaseModelMetadata(self.metadata_ptr.as_ptr())];
 	}

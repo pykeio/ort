@@ -422,7 +422,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for Array<T, D>
 }
 
 #[cfg(feature = "ndarray")]
-impl<'v, T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for ArrayView<'v, T, D> {
+impl<T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for ArrayView<'_, T, D> {
 	type Item = T;
 
 	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {

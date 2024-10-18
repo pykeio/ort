@@ -96,7 +96,7 @@ pub struct InMemorySession<'s> {
 	phantom: PhantomData<&'s ()>
 }
 
-impl<'s> Deref for InMemorySession<'s> {
+impl Deref for InMemorySession<'_> {
 	type Target = Session;
 	fn deref(&self) -> &Self::Target {
 		&self.session

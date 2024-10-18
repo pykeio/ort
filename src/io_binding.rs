@@ -110,15 +110,15 @@ impl IoBinding {
 
 	/// Bind a [`Value`] to a session input.
 	///
-	/// Upon invocation, the value's data will be copied to the device the session is allocated on. The copied data will
-	/// be used as an input (specified by `name`) in all future invocations of [`IoBinding::run`] until the input is
-	/// overridden (by calling [`IoBinding::bind_input`] again) or until all inputs are cleared (via
+	/// Upon invocation, the value's data will be queued to be copied to the device the session is allocated on. The
+	/// copied data will be used as an input (specified by `name`) in all future invocations of [`IoBinding::run`]
+	/// until the input is overridden (by calling [`IoBinding::bind_input`] again) or until all inputs are cleared (via
 	/// [`IoBinding::clear_inputs`] or [`IoBinding::clear`]).
 	///
-	/// The data is only copied **once**, immediately upon invocation of this function. Any changes to the given
-	/// value afterwards will not affect the data seen by the session until the value is re-bound. Subsequent re-binds
-	/// will still copy data, hence why [`IoBinding`] is really only suitable when one or more inputs do not change
-	/// between runs.
+	/// The data is only copied upon invocation of this function. Any changes to the given value afterwards will not
+	/// affect the data seen by the session until the value is re-bound. Subsequent re-binds, or calls to
+	/// [`IoBinding::synchronize_inputs`] will copy the data again, hence why [`IoBinding`] is really only suitable when
+	/// one or more inputs do not change between runs.
 	pub fn bind_input<T: ValueTypeMarker, S: AsRef<str>>(&mut self, name: S, ort_value: &Value<T>) -> Result<()> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
@@ -170,6 +170,27 @@ impl IoBinding {
 	pub fn clear(&mut self) {
 		self.clear_inputs();
 		self.clear_outputs();
+	}
+
+	/// Synchronize all bound inputs.
+	///
+	/// Each input previously bound via [`IoBinding::bind_input`] will have its data re-copied to the session device
+	/// immediately. Unlike [`IoBinding::bind_input`], this is a **synchronous** operation.
+	pub fn synchronize_inputs(&self) -> Result<()> {
+		ortsys![unsafe SynchronizeBoundInputs(self.ptr.as_ptr())?];
+		Ok(())
+	}
+	/// Synchronize all bound outputs.
+	pub fn synchronize_outputs(&self) -> Result<()> {
+		ortsys![unsafe SynchronizeBoundOutputs(self.ptr.as_ptr())?];
+		Ok(())
+	}
+	/// Synchronizes both inputs & outputs; equivalent to [`IoBinding::synchronize_inputs`] followed by
+	/// [`IoBinding::synchronize_outputs`].
+	pub fn synchronize(&self) -> Result<()> {
+		self.synchronize_inputs()?;
+		self.synchronize_outputs()?;
+		Ok(())
 	}
 
 	/// Performs inference on the session using the bound inputs specified by [`IoBinding::bind_input`].

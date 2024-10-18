@@ -294,11 +294,15 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("debugging"), &profile));
 					println!("cargo:rustc-link-lib=static=absl_symbolize");
 					println!("cargo:rustc-link-lib=static=absl_stacktrace");
-					add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("log"), &profile));
+					let abseil_lib_log_dir = transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("log"), &profile);
+					add_search_dir(&abseil_lib_log_dir);
 					println!("cargo:rustc-link-lib=static=absl_log_globals");
 					println!("cargo:rustc-link-lib=static=absl_log_internal_format");
 					println!("cargo:rustc-link-lib=static=absl_log_internal_proto");
 					println!("cargo:rustc-link-lib=static=absl_log_internal_globals");
+					if abseil_lib_log_dir.join(platform_format_lib("absl_log_internal_check_op")).exists() {
+						println!("cargo:rustc-link-lib=static=absl_log_internal_check_op");
+					}
 					println!("cargo:rustc-link-lib=static=absl_log_internal_log_sink_set");
 					println!("cargo:rustc-link-lib=static=absl_log_sink");
 					println!("cargo:rustc-link-lib=static=absl_log_internal_message");

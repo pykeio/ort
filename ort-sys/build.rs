@@ -209,6 +209,10 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 						}
 					}
 
+					if lib_dir.join(platform_format_lib("onnxruntime_lora")).exists() {
+						println!("cargo:rustc-link-lib=static=onnxruntime_lora");
+					}
+
 					if extension_lib_dir.exists() && extension_lib_dir.join(platform_format_lib("ortcustomops")).exists() {
 						add_search_dir(&extension_lib_dir);
 						println!("cargo:rustc-link-lib=static=ortcustomops");

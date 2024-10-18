@@ -10,7 +10,7 @@
 	},
 	"link-api": {
 		"title": "API Reference ↗",
-		"href": "https://ort.pyke.io/rustdoc/ort/"
+		"href": "https://docs.rs/ort/2.0.0-rc.7/ort/"
 	},
 	"link-crates": {
 		"title": "Crates.io ↗",

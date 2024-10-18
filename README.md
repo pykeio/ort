@@ -10,7 +10,7 @@
 
 ## 📖 Documentation
 - [Guide](https://ort.pyke.io/)
-- [API reference](https://ort.pyke.io/rustdoc/ort/)
+- [API reference](https://docs.rs/ort/2.0.0-rc.7/ort/)
 - [Examples](https://github.com/pykeio/ort/tree/main/examples)
 - [Migrating from v1.x to v2.0](https://ort.pyke.io/migrating/v2)
 

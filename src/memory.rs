@@ -456,6 +456,12 @@ impl MemoryInfo {
 	}
 }
 
+impl Clone for MemoryInfo {
+	fn clone(&self) -> Self {
+		MemoryInfo::new(self.allocation_device(), self.device_id(), self.allocator_type(), self.memory_type()).expect("failed to clone memory info")
+	}
+}
+
 impl PartialEq<MemoryInfo> for MemoryInfo {
 	fn eq(&self, other: &MemoryInfo) -> bool {
 		let mut out = 0;

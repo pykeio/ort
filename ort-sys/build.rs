@@ -242,15 +242,16 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					}
 
 					add_search_dir(transform_dep(external_lib_dir.join("pytorch_cpuinfo-build"), &profile));
-					// only android doesn't use clog, how fun!
-					if target_os != "android" {
-						let clog_path = transform_dep(external_lib_dir.join("pytorch_cpuinfo-build").join("deps").join("clog"), &profile);
-						if clog_path.exists() {
-							add_search_dir(clog_path);
-						} else {
-							add_search_dir(transform_dep(external_lib_dir.join("pytorch_clog-build"), &profile));
+					// clog isn't built when not building unit tests, or when compiling for android
+					for potential_clog_path in [
+						transform_dep(external_lib_dir.join("pytorch_cpuinfo-build").join("deps").join("clog"), &profile),
+						transform_dep(external_lib_dir.join("pytorch_clog-build"), &profile)
+					] {
+						if potential_clog_path.exists() && potential_clog_path.join(platform_format_lib("clog")).exists() {
+							add_search_dir(potential_clog_path);
+							println!("cargo:rustc-link-lib=static=clog");
+							break;
 						}
-						println!("cargo:rustc-link-lib=static=clog");
 					}
 					println!("cargo:rustc-link-lib=static=cpuinfo");
 

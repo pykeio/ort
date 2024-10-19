@@ -283,6 +283,26 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 		ortsys![unsafe RunOptionsUnsetTerminate(self.run_options_ptr.as_ptr())?];
 		Ok(())
 	}
+
+	/// Adds a custom configuration option to the `RunOptions`.
+	///
+	/// This can be used to, for example, configure the graph ID when using compute graphs with an execution provider
+	/// like CUDA:
+	/// ```no_run
+	/// # use std::sync::Arc;
+	/// # use ort::{Session, RunOptions, Value, ValueType, TensorElementType};
+	/// # fn main() -> ort::Result<()> {
+	/// let mut run_options = RunOptions::new()?;
+	/// run_options.add_config_entry("gpu_graph_id", "1")?;
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	pub fn add_config_entry(&mut self, key: impl AsRef<str>, value: impl AsRef<str>) -> Result<()> {
+		let key = CString::new(key.as_ref())?;
+		let value = CString::new(value.as_ref())?;
+		ortsys![unsafe AddRunConfigEntry(self.run_options_ptr.as_ptr(), key.as_ptr(), value.as_ptr())?];
+		Ok(())
+	}
 }
 
 impl<O: SelectedOutputMarker> Drop for RunOptions<O> {

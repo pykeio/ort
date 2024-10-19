@@ -1,6 +1,11 @@
 name: 🔗 Static Linking
 on:
   workflow_dispatch:
+    inputs:
+      onnxruntime-branch:
+        type: string
+        description: "ONNX Runtime branch"
+        default: "v1.19.2"
   push:
     paths:
       - 'ort-sys/build.rs'
@@ -19,15 +24,34 @@ jobs:
       - uses: actions/checkout@v4
       - name: Compile ONNX Runtime
         run: |
-          git clone https://github.com/microsoft/onnxruntime --recursive --branch v1.19.2 --single-branch --depth 1
+          git clone https://github.com/microsoft/onnxruntime --recursive --branch ${{ inputs.onnxruntime-branch }} --single-branch --depth 1
           cd onnxruntime
-          ./build.sh --update --build --config Release --parallel --compile_no_warning_as_error --skip_submodule_sync --cmake_extra_defines=onnxruntime_BUILD_UNIT_TESTS=OFF
+          ./build.sh --update --build --config Release --parallel --compile_no_warning_as_error --skip_submodule_sync
           cd ..
       - name: Install stable Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v1
-      - name: Run tests
+      - name: Run test
         run: |
           ORT_LIB_LOCATION="$(pwd)/onnxruntime/build/Linux/Release" cargo run --example custom-ops
+  minimal-build:
+    name: Minimal build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile ONNX Runtime
+        run: |
+          git clone https://github.com/microsoft/onnxruntime --recursive --branch ${{ inputs.onnxruntime-branch }} --single-branch --depth 1
+          cd onnxruntime
+          ./build.sh --update --build --config Release --parallel --compile_no_warning_as_error --skip_submodule_sync --minimal_build
+          cd ..
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v1
+      - name: Test linking
+        run: |
+          ORT_LIB_LOCATION="$(pwd)/onnxruntime/build/Linux/Release" cargo build --example gpt2

@@ -2,7 +2,6 @@ use std::{
 	any::Any,
 	fmt::{self, Debug},
 	marker::PhantomData,
-	mem::ManuallyDrop,
 	ops::{Deref, DerefMut},
 	ptr::NonNull,
 	sync::Arc
@@ -234,16 +233,13 @@ impl ValueInner {
 /// A temporary version of a [`Value`] with a lifetime specifier.
 #[derive(Debug)]
 pub struct ValueRef<'v, Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
-	inner: ManuallyDrop<Value<Type>>,
+	inner: Value<Type>,
 	lifetime: PhantomData<&'v ()>
 }
 
 impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 	pub(crate) fn new(inner: Value<Type>) -> Self {
-		ValueRef {
-			inner: ManuallyDrop::new(inner),
-			lifetime: PhantomData
-		}
+		ValueRef { inner, lifetime: PhantomData }
 	}
 
 	/// Attempts to downcast a temporary dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed
@@ -269,7 +265,7 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 			return Err(self);
 		}
 
-		Ok(ManuallyDrop::into_inner(self.inner))
+		Ok(self.inner)
 	}
 
 	pub fn into_dyn(self) -> ValueRef<'v, DynValueTypeMarker> {
@@ -288,16 +284,13 @@ impl<Type: ValueTypeMarker + ?Sized> Deref for ValueRef<'_, Type> {
 /// A mutable temporary version of a [`Value`] with a lifetime specifier.
 #[derive(Debug)]
 pub struct ValueRefMut<'v, Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
-	inner: ManuallyDrop<Value<Type>>,
+	inner: Value<Type>,
 	lifetime: PhantomData<&'v ()>
 }
 
 impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 	pub(crate) fn new(inner: Value<Type>) -> Self {
-		ValueRefMut {
-			inner: ManuallyDrop::new(inner),
-			lifetime: PhantomData
-		}
+		ValueRefMut { inner, lifetime: PhantomData }
 	}
 
 	/// Attempts to downcast a temporary mutable dynamic value (like [`DynValue`] or [`DynTensor`]) to a more
@@ -323,7 +316,7 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 			return Err(self);
 		}
 
-		Ok(ManuallyDrop::into_inner(self.inner))
+		Ok(self.inner)
 	}
 
 	pub fn into_dyn(self) -> ValueRefMut<'v, DynValueTypeMarker> {

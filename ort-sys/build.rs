@@ -1,7 +1,6 @@
 use std::{
 	env, fs,
-	path::{Path, PathBuf},
-	process::Command
+	path::{Path, PathBuf}
 };
 
 #[allow(unused)]
@@ -165,10 +164,18 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 	if let Ok(lib_dir) = env::var(ORT_ENV_SYSTEM_LIB_LOCATION) {
 		let lib_dir = PathBuf::from(lib_dir);
 
-		let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap().to_lowercase();
 		let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap().to_lowercase();
 		let platform_format_lib = |a: &str| {
 			if target_os.contains("windows") { format!("{}.lib", a) } else { format!("lib{}.a", a) }
+		};
+		let optional_link_lib = |dir: &Path, lib: &str| {
+			if dir.exists() && dir.join(platform_format_lib(lib)).exists() {
+				add_search_dir(dir);
+				println!("cargo:rustc-link-lib=static={lib}");
+				true
+			} else {
+				false
+			}
 		};
 
 		let mut profile = env::var(ORT_ENV_SYSTEM_LIB_PROFILE).unwrap_or_default();
@@ -234,12 +241,8 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					println!("cargo:rustc-link-lib=static=onnx");
 					println!("cargo:rustc-link-lib=static=onnx_proto");
 
-					let nsync_path = transform_dep(external_lib_dir.join("google_nsync-build"), &profile);
 					// some builds of ONNX Runtime, particularly the default no-EP windows build, don't require nsync
-					if nsync_path.exists() {
-						add_search_dir(nsync_path);
-						println!("cargo:rustc-link-lib=static=nsync_cpp");
-					}
+					optional_link_lib(&transform_dep(external_lib_dir.join("google_nsync-build"), &profile), "nsync_cpp");
 
 					add_search_dir(transform_dep(external_lib_dir.join("pytorch_cpuinfo-build"), &profile));
 					// clog isn't built when not building unit tests, or when compiling for android
@@ -247,9 +250,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 						transform_dep(external_lib_dir.join("pytorch_cpuinfo-build").join("deps").join("clog"), &profile),
 						transform_dep(external_lib_dir.join("pytorch_clog-build"), &profile)
 					] {
-						if potential_clog_path.exists() && potential_clog_path.join(platform_format_lib("clog")).exists() {
-							add_search_dir(potential_clog_path);
-							println!("cargo:rustc-link-lib=static=clog");
+						if optional_link_lib(&potential_clog_path, "clog") {
 							break;
 						}
 					}
@@ -301,9 +302,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					println!("cargo:rustc-link-lib=static=absl_log_internal_format");
 					println!("cargo:rustc-link-lib=static=absl_log_internal_proto");
 					println!("cargo:rustc-link-lib=static=absl_log_internal_globals");
-					if abseil_lib_log_dir.join(platform_format_lib("absl_log_internal_check_op")).exists() {
-						println!("cargo:rustc-link-lib=static=absl_log_internal_check_op");
-					}
+					optional_link_lib(&abseil_lib_log_dir, "absl_log_internal_check_op");
 					println!("cargo:rustc-link-lib=static=absl_log_internal_log_sink_set");
 					println!("cargo:rustc-link-lib=static=absl_log_sink");
 					println!("cargo:rustc-link-lib=static=absl_log_internal_message");

@@ -1,4 +1,4 @@
-name: Run cargo tests
+name: 🧪 Cargo Tests
 on:
   workflow_dispatch:
   push:

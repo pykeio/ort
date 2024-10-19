@@ -1,0 +1,33 @@
+name: 🔗 Static Linking
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'ort-sys/build.rs'
+  pull_request:
+    paths:
+      - 'ort-sys/build.rs'
+env:
+  RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
+jobs:
+  static-link-linux:
+    name: Linux (x64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile ONNX Runtime
+        run: |
+          git clone https://github.com/microsoft/onnxruntime --recursive --branch v1.19.2 --single-branch --depth 1
+          cd onnxruntime
+          ./build.sh --update --build --config Release --parallel --compile_no_warning_as_error --skip_submodule_sync --cmake_extra_defines=onnxruntime_BUILD_UNIT_TESTS=OFF
+          cd ..
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v1
+      - name: Run tests
+        run: |
+          ORT_LIB_LOCATION="$(pwd)/onnxruntime/build/Linux/Release" cargo run --example custom-ops

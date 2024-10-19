@@ -1,4 +1,4 @@
-name: Code Quality
+name: 📋 Code Quality
 on:
   workflow_dispatch:
   push:

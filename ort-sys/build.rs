@@ -9,6 +9,8 @@ const ONNXRUNTIME_VERSION: &str = "1.19.2";
 const ORT_ENV_SYSTEM_LIB_LOCATION: &str = "ORT_LIB_LOCATION";
 const ORT_ENV_SYSTEM_LIB_PROFILE: &str = "ORT_LIB_PROFILE";
 const ORT_ENV_PREFER_DYNAMIC_LINK: &str = "ORT_PREFER_DYNAMIC_LINK";
+const ORT_ENV_CXX_STDLIB: &str = "ORT_CXX_STDLIB";
+const ENV_CXXSTDLIB: &str = "CXXSTDLIB"; // Used by the `cc` crate - we should mirror if this is set for other C++ crates
 #[cfg(feature = "download-binaries")]
 const ORT_EXTRACT_DIR: &str = "onnxruntime";
 
@@ -133,13 +135,26 @@ fn add_search_dir<P: AsRef<Path>>(base: P) {
 }
 
 fn static_link_prerequisites(using_pyke_libs: bool) {
-	let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
-	if target_os == "macos" || target_os == "ios" {
-		println!("cargo:rustc-link-lib=c++");
+	let target_triple = env::var("TARGET").unwrap();
+
+	let cpp_link_stdlib = if let Ok(stdlib) = env::var(ORT_ENV_CXX_STDLIB).or_else(|_| env::var(ENV_CXXSTDLIB)) {
+		if stdlib.is_empty() { None } else { Some(stdlib) }
+	} else if target_triple.contains("msvc") {
+		None
+	} else if target_triple.contains("apple") {
+		Some("c++".to_string())
+	} else if target_triple.contains("android") {
+		Some("c++_shared".to_string())
+	} else {
+		Some("stdc++".to_string())
+	};
+	if let Some(cpp_link_stdlib) = cpp_link_stdlib {
+		println!("cargo:rustc-link-lib={cpp_link_stdlib}");
+	}
+
+	if target_triple.contains("apple") {
 		println!("cargo:rustc-link-lib=framework=Foundation");
-	} else if target_os == "linux" || target_os == "android" {
-		println!("cargo:rustc-link-lib=stdc++");
-	} else if target_os == "windows" && (using_pyke_libs || cfg!(feature = "directml")) {
+	} else if target_triple.contains("windows") && (using_pyke_libs || cfg!(feature = "directml")) {
 		println!("cargo:rustc-link-lib=dxguid");
 		println!("cargo:rustc-link-lib=DXCORE");
 		println!("cargo:rustc-link-lib=DXGI");
@@ -437,6 +452,8 @@ fn real_main(link: bool) {
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_SYSTEM_LIB_LOCATION);
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_SYSTEM_LIB_PROFILE);
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_PREFER_DYNAMIC_LINK);
+	println!("cargo:rerun-if-env-changed={}", ORT_ENV_CXX_STDLIB);
+	println!("cargo:rerun-if-env-changed={}", ENV_CXXSTDLIB);
 
 	let (install_dir, needs_link) = prepare_libort_dir();
 

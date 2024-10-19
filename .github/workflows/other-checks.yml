@@ -5,7 +5,7 @@ on:
     branches:
       - 'main'
     paths:
-      - '.github/workflows/test.yml'
+      - '.github/workflows/other-checks.yml'
       - 'src/**/*.rs'
       - 'examples/**/*'
       - 'ort-sys/**/*.rs'
@@ -16,7 +16,7 @@ on:
       - 'tests/**/*'
   pull_request:
     paths:
-      - '.github/workflows/test.yml'
+      - '.github/workflows/other-checks.yml'
       - 'src/**/*.rs'
       - 'examples/**/*'
       - 'ort-sys/**/*.rs'
@@ -43,7 +43,7 @@ jobs:
         run: |
           rustup target add aarch64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v1
-      - name: Run tests
+      - name: Run checks
         run: |
           cargo check -p ort --target aarch64-unknown-linux-gnu
   no-default-features:
@@ -56,6 +56,6 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v1
-      - name: Run tests
+      - name: Run checks
         run: |
           cargo check -p ort --no-default-features

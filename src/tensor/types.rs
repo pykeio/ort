@@ -45,8 +45,10 @@ pub enum TensorElementType {
 impl fmt::Display for TensorElementType {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.write_str(match self {
-			TensorElementType::Bfloat16 => "bf16",
 			TensorElementType::Bool => "bool",
+			#[cfg(feature = "half")]
+			TensorElementType::Bfloat16 => "bf16",
+			#[cfg(feature = "half")]
 			TensorElementType::Float16 => "f16",
 			TensorElementType::Float32 => "f32",
 			TensorElementType::Float64 => "f64",

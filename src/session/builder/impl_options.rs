@@ -1,4 +1,4 @@
-use std::{borrow::Cow, path::Path, rc::Rc, sync::Arc};
+use std::{borrow::Cow, ffi::c_char, path::Path, rc::Rc, sync::Arc};
 
 use super::SessionBuilder;
 use crate::{
@@ -141,7 +141,7 @@ impl SessionBuilder {
 	pub fn with_external_initializer(mut self, name: impl AsRef<str>, value: DynValue) -> Result<Self> {
 		let name = name.as_ref();
 		let value = Rc::new(value);
-		ortsys![unsafe AddExternalInitializers(self.session_options_ptr.as_ptr(), &name.as_ptr().cast::<i8>(), &value.ptr().cast_const(), 1)?];
+		ortsys![unsafe AddExternalInitializers(self.session_options_ptr.as_ptr(), &name.as_ptr().cast::<c_char>(), &value.ptr().cast_const(), 1)?];
 		self.external_initializers.push(value);
 		Ok(self)
 	}
@@ -153,7 +153,7 @@ impl SessionBuilder {
 
 		let file_name = crate::util::path_to_os_char(file_name);
 		let sizes = [buffer.len() as ort_sys::size_t];
-		ortsys![unsafe AddExternalInitializersFromMemory(self.session_options_ptr.as_ptr(), &file_name.as_ptr(), &buffer.as_ptr().cast::<i8>().cast_mut(), sizes.as_ptr(), 1)?];
+		ortsys![unsafe AddExternalInitializersFromMemory(self.session_options_ptr.as_ptr(), &file_name.as_ptr(), &buffer.as_ptr().cast::<c_char>().cast_mut(), sizes.as_ptr(), 1)?];
 		self.external_initializer_buffers.push(buffer);
 		Ok(self)
 	}

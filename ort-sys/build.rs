@@ -333,12 +333,23 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					optional_link_lib(&lib_dir, "onnxruntime_providers_acl");
 					optional_link_lib(&lib_dir, "onnxruntime_providers_armnn");
 					optional_link_lib(&lib_dir, "onnxruntime_providers_azure");
-					optional_link_lib(&lib_dir, "onnxruntime_providers_dml");
+					if optional_link_lib(&lib_dir, "onnxruntime_providers_dml") {
+						println!("cargo:rustc-link-lib=dxguid");
+						println!("cargo:rustc-link-lib=DXCORE");
+						println!("cargo:rustc-link-lib=DXGI");
+						println!("cargo:rustc-link-lib=D3D12");
+						println!("cargo:rustc-link-lib=DirectML");
+					}
 					optional_link_lib(&lib_dir, "onnxruntime_providers_nnapi");
 					optional_link_lib(&lib_dir, "onnxruntime_providers_qnn");
 					optional_link_lib(&lib_dir, "onnxruntime_providers_rknpu");
 					optional_link_lib(&lib_dir, "onnxruntime_providers_tvm");
-					optional_link_lib(&lib_dir, "onnxruntime_providers_xnnpack");
+					if optional_link_lib(&lib_dir, "onnxruntime_providers_xnnpack") {
+						add_search_dir(transform_dep(external_lib_dir.join("googlexnnpack-build"), &profile));
+						println!("cargo:rustc-link-lib=static=XNNPACK");
+						add_search_dir(transform_dep(external_lib_dir.join("pthreadpool-build"), &profile));
+						println!("cargo:rustc-link-lib=static=pthreadpool");
+					}
 
 					needs_link = false;
 					break;

@@ -200,8 +200,8 @@ impl ExecutionProviderOptionsFFI {
 		self.value_ptrs.as_ptr()
 	}
 
-	pub fn len(&self) -> ort_sys::size_t {
-		self.key_ptrs.len() as _
+	pub fn len(&self) -> usize {
+		self.key_ptrs.len()
 	}
 }
 

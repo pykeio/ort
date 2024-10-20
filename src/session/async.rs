@@ -134,7 +134,7 @@ pub(crate) struct AsyncInferenceContext<'r, 's> {
 }
 
 crate::extern_system_fn! {
-	pub(crate) fn async_callback(user_data: *mut c_void, _: *mut *mut ort_sys::OrtValue, _: ort_sys::size_t, status: *mut OrtStatus) {
+	pub(crate) fn async_callback(user_data: *mut c_void, _: *mut *mut ort_sys::OrtValue, _: usize, status: *mut OrtStatus) {
 		let ctx = unsafe { Box::from_raw(user_data.cast::<AsyncInferenceContext<'_, '_>>()) };
 
 		// Reconvert name ptrs to CString so drop impl is called and memory is freed

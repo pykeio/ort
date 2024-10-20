@@ -24,7 +24,7 @@ impl<O: Operator> BoundOperator<O> {
 	pub(crate) fn new(name: CString, execution_provider_type: Option<CString>) -> Self {
 		Self {
 			implementation: ort_sys::OrtCustomOp {
-				version: ort_sys::ORT_API_VERSION as _,
+				version: ort_sys::ORT_API_VERSION,
 				GetStartVersion: Some(BoundOperator::<O>::GetStartVersion),
 				GetEndVersion: Some(BoundOperator::<O>::GetEndVersion),
 				CreateKernel: None,
@@ -119,41 +119,41 @@ impl<O: Operator> BoundOperator<O> {
 	}
 
 	extern_system_fn! {
-		pub(crate) unsafe fn GetInputMemoryType(_: *const ort_sys::OrtCustomOp, index: ort_sys::size_t) -> ort_sys::OrtMemType {
-			O::inputs()[index as usize].memory_type.into()
+		pub(crate) unsafe fn GetInputMemoryType(_: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtMemType {
+			O::inputs()[index].memory_type.into()
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetInputCharacteristic(_: *const ort_sys::OrtCustomOp, index: ort_sys::size_t) -> ort_sys::OrtCustomOpInputOutputCharacteristic {
-			O::inputs()[index as usize].characteristic.into()
+		pub(crate) unsafe fn GetInputCharacteristic(_: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtCustomOpInputOutputCharacteristic {
+			O::inputs()[index].characteristic.into()
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetOutputCharacteristic(_: *const ort_sys::OrtCustomOp, index: ort_sys::size_t) -> ort_sys::OrtCustomOpInputOutputCharacteristic {
-			O::outputs()[index as usize].characteristic.into()
+		pub(crate) unsafe fn GetOutputCharacteristic(_: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtCustomOpInputOutputCharacteristic {
+			O::outputs()[index].characteristic.into()
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetInputTypeCount(_: *const ort_sys::OrtCustomOp) -> ort_sys::size_t {
-			O::inputs().len() as _
+		pub(crate) unsafe fn GetInputTypeCount(_: *const ort_sys::OrtCustomOp) -> usize {
+			O::inputs().len()
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetOutputTypeCount(_: *const ort_sys::OrtCustomOp) -> ort_sys::size_t {
-			O::outputs().len() as _
+		pub(crate) unsafe fn GetOutputTypeCount(_: *const ort_sys::OrtCustomOp) -> usize {
+			O::outputs().len()
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetInputType(_: *const ort_sys::OrtCustomOp, index: ort_sys::size_t) -> ort_sys::ONNXTensorElementDataType {
-			O::inputs()[index as usize]
+		pub(crate) unsafe fn GetInputType(_: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::ONNXTensorElementDataType {
+			O::inputs()[index]
 				.r#type
 				.map(|c| c.into())
 				.unwrap_or(ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED)
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetOutputType(_: *const ort_sys::OrtCustomOp, index: ort_sys::size_t) -> ort_sys::ONNXTensorElementDataType {
-			O::outputs()[index as usize]
+		pub(crate) unsafe fn GetOutputType(_: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::ONNXTensorElementDataType {
+			O::outputs()[index]
 				.r#type
 				.map(|c| c.into())
 				.unwrap_or(ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED)

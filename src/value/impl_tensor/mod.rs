@@ -241,7 +241,7 @@ impl<T: IntoTensorElementType + Clone + Debug, const N: usize> Index<[i64; N]> f
 		}
 
 		let mut out: *mut ort_sys::c_void = std::ptr::null_mut();
-		ortsys![unsafe TensorAt(self.ptr(), index.as_ptr(), N as _, &mut out).expect("Failed to index tensor")];
+		ortsys![unsafe TensorAt(self.ptr(), index.as_ptr(), N, &mut out).expect("Failed to index tensor")];
 		unsafe { &*out.cast::<T>() }
 	}
 }
@@ -252,7 +252,7 @@ impl<T: IntoTensorElementType + Clone + Debug, const N: usize> IndexMut<[i64; N]
 		}
 
 		let mut out: *mut ort_sys::c_void = std::ptr::null_mut();
-		ortsys![unsafe TensorAt(self.ptr(), index.as_ptr(), N as _, &mut out).expect("Failed to index tensor")];
+		ortsys![unsafe TensorAt(self.ptr(), index.as_ptr(), N, &mut out).expect("Failed to index tensor")];
 		unsafe { &mut *out.cast::<T>() }
 	}
 }

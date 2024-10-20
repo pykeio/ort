@@ -303,7 +303,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 					let len = calculate_tensor_size(&dimensions);
 
 					// Total length of string data, not including \0 suffix
-					let mut total_length: ort_sys::size_t = 0;
+					let mut total_length = 0;
 					ortsys![unsafe GetStringTensorDataLength(self.ptr(), &mut total_length)?];
 
 					// In the JNI impl of this, tensor_element_len was included in addition to total_length,
@@ -311,12 +311,12 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 					// don't seem to be written to in practice either.
 					// If the string data actually did go farther, it would panic below when using the offset
 					// data to get slices for each string.
-					let mut string_contents = vec![0u8; total_length as _];
+					let mut string_contents = vec![0u8; total_length];
 					// one extra slot so that the total length can go in the last one, making all per-string
 					// length calculations easy
-					let mut offsets = vec![0; (len + 1) as _];
+					let mut offsets = vec![0; len + 1];
 
-					ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len as _)?];
+					ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len)?];
 
 					// final offset = overall length so that per-string length calculations work for the last string
 					debug_assert_eq!(0, offsets[len]);
@@ -326,7 +326,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 						// offsets has 1 extra offset past the end so that all windows work
 						.windows(2)
 						.map(|w| {
-							let slice = &string_contents[w[0] as _..w[1] as _];
+							let slice = &string_contents[w[0]..w[1]];
 							String::from_utf8(slice.into())
 						})
 						.collect::<Result<Vec<String>, FromUtf8Error>>()
@@ -370,7 +370,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 					let len = calculate_tensor_size(&dimensions);
 
 					// Total length of string data, not including \0 suffix
-					let mut total_length: ort_sys::size_t = 0;
+					let mut total_length = 0;
 					ortsys![unsafe GetStringTensorDataLength(self.ptr(), &mut total_length)?];
 
 					// In the JNI impl of this, tensor_element_len was included in addition to total_length,
@@ -378,12 +378,12 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 					// don't seem to be written to in practice either.
 					// If the string data actually did go farther, it would panic below when using the offset
 					// data to get slices for each string.
-					let mut string_contents = vec![0u8; total_length as _];
+					let mut string_contents = vec![0u8; total_length];
 					// one extra slot so that the total length can go in the last one, making all per-string
 					// length calculations easy
-					let mut offsets = vec![0; (len + 1) as _];
+					let mut offsets = vec![0; len + 1];
 
-					ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len as _)?];
+					ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len)?];
 
 					// final offset = overall length so that per-string length calculations work for the last string
 					debug_assert_eq!(0, offsets[len]);
@@ -393,7 +393,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 						// offsets has 1 extra offset past the end so that all windows work
 						.windows(2)
 						.map(|w| {
-							let slice = &string_contents[w[0] as _..w[1] as _];
+							let slice = &string_contents[w[0]..w[1]];
 							String::from_utf8(slice.into())
 						})
 						.collect::<Result<Vec<String>, FromUtf8Error>>()
@@ -428,8 +428,8 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 			let mut num_dims = 0;
 			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims)?];
 
-			let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims as _)?];
+			let mut node_dims: Vec<i64> = vec![0; num_dims];
+			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims)?];
 
 			Ok(node_dims)
 		};

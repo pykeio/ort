@@ -158,7 +158,7 @@ impl SessionBuilder {
 		// either accept a &'static [u8] or Vec<u8> via Cow<'_, [u8]>, which still allows users to use include_bytes!.
 
 		let file_name = crate::util::path_to_os_char(file_name);
-		let sizes = [buffer.len() as ort_sys::size_t];
+		let sizes = [buffer.len()];
 		ortsys![unsafe AddExternalInitializersFromMemory(self.session_options_ptr.as_ptr(), &file_name.as_ptr(), &buffer.as_ptr().cast::<c_char>().cast_mut(), sizes.as_ptr(), 1)?];
 		self.external_initializer_buffers.push(buffer);
 		Ok(self)

@@ -302,9 +302,9 @@ impl Session {
 				run_options_ptr,
 				input_names_ptr.as_ptr(),
 				input_ort_values.as_ptr(),
-				input_ort_values.len() as _,
+				input_ort_values.len(),
 				output_names_ptr.as_ptr(),
-				output_names_ptr.len() as _,
+				output_names_ptr.len(),
 				output_tensor_ptrs.as_mut_ptr()
 			)?
 		];
@@ -448,9 +448,9 @@ impl Session {
 				run_options_ptr,
 				ctx.input_name_ptrs.as_ptr(),
 				ctx.input_ort_values.as_ptr(),
-				ctx.input_ort_values.len() as _,
+				ctx.input_ort_values.len(),
 				ctx.output_name_ptrs.as_ptr(),
-				ctx.output_name_ptrs.len() as _,
+				ctx.output_name_ptrs.len(),
 				ctx.output_value_ptrs.as_mut_ptr(),
 				Some(self::r#async::async_callback),
 				ctx as *mut _ as *mut ort_sys::c_void
@@ -515,21 +515,21 @@ mod dangerous {
 	}
 
 	fn extract_io_count(
-		f: extern_system_fn! { unsafe fn(*const ort_sys::OrtSession, *mut ort_sys::size_t) -> *mut ort_sys::OrtStatus },
+		f: extern_system_fn! { unsafe fn(*const ort_sys::OrtSession, *mut usize) -> *mut ort_sys::OrtStatus },
 		session_ptr: NonNull<ort_sys::OrtSession>
 	) -> Result<usize> {
 		let mut num_nodes = 0;
 		let status = unsafe { f(session_ptr.as_ptr(), &mut num_nodes) };
 		status_to_result(status)?;
-		Ok(num_nodes as _)
+		Ok(num_nodes)
 	}
 
-	fn extract_input_name(session_ptr: NonNull<ort_sys::OrtSession>, allocator: &Allocator, i: ort_sys::size_t) -> Result<String> {
+	fn extract_input_name(session_ptr: NonNull<ort_sys::OrtSession>, allocator: &Allocator, i: usize) -> Result<String> {
 		let f = ortsys![unsafe SessionGetInputName];
 		extract_io_name(f, session_ptr, allocator, i)
 	}
 
-	fn extract_output_name(session_ptr: NonNull<ort_sys::OrtSession>, allocator: &Allocator, i: ort_sys::size_t) -> Result<String> {
+	fn extract_output_name(session_ptr: NonNull<ort_sys::OrtSession>, allocator: &Allocator, i: usize) -> Result<String> {
 		let f = ortsys![unsafe SessionGetOutputName];
 		extract_io_name(f, session_ptr, allocator, i)
 	}
@@ -549,13 +549,13 @@ mod dangerous {
 	fn extract_io_name(
 		f: extern_system_fn! { unsafe fn(
 			*const ort_sys::OrtSession,
-			ort_sys::size_t,
+			usize,
 			*mut ort_sys::OrtAllocator,
 			*mut *mut c_char,
 		) -> *mut ort_sys::OrtStatus },
 		session_ptr: NonNull<ort_sys::OrtSession>,
 		allocator: &Allocator,
-		i: ort_sys::size_t
+		i: usize
 	) -> Result<String> {
 		let mut name_bytes: *mut c_char = std::ptr::null_mut();
 
@@ -567,27 +567,27 @@ mod dangerous {
 	}
 
 	pub(super) fn extract_input(session_ptr: NonNull<ort_sys::OrtSession>, allocator: &Allocator, i: usize) -> Result<Input> {
-		let input_name = extract_input_name(session_ptr, allocator, i as _)?;
+		let input_name = extract_input_name(session_ptr, allocator, i)?;
 		let f = ortsys![unsafe SessionGetInputTypeInfo];
-		let input_type = extract_io(f, session_ptr, i as _)?;
+		let input_type = extract_io(f, session_ptr, i)?;
 		Ok(Input { name: input_name, input_type })
 	}
 
 	pub(super) fn extract_output(session_ptr: NonNull<ort_sys::OrtSession>, allocator: &Allocator, i: usize) -> Result<Output> {
-		let output_name = extract_output_name(session_ptr, allocator, i as _)?;
+		let output_name = extract_output_name(session_ptr, allocator, i)?;
 		let f = ortsys![unsafe SessionGetOutputTypeInfo];
-		let output_type = extract_io(f, session_ptr, i as _)?;
+		let output_type = extract_io(f, session_ptr, i)?;
 		Ok(Output { name: output_name, output_type })
 	}
 
 	fn extract_io(
 		f: extern_system_fn! { unsafe fn(
 			*const ort_sys::OrtSession,
-			ort_sys::size_t,
+			usize,
 			*mut *mut ort_sys::OrtTypeInfo,
 		) -> *mut ort_sys::OrtStatus },
 		session_ptr: NonNull<ort_sys::OrtSession>,
-		i: ort_sys::size_t
+		i: usize
 	) -> Result<ValueType> {
 		let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
 

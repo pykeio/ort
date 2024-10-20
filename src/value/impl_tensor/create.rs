@@ -56,7 +56,7 @@ impl Tensor<String> {
 
 		// create tensor without data -- data is filled in later
 		ortsys![
-			unsafe CreateTensorAsOrtValue(Allocator::default().ptr.as_ptr(), shape_ptr, shape_len as _, TensorElementType::String.into(), &mut value_ptr)?;
+			unsafe CreateTensorAsOrtValue(Allocator::default().ptr.as_ptr(), shape_ptr, shape_len, TensorElementType::String.into(), &mut value_ptr)?;
 			nonNull(value_ptr)
 		];
 
@@ -72,7 +72,7 @@ impl Tensor<String> {
 
 		let string_pointers = null_terminated_copies.iter().map(|cstring| cstring.as_ptr()).collect::<Vec<_>>();
 
-		ortsys![unsafe FillStringTensor(value_ptr, string_pointers.as_ptr(), string_pointers.len() as _)?];
+		ortsys![unsafe FillStringTensor(value_ptr, string_pointers.as_ptr(), string_pointers.len())?];
 
 		Ok(Value {
 			inner: Arc::new(ValueInner::RustOwned {
@@ -115,7 +115,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 			unsafe CreateTensorAsOrtValue(
 				allocator.ptr.as_ptr(),
 				shape_ptr,
-				shape_len as _,
+				shape_len,
 				T::into_tensor_element_type().into(),
 				&mut value_ptr
 			)?;
@@ -184,9 +184,9 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 			unsafe CreateTensorWithDataAsOrtValue(
 				memory_info.ptr.as_ptr(),
 				tensor_values_ptr,
-				(ptr_len * std::mem::size_of::<T>()) as _,
+				ptr_len * std::mem::size_of::<T>(),
 				shape_ptr,
-				shape_len as _,
+				shape_len,
 				T::into_tensor_element_type().into(),
 				&mut value_ptr
 			)?;
@@ -241,9 +241,9 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 			unsafe CreateTensorWithDataAsOrtValue(
 				info.ptr.as_ptr(),
 				data,
-				data_len as _,
+				data_len,
 				shape_ptr,
-				shape_len as _,
+				shape_len,
 				T::into_tensor_element_type().into(),
 				&mut value_ptr
 			)?;

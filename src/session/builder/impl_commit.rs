@@ -147,7 +147,7 @@ impl SessionBuilder {
 		let model_data = model_bytes.as_ptr().cast::<std::ffi::c_void>();
 		let model_data_length = model_bytes.len();
 		ortsys![
-			unsafe CreateSessionFromArray(env.env_ptr.as_ptr(), model_data, model_data_length as _, self.session_options_ptr.as_ptr(), &mut session_ptr)?;
+			unsafe CreateSessionFromArray(env.env_ptr.as_ptr(), model_data, model_data_length, self.session_options_ptr.as_ptr(), &mut session_ptr)?;
 			nonNull(session_ptr)
 		];
 

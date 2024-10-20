@@ -586,8 +586,8 @@ pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys
 	let mut num_dims = 0;
 	ortsys![GetDimensionsCount(info_ptr, &mut num_dims)];
 
-	let mut node_dims: Vec<i64> = vec![0; num_dims as _];
-	ortsys![GetDimensions(info_ptr, node_dims.as_mut_ptr(), num_dims as _)];
+	let mut node_dims: Vec<i64> = vec![0; num_dims];
+	ortsys![GetDimensions(info_ptr, node_dims.as_mut_ptr(), num_dims)];
 
 	ValueType::Tensor {
 		ty: type_sys.into(),

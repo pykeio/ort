@@ -10,7 +10,7 @@ use crate::{
 pub struct OpenVINOExecutionProvider {
 	device_type: Option<String>,
 	device_id: Option<String>,
-	num_threads: ort_sys::size_t,
+	num_threads: usize,
 	cache_dir: Option<String>,
 	context: *mut c_void,
 	enable_opencl_throttling: bool,
@@ -57,7 +57,7 @@ impl OpenVINOExecutionProvider {
 	/// explicitly set, default value of 8 is used during build time.
 	#[must_use]
 	pub fn with_num_threads(mut self, num_threads: usize) -> Self {
-		self.num_threads = num_threads as _;
+		self.num_threads = num_threads;
 		self
 	}
 

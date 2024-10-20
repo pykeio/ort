@@ -212,12 +212,12 @@ impl IoBinding {
 		ortsys![unsafe RunWithBinding(self.session.session_ptr.as_ptr(), run_options_ptr, self.ptr.as_ptr())?];
 
 		let owned_ptrs: HashMap<*mut ort_sys::OrtValue, &Arc<ValueInner>> = self.output_values.values().map(|c| (c.ptr(), &c.inner)).collect();
-		let mut count = self.output_names.len() as ort_sys::size_t;
+		let mut count = self.output_names.len();
 		if count > 0 {
 			let mut output_values_ptr: *mut *mut ort_sys::OrtValue = ptr::null_mut();
 			ortsys![unsafe GetBoundOutputValues(self.ptr.as_ptr(), self.session.allocator.ptr.as_ptr(), &mut output_values_ptr, &mut count)?; nonNull(output_values_ptr)];
 
-			let output_values = unsafe { std::slice::from_raw_parts(output_values_ptr, count as _).to_vec() }
+			let output_values = unsafe { std::slice::from_raw_parts(output_values_ptr, count).to_vec() }
 				.into_iter()
 				.map(|v| unsafe {
 					if let Some(inner) = owned_ptrs.get(&v) {

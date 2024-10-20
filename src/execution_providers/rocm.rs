@@ -10,7 +10,7 @@ use crate::{
 pub struct ROCmExecutionProvider {
 	device_id: i32,
 	miopen_conv_exhaustive_search: bool,
-	gpu_mem_limit: ort_sys::size_t,
+	gpu_mem_limit: usize,
 	arena_extend_strategy: ArenaExtendStrategy,
 	do_copy_in_default_stream: bool,
 	user_compute_stream: Option<*mut c_void>,
@@ -29,7 +29,7 @@ impl Default for ROCmExecutionProvider {
 		Self {
 			device_id: 0,
 			miopen_conv_exhaustive_search: false,
-			gpu_mem_limit: ort_sys::size_t::MAX,
+			gpu_mem_limit: usize::MAX,
 			arena_extend_strategy: ArenaExtendStrategy::NextPowerOfTwo,
 			do_copy_in_default_stream: true,
 			user_compute_stream: None,
@@ -57,7 +57,7 @@ impl ROCmExecutionProvider {
 
 	#[must_use]
 	pub fn with_mem_limit(mut self, limit: usize) -> Self {
-		self.gpu_mem_limit = limit as _;
+		self.gpu_mem_limit = limit;
 		self
 	}
 
@@ -137,7 +137,7 @@ impl ExecutionProvider for ROCmExecutionProvider {
 			let rocm_options = ort_sys::OrtROCMProviderOptions {
 				device_id: self.device_id,
 				miopen_conv_exhaustive_search: self.miopen_conv_exhaustive_search.into(),
-				gpu_mem_limit: self.gpu_mem_limit as _,
+				gpu_mem_limit: self.gpu_mem_limit,
 				arena_extend_strategy: match self.arena_extend_strategy {
 					ArenaExtendStrategy::NextPowerOfTwo => 0,
 					ArenaExtendStrategy::SameAsRequested => 1

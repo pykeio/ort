@@ -328,8 +328,17 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 						println!("cargo:rustc-link-lib=onnxruntime_providers_coreml");
 					}
 
-					// #[cfg(feature = "rocm")]
-					// println!("cargo:rustc-link-lib=onnxruntime_providers_rocm");
+					// link static EPs if present
+					// not sure if these are the right libs but they're optional links so...
+					optional_link_lib(&lib_dir, "onnxruntime_providers_acl");
+					optional_link_lib(&lib_dir, "onnxruntime_providers_armnn");
+					optional_link_lib(&lib_dir, "onnxruntime_providers_azure");
+					optional_link_lib(&lib_dir, "onnxruntime_providers_dml");
+					optional_link_lib(&lib_dir, "onnxruntime_providers_nnapi");
+					optional_link_lib(&lib_dir, "onnxruntime_providers_qnn");
+					optional_link_lib(&lib_dir, "onnxruntime_providers_rknpu");
+					optional_link_lib(&lib_dir, "onnxruntime_providers_tvm");
+					optional_link_lib(&lib_dir, "onnxruntime_providers_xnnpack");
 
 					needs_link = false;
 					break;

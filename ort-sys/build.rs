@@ -154,7 +154,8 @@ fn static_link_prerequisites(using_pyke_libs: bool) {
 
 	if target_triple.contains("apple") {
 		println!("cargo:rustc-link-lib=framework=Foundation");
-	} else if target_triple.contains("windows") && (using_pyke_libs || cfg!(feature = "directml")) {
+	}
+	if target_triple.contains("windows") && using_pyke_libs {
 		println!("cargo:rustc-link-lib=dxguid");
 		println!("cargo:rustc-link-lib=DXCORE");
 		println!("cargo:rustc-link-lib=DXGI");
@@ -322,17 +323,15 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					println!("cargo:rustc-link-lib=static=absl_log_sink");
 					println!("cargo:rustc-link-lib=static=absl_log_internal_message");
 
-					if cfg!(feature = "coreml") && (target_os == "macos" || target_os == "ios") {
-						println!("cargo:rustc-link-lib=framework=CoreML");
-						println!("cargo:rustc-link-lib=coreml_proto");
-						println!("cargo:rustc-link-lib=onnxruntime_providers_coreml");
-					}
-
 					// link static EPs if present
 					// not sure if these are the right libs but they're optional links so...
 					optional_link_lib(&lib_dir, "onnxruntime_providers_acl");
 					optional_link_lib(&lib_dir, "onnxruntime_providers_armnn");
 					optional_link_lib(&lib_dir, "onnxruntime_providers_azure");
+					if optional_link_lib(&lib_dir, "onnxruntime_providers_coreml") {
+						println!("cargo:rustc-link-lib=framework=CoreML");
+						println!("cargo:rustc-link-lib=coreml_proto");
+					}
 					if optional_link_lib(&lib_dir, "onnxruntime_providers_dml") {
 						println!("cargo:rustc-link-lib=dxguid");
 						println!("cargo:rustc-link-lib=DXCORE");

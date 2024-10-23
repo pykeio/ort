@@ -344,8 +344,11 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					optional_link_lib(&lib_dir, "onnxruntime_providers_rknpu");
 					optional_link_lib(&lib_dir, "onnxruntime_providers_tvm");
 					if optional_link_lib(&lib_dir, "onnxruntime_providers_xnnpack") {
-						add_search_dir(transform_dep(external_lib_dir.join("googlexnnpack-build"), &profile));
+						let xnnpack_build_dir = transform_dep(external_lib_dir.join("googlexnnpack-build"), &profile);
+						add_search_dir(&xnnpack_build_dir);
 						println!("cargo:rustc-link-lib=static=XNNPACK");
+						optional_link_lib(&xnnpack_build_dir, "microkernels-prod");
+
 						add_search_dir(transform_dep(external_lib_dir.join("pthreadpool-build"), &profile));
 						println!("cargo:rustc-link-lib=static=pthreadpool");
 					}

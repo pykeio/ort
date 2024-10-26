@@ -160,6 +160,18 @@ impl QNNExecutionProvider {
 	}
 
 	#[must_use]
+	pub fn with_htp_weight_sharing(mut self, enable: bool) -> Self {
+		self.options.set("enable_htp_weight_sharing", if enable { "1" } else { "0" });
+		self
+	}
+
+	#[must_use]
+	pub fn with_offload_graph_io_quantization(mut self, enable: bool) -> Self {
+		self.options.set("offload_graph_io_quantization", if enable { "1" } else { "0" });
+		self
+	}
+
+	#[must_use]
 	pub fn build(self) -> ExecutionProviderDispatch {
 		self.into()
 	}

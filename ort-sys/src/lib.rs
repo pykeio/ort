@@ -281,6 +281,11 @@ pub struct OrtLogger {
 pub struct OrtShapeInferContext {
 	_unused: [u8; 0]
 }
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OrtLoraAdapter {
+	_unused: [u8; 0]
+}
 pub type OrtStatusPtr = *mut OrtStatus;
 #[doc = " \\brief Memory allocation interface\n\n Structure of function pointers that defines a memory allocator. This can be created and filled in by the user for custom allocators.\n\n When an allocator is passed to any function, be sure that the allocator object is not destroyed until the last allocated object using it is freed."]
 #[repr(C)]
@@ -721,7 +726,8 @@ pub struct OrtMIGraphXProviderOptions {
 	pub migraphx_save_compiled_model: ::std::os::raw::c_int,
 	pub migraphx_save_model_path: *const ::std::os::raw::c_char,
 	pub migraphx_load_compiled_model: ::std::os::raw::c_int,
-	pub migraphx_load_model_path: *const ::std::os::raw::c_char
+	pub migraphx_load_model_path: *const ::std::os::raw::c_char,
+	pub migraphx_exhaustive_tune: bool
 }
 #[test]
 fn bindgen_test_layout_OrtMIGraphXProviderOptions() {
@@ -1971,6 +1977,26 @@ pub struct OrtApi {
 				external_initializer_file_buffer_array: *const *mut ::std::os::raw::c_char,
 				external_initializer_file_lengths: *const usize,
 				num_external_initializer_files: usize
+			) -> OrtStatusPtr
+		)
+	>,
+	pub CreateLoraAdapter: ::std::option::Option<
+		_system!(unsafe fn(adapter_file_path: *const ortchar, allocator: *mut OrtAllocator, out: *mut *mut OrtLoraAdapter) -> OrtStatusPtr)
+	>,
+	pub CreateLoraAdapterFromArray: ::std::option::Option<
+		_system!(
+			unsafe fn(bytes: *const ::std::os::raw::c_void, num_bytes: usize, allocator: *mut OrtAllocator, out: *mut *mut OrtLoraAdapter) -> OrtStatusPtr
+		)
+	>,
+	pub ReleaseLoraAdapter: ::std::option::Option<_system!(unsafe fn(input: *mut OrtLoraAdapter))>,
+	pub RunOptionsAddActiveLoraAdapter: ::std::option::Option<_system!(unsafe fn(options: *mut OrtRunOptions, adapter: *const OrtLoraAdapter) -> OrtStatusPtr)>,
+	pub SetEpDynamicOptions: ::std::option::Option<
+		_system!(
+			unsafe fn(
+				sess: *mut OrtSession,
+				keys: *const *const ::std::os::raw::c_char,
+				values: *const *const ::std::os::raw::c_char,
+				kv_len: usize
 			) -> OrtStatusPtr
 		)
 	>

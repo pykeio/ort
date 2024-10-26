@@ -14,7 +14,8 @@ pub struct MIGraphXExecutionProvider {
 	use_native_calibration_table: bool,
 	int8_calibration_table_name: Option<CString>,
 	save_model_path: Option<CString>,
-	load_model_path: Option<CString>
+	load_model_path: Option<CString>,
+	exhaustive_tune: bool
 }
 
 impl MIGraphXExecutionProvider {
@@ -56,6 +57,12 @@ impl MIGraphXExecutionProvider {
 	}
 
 	#[must_use]
+	pub fn with_exhaustive_tune(mut self, enable: bool) -> Self {
+		self.exhaustive_tune = enable;
+		self
+	}
+
+	#[must_use]
 	pub fn build(self) -> ExecutionProviderDispatch {
 		self.into()
 	}
@@ -93,7 +100,8 @@ impl ExecutionProvider for MIGraphXExecutionProvider {
 				migraphx_load_compiled_model: self.load_model_path.is_some().into(),
 				migraphx_load_model_path: self.load_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(std::ptr::null),
 				migraphx_save_compiled_model: self.save_model_path.is_some().into(),
-				migraphx_save_model_path: self.save_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(std::ptr::null)
+				migraphx_save_model_path: self.save_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(std::ptr::null),
+				migraphx_exhaustive_tune: self.exhaustive_tune
 			};
 			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_MIGraphX(session_builder.session_options_ptr.as_ptr(), &options)?];
 			return Ok(());

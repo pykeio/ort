@@ -1,8 +1,4 @@
 {
-	"-- Links": {
-		"type": "separator",
-		"title": "Links"
-	},
 	"link-oc": {
 		"title": "Sponsor ↗",
 		"href": "https://opencollective.com/pyke-osai",

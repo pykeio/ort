@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+	font-family: 'TASA Orbiter';
+	src: url("https://parcel.pyke.io/v2/cdn/3rdparty/tasa-orbiter/TASAOrbiterVF.woff2") format("woff");
+}
+
+html {
+	font-family: 'TASA Orbiter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" !important;
+}
+
+.nextra-menu-desktop > :nth-child(1), .nextra-menu-mobile > :nth-child(1) {
+	background: linear-gradient(90deg, #45a9fc 0%, #1dfdc8 50%, #54f150 100%);
+	border-radius: 12px;
+}
+.nextra-menu-desktop > :nth-child(1) > a, .nextra-menu-mobile > :nth-child(1) > a {
+	padding: 0.5rem;
+	font-weight: 650;
+	color: #fff !important;
+}
+.dark .nextra-menu-desktop > :nth-child(1) > a, .dark .nextra-menu-mobile > :nth-child(1) > a {
+	color: #000 !important;
+}

@@ -1,6 +1,29 @@
----
-title: 'Troubleshoot: Compiling & Linking'
----
+## The trait bound `ort::Value: From<...>` is not satisfied
+An error like this might come up when attempting to upgrade from an earlier (1.x) version of `ort` to a more recent version:
+```
+error[E0277]: the trait bound `ort::Value: From<ArrayBase<OwnedRepr<f32>, Dim<[usize; 3]>>>` is not satisfied
+  --> src/main.rs:72:16
+   |
+72 |           let inputs = ort::inputs![
+   |  ______________________^
+73 | |             input1,
+74 | |         ]?;
+   | |_________^ the trait `From<ArrayBase<OwnedRepr<f32>, Dim<[usize; 3]>>>` is not implemented for `ort::Value`, which is required by `ort::Value: TryFrom<ArrayBase<OwnedRepr<f32>, Dim<[usize; 3]>>>`
+   |
+   = help: the following other types implement trait `From<T>`:
+             `ort::Value` implements `From<ort::Value<DynTensorValueType>>`
+             `ort::Value` implements `From<ort::Value<TensorValueType<T>>>`
+   = note: required for `ArrayBase<OwnedRepr<f32>, Dim<[usize; 3]>>` to implement `Into<ort::Value>`
+   = note: required for `ort::Value` to implement `TryFrom<ArrayBase<OwnedRepr<i64>, Dim<[usize; 2]>>>`
+   = note: this error originates in the macro `ort::inputs` (in Nightly builds, run with -Z macro-backtrace for more info)
+```
+
+Recent versions of `ort` require `ndarray` `0.16`, whereas older versions (and thus possibly your code) required `0.15`. Since these versions are semver incompatible, Cargo treats the `ndarray` used by your crate and the `ndarray` used by `ort` as separate crates entirely; hence the contradictory error message.
+
+To fix this, upgrade your `ndarray` dependency to `0.16`; the new release features no breaking changes, although `.into_shape()` is deprecated; see [`ndarray`'s release notes](https://github.com/rust-ndarray/ndarray/releases/tag/0.16.0) for more information.
 
 ## Undefined symbols: `___isPlatformVersionAtLeast`, referenced from...
 If you run into this issue compiling with CoreML for macOS/iOS, you'll need to add a `rustc` flag to your crate to get it to link properly. See [Execution providers > CoreML](/perf/execution-providers#coreml) for instructions on how to do so.
+
+## Unresolved external symbol `__std_*`
+If you encounter these errors when linking on Windows, make sure your Visual Studio 2022 installation is up to date; at least version **17.11** is required when using default pyke binaries.

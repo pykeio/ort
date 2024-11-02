@@ -1,57 +1,7 @@
----
-title: 'Troubleshoot: Performance'
----
-
-import { Callout, Tabs, Steps } from 'nextra/components';
-
 ## Execution providers don't seem to register
-`ort` is designed to fail gracefully when an execution provider is not available. It logs failure events through [`tracing`](https://crates.io/crates/tracing), thus you'll need a library that subscribes to `tracing` events to see the logs. The simplest way to do this is to use [`tracing-subscriber`](https://crates.io/crates/tracing-subscriber).
+`ort` is designed to fail gracefully when an execution provider is not available or fails to register. To debug errors raised by EPs, [set up logging for `ort`](/troubleshooting/logging).
 
-<Steps>
-
-### Add tracing-subscriber to your dependencies
-```toml Cargo.toml
-[dependencies]
-tracing-subscriber = { version = "0.3", features = [ "env-filter", "fmt" ] }
-```
-
-### Initialize the subscriber in the main function
-```rust main.rs
-fn main() {
-    tracing_subscriber::fmt::init();
-}
-```
-
-### Show debug messages from ort
-Set the environment variable `RUST_LOG` to `ort=debug` to see all debug messages from `ort`.
-<Tabs items={['Windows (PowerShell)', 'Windows (Command Prompt)', 'Linux', 'macOS']}>
-    <Tabs.Tab title="Windows (PowerShell)">
-        ```powershell
-        $env:RUST_LOG = 'ort=debug';
-        cargo run
-        ```
-    </Tabs.Tab>
-    <Tabs.Tab title="Windows (Command Prompt)">
-        ```cmd
-        set RUST_LOG=ort=debug
-        cargo run
-        ```
-    </Tabs.Tab>
-    <Tabs.Tab title="Linux">
-        ```shell
-        RUST_LOG="ort=debug" cargo run
-        ```
-    </Tabs.Tab>
-    <Tabs.Tab title="macOS">
-        ```shell
-        RUST_LOG="ort=debug" cargo run
-        ```
-    </Tabs.Tab>
-</Tabs>
-
-</Steps>
-
-<Callout type='info'>You can also detect EP regsitration failures programmatically. See [Execution providers: Fallback behavior](/perf/execution-providers#fallback-behavior) for more info.</Callout>
+You can also detect EP regsitration failures programmatically. See [Execution providers: Fallback behavior](/perf/execution-providers#fallback-behavior) for more info.
 
 ## Inference is slower than expected
 There are a few things you could try to improve performance:

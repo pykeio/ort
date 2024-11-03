@@ -2,3 +2,123 @@
 title: I/O Binding
 description: Boost efficiency by arranging inputs on an accelerator device prior to graph execution.
 ---
+
+import { Callout } from 'nextra/components';
+
+Often times when running a model with a non-CPU [execution provider](/perf/execution-providers), you'll find that the act of copying data between the device and CPU takes up a considerable amount of inference time.
+
+In some cases, this I/O overhead is unavoidable -- a causal language model, for example, must copy its sequence of input tokens to the GPU and copy the output probabilities back to the CPU to perform sampling on each run. In this case, there isn't much room to optimize I/O. In other cases, though, you may have an input or output that does *not* need to be copied off of the device it is allocated on - i.e., if an input does not change between runs (such as a style embedding), or if an output is subsequently used directly as an input to another/the same model on the same device.
+
+For these cases, ONNX Runtime provides **I/O binding**, an interface that allows you to manually specify which inputs/outputs reside on which device, and control when they are synchronized.
+
+## Creating
+I/O binding is used via the [`IoBinding`](https://docs.rs/ort/2.0.0-rc.8/ort/struct.IoBinding.html) struct. `IoBinding` is created using the [`Session::create_binding`](https://docs.rs/ort/2.0.0-rc.8/ort/struct.Session.html#method.create_binding) method:
+
+```rs
+let mut binding = session.create_binding()?;
+```
+
+<Callout>
+    You'll generally want to create one binding per "request", as bound inputs/outputs only apply to individual instances of `IoBinding`.
+</Callout>
+
+## Binding
+### Binding inputs
+To bind an input, use `IoBinding::bind_input`. This will queue the input data to be copied to the device that `session` is allocated on.
+```rs
+let style_embedding: Tensor<f32> = Tensor::from_array(...)?;
+
+binding.bind_input("style_embd", &style_embedding)?;
+```
+
+The data is not guaranteed to be synchronized immediately. The data *will* be fully synchronized once the I/O binding is run. To force synchronization, use `IoBinding::synchronize_inputs`.
+```rs
+binding.synchronize_inputs()?;
+// all inputs are now synchronized
+```
+
+Binding an input represents a single copy at that moment in time. Any updates to `style_embedding` intentionally won't take effect until you either call `synchronize_inputs` (which synchronizes *all* inputs), or re-bind `style_embd` (which will only synchronize `style_embedding`).
+
+### Binding outputs
+Binding an output is similar; use `IoBinding::bind_output`, providing a value which the output will be placed into.
+```rs
+binding.bind_output("action", Tensor::<f32>::new(&Allocator::default(), [1, 32])?)?;
+```
+
+If you don't know the output's dimensions ahead of time, you can also simply bind to a device instead of providing a preallocated tensor:
+```rs
+let allocator = Allocator::default();
+binding.bind_output_to_device("action", &allocator.memory_info())?;
+```
+
+<Callout>
+    In this example, when the I/O binding is run, the session output `action` will be placed into the same memory allocation provided in the `bind_output` call.
+    
+    This means that subsequent runs will *override* the data in `action`. If you need to access a bound output's data *across* runs (i.e. in a multithreading setting), the data needs to be copied to another buffer to avoid undefined behavior.
+</Callout>
+
+Outputs can be bound to any device -- they can even stay on the EP device if you bind it to a tensor created with the session's allocator (`Tensor::new(session.allocator(), ...)`). You can then access the pointer to device memory using [`Tensor::data_ptr`](https://docs.rs/ort/2.0.0-rc.8/ort/type.Tensor.html#method.data_ptr).
+
+If you do bind an output to the session's device, it is not guaranteed to be synchronized after `run`, just like `bind_input`. You can force outputs to synchronize immediately using `IoBinding::synchronize_outputs`.
+
+## Running
+To run a session using an I/O binding, you simply call `run()` on `IoBinding` instead of on the session:
+```rs
+let outputs = io_binding.run()?;
+```
+
+`outputs` provides the same interface as the outputs returned by `Session::run`, it just returns the outputs that you bound earlier.
+```rs
+// same `action` we allocated earlier in `bind_output`
+let action: Tensor<f32> = outputs.remove("action").unwrap().downcast()?;
+```
+
+## All together
+Here is a more complete example of the I/O binding API in a scenario where I/O performance can be improved significantly. This example features a typical text-to-image diffusion pipeline, using a text encoder like CLIP to create the condition tensor and a UNet for diffusion.
+
+```rs
+let text_encoder = Session::builder()?
+	.with_execution_providers([CUDAExecutionProvider::default().build()])?
+	.commit_from_file("text_encoder.onnx")?;
+let unet = Session::builder()?
+	.with_execution_providers([CUDAExecutionProvider::default().build()])?
+	.commit_from_file("unet.onnx")?;
+
+let text_condition = {
+    let mut binding = text_encoder.create_binding()?;
+    binding.bind_input("tokens", &Tensor::<i64>::from_array((
+        vec![1, 22],
+        vec![49, 272, 503, 286, 1396, 353, 9653, 284, 1234, 287, 616, 2438, 11, 7926, 13, 3423, 338, 3362, 25, 12520, 238, 242]
+    ))?)?;
+    binding.bind_output_to_device("output0", &text_encoder.allocator().memory_info())?;
+    binding.run()?.remove("output0").unwrap()
+};
+
+let input_allocator = Allocator::new(
+	&unet,
+	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
+)?;
+let mut latents = Tensor::<f32>::new(&input_allocator, [1, 4, 64, 64])?;
+
+let mut io_binding = unet.create_binding()?;
+io_binding.bind_input("condition", &text_condition)?;
+
+let output_allocator = Allocator::new(
+	&unet,
+	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUOutput)?
+)?;
+io_binding.bind_output("noise_pred", Tensor::<f32>::new(&output_allocator, [1, 4, 64, 64])?)?;
+
+for _ in 0..20 {
+	io_binding.bind_input("latents", &latents)?;
+	let noise_pred = io_binding.run()?.remove("noise_pred").unwrap();
+
+	let mut latents = latents.extract_tensor_mut();
+	latents += &noise_pred.try_extract_tensor::<f32>()?;
+}
+```
+
+I/O binding provides 3 key performance boosts here:
+- Since we don't use the text embeddings on the CPU, we can keep them on the GPU and avoid an expensive device-CPU-device copy.
+- Since the text condition tensor stays constant across each run of the UNet, we can use `IoBinding` to only copy it **once**.
+- Since the output tensor is always the same shape, we can pre-allocate the output in faster [pinned memory](/perf/memory) and re-use the same allocation for each run.

@@ -4,7 +4,7 @@ use std::{
 };
 
 #[allow(unused)]
-const ONNXRUNTIME_VERSION: &str = "1.19.2";
+const ONNXRUNTIME_VERSION: &str = "1.20.0";
 
 const ORT_ENV_SYSTEM_LIB_LOCATION: &str = "ORT_LIB_LOCATION";
 const ORT_ENV_SYSTEM_LIB_PROFILE: &str = "ORT_LIB_PROFILE";
@@ -222,7 +222,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 				if lib_dir.join(platform_format_lib("onnxruntime_common")).exists() && external_lib_dir.exists() {
 					add_search_dir(&lib_dir);
 
-					for lib in &["common", "flatbuffers", "framework", "graph", "mlas", "optimizer", "providers", "session", "util"] {
+					for lib in &["common", "flatbuffers", "framework", "graph", "lora", "mlas", "optimizer", "providers", "session", "util"] {
 						let lib_path = lib_dir.join(platform_format_lib(&format!("onnxruntime_{lib}")));
 						// sanity check, just make sure the library exists before we try to link to it
 						if lib_path.exists() {
@@ -230,10 +230,6 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 						} else {
 							panic!("[ort] unable to find ONNX Runtime library: {}", lib_path.display());
 						}
-					}
-
-					if lib_dir.join(platform_format_lib("onnxruntime_lora")).exists() {
-						println!("cargo:rustc-link-lib=static=onnxruntime_lora");
 					}
 
 					if extension_lib_dir.exists() && extension_lib_dir.join(platform_format_lib("ortcustomops")).exists() {

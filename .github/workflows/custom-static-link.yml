@@ -5,7 +5,7 @@ on:
       onnxruntime-branch:
         type: string
         description: "ONNX Runtime branch"
-        default: "v1.19.2"
+        default: "v1.20.0"
   push:
     paths:
       - 'ort-sys/build.rs'
@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Compile ONNX Runtime
         run: |
-          git clone https://github.com/microsoft/onnxruntime --recursive --branch ${{ inputs.onnxruntime-branch || 'v1.19.2' }} --single-branch --depth 1
+          git clone https://github.com/microsoft/onnxruntime --recursive --branch ${{ inputs.onnxruntime-branch || 'v1.20.0' }} --single-branch --depth 1
           cd onnxruntime
           ./build.sh --update --build --config Release --parallel --compile_no_warning_as_error --skip_submodule_sync
           cd ..
@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Compile ONNX Runtime
         run: |
-          git clone https://github.com/microsoft/onnxruntime --recursive --branch ${{ inputs.onnxruntime-branch || 'v1.19.2' }} --single-branch --depth 1
+          git clone https://github.com/microsoft/onnxruntime --recursive --branch ${{ inputs.onnxruntime-branch || 'v1.20.0' }} --single-branch --depth 1
           cd onnxruntime
           ./build.sh --update --build --config Release --parallel --compile_no_warning_as_error --skip_submodule_sync --minimal_build
           cd ..

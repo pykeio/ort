@@ -14,6 +14,7 @@
 #[cfg(all(test, not(feature = "fetch-models")))]
 compile_error!("`cargo test --features fetch-models`!!1!");
 
+pub(crate) mod adapter;
 pub(crate) mod environment;
 pub(crate) mod error;
 pub(crate) mod execution_providers;
@@ -48,6 +49,7 @@ pub use self::tensor::ArrayExtensions;
 #[cfg_attr(docsrs, doc(cfg(feature = "training")))]
 pub use self::training::*;
 pub use self::{
+	adapter::Adapter,
 	environment::{Environment, EnvironmentBuilder, EnvironmentGlobalThreadPoolOptions, get_environment, init},
 	error::{Error, ErrorCode, Result},
 	execution_providers::*,

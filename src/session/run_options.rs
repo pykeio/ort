@@ -1,6 +1,7 @@
 use std::{collections::HashMap, ffi::CString, marker::PhantomData, ptr::NonNull, sync::Arc};
 
 use crate::{
+	adapter::{Adapter, AdapterInner},
 	error::Result,
 	ortsys,
 	session::Output,
@@ -157,6 +158,7 @@ impl SelectedOutputMarker for HasSelectedOutputs {}
 pub struct RunOptions<O: SelectedOutputMarker = NoSelectedOutputs> {
 	pub(crate) run_options_ptr: NonNull<ort_sys::OrtRunOptions>,
 	pub(crate) outputs: OutputSelector,
+	adapters: Vec<Arc<AdapterInner>>,
 	_marker: PhantomData<O>
 }
 
@@ -175,6 +177,7 @@ impl RunOptions {
 		Ok(RunOptions {
 			run_options_ptr: unsafe { NonNull::new_unchecked(run_options_ptr) },
 			outputs: OutputSelector::default(),
+			adapters: Vec::new(),
 			_marker: PhantomData
 		})
 	}
@@ -301,6 +304,12 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 		let key = CString::new(key.as_ref())?;
 		let value = CString::new(value.as_ref())?;
 		ortsys![unsafe AddRunConfigEntry(self.run_options_ptr.as_ptr(), key.as_ptr(), value.as_ptr())?];
+		Ok(())
+	}
+
+	pub fn add_adapter(&mut self, adapter: &Adapter) -> Result<()> {
+		ortsys![unsafe RunOptionsAddActiveLoraAdapter(self.run_options_ptr.as_ptr(), adapter.ptr())?];
+		self.adapters.push(Arc::clone(&adapter.inner));
 		Ok(())
 	}
 }

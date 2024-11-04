@@ -505,12 +505,12 @@ mod dangerous {
 	use super::*;
 
 	pub(super) fn extract_inputs_count(session_ptr: NonNull<ort_sys::OrtSession>) -> Result<usize> {
-		let f = ortsys![unsafe SessionGetInputCount];
+		let f = ortsys![SessionGetInputCount];
 		extract_io_count(f, session_ptr)
 	}
 
 	pub(super) fn extract_outputs_count(session_ptr: NonNull<ort_sys::OrtSession>) -> Result<usize> {
-		let f = ortsys![unsafe SessionGetOutputCount];
+		let f = ortsys![SessionGetOutputCount];
 		extract_io_count(f, session_ptr)
 	}
 
@@ -525,12 +525,12 @@ mod dangerous {
 	}
 
 	fn extract_input_name(session_ptr: NonNull<ort_sys::OrtSession>, allocator: &Allocator, i: usize) -> Result<String> {
-		let f = ortsys![unsafe SessionGetInputName];
+		let f = ortsys![SessionGetInputName];
 		extract_io_name(f, session_ptr, allocator, i)
 	}
 
 	fn extract_output_name(session_ptr: NonNull<ort_sys::OrtSession>, allocator: &Allocator, i: usize) -> Result<String> {
-		let f = ortsys![unsafe SessionGetOutputName];
+		let f = ortsys![SessionGetOutputName];
 		extract_io_name(f, session_ptr, allocator, i)
 	}
 
@@ -568,14 +568,14 @@ mod dangerous {
 
 	pub(super) fn extract_input(session_ptr: NonNull<ort_sys::OrtSession>, allocator: &Allocator, i: usize) -> Result<Input> {
 		let input_name = extract_input_name(session_ptr, allocator, i)?;
-		let f = ortsys![unsafe SessionGetInputTypeInfo];
+		let f = ortsys![SessionGetInputTypeInfo];
 		let input_type = extract_io(f, session_ptr, i)?;
 		Ok(Input { name: input_name, input_type })
 	}
 
 	pub(super) fn extract_output(session_ptr: NonNull<ort_sys::OrtSession>, allocator: &Allocator, i: usize) -> Result<Output> {
 		let output_name = extract_output_name(session_ptr, allocator, i)?;
-		let f = ortsys![unsafe SessionGetOutputTypeInfo];
+		let f = ortsys![SessionGetOutputTypeInfo];
 		let output_type = extract_io(f, session_ptr, i)?;
 		Ok(Output { name: output_name, output_type })
 	}

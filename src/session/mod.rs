@@ -324,18 +324,11 @@ impl Session {
 			.collect();
 
 		// Reconvert name ptrs to CString so drop impl is called and memory is freed
-		drop(
-			input_names_ptr
-				.into_iter()
-				.chain(output_names_ptr.into_iter())
-				.map(|p| {
-					assert_non_null_pointer(p, "c_char for CString")?;
-					unsafe { Ok(CString::from_raw(p.cast_mut().cast())) }
-				})
-				.collect::<Result<Vec<_>>>()?
-		);
+		for p in input_names_ptr.into_iter().chain(output_names_ptr.into_iter()) {
+			drop(unsafe { CString::from_raw(p.cast_mut().cast()) });
+		}
 
-		Ok(SessionOutputs::new(output_names.into_iter(), outputs))
+		Ok(SessionOutputs::new(output_names, outputs))
 	}
 
 	/// Asynchronously run input data through the ONNX graph, performing inference.

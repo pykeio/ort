@@ -231,11 +231,17 @@ impl IoBinding {
 							Some(Arc::clone(&self.session))
 						)
 					}
-				});
+				})
+				.collect::<Vec<_>>();
 
 			// output values will be freed when the `Value`s in `SessionOutputs` drop
 
-			Ok(SessionOutputs::new_backed(self.output_names.iter().map(String::as_str), output_values, &self.session.allocator, output_values_ptr.cast()))
+			Ok(SessionOutputs::new_backed(
+				self.output_names.iter().map(String::as_str).collect(),
+				output_values,
+				&self.session.allocator,
+				output_values_ptr.cast()
+			))
 		} else {
 			Ok(SessionOutputs::new_empty())
 		}

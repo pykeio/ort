@@ -12,7 +12,7 @@ use std::{
 use ort_sys::{OrtStatus, c_void};
 
 use crate::{
-	error::{Result, assert_non_null_pointer},
+	error::Result,
 	session::{RunOptions, SelectedOutputMarker, SessionInputValue, SessionOutputs, SharedSessionInner},
 	value::Value
 };
@@ -138,17 +138,9 @@ crate::extern_system_fn! {
 		let ctx = unsafe { Box::from_raw(user_data.cast::<AsyncInferenceContext<'_, '_>>()) };
 
 		// Reconvert name ptrs to CString so drop impl is called and memory is freed
-		drop(
-			ctx.input_name_ptrs
-				.into_iter()
-				.chain(ctx.output_name_ptrs)
-				.map(|p| {
-					assert_non_null_pointer(p, "c_char for CString")?;
-					unsafe { Ok(CString::from_raw(p.cast_mut().cast())) }
-				})
-				.collect::<Result<Vec<_>>>()
-				.expect("Input name should not be null")
-		);
+		for p in ctx.input_name_ptrs {
+			drop(unsafe { CString::from_raw(p.cast_mut().cast()) });
+		}
 
 		if let Err(e) = crate::error::status_to_result(status) {
 			ctx.inner.emplace_value(Err(e));
@@ -164,7 +156,7 @@ crate::extern_system_fn! {
 			})
 			.collect();
 
-		ctx.inner.emplace_value(Ok(SessionOutputs::new(ctx.output_names.into_iter(), outputs)));
+		ctx.inner.emplace_value(Ok(SessionOutputs::new(ctx.output_names, outputs)));
 		ctx.inner.wake();
 	}
 }

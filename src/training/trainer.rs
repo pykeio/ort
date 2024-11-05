@@ -136,7 +136,7 @@ impl Trainer {
 			})
 			.collect();
 
-		Ok(SessionOutputs::new(self.train_output_names.iter().map(|o| o.as_str()), outputs))
+		Ok(SessionOutputs::new(self.train_output_names.iter().map(String::as_str).collect(), outputs))
 	}
 
 	pub fn eval_step<'s, 'i1, 'v1: 'i1, 'i2: 'i1, 'v2: 'i2 + 'i1, const N1: usize, const N2: usize>(
@@ -185,7 +185,7 @@ impl Trainer {
 			})
 			.collect();
 
-		Ok(SessionOutputs::new(self.train_output_names.iter().map(|o| o.as_str()), outputs))
+		Ok(SessionOutputs::new(self.train_output_names.iter().map(String::as_str).collect(), outputs))
 	}
 
 	pub fn export<O: AsRef<str>>(&self, out_path: impl AsRef<Path>, output_names: impl AsRef<[O]>) -> Result<()> {

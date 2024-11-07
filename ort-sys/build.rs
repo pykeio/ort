@@ -165,14 +165,9 @@ fn static_link_prerequisites(using_pyke_libs: bool) {
 }
 
 fn prefer_dynamic_linking() -> bool {
-	// If the cuda or tensorrt features are enabled, we need to use dynamic linking.
-	if cfg!(feature = "cuda") || cfg!(feature = "tensorrt") {
-		return true;
-	}
-
 	match env::var(ORT_ENV_PREFER_DYNAMIC_LINK) {
 		Ok(val) => val == "1" || val.to_lowercase() == "true",
-		Err(_) => false
+		Err(_) => cfg!(feature = "cuda") || cfg!(feature = "tensorrt")
 	}
 }
 

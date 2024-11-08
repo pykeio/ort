@@ -346,8 +346,13 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 						add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("debugging"), &profile));
 						println!("cargo:rustc-link-lib=static=absl_symbolize");
 						println!("cargo:rustc-link-lib=static=absl_stacktrace");
-						let abseil_lib_log_dir = transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("log"), &profile);
-						add_search_dir(&abseil_lib_log_dir);
+						let abseil_lib_log_dir = if !has_vcpkg_link {
+							let dir = transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("log"), &profile);
+							add_search_dir(&dir);
+							dir
+						} else {
+							vcpkg_lib_dir.clone().unwrap()
+						};
 						println!("cargo:rustc-link-lib=static=absl_log_globals");
 						println!("cargo:rustc-link-lib=static=absl_log_internal_format");
 						println!("cargo:rustc-link-lib=static=absl_log_internal_proto");

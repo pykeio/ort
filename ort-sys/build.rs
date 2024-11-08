@@ -306,7 +306,9 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					}
 					println!("cargo:rustc-link-lib=static=re2");
 
-					if !has_vcpkg_link {
+					if has_vcpkg_link && target_os.contains("windows") {
+						println!("cargo:rustc-link-lib=static=abseil_dll");
+					} else {
 						add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("debugging"), &profile));
 						println!("cargo:rustc-link-lib=static=absl_examine_stack");
 						println!("cargo:rustc-link-lib=static=absl_debugging_internal");
@@ -354,8 +356,6 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 						println!("cargo:rustc-link-lib=static=absl_log_internal_log_sink_set");
 						println!("cargo:rustc-link-lib=static=absl_log_sink");
 						println!("cargo:rustc-link-lib=static=absl_log_internal_message");
-					} else {
-						println!("cargo:rustc-link-lib=static=abseil_dll");
 					}
 
 					// link static EPs if present

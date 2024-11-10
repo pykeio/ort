@@ -10,9 +10,9 @@ import { Callout, Tabs, Steps } from 'nextra/components';
 ## Static linking
 Most ONNX Runtime compile configurations will support static linking - just run `build.sh` without the `--build_shared_lib` argument. You should prefer static linking if your execution providers support it, as it avoids many issues and follows de facto Rust practices. If you compile both static libraries and dynamic libraries, `ort` will prefer linking to the static libraries.
 
-To direct `ort` to your statically built binaries, use the `ORT_LIB_LOCATION` environment variable when running `cargo build`. Point it to the location where the static libraries (`.a`/`.lib` files) are compiled to. This will typically be `onnxruntime/build/<os>`. For example:
+To direct `ort` to your statically built binaries, use the `ORT_LIB_LOCATION` environment variable when running `cargo build`. Point it to the location where the static libraries (`.a`/`.lib` files) are compiled to. This will typically be `onnxruntime/build/<os>/<profile>`. For example:
 ```shell
-$ ORT_LIB_LOCATION=~/onnxruntime/build/Linux cargo build
+$ ORT_LIB_LOCATION=~/onnxruntime/build/Linux/Release cargo build
 ```
 
 For iOS (or for other platforms if you are compiling multiple profiles at once), you'll need to manually specify the profile with the `ORT_LIB_PROFILE` environment variable. If not specified, `ort` will prefer `Release` over `RelWithDebInfo` over `MinSizeRel` over `Debug`.

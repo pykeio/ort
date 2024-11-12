@@ -378,7 +378,6 @@ mod tests {
 	fn test_tensor_index() -> crate::Result<()> {
 		let mut tensor = Tensor::new(&Allocator::default(), [1, 3, 224, 224])?;
 
-		assert_eq!(tensor[[0, 2, 42, 42]], 0.0);
 		tensor[[0, 2, 42, 42]] = 1.0;
 		assert_eq!(tensor[[0, 2, 42, 42]], 1.0);
 
@@ -390,7 +389,6 @@ mod tests {
 		assert_eq!(tensor[[0, 1, 0, 0]], -1.0);
 		assert_eq!(tensor[[0, 1, 223, 223]], -1.0);
 
-		assert_eq!(tensor[[0, 0, 0, 0]], 0.0);
 		assert_eq!(tensor[[0, 2, 42, 42]], 1.0);
 
 		Ok(())

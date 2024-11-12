@@ -30,6 +30,14 @@ impl SequenceValueTypeMarker for DynSequenceValueType {
 	crate::private_impl!();
 }
 
+impl DowncastableTarget for DynSequenceValueType {
+	fn can_downcast(dtype: &ValueType) -> bool {
+		matches!(dtype, ValueType::Sequence { .. })
+	}
+
+	crate::private_impl!();
+}
+
 #[derive(Debug)]
 pub struct SequenceValueType<T: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(PhantomData<T>);
 impl<T: ValueTypeMarker + DowncastableTarget + Debug + ?Sized> ValueTypeMarker for SequenceValueType<T> {
@@ -40,6 +48,17 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + ?Sized> ValueTypeMarker f
 	crate::private_impl!();
 }
 impl<T: ValueTypeMarker + DowncastableTarget + Debug + ?Sized> SequenceValueTypeMarker for SequenceValueType<T> {
+	crate::private_impl!();
+}
+
+impl<T: ValueTypeMarker + DowncastableTarget + Debug + ?Sized> DowncastableTarget for SequenceValueType<T> {
+	fn can_downcast(dtype: &ValueType) -> bool {
+		match dtype {
+			ValueType::Sequence(ty) => T::can_downcast(ty),
+			_ => false
+		}
+	}
+
 	crate::private_impl!();
 }
 

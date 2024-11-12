@@ -37,7 +37,7 @@ fn main() -> ort::Result<()> {
 
 	// convert to 8-bit
 	let output = output.mul(255.0).map(|x| *x as u8);
-	let output = output.into_raw_vec();
+	let (output, _) = output.into_raw_vec_and_offset();
 
 	// change rgb to rgba
 	let output_img = ImageBuffer::from_fn(512, 512, |x, y| {

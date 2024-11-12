@@ -283,7 +283,11 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					println!("cargo:rustc-link-lib=static=onnx_proto");
 
 					// some builds of ONNX Runtime, particularly the default no-EP windows build, don't require nsync
-					optional_link_lib(&transform_dep(external_lib_dir.join("google_nsync-build"), &profile), "nsync_cpp");
+					if !has_vcpkg_link {
+						optional_link_lib(&transform_dep(external_lib_dir.join("google_nsync-build"), &profile), "nsync_cpp");
+					} else {
+						optional_link_lib(vcpkg_lib_dir.as_ref().unwrap(), "nsync_cpp");
+					}
 
 					if !has_vcpkg_link {
 						add_search_dir(transform_dep(external_lib_dir.join("pytorch_cpuinfo-build"), &profile));

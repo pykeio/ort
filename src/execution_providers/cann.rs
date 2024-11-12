@@ -139,9 +139,11 @@ impl ExecutionProvider for CANNExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "cann"))]
 		{
+			use crate::AsPointer;
+
 			let mut cann_options: *mut ort_sys::OrtCANNProviderOptions = std::ptr::null_mut();
 			crate::ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)?];
 			let ffi_options = self.options.to_ffi();
@@ -152,7 +154,7 @@ impl ExecutionProvider for CANNExecutionProvider {
 				return Err(e);
 			}
 
-			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_CANN(session_builder.session_options_ptr.as_ptr(), cann_options)];
+			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_CANN(session_builder.ptr_mut(), cann_options)];
 			crate::ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
 			return crate::error::status_to_result(status);
 		}

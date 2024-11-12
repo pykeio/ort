@@ -8,7 +8,7 @@ use std::{
 };
 
 use crate::{
-	SharedSessionInner,
+	AsPointer, SharedSessionInner,
 	error::Result,
 	memory::MemoryInfo,
 	ortsys,
@@ -88,7 +88,7 @@ use crate::{
 /// tensor is only copied to the device once instead of 20 times.
 #[derive(Debug)]
 pub struct IoBinding {
-	pub(crate) ptr: NonNull<ort_sys::OrtIoBinding>,
+	ptr: NonNull<ort_sys::OrtIoBinding>,
 	held_inputs: HashMap<String, Arc<ValueInner>>,
 	output_names: Vec<String>,
 	output_values: HashMap<String, DynValue>,
@@ -98,7 +98,7 @@ pub struct IoBinding {
 impl IoBinding {
 	pub(crate) fn new(session: &Session) -> Result<Self> {
 		let mut ptr: *mut ort_sys::OrtIoBinding = ptr::null_mut();
-		ortsys![unsafe CreateIoBinding(session.inner.session_ptr.as_ptr(), &mut ptr)?; nonNull(ptr)];
+		ortsys![unsafe CreateIoBinding(session.ptr().cast_mut(), &mut ptr)?; nonNull(ptr)];
 		Ok(Self {
 			ptr: unsafe { NonNull::new_unchecked(ptr) },
 			session: session.inner(),
@@ -122,7 +122,7 @@ impl IoBinding {
 	pub fn bind_input<T: ValueTypeMarker, S: AsRef<str>>(&mut self, name: S, ort_value: &Value<T>) -> Result<()> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
-		ortsys![unsafe BindInput(self.ptr.as_ptr(), cname.as_ptr(), ort_value.ptr())?];
+		ortsys![unsafe BindInput(self.ptr_mut(), cname.as_ptr(), ort_value.ptr())?];
 		self.held_inputs.insert(name.to_string(), Arc::clone(&ort_value.inner));
 		Ok(())
 	}
@@ -137,7 +137,7 @@ impl IoBinding {
 	pub fn bind_output<T: ValueTypeMarker, S: AsRef<str>>(&mut self, name: S, ort_value: Value<T>) -> Result<()> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
-		ortsys![unsafe BindOutput(self.ptr.as_ptr(), cname.as_ptr(), ort_value.ptr())?];
+		ortsys![unsafe BindOutput(self.ptr_mut(), cname.as_ptr(), ort_value.ptr())?];
 		self.output_names.push(name.to_string());
 		// Clear the old bound output if we have any.
 		drop(self.output_values.remove(name));
@@ -149,19 +149,19 @@ impl IoBinding {
 	pub fn bind_output_to_device<S: AsRef<str>>(&mut self, name: S, mem_info: &MemoryInfo) -> Result<()> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
-		ortsys![unsafe BindOutputToDevice(self.ptr.as_ptr(), cname.as_ptr(), mem_info.ptr.as_ptr())?];
+		ortsys![unsafe BindOutputToDevice(self.ptr_mut(), cname.as_ptr(), mem_info.ptr())?];
 		self.output_names.push(name.to_string());
 		Ok(())
 	}
 
 	/// Clears all bound inputs specified by [`IoBinding::bind_input`].
 	pub fn clear_inputs(&mut self) {
-		ortsys![unsafe ClearBoundInputs(self.ptr.as_ptr())];
+		ortsys![unsafe ClearBoundInputs(self.ptr_mut())];
 		drop(self.held_inputs.drain());
 	}
 	/// Clears all bound outputs specified by [`IoBinding::bind_output`] or [`IoBinding::bind_output_to_device`].
 	pub fn clear_outputs(&mut self) {
-		ortsys![unsafe ClearBoundOutputs(self.ptr.as_ptr())];
+		ortsys![unsafe ClearBoundOutputs(self.ptr_mut())];
 		drop(self.output_names.drain(..));
 		drop(self.output_values.drain());
 	}
@@ -176,18 +176,18 @@ impl IoBinding {
 	///
 	/// Each input previously bound via [`IoBinding::bind_input`] will have its data re-copied to the session device
 	/// immediately. Unlike [`IoBinding::bind_input`], this is a **synchronous** operation.
-	pub fn synchronize_inputs(&self) -> Result<()> {
-		ortsys![unsafe SynchronizeBoundInputs(self.ptr.as_ptr())?];
+	pub fn synchronize_inputs(&mut self) -> Result<()> {
+		ortsys![unsafe SynchronizeBoundInputs(self.ptr_mut())?];
 		Ok(())
 	}
 	/// Synchronize all bound outputs.
-	pub fn synchronize_outputs(&self) -> Result<()> {
-		ortsys![unsafe SynchronizeBoundOutputs(self.ptr.as_ptr())?];
+	pub fn synchronize_outputs(&mut self) -> Result<()> {
+		ortsys![unsafe SynchronizeBoundOutputs(self.ptr_mut())?];
 		Ok(())
 	}
 	/// Synchronizes both inputs & outputs; equivalent to [`IoBinding::synchronize_inputs`] followed by
 	/// [`IoBinding::synchronize_outputs`].
-	pub fn synchronize(&self) -> Result<()> {
+	pub fn synchronize(&mut self) -> Result<()> {
 		self.synchronize_inputs()?;
 		self.synchronize_outputs()?;
 		Ok(())
@@ -204,18 +204,14 @@ impl IoBinding {
 	}
 
 	fn run_inner(&mut self, run_options: Option<&RunOptions<NoSelectedOutputs>>) -> Result<SessionOutputs<'_, '_>> {
-		let run_options_ptr = if let Some(run_options) = run_options {
-			run_options.run_options_ptr.as_ptr()
-		} else {
-			std::ptr::null_mut()
-		};
-		ortsys![unsafe RunWithBinding(self.session.session_ptr.as_ptr(), run_options_ptr, self.ptr.as_ptr())?];
+		let run_options_ptr = if let Some(run_options) = run_options { run_options.ptr() } else { std::ptr::null() };
+		ortsys![unsafe RunWithBinding(self.session.ptr().cast_mut(), run_options_ptr, self.ptr())?];
 
-		let owned_ptrs: HashMap<*mut ort_sys::OrtValue, &Arc<ValueInner>> = self.output_values.values().map(|c| (c.ptr(), &c.inner)).collect();
+		let owned_ptrs: HashMap<*mut ort_sys::OrtValue, &Arc<ValueInner>> = self.output_values.values().map(|c| (c.ptr().cast_mut(), &c.inner)).collect();
 		let mut count = self.output_names.len();
 		if count > 0 {
 			let mut output_values_ptr: *mut *mut ort_sys::OrtValue = ptr::null_mut();
-			ortsys![unsafe GetBoundOutputValues(self.ptr.as_ptr(), self.session.allocator.ptr.as_ptr(), &mut output_values_ptr, &mut count)?; nonNull(output_values_ptr)];
+			ortsys![unsafe GetBoundOutputValues(self.ptr(), self.session.allocator.ptr().cast_mut(), &mut output_values_ptr, &mut count)?; nonNull(output_values_ptr)];
 
 			let output_values = unsafe { std::slice::from_raw_parts(output_values_ptr, count).to_vec() }
 				.into_iter()
@@ -246,17 +242,21 @@ impl IoBinding {
 			Ok(SessionOutputs::new_empty())
 		}
 	}
-
-	pub fn ptr(&self) -> *mut ort_sys::OrtIoBinding {
-		self.ptr.as_ptr()
-	}
 }
 
 unsafe impl Send for IoBinding {}
 
+impl AsPointer for IoBinding {
+	type Sys = ort_sys::OrtIoBinding;
+
+	fn ptr(&self) -> *const Self::Sys {
+		self.ptr.as_ptr()
+	}
+}
+
 impl Drop for IoBinding {
 	fn drop(&mut self) {
-		ortsys![unsafe ReleaseIoBinding(self.ptr.as_ptr())];
+		ortsys![unsafe ReleaseIoBinding(self.ptr_mut())];
 	}
 }
 

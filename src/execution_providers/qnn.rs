@@ -200,13 +200,15 @@ impl ExecutionProvider for QNNExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "qnn"))]
 		{
+			use crate::AsPointer;
+
 			let ffi_options = self.options.to_ffi();
 			let ep_name = std::ffi::CString::new("QNN").unwrap_or_else(|_| unreachable!());
 			return crate::error::status_to_result(crate::ortsys![unsafe SessionOptionsAppendExecutionProvider(
-				session_builder.session_options_ptr.as_ptr(),
+				session_builder.ptr_mut(),
 				ep_name.as_ptr(),
 				ffi_options.key_ptrs(),
 				ffi_options.value_ptrs(),

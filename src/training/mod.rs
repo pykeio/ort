@@ -4,7 +4,7 @@ use std::{
 	sync::OnceLock
 };
 
-use crate::{Error, Result, RunOptions, ortsys};
+use crate::{AsPointer, Error, Result, RunOptions, ortsys};
 
 mod simple;
 mod trainer;
@@ -89,7 +89,7 @@ pub(crate) use trainsys;
 
 #[derive(Debug)]
 pub struct Checkpoint {
-	pub(crate) ptr: NonNull<ort_sys::OrtCheckpointState>
+	ptr: NonNull<ort_sys::OrtCheckpointState>
 }
 
 impl Checkpoint {
@@ -107,8 +107,12 @@ impl Checkpoint {
 		trainsys![unsafe SaveCheckpoint(self.ptr.as_ptr(), path.as_ptr(), include_optimizer_state)?];
 		Ok(())
 	}
+}
 
-	pub fn ptr(&self) -> *mut ort_sys::OrtCheckpointState {
+impl AsPointer for Checkpoint {
+	type Sys = ort_sys::OrtCheckpointState;
+
+	fn ptr(&self) -> *const Self::Sys {
 		self.ptr.as_ptr()
 	}
 }
@@ -145,7 +149,7 @@ impl Optimizer {
 	}
 
 	pub fn step_with_options(&self, options: RunOptions) -> Result<()> {
-		trainsys![unsafe OptimizerStep(self.0.as_ptr(), options.run_options_ptr.as_ptr())?];
+		trainsys![unsafe OptimizerStep(self.0.as_ptr(), options.ptr())?];
 		Ok(())
 	}
 }

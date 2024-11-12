@@ -9,7 +9,7 @@ use tracing::{Level, debug};
 
 #[cfg(feature = "load-dynamic")]
 use crate::G_ORT_DYLIB_PATH;
-use crate::{error::Result, execution_providers::ExecutionProviderDispatch, extern_system_fn, ortsys};
+use crate::{AsPointer, error::Result, execution_providers::ExecutionProviderDispatch, extern_system_fn, ortsys};
 
 struct EnvironmentSingleton {
 	lock: RwLock<Option<Arc<Environment>>>
@@ -33,24 +33,25 @@ static G_ENV: EnvironmentSingleton = EnvironmentSingleton { lock: RwLock::new(No
 #[derive(Debug)]
 pub struct Environment {
 	pub(crate) execution_providers: Vec<ExecutionProviderDispatch>,
-	pub(crate) env_ptr: NonNull<ort_sys::OrtEnv>,
+	ptr: NonNull<ort_sys::OrtEnv>,
 	pub(crate) has_global_threadpool: bool
 }
 
 unsafe impl Send for Environment {}
 unsafe impl Sync for Environment {}
 
-impl Environment {
-	/// Returns the underlying [`ort_sys::OrtEnv`] pointer.
-	pub fn ptr(&self) -> *mut ort_sys::OrtEnv {
-		self.env_ptr.as_ptr()
+impl AsPointer for Environment {
+	type Sys = ort_sys::OrtEnv;
+
+	fn ptr(&self) -> *const Self::Sys {
+		self.ptr.as_ptr()
 	}
 }
 
 impl Drop for Environment {
 	fn drop(&mut self) {
-		debug!(ptr = ?self.env_ptr.as_ptr(), "Releasing environment");
-		ortsys![unsafe ReleaseEnv(self.env_ptr.as_ptr())];
+		debug!(ptr = ?self.ptr(), "Releasing environment");
+		ortsys![unsafe ReleaseEnv(self.ptr_mut())];
 	}
 }
 
@@ -213,7 +214,7 @@ impl EnvironmentBuilder {
 		let env = Arc::new(Environment {
 			execution_providers: self.execution_providers,
 			// we already asserted the env pointer is non-null in the `CreateEnvWithCustomLogger` call
-			env_ptr: unsafe { NonNull::new_unchecked(env_ptr) },
+			ptr: unsafe { NonNull::new_unchecked(env_ptr) },
 			has_global_threadpool
 		});
 		env_lock.replace(Arc::clone(&env));

@@ -14,7 +14,7 @@ use self::{
 	io::{OperatorInput, OperatorOutput},
 	kernel::{DummyKernel, Kernel, KernelAttributes}
 };
-use crate::{error::Result, ortsys};
+use crate::{AsPointer, error::Result, ortsys};
 
 pub type InferShapeFn = dyn FnMut(*mut ort_sys::OrtShapeInferContext) -> crate::Result<()>;
 
@@ -97,10 +97,6 @@ impl OperatorDomain {
 		})
 	}
 
-	pub(crate) fn ptr(&self) -> *mut ort_sys::OrtCustomOpDomain {
-		self.ptr.as_ptr()
-	}
-
 	#[allow(clippy::should_implement_trait)]
 	pub fn add<O: Operator>(mut self) -> Result<Self> {
 		let name = O::name();
@@ -112,6 +108,14 @@ impl OperatorDomain {
 		self.operators.push(bound);
 
 		Ok(self)
+	}
+}
+
+impl AsPointer for OperatorDomain {
+	type Sys = ort_sys::OrtCustomOpDomain;
+
+	fn ptr(&self) -> *const Self::Sys {
+		self.ptr.as_ptr()
 	}
 }
 

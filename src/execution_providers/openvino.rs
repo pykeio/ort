@@ -120,10 +120,12 @@ impl ExecutionProvider for OpenVINOExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "openvino"))]
 		{
 			use std::ffi::CString;
+
+			use crate::AsPointer;
 
 			let device_type = self.device_type.as_deref().map(CString::new).transpose()?;
 			let device_id = self.device_id.as_deref().map(CString::new).transpose()?;
@@ -145,7 +147,7 @@ impl ExecutionProvider for OpenVINOExecutionProvider {
 				enable_npu_fast_compile: self.enable_npu_fast_compile.into()
 			};
 			return crate::error::status_to_result(
-				crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO(session_builder.session_options_ptr.as_ptr(), std::ptr::addr_of!(openvino_options))]
+				crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO(session_builder.ptr_mut(), std::ptr::addr_of!(openvino_options))]
 			);
 		}
 

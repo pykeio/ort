@@ -67,9 +67,11 @@ impl ExecutionProvider for TVMExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "tvm"))]
 		{
+			use crate::AsPointer;
+
 			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut ort_sys::OrtSessionOptions, opt_str: *const std::os::raw::c_char) -> ort_sys::OrtStatusPtr);
 			let mut option_string = Vec::new();
 			if let Some(check_hash) = self.check_hash {
@@ -109,9 +111,7 @@ impl ExecutionProvider for TVMExecutionProvider {
 				option_string.push(format!("to_nhwc:{}", if to_nhwc { "True" } else { "False" }));
 			}
 			let options_string = std::ffi::CString::new(option_string.join(",")).unwrap_or_else(|_| unreachable!());
-			return crate::error::status_to_result(unsafe {
-				OrtSessionOptionsAppendExecutionProvider_Tvm(session_builder.session_options_ptr.as_ptr(), options_string.as_ptr())
-			});
+			return crate::error::status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_Tvm(session_builder.ptr_mut(), options_string.as_ptr()) });
 		}
 
 		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))

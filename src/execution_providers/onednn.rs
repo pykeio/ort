@@ -46,9 +46,11 @@ impl ExecutionProvider for OneDNNExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "onednn"))]
 		{
+			use crate::AsPointer;
+
 			let mut dnnl_options: *mut ort_sys::OrtDnnlProviderOptions = std::ptr::null_mut();
 			crate::ortsys![unsafe CreateDnnlProviderOptions(&mut dnnl_options)?];
 			let ffi_options = self.options.to_ffi();
@@ -59,7 +61,7 @@ impl ExecutionProvider for OneDNNExecutionProvider {
 				return Err(e);
 			}
 
-			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_Dnnl(session_builder.session_options_ptr.as_ptr(), dnnl_options)];
+			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_Dnnl(session_builder.ptr_mut(), dnnl_options)];
 			crate::ortsys![unsafe ReleaseDnnlProviderOptions(dnnl_options)];
 			return Ok(());
 		}

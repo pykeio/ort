@@ -11,7 +11,7 @@ use std::{
 };
 
 use crate::{
-	char_p_to_string,
+	AsPointer, char_p_to_string,
 	environment::Environment,
 	error::{Error, ErrorCode, Result, assert_non_null_pointer, status_to_result},
 	extern_system_fn,
@@ -42,7 +42,7 @@ pub use self::{
 /// of [`Session::run`] to ensure that the [`Value`]s are kept alive until all references to the session are dropped.
 #[derive(Debug)]
 pub struct SharedSessionInner {
-	pub(crate) session_ptr: NonNull<ort_sys::OrtSession>,
+	session_ptr: NonNull<ort_sys::OrtSession>,
 	pub(crate) allocator: Allocator,
 	/// Additional things we may need to hold onto for the duration of this session, like [`crate::OperatorDomain`]s and
 	/// DLL handles for operator libraries.
@@ -50,15 +50,16 @@ pub struct SharedSessionInner {
 	_environment: Arc<Environment>
 }
 
-impl SharedSessionInner {
-	/// Returns the underlying [`ort_sys::OrtSession`] pointer.
-	pub fn ptr(&self) -> *mut ort_sys::OrtSession {
+unsafe impl Send for SharedSessionInner {}
+unsafe impl Sync for SharedSessionInner {}
+
+impl AsPointer for SharedSessionInner {
+	type Sys = ort_sys::OrtSession;
+
+	fn ptr(&self) -> *const Self::Sys {
 		self.session_ptr.as_ptr()
 	}
 }
-
-unsafe impl Send for SharedSessionInner {}
-unsafe impl Sync for SharedSessionInner {}
 
 impl Drop for SharedSessionInner {
 	fn drop(&mut self) {
@@ -138,11 +139,6 @@ impl Session {
 		IoBinding::new(self)
 	}
 
-	/// Returns the underlying [`ort_sys::OrtSession`] pointer.
-	pub fn ptr(&self) -> *mut ort_sys::OrtSession {
-		self.inner.ptr()
-	}
-
 	/// Get a shared ([`Arc`]'d) reference to the underlying [`SharedSessionInner`], which holds the
 	/// [`ort_sys::OrtSession`] pointer and the session allocator.
 	#[must_use]
@@ -162,7 +158,7 @@ impl Session {
 		(0..size)
 			.map(|i| {
 				let mut name: *mut c_char = std::ptr::null_mut();
-				ortsys![unsafe SessionGetOverridableInitializerName(self.ptr(), i, allocator.ptr.as_ptr(), &mut name).expect("infallible")];
+				ortsys![unsafe SessionGetOverridableInitializerName(self.ptr(), i, allocator.ptr().cast_mut(), &mut name).expect("infallible")];
 				let name = unsafe { CStr::from_ptr(name) }.to_string_lossy().into_owned();
 				let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
 				ortsys![unsafe SessionGetOverridableInitializerTypeInfo(self.ptr(), i, &mut typeinfo_ptr).expect("infallible")];
@@ -260,7 +256,7 @@ impl Session {
 			.map(|n| n.into_raw().cast_const())
 			.collect();
 
-		let (output_names, output_tensors) = match run_options {
+		let (output_names, mut output_tensors) = match run_options {
 			Some(r) => r.outputs.resolve_outputs(&self.outputs),
 			None => (self.outputs.iter().map(|o| o.name.as_str()).collect(), std::iter::repeat_with(|| None).take(self.outputs.len()).collect())
 		};
@@ -270,15 +266,15 @@ impl Session {
 			.map(|n| n.into_raw().cast_const())
 			.collect();
 		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = output_tensors
-			.iter()
+			.iter_mut()
 			.map(|c| match c {
-				Some(v) => v.ptr(),
+				Some(v) => v.ptr_mut(),
 				None => std::ptr::null_mut()
 			})
 			.collect();
 
 		// The C API expects pointers for the arrays (pointers to C-arrays)
-		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.map(|input_array_ort| input_array_ort.ptr().cast_const()).collect();
+		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.map(|input_array_ort| input_array_ort.ptr()).collect();
 		if input_ort_values.len() > input_names.len() {
 			// If we provide more inputs than the model expects with `ort::inputs![a, b, c]`, then we get an `input_names` shorter
 			// than `inputs`. ONNX Runtime will attempt to look up the name of all inputs before doing any checks, thus going out of
@@ -290,11 +286,7 @@ impl Session {
 			));
 		}
 
-		let run_options_ptr = if let Some(run_options) = &run_options {
-			run_options.run_options_ptr.as_ptr()
-		} else {
-			std::ptr::null_mut()
-		};
+		let run_options_ptr = if let Some(run_options) = &run_options { run_options.ptr() } else { std::ptr::null() };
 
 		ortsys![
 			unsafe Run(
@@ -416,9 +408,7 @@ impl Session {
 		let output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![std::ptr::null_mut(); self.outputs.len()];
 
 		let input_values: Vec<_> = input_values.collect();
-		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.iter().map(|input_array_ort| input_array_ort.ptr().cast_const()).collect();
-
-		let run_options_ptr = run_options.run_options_ptr.as_ptr();
+		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.iter().map(|input_array_ort| input_array_ort.ptr()).collect();
 
 		let async_inner = Arc::new(InferenceFutInner::new());
 
@@ -438,7 +428,7 @@ impl Session {
 		ortsys![
 			unsafe RunAsync(
 				self.inner.session_ptr.as_ptr(),
-				run_options_ptr,
+				run_options.ptr(),
 				ctx.input_name_ptrs.as_ptr(),
 				ctx.input_ort_values.as_ptr(),
 				ctx.input_ort_values.len(),
@@ -466,7 +456,7 @@ impl Session {
 	pub fn end_profiling(&self) -> Result<String> {
 		let mut profiling_name: *mut c_char = std::ptr::null_mut();
 
-		ortsys![unsafe SessionEndProfiling(self.inner.session_ptr.as_ptr(), self.inner.allocator.ptr.as_ptr(), &mut profiling_name)];
+		ortsys![unsafe SessionEndProfiling(self.inner.session_ptr.as_ptr(), self.inner.allocator.ptr().cast_mut(), &mut profiling_name)];
 		assert_non_null_pointer(profiling_name, "ProfilingName")?;
 		dangerous::raw_pointer_to_string(&self.inner.allocator, profiling_name)
 	}
@@ -477,6 +467,14 @@ unsafe impl Send for Session {}
 // Allowing `Sync` segfaults with CUDA, DirectML, and seemingly any EP other than the CPU EP. I'm not certain if it's a
 // temporary bug in ONNX Runtime or a wontfix. Maybe this impl should be removed just to be safe?
 unsafe impl Sync for Session {}
+
+impl AsPointer for Session {
+	type Sys = ort_sys::OrtSession;
+
+	fn ptr(&self) -> *const Self::Sys {
+		self.inner.ptr()
+	}
+}
 
 #[derive(Debug, Clone)]
 pub struct OverridableInitializer {
@@ -552,7 +550,7 @@ mod dangerous {
 	) -> Result<String> {
 		let mut name_bytes: *mut c_char = std::ptr::null_mut();
 
-		let status = unsafe { f(session_ptr.as_ptr(), i, allocator.ptr.as_ptr(), &mut name_bytes) };
+		let status = unsafe { f(session_ptr.as_ptr(), i, allocator.ptr().cast_mut(), &mut name_bytes) };
 		status_to_result(status)?;
 		assert_non_null_pointer(name_bytes, "InputName")?;
 

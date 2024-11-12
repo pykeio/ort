@@ -19,6 +19,7 @@ pub use self::{
 	impl_tensor::{DynTensor, DynTensorRef, DynTensorRefMut, DynTensorValueType, Tensor, TensorRef, TensorRefMut, TensorValueType, TensorValueTypeMarker}
 };
 use crate::{
+	AsPointer,
 	error::{Error, ErrorCode, Result},
 	memory::MemoryInfo,
 	ortsys,
@@ -222,10 +223,25 @@ pub(crate) enum ValueInner {
 	}
 }
 
-impl ValueInner {
-	pub(crate) fn ptr(&self) -> *mut ort_sys::OrtValue {
+impl AsPointer for ValueInner {
+	type Sys = ort_sys::OrtValue;
+
+	fn ptr(&self) -> *const Self::Sys {
 		match self {
 			ValueInner::CppOwned { ptr, .. } | ValueInner::RustOwned { ptr, .. } => ptr.as_ptr()
+		}
+	}
+}
+
+impl Drop for ValueInner {
+	fn drop(&mut self) {
+		let ptr = self.ptr_mut();
+		tracing::trace!("dropping {} value at {ptr:p}", match self {
+			ValueInner::RustOwned { .. } => "rust-owned",
+			ValueInner::CppOwned { .. } => "cpp-owned"
+		});
+		if !matches!(self, ValueInner::CppOwned { drop: false, .. }) {
+			ortsys![unsafe ReleaseValue(ptr)];
 		}
 	}
 }
@@ -477,11 +493,6 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 		}
 	}
 
-	/// Returns the underlying [`ort_sys::OrtValue`] pointer.
-	pub fn ptr(&self) -> *mut ort_sys::OrtValue {
-		self.inner.ptr()
-	}
-
 	/// Create a view of this value's data.
 	pub fn view(&self) -> ValueRef<'_, Type> {
 		ValueRef::new(Value {
@@ -565,16 +576,11 @@ impl Value<DynValueTypeMarker> {
 	}
 }
 
-impl Drop for ValueInner {
-	fn drop(&mut self) {
-		let ptr = self.ptr();
-		tracing::trace!("dropping {} value at {ptr:p}", match self {
-			ValueInner::RustOwned { .. } => "rust-owned",
-			ValueInner::CppOwned { .. } => "cpp-owned"
-		});
-		if !matches!(self, ValueInner::CppOwned { drop: false, .. }) {
-			ortsys![unsafe ReleaseValue(ptr)];
-		}
+impl<Type: ValueTypeMarker + ?Sized> AsPointer for Value<Type> {
+	type Sys = ort_sys::OrtValue;
+
+	fn ptr(&self) -> *const Self::Sys {
+		self.inner.ptr()
 	}
 }
 

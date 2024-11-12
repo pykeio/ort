@@ -5,6 +5,7 @@ use std::{
 };
 
 use crate::{
+	AsPointer,
 	error::{Error, Result, status_to_result},
 	memory::{Allocator, MemoryInfo},
 	ortsys,
@@ -88,8 +89,12 @@ impl KernelAttributes {
 		ortsys![unsafe KernelInfo_GetNodeName(self.0.as_ptr(), name.as_mut_ptr().cast::<c_char>(), &mut name_len)?];
 		CString::from_vec_with_nul(name).map_err(Error::wrap)?.into_string().map_err(Error::wrap)
 	}
+}
 
-	pub fn ptr(&self) -> *mut ort_sys::OrtKernelInfo {
+impl AsPointer for KernelAttributes {
+	type Sys = ort_sys::OrtKernelInfo;
+
+	fn ptr(&self) -> *const Self::Sys {
 		self.0.as_ptr()
 	}
 }
@@ -171,7 +176,7 @@ impl<'s, T: DowncastableTarget> GetKernelAttribute<'s> for ValueRef<'s, T> {
 		let allocator = Allocator::default();
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
-		status_to_result(ortsys![unsafe KernelInfoGetAttribute_tensor(info, name, allocator.ptr.as_ptr(), &mut value_ptr)]).ok()?;
+		status_to_result(ortsys![unsafe KernelInfoGetAttribute_tensor(info, name, allocator.ptr().cast_mut(), &mut value_ptr)]).ok()?;
 		unsafe { ValueRef::new(DynValue::from_ptr(NonNull::new(value_ptr)?, None)) }
 			.downcast()
 			.ok()
@@ -243,7 +248,7 @@ impl KernelContext {
 
 	pub fn allocator(&self, memory_info: &MemoryInfo) -> Result<Allocator> {
 		let mut allocator_ptr = ptr::null_mut();
-		ortsys![unsafe KernelContext_GetAllocator(self.ptr.as_ptr(), memory_info.ptr.as_ptr(), &mut allocator_ptr)?];
+		ortsys![unsafe KernelContext_GetAllocator(self.ptr.as_ptr(), memory_info.ptr(), &mut allocator_ptr)?];
 		Ok(unsafe { Allocator::from_raw_unchecked(allocator_ptr) })
 	}
 
@@ -292,8 +297,12 @@ impl KernelContext {
 		ortsys![unsafe KernelContext_GetGPUComputeStream(self.ptr.as_ptr(), &mut stream_ptr)?];
 		Ok(NonNull::new(stream_ptr))
 	}
+}
 
-	pub fn ptr(&self) -> *mut ort_sys::OrtKernelContext {
+impl AsPointer for KernelContext {
+	type Sys = ort_sys::OrtKernelContext;
+
+	fn ptr(&self) -> *const Self::Sys {
 		self.ptr.as_ptr()
 	}
 }

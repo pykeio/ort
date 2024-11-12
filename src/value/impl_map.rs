@@ -12,7 +12,7 @@ use super::{
 	impl_tensor::{DynTensor, Tensor, calculate_tensor_size}
 };
 use crate::{
-	ErrorCode,
+	AsPointer, ErrorCode,
 	error::{Error, Result},
 	memory::Allocator,
 	ortsys,
@@ -95,7 +95,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 				let allocator = Allocator::default();
 
 				let mut key_tensor_ptr = ptr::null_mut();
-				ortsys![unsafe GetValue(self.ptr(), 0, allocator.ptr.as_ptr(), &mut key_tensor_ptr)?; nonNull(key_tensor_ptr)];
+				ortsys![unsafe GetValue(self.ptr(), 0, allocator.ptr().cast_mut(), &mut key_tensor_ptr)?; nonNull(key_tensor_ptr)];
 				let key_value: DynTensor = unsafe { Value::from_ptr(NonNull::new_unchecked(key_tensor_ptr), None) };
 				if K::into_tensor_element_type() != TensorElementType::String {
 					let dtype = key_value.dtype();
@@ -134,7 +134,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 					};
 
 					let mut value_tensor_ptr = ptr::null_mut();
-					ortsys![unsafe GetValue(self.ptr(), 1, allocator.ptr.as_ptr(), &mut value_tensor_ptr)?; nonNull(value_tensor_ptr)];
+					ortsys![unsafe GetValue(self.ptr(), 1, allocator.ptr().cast_mut(), &mut value_tensor_ptr)?; nonNull(value_tensor_ptr)];
 					let value_value: DynTensor = unsafe { Value::from_ptr(NonNull::new_unchecked(value_tensor_ptr), None) };
 					let (value_tensor_shape, value_tensor) = value_value.try_extract_raw_tensor::<V>()?;
 
@@ -155,7 +155,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 					let key_tensor: Vec<K> = unsafe { std::mem::transmute(key_tensor) };
 
 					let mut value_tensor_ptr = ptr::null_mut();
-					ortsys![unsafe GetValue(self.ptr(), 1, allocator.ptr.as_ptr(), &mut value_tensor_ptr)?; nonNull(value_tensor_ptr)];
+					ortsys![unsafe GetValue(self.ptr(), 1, allocator.ptr().cast_mut(), &mut value_tensor_ptr)?; nonNull(value_tensor_ptr)];
 					let value_value: DynTensor = unsafe { Value::from_ptr(NonNull::new_unchecked(value_tensor_ptr), None) };
 					let (value_tensor_shape, value_tensor) = value_value.try_extract_raw_tensor::<V>()?;
 
@@ -245,7 +245,7 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq + 'static, V: IntoTens
 	pub fn new_kv(keys: Tensor<K>, values: Tensor<V>) -> Result<Self> {
 		let mut value_ptr = ptr::null_mut();
 		let values: [DynValue; 2] = [keys.into_dyn(), values.into_dyn()];
-		let value_ptrs: Vec<*const ort_sys::OrtValue> = values.iter().map(|c| c.ptr().cast_const()).collect();
+		let value_ptrs: Vec<*const ort_sys::OrtValue> = values.iter().map(|c| c.ptr()).collect();
 		ortsys![
 			unsafe CreateValue(value_ptrs.as_ptr(), 2, ort_sys::ONNXType::ONNX_TYPE_MAP, &mut value_ptr)?;
 			nonNull(value_ptr)

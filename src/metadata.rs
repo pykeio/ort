@@ -1,6 +1,6 @@
 use std::{ffi::CString, os::raw::c_char, ptr::NonNull};
 
-use crate::{char_p_to_string, error::Result, memory::Allocator, ortsys};
+use crate::{AsPointer, char_p_to_string, error::Result, memory::Allocator, ortsys};
 
 /// Container for model metadata, including name & producer information.
 pub struct ModelMetadata<'s> {
@@ -16,7 +16,7 @@ impl<'s> ModelMetadata<'s> {
 	/// Gets the model description, returning an error if no description is present.
 	pub fn description(&self) -> Result<String> {
 		let mut str_bytes: *mut c_char = std::ptr::null_mut();
-		ortsys![unsafe ModelMetadataGetDescription(self.metadata_ptr.as_ptr(), self.allocator.ptr.as_ptr(), &mut str_bytes)?; nonNull(str_bytes)];
+		ortsys![unsafe ModelMetadataGetDescription(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?; nonNull(str_bytes)];
 
 		let value = match char_p_to_string(str_bytes) {
 			Ok(value) => value,
@@ -32,7 +32,7 @@ impl<'s> ModelMetadata<'s> {
 	/// Gets the model producer name, returning an error if no producer name is present.
 	pub fn producer(&self) -> Result<String> {
 		let mut str_bytes: *mut c_char = std::ptr::null_mut();
-		ortsys![unsafe ModelMetadataGetProducerName(self.metadata_ptr.as_ptr(), self.allocator.ptr.as_ptr(), &mut str_bytes)?; nonNull(str_bytes)];
+		ortsys![unsafe ModelMetadataGetProducerName(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?; nonNull(str_bytes)];
 
 		let value = match char_p_to_string(str_bytes) {
 			Ok(value) => value,
@@ -48,7 +48,7 @@ impl<'s> ModelMetadata<'s> {
 	/// Gets the model name, returning an error if no name is present.
 	pub fn name(&self) -> Result<String> {
 		let mut str_bytes: *mut c_char = std::ptr::null_mut();
-		ortsys![unsafe ModelMetadataGetGraphName(self.metadata_ptr.as_ptr(), self.allocator.ptr.as_ptr(), &mut str_bytes)?; nonNull(str_bytes)];
+		ortsys![unsafe ModelMetadataGetGraphName(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?; nonNull(str_bytes)];
 
 		let value = match char_p_to_string(str_bytes) {
 			Ok(value) => value,
@@ -72,7 +72,7 @@ impl<'s> ModelMetadata<'s> {
 	pub fn custom(&self, key: &str) -> Result<Option<String>> {
 		let mut str_bytes: *mut c_char = std::ptr::null_mut();
 		let key_str = CString::new(key)?;
-		ortsys![unsafe ModelMetadataLookupCustomMetadataMap(self.metadata_ptr.as_ptr(), self.allocator.ptr.as_ptr(), key_str.as_ptr(), &mut str_bytes)?];
+		ortsys![unsafe ModelMetadataLookupCustomMetadataMap(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), key_str.as_ptr(), &mut str_bytes)?];
 		if !str_bytes.is_null() {
 			let value = match char_p_to_string(str_bytes) {
 				Ok(value) => value,
@@ -91,7 +91,7 @@ impl<'s> ModelMetadata<'s> {
 	pub fn custom_keys(&self) -> Result<Vec<String>> {
 		let mut keys: *mut *mut c_char = std::ptr::null_mut();
 		let mut key_len = 0;
-		ortsys![unsafe ModelMetadataGetCustomMetadataMapKeys(self.metadata_ptr.as_ptr(), self.allocator.ptr.as_ptr(), &mut keys, &mut key_len)?];
+		ortsys![unsafe ModelMetadataGetCustomMetadataMapKeys(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut keys, &mut key_len)?];
 		if key_len != 0 && !keys.is_null() {
 			let res = unsafe { std::slice::from_raw_parts(keys, key_len as usize) }
 				.iter()
@@ -107,8 +107,12 @@ impl<'s> ModelMetadata<'s> {
 			Ok(vec![])
 		}
 	}
+}
 
-	pub fn ptr(&self) -> *mut ort_sys::OrtModelMetadata {
+impl AsPointer for ModelMetadata<'_> {
+	type Sys = ort_sys::OrtModelMetadata;
+
+	fn ptr(&self) -> *const Self::Sys {
 		self.metadata_ptr.as_ptr()
 	}
 }

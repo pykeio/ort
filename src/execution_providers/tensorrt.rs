@@ -282,9 +282,11 @@ impl ExecutionProvider for TensorRTExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "tensorrt"))]
 		{
+			use crate::AsPointer;
+
 			// The TensorRT execution provider specifically is pretty picky about requiring an environment to be initialized by the
 			// time we register it. This isn't always the case in `ort`, so if we get to this point, let's make sure we have an
 			// environment initialized.
@@ -300,7 +302,7 @@ impl ExecutionProvider for TensorRTExecutionProvider {
 				return Err(e);
 			}
 
-			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_TensorRT_V2(session_builder.session_options_ptr.as_ptr(), trt_options)];
+			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_TensorRT_V2(session_builder.ptr_mut(), trt_options)];
 			crate::ortsys![unsafe ReleaseTensorRTProviderOptions(trt_options)];
 			return crate::error::status_to_result(status);
 		}

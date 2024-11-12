@@ -188,12 +188,12 @@ impl Utf8Data for &str {
 /// Only to be used on types whose Rust in-memory representation matches ONNX Runtime's (e.g. primitive numeric types
 /// like u32)
 #[cfg(feature = "ndarray")]
-pub(crate) fn extract_primitive_array<'t, T>(shape: ndarray::IxDyn, tensor: *mut ort_sys::OrtValue) -> Result<ndarray::ArrayViewD<'t, T>> {
+pub(crate) fn extract_primitive_array<'t, T>(shape: ndarray::IxDyn, tensor: *const ort_sys::OrtValue) -> Result<ndarray::ArrayViewD<'t, T>> {
 	// Get pointer to output tensor values
 	let mut output_array_ptr: *mut T = ptr::null_mut();
 	let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
 	let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
-	ortsys![unsafe GetTensorMutableData(tensor, output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
+	ortsys![unsafe GetTensorMutableData(tensor.cast_mut(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
 	let array_view = unsafe { ndarray::ArrayView::from_shape_ptr(shape, output_array_ptr) };
 	Ok(array_view)

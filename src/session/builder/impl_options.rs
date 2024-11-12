@@ -8,11 +8,14 @@ use std::{
 
 use super::SessionBuilder;
 use crate::{
-	DynValue, MemoryInfo, OperatorDomain,
+	AsPointer,
 	error::Result,
 	execution_providers::{ExecutionProviderDispatch, apply_execution_providers},
+	memory::MemoryInfo,
+	operator::OperatorDomain,
 	ortsys,
-	util::path_to_os_char
+	util::path_to_os_char,
+	value::DynValue
 };
 
 impl SessionBuilder {
@@ -28,8 +31,8 @@ impl SessionBuilder {
 	/// - **Indiscriminate use of [`SessionBuilder::with_execution_providers`] in a library** (e.g. always enabling
 	///   `CUDAExecutionProvider`) **is discouraged** unless you allow the user to configure the execution providers by
 	///   providing a `Vec` of [`ExecutionProviderDispatch`]es.
-	pub fn with_execution_providers(self, execution_providers: impl IntoIterator<Item = ExecutionProviderDispatch>) -> Result<Self> {
-		apply_execution_providers(&self, execution_providers.into_iter())?;
+	pub fn with_execution_providers(mut self, execution_providers: impl IntoIterator<Item = ExecutionProviderDispatch>) -> Result<Self> {
+		apply_execution_providers(&mut self, execution_providers.into_iter())?;
 		Ok(self)
 	}
 
@@ -40,8 +43,8 @@ impl SessionBuilder {
 	///
 	/// For configuring the number of threads used when the session execution mode is set to `Parallel`, see
 	/// [`SessionBuilder::with_inter_threads()`].
-	pub fn with_intra_threads(self, num_threads: usize) -> Result<Self> {
-		ortsys![unsafe SetIntraOpNumThreads(self.session_options_ptr.as_ptr(), num_threads as _)?];
+	pub fn with_intra_threads(mut self, num_threads: usize) -> Result<Self> {
+		ortsys![unsafe SetIntraOpNumThreads(self.ptr_mut(), num_threads as _)?];
 		Ok(self)
 	}
 
@@ -52,8 +55,8 @@ impl SessionBuilder {
 	///
 	/// For configuring the number of threads used to parallelize the execution within nodes, see
 	/// [`SessionBuilder::with_intra_threads()`].
-	pub fn with_inter_threads(self, num_threads: usize) -> Result<Self> {
-		ortsys![unsafe SetInterOpNumThreads(self.session_options_ptr.as_ptr(), num_threads as _)?];
+	pub fn with_inter_threads(mut self, num_threads: usize) -> Result<Self> {
+		ortsys![unsafe SetInterOpNumThreads(self.ptr_mut(), num_threads as _)?];
 		Ok(self)
 	}
 
@@ -62,20 +65,20 @@ impl SessionBuilder {
 	/// Parallel execution can improve performance for models with many branches, at the cost of higher memory usage.
 	/// You can configure the amount of threads used to parallelize the execution of the graph via
 	/// [`SessionBuilder::with_inter_threads()`].
-	pub fn with_parallel_execution(self, parallel_execution: bool) -> Result<Self> {
+	pub fn with_parallel_execution(mut self, parallel_execution: bool) -> Result<Self> {
 		let execution_mode = if parallel_execution {
 			ort_sys::ExecutionMode::ORT_PARALLEL
 		} else {
 			ort_sys::ExecutionMode::ORT_SEQUENTIAL
 		};
-		ortsys![unsafe SetSessionExecutionMode(self.session_options_ptr.as_ptr(), execution_mode)?];
+		ortsys![unsafe SetSessionExecutionMode(self.ptr_mut(), execution_mode)?];
 		Ok(self)
 	}
 
 	/// Set the session's optimization level. See [`GraphOptimizationLevel`] for more information on the different
 	/// optimization levels.
-	pub fn with_optimization_level(self, opt_level: GraphOptimizationLevel) -> Result<Self> {
-		ortsys![unsafe SetSessionGraphOptimizationLevel(self.session_options_ptr.as_ptr(), opt_level.into())?];
+	pub fn with_optimization_level(mut self, opt_level: GraphOptimizationLevel) -> Result<Self> {
+		ortsys![unsafe SetSessionGraphOptimizationLevel(self.ptr_mut(), opt_level.into())?];
 		Ok(self)
 	}
 
@@ -83,26 +86,26 @@ impl SessionBuilder {
 	/// newly optimized model to the given path (for 'offline' graph optimization).
 	///
 	/// Note that the file will only be created after the model is committed.
-	pub fn with_optimized_model_path<S: AsRef<Path>>(self, path: S) -> Result<Self> {
+	pub fn with_optimized_model_path<S: AsRef<Path>>(mut self, path: S) -> Result<Self> {
 		let path = crate::util::path_to_os_char(path);
-		ortsys![unsafe SetOptimizedModelFilePath(self.session_options_ptr.as_ptr(), path.as_ptr())?];
+		ortsys![unsafe SetOptimizedModelFilePath(self.ptr_mut(), path.as_ptr())?];
 		Ok(self)
 	}
 
 	/// Enables profiling. Profile information will be writen to `profiling_file` after profiling completes.
 	/// See [`Session::end_profiling`].
-	pub fn with_profiling<S: AsRef<Path>>(self, profiling_file: S) -> Result<Self> {
+	pub fn with_profiling<S: AsRef<Path>>(mut self, profiling_file: S) -> Result<Self> {
 		let profiling_file = crate::util::path_to_os_char(profiling_file);
-		ortsys![unsafe EnableProfiling(self.session_options_ptr.as_ptr(), profiling_file.as_ptr())?];
+		ortsys![unsafe EnableProfiling(self.ptr_mut(), profiling_file.as_ptr())?];
 		Ok(self)
 	}
 
 	/// Enables/disables memory pattern optimization. Disable it if the input size varies, i.e., dynamic batch
-	pub fn with_memory_pattern(self, enable: bool) -> Result<Self> {
+	pub fn with_memory_pattern(mut self, enable: bool) -> Result<Self> {
 		if enable {
-			ortsys![unsafe EnableMemPattern(self.session_options_ptr.as_ptr())?];
+			ortsys![unsafe EnableMemPattern(self.ptr_mut())?];
 		} else {
-			ortsys![unsafe DisableMemPattern(self.session_options_ptr.as_ptr())?];
+			ortsys![unsafe DisableMemPattern(self.ptr_mut())?];
 		}
 		Ok(self)
 	}
@@ -116,21 +119,21 @@ impl SessionBuilder {
 	}
 
 	/// Registers a custom operator library at the given library path.
-	pub fn with_operator_library(self, lib_path: impl AsRef<Path>) -> Result<Self> {
+	pub fn with_operator_library(mut self, lib_path: impl AsRef<Path>) -> Result<Self> {
 		let path_cstr = path_to_os_char(lib_path);
-		ortsys![unsafe RegisterCustomOpsLibrary_V2(self.session_options_ptr.as_ptr(), path_cstr.as_ptr())?];
+		ortsys![unsafe RegisterCustomOpsLibrary_V2(self.ptr_mut(), path_cstr.as_ptr())?];
 		Ok(self)
 	}
 
 	/// Enables [`onnxruntime-extensions`](https://github.com/microsoft/onnxruntime-extensions) custom operators.
-	pub fn with_extensions(self) -> Result<Self> {
-		ortsys![unsafe EnableOrtCustomOps(self.session_options_ptr.as_ptr())?];
+	pub fn with_extensions(mut self) -> Result<Self> {
+		ortsys![unsafe EnableOrtCustomOps(self.ptr_mut())?];
 		Ok(self)
 	}
 
 	pub fn with_operators(mut self, domain: impl Into<Arc<OperatorDomain>>) -> Result<Self> {
 		let domain = domain.into();
-		ortsys![unsafe AddCustomOpDomain(self.session_options_ptr.as_ptr(), domain.ptr())?];
+		ortsys![unsafe AddCustomOpDomain(self.ptr_mut(), domain.ptr().cast_mut())?];
 		self.operator_domains.push(domain);
 		Ok(self)
 	}
@@ -139,15 +142,15 @@ impl SessionBuilder {
 	///
 	/// The default (non-deterministic) kernels will typically use faster algorithms that may introduce slight variance.
 	/// Enabling deterministic compute will output reproducible results, but may come at a performance penalty.
-	pub fn with_deterministic_compute(self, enable: bool) -> Result<Self> {
-		ortsys![unsafe SetDeterministicCompute(self.session_options_ptr.as_ptr(), enable)?];
+	pub fn with_deterministic_compute(mut self, enable: bool) -> Result<Self> {
+		ortsys![unsafe SetDeterministicCompute(self.ptr_mut(), enable)?];
 		Ok(self)
 	}
 
 	pub fn with_external_initializer(mut self, name: impl AsRef<str>, value: DynValue) -> Result<Self> {
 		let name = CString::new(name.as_ref())?;
 		let value = Rc::new(value);
-		ortsys![unsafe AddExternalInitializers(self.session_options_ptr.as_ptr(), &name.as_ptr(), &value.ptr().cast_const(), 1)?];
+		ortsys![unsafe AddExternalInitializers(self.ptr_mut(), &name.as_ptr(), &value.ptr(), 1)?];
 		self.external_initializers.push(value);
 		Ok(self)
 	}
@@ -159,7 +162,7 @@ impl SessionBuilder {
 
 		let file_name = crate::util::path_to_os_char(file_name);
 		let sizes = [buffer.len()];
-		ortsys![unsafe AddExternalInitializersFromMemory(self.session_options_ptr.as_ptr(), &file_name.as_ptr(), &buffer.as_ptr().cast::<c_char>().cast_mut(), sizes.as_ptr(), 1)?];
+		ortsys![unsafe AddExternalInitializersFromMemory(self.ptr_mut(), &file_name.as_ptr(), &buffer.as_ptr().cast::<c_char>().cast_mut(), sizes.as_ptr(), 1)?];
 		self.external_initializer_buffers.push(buffer);
 		Ok(self)
 	}

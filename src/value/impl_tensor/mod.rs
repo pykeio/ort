@@ -10,7 +10,7 @@ use std::{
 };
 
 use super::{DowncastableTarget, DynValue, Value, ValueRef, ValueRefMut, ValueType, ValueTypeMarker};
-use crate::{error::Result, memory::MemoryInfo, ortsys, tensor::IntoTensorElementType};
+use crate::{AsPointer, error::Result, memory::MemoryInfo, ortsys, tensor::IntoTensorElementType};
 
 pub trait TensorValueTypeMarker: ValueTypeMarker {
 	crate::private_trait!();
@@ -89,7 +89,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	pub fn data_ptr_mut(&mut self) -> Result<*mut ort_sys::c_void> {
 		let mut buffer_ptr: *mut ort_sys::c_void = std::ptr::null_mut();
-		ortsys![unsafe GetTensorMutableData(self.ptr(), &mut buffer_ptr)?; nonNull(buffer_ptr)];
+		ortsys![unsafe GetTensorMutableData(self.ptr_mut(), &mut buffer_ptr)?; nonNull(buffer_ptr)];
 		Ok(buffer_ptr)
 	}
 
@@ -112,7 +112,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	pub fn data_ptr(&self) -> Result<*const ort_sys::c_void> {
 		let mut buffer_ptr: *mut ort_sys::c_void = std::ptr::null_mut();
-		ortsys![unsafe GetTensorMutableData(self.ptr(), &mut buffer_ptr)?; nonNull(buffer_ptr)];
+		ortsys![unsafe GetTensorMutableData(self.ptr().cast_mut(), &mut buffer_ptr)?; nonNull(buffer_ptr)];
 		Ok(buffer_ptr)
 	}
 
@@ -241,7 +241,7 @@ impl<T: IntoTensorElementType + Clone + Debug, const N: usize> Index<[i64; N]> f
 		}
 
 		let mut out: *mut ort_sys::c_void = std::ptr::null_mut();
-		ortsys![unsafe TensorAt(self.ptr(), index.as_ptr(), N, &mut out).expect("Failed to index tensor")];
+		ortsys![unsafe TensorAt(self.ptr().cast_mut(), index.as_ptr(), N, &mut out).expect("Failed to index tensor")];
 		unsafe { &*out.cast::<T>() }
 	}
 }
@@ -252,7 +252,7 @@ impl<T: IntoTensorElementType + Clone + Debug, const N: usize> IndexMut<[i64; N]
 		}
 
 		let mut out: *mut ort_sys::c_void = std::ptr::null_mut();
-		ortsys![unsafe TensorAt(self.ptr(), index.as_ptr(), N, &mut out).expect("Failed to index tensor")];
+		ortsys![unsafe TensorAt(self.ptr_mut(), index.as_ptr(), N, &mut out).expect("Failed to index tensor")];
 		unsafe { &mut *out.cast::<T>() }
 	}
 }

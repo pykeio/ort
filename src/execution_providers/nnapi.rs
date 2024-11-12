@@ -76,9 +76,11 @@ impl ExecutionProvider for NNAPIExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "nnapi"))]
 		{
+			use crate::AsPointer;
+
 			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut ort_sys::OrtSessionOptions, flags: u32) -> ort_sys::OrtStatusPtr);
 			let mut flags = 0;
 			if self.use_fp16 {
@@ -93,9 +95,7 @@ impl ExecutionProvider for NNAPIExecutionProvider {
 			if self.cpu_only {
 				flags |= 0x008;
 			}
-			return crate::error::status_to_result(unsafe {
-				OrtSessionOptionsAppendExecutionProvider_Nnapi(session_builder.session_options_ptr.as_ptr(), flags)
-			});
+			return crate::error::status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_Nnapi(session_builder.ptr_mut(), flags) });
 		}
 
 		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))

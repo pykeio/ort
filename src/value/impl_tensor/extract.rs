@@ -7,6 +7,7 @@ use super::{Tensor, TensorValueTypeMarker, calculate_tensor_size};
 #[cfg(feature = "ndarray")]
 use crate::tensor::{extract_primitive_array, extract_primitive_array_mut};
 use crate::{
+	AsPointer,
 	error::{Error, ErrorCode, Result},
 	ortsys,
 	tensor::{PrimitiveTensorElementType, TensorElementType},
@@ -43,6 +44,8 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_tensor<T: PrimitiveTensorElementType>(&self) -> Result<ndarray::ArrayViewD<'_, T>> {
+		use crate::AsPointer;
+
 		let dtype = self.dtype();
 		match dtype {
 			ValueType::Tensor { ty, dimensions } => {
@@ -105,7 +108,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 					let mut output_array_ptr: *mut T = ptr::null_mut();
 					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
 					let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
-					ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
+					ortsys![unsafe GetTensorMutableData(self.ptr().cast_mut(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
 					Ok(unsafe { *output_array_ptr })
 				} else {
@@ -158,7 +161,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 				}
 
 				if ty == T::into_tensor_element_type() {
-					Ok(extract_primitive_array_mut(IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>()), self.ptr())?)
+					Ok(extract_primitive_array_mut(IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>()), self.ptr_mut())?)
 				} else {
 					Err(Error::new_with_code(
 						ErrorCode::InvalidArgument,
@@ -209,7 +212,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 					let mut output_array_ptr: *mut T = ptr::null_mut();
 					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
 					let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
-					ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
+					ortsys![unsafe GetTensorMutableData(self.ptr().cast_mut(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
 					let len = calculate_tensor_size(&dimensions);
 					Ok((dimensions, unsafe { std::slice::from_raw_parts(output_array_ptr, len) }))
@@ -260,7 +263,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 					let mut output_array_ptr: *mut T = ptr::null_mut();
 					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
 					let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
-					ortsys![unsafe GetTensorMutableData(self.ptr(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
+					ortsys![unsafe GetTensorMutableData(self.ptr_mut(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
 					let len = calculate_tensor_size(&dimensions);
 					Ok((dimensions, unsafe { std::slice::from_raw_parts_mut(output_array_ptr, len) }))

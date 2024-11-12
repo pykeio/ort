@@ -8,13 +8,13 @@ use ort_sys::c_char;
 
 use super::{Checkpoint, Optimizer, trainsys};
 use crate::{
-	Allocator, Result, RunOptions, SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs, Value, char_p_to_string,
+	Allocator, AsPointer, Result, RunOptions, SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs, Value, char_p_to_string,
 	error::{assert_non_null_pointer, status_to_result}
 };
 
 #[derive(Debug)]
 pub struct Trainer {
-	pub(crate) ptr: NonNull<ort_sys::OrtTrainingSession>,
+	ptr: NonNull<ort_sys::OrtTrainingSession>,
 	train_output_names: Vec<String>,
 	optimizer: Optimizer,
 	ckpt: Checkpoint,
@@ -37,7 +37,7 @@ impl Trainer {
 		let env = crate::get_environment()?;
 
 		let mut ptr: *mut ort_sys::OrtTrainingSession = ptr::null_mut();
-		trainsys![unsafe CreateTrainingSession(env.ptr(), session_options.session_options_ptr.as_ptr(), ckpt.ptr.as_ptr(), training_model_path.as_ptr(), eval_model_path.as_ptr(), optimizer_model_path.as_ptr(), &mut ptr)?; nonNull(ptr)];
+		trainsys![unsafe CreateTrainingSession(env.ptr(), session_options.ptr(), ckpt.ptr.as_ptr(), training_model_path.as_ptr(), eval_model_path.as_ptr(), optimizer_model_path.as_ptr(), &mut ptr)?; nonNull(ptr)];
 
 		let ptr = unsafe { NonNull::new_unchecked(ptr) };
 
@@ -46,7 +46,7 @@ impl Trainer {
 		let train_output_names = (0..train_output_len)
 			.map(|i| {
 				let mut name_bytes: *mut c_char = std::ptr::null_mut();
-				trainsys![unsafe TrainingSessionGetTrainingModelOutputName(ptr.as_ptr(), i, allocator.ptr.as_ptr(), &mut name_bytes)?];
+				trainsys![unsafe TrainingSessionGetTrainingModelOutputName(ptr.as_ptr(), i, allocator.ptr().cast_mut(), &mut name_bytes)?];
 				let name = match char_p_to_string(name_bytes) {
 					Ok(name) => name,
 					Err(e) => {
@@ -117,13 +117,9 @@ impl Trainer {
 	) -> Result<SessionOutputs<'r, 's>> {
 		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![std::ptr::null_mut(); self.train_output_names.len()];
 
-		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.map(|input_array_ort| input_array_ort.ptr().cast_const()).collect();
+		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.map(|input_array_ort| input_array_ort.ptr()).collect();
 
-		let run_options_ptr = if let Some(run_options) = &run_options {
-			run_options.run_options_ptr.as_ptr()
-		} else {
-			std::ptr::null_mut()
-		};
+		let run_options_ptr = if let Some(run_options) = &run_options { run_options.ptr() } else { std::ptr::null() };
 
 		trainsys![unsafe TrainStep(self.ptr.as_ptr(), run_options_ptr, input_ort_values.len(), input_ort_values.as_ptr(), output_tensor_ptrs.len(), output_tensor_ptrs.as_mut_ptr())?];
 
@@ -166,13 +162,9 @@ impl Trainer {
 	) -> Result<SessionOutputs<'r, 's>> {
 		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![std::ptr::null_mut(); self.train_output_names.len()];
 
-		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.map(|input_array_ort| input_array_ort.ptr().cast_const()).collect();
+		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.map(|input_array_ort| input_array_ort.ptr()).collect();
 
-		let run_options_ptr = if let Some(run_options) = &run_options {
-			run_options.run_options_ptr.as_ptr()
-		} else {
-			std::ptr::null_mut()
-		};
+		let run_options_ptr = if let Some(run_options) = &run_options { run_options.ptr() } else { std::ptr::null() };
 
 		trainsys![unsafe EvalStep(self.ptr.as_ptr(), run_options_ptr, input_ort_values.len(), input_ort_values.as_ptr(), output_tensor_ptrs.len(), output_tensor_ptrs.as_mut_ptr())?];
 
@@ -223,8 +215,12 @@ impl Trainer {
 	pub fn checkpoint(&self) -> &Checkpoint {
 		&self.ckpt
 	}
+}
 
-	pub fn ptr(&self) -> *mut ort_sys::OrtTrainingSession {
+impl AsPointer for Trainer {
+	type Sys = ort_sys::OrtTrainingSession;
+
+	fn ptr(&self) -> *const Self::Sys {
 		self.ptr.as_ptr()
 	}
 }

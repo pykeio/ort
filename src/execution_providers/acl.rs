@@ -43,13 +43,13 @@ impl ExecutionProvider for ACLExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "acl"))]
 		{
+			use crate::AsPointer;
+
 			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut ort_sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> ort_sys::OrtStatusPtr);
-			return crate::error::status_to_result(unsafe {
-				OrtSessionOptionsAppendExecutionProvider_ACL(session_builder.session_options_ptr.as_ptr(), self.use_arena.into())
-			});
+			return crate::error::status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_ACL(session_builder.ptr_mut(), self.use_arena.into()) });
 		}
 
 		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))

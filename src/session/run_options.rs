@@ -1,6 +1,7 @@
 use std::{collections::HashMap, ffi::CString, marker::PhantomData, ptr::NonNull, sync::Arc};
 
 use crate::{
+	AsPointer,
 	adapter::{Adapter, AdapterInner},
 	error::Result,
 	ortsys,
@@ -156,7 +157,7 @@ impl SelectedOutputMarker for HasSelectedOutputs {}
 /// have been selected.
 #[derive(Debug)]
 pub struct RunOptions<O: SelectedOutputMarker = NoSelectedOutputs> {
-	pub(crate) run_options_ptr: NonNull<ort_sys::OrtRunOptions>,
+	run_options_ptr: NonNull<ort_sys::OrtRunOptions>,
 	pub(crate) outputs: OutputSelector,
 	adapters: Vec<Arc<AdapterInner>>,
 	_marker: PhantomData<O>
@@ -311,6 +312,14 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 		ortsys![unsafe RunOptionsAddActiveLoraAdapter(self.run_options_ptr.as_ptr(), adapter.ptr())?];
 		self.adapters.push(Arc::clone(&adapter.inner));
 		Ok(())
+	}
+}
+
+impl<O: SelectedOutputMarker> AsPointer for RunOptions<O> {
+	type Sys = ort_sys::OrtRunOptions;
+
+	fn ptr(&self) -> *const Self::Sys {
+		self.run_options_ptr.as_ptr()
 	}
 }
 

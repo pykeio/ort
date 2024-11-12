@@ -55,13 +55,15 @@ impl ExecutionProvider for VitisAIExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "vitis"))]
 		{
+			use crate::AsPointer;
+
 			let ffi_options = self.options.to_ffi();
 			let status = crate::ortsys![
 				unsafe SessionOptionsAppendExecutionProvider_VitisAI(
-					session_builder.session_options_ptr.as_ptr(),
+					session_builder.ptr_mut(),
 					ffi_options.key_ptrs(),
 					ffi_options.value_ptrs(),
 					ffi_options.len()

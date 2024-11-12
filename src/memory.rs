@@ -6,6 +6,7 @@ use std::{
 };
 
 use crate::{
+	AsPointer,
 	error::{Result, status_to_result},
 	ortsys,
 	session::{Session, SharedSessionInner}
@@ -63,7 +64,7 @@ use crate::{
 /// ```
 #[derive(Debug)]
 pub struct Allocator {
-	pub(crate) ptr: NonNull<ort_sys::OrtAllocator>,
+	ptr: NonNull<ort_sys::OrtAllocator>,
 	/// The 'default' CPU allocator, provided by `GetAllocatorWithDefaultOptions` and implemented by
 	/// [`Allocator::default`], should **not** be released, so this field marks whether or not we should call
 	/// `ReleaseAllocator` on drop.
@@ -155,10 +156,6 @@ impl Allocator {
 			_info: Some(memory_info)
 		})
 	}
-
-	pub fn ptr(&self) -> *mut ort_sys::OrtAllocator {
-		self.ptr.as_ptr()
-	}
 }
 
 impl Default for Allocator {
@@ -177,6 +174,14 @@ impl Default for Allocator {
 			_session_inner: None,
 			_info: None
 		}
+	}
+}
+
+impl AsPointer for Allocator {
+	type Sys = ort_sys::OrtAllocator;
+
+	fn ptr(&self) -> *const Self::Sys {
+		self.ptr.as_ptr()
 	}
 }
 
@@ -353,7 +358,7 @@ impl From<ort_sys::OrtMemoryInfoDeviceType> for DeviceType {
 /// is requested).
 #[derive(Debug)]
 pub struct MemoryInfo {
-	pub(crate) ptr: NonNull<ort_sys::OrtMemoryInfo>,
+	ptr: NonNull<ort_sys::OrtMemoryInfo>,
 	should_release: bool
 }
 
@@ -485,10 +490,6 @@ impl MemoryInfo {
 	pub fn is_cpu_accessible(&self) -> bool {
 		self.device_type() == DeviceType::CPU
 	}
-
-	pub fn ptr(&self) -> *mut ort_sys::OrtMemoryInfo {
-		self.ptr.as_ptr()
-	}
 }
 
 impl Clone for MemoryInfo {
@@ -502,6 +503,14 @@ impl PartialEq<MemoryInfo> for MemoryInfo {
 		let mut out = 0;
 		ortsys![unsafe CompareMemoryInfo(self.ptr.as_ptr(), other.ptr.as_ptr(), &mut out)]; // implementation always returns ok status
 		out == 0
+	}
+}
+
+impl AsPointer for MemoryInfo {
+	type Sys = ort_sys::OrtMemoryInfo;
+
+	fn ptr(&self) -> *const Self::Sys {
+		self.ptr.as_ptr()
 	}
 }
 

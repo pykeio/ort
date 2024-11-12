@@ -131,9 +131,11 @@ impl ExecutionProvider for ROCmExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "rocm"))]
 		{
+			use crate::AsPointer;
+
 			let rocm_options = ort_sys::OrtROCMProviderOptions {
 				device_id: self.device_id,
 				miopen_conv_exhaustive_search: self.miopen_conv_exhaustive_search.into(),
@@ -152,7 +154,7 @@ impl ExecutionProvider for ROCmExecutionProvider {
 				tunable_op_max_tuning_duration_ms: self.tunable_op_max_tuning_duration_ms
 			};
 			return crate::error::status_to_result(
-				crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(session_builder.session_options_ptr.as_ptr(), std::ptr::addr_of!(rocm_options))]
+				crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(session_builder.ptr_mut(), std::ptr::addr_of!(rocm_options))]
 			);
 		}
 

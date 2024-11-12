@@ -84,9 +84,11 @@ impl ExecutionProvider for MIGraphXExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "migraphx"))]
 		{
+			use crate::AsPointer;
+
 			let options = ort_sys::OrtMIGraphXProviderOptions {
 				device_id: self.device_id,
 				migraphx_fp16_enable: self.enable_fp16.into(),
@@ -103,7 +105,7 @@ impl ExecutionProvider for MIGraphXExecutionProvider {
 				migraphx_save_model_path: self.save_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(std::ptr::null),
 				migraphx_exhaustive_tune: self.exhaustive_tune
 			};
-			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_MIGraphX(session_builder.session_options_ptr.as_ptr(), &options)?];
+			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_MIGraphX(session_builder.ptr_mut(), &options)?];
 			return Ok(());
 		}
 

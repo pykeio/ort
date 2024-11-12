@@ -7,7 +7,7 @@ use std::{
 
 use super::{DowncastableTarget, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker};
 use crate::{
-	ErrorCode,
+	AsPointer, ErrorCode,
 	error::{Error, Result},
 	memory::Allocator,
 	ortsys
@@ -83,7 +83,7 @@ impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
 				let mut vec = Vec::with_capacity(len);
 				for i in 0..len {
 					let mut value_ptr = ptr::null_mut();
-					ortsys![unsafe GetValue(self.ptr(), i as _, allocator.ptr.as_ptr(), &mut value_ptr)?; nonNull(value_ptr)];
+					ortsys![unsafe GetValue(self.ptr(), i as _, allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
 
 					let value = unsafe { Value::from_ptr(NonNull::new_unchecked(value_ptr), None) };
 					let value_type = value.dtype();
@@ -125,7 +125,7 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized + 'static> Value<Se
 	pub fn new(values: impl IntoIterator<Item = Value<T>>) -> Result<Self> {
 		let mut value_ptr = ptr::null_mut();
 		let values: Vec<Value<T>> = values.into_iter().collect();
-		let value_ptrs: Vec<*const ort_sys::OrtValue> = values.iter().map(|c| c.ptr().cast_const()).collect();
+		let value_ptrs: Vec<*const ort_sys::OrtValue> = values.iter().map(|c| c.ptr()).collect();
 		ortsys![
 			unsafe CreateValue(value_ptrs.as_ptr(), values.len(), ort_sys::ONNXType::ONNX_TYPE_SEQUENCE, &mut value_ptr)?;
 			nonNull(value_ptr)

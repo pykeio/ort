@@ -264,9 +264,11 @@ impl ExecutionProvider for CUDAExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "cuda"))]
 		{
+			use crate::AsPointer;
+
 			let mut cuda_options: *mut ort_sys::OrtCUDAProviderOptionsV2 = std::ptr::null_mut();
 			crate::ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)?];
 			let ffi_options = self.options.to_ffi();
@@ -277,7 +279,7 @@ impl ExecutionProvider for CUDAExecutionProvider {
 				return Err(e);
 			}
 
-			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(session_builder.session_options_ptr.as_ptr(), cuda_options)];
+			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(session_builder.ptr_mut(), cuda_options)];
 			crate::ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
 			return crate::error::status_to_result(status);
 		}

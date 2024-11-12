@@ -4,6 +4,7 @@ use std::{any::Any, marker::PhantomData, path::Path, ptr::NonNull, sync::Arc};
 
 use super::SessionBuilder;
 use crate::{
+	AsPointer,
 	environment::get_environment,
 	error::{Error, ErrorCode, Result},
 	execution_providers::apply_execution_providers,
@@ -73,21 +74,21 @@ impl SessionBuilder {
 		let model_path = crate::util::path_to_os_char(model_filepath);
 
 		let env = get_environment()?;
-		apply_execution_providers(&self, env.execution_providers.iter().cloned())?;
+		apply_execution_providers(&mut self, env.execution_providers.iter().cloned())?;
 
 		if env.has_global_threadpool {
-			ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr.as_ptr())?];
+			ortsys![unsafe DisablePerSessionThreads(self.ptr_mut())?];
 		}
 
 		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
-		ortsys![unsafe CreateSession(env.env_ptr.as_ptr(), model_path.as_ptr(), self.session_options_ptr.as_ptr(), &mut session_ptr)?; nonNull(session_ptr)];
+		ortsys![unsafe CreateSession(env.ptr(), model_path.as_ptr(), self.ptr(), &mut session_ptr)?; nonNull(session_ptr)];
 
 		let session_ptr = unsafe { NonNull::new_unchecked(session_ptr) };
 
 		let allocator = match &self.memory_info {
 			Some(info) => {
 				let mut allocator_ptr: *mut ort_sys::OrtAllocator = std::ptr::null_mut();
-				ortsys![unsafe CreateAllocator(session_ptr.as_ptr(), info.ptr.as_ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
+				ortsys![unsafe CreateAllocator(session_ptr.as_ptr(), info.ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
 				unsafe { Allocator::from_raw_unchecked(allocator_ptr) }
 			}
 			None => Allocator::default()
@@ -138,16 +139,16 @@ impl SessionBuilder {
 		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
 
 		let env = get_environment()?;
-		apply_execution_providers(&self, env.execution_providers.iter().cloned())?;
+		apply_execution_providers(&mut self, env.execution_providers.iter().cloned())?;
 
 		if env.has_global_threadpool {
-			ortsys![unsafe DisablePerSessionThreads(self.session_options_ptr.as_ptr())?];
+			ortsys![unsafe DisablePerSessionThreads(self.ptr_mut())?];
 		}
 
 		let model_data = model_bytes.as_ptr().cast::<std::ffi::c_void>();
 		let model_data_length = model_bytes.len();
 		ortsys![
-			unsafe CreateSessionFromArray(env.env_ptr.as_ptr(), model_data, model_data_length, self.session_options_ptr.as_ptr(), &mut session_ptr)?;
+			unsafe CreateSessionFromArray(env.ptr(), model_data, model_data_length, self.ptr(), &mut session_ptr)?;
 			nonNull(session_ptr)
 		];
 
@@ -156,7 +157,7 @@ impl SessionBuilder {
 		let allocator = match &self.memory_info {
 			Some(info) => {
 				let mut allocator_ptr: *mut ort_sys::OrtAllocator = std::ptr::null_mut();
-				ortsys![unsafe CreateAllocator(session_ptr.as_ptr(), info.ptr.as_ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
+				ortsys![unsafe CreateAllocator(session_ptr.as_ptr(), info.ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
 				unsafe { Allocator::from_raw_unchecked(allocator_ptr) }
 			}
 			None => Allocator::default()

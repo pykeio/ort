@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{
-	DynValue,
+	AsPointer, DynValue,
 	error::{Result, assert_non_null_pointer, status_to_result},
 	memory::MemoryInfo,
 	operator::OperatorDomain,
@@ -36,7 +36,7 @@ pub use self::impl_options::GraphOptimizationLevel;
 /// # }
 /// ```
 pub struct SessionBuilder {
-	pub(crate) session_options_ptr: NonNull<ort_sys::OrtSessionOptions>,
+	session_options_ptr: NonNull<ort_sys::OrtSessionOptions>,
 	memory_info: Option<Rc<MemoryInfo>>,
 	operator_domains: Vec<Arc<OperatorDomain>>,
 	external_initializers: Vec<Rc<DynValue>>,
@@ -46,8 +46,7 @@ pub struct SessionBuilder {
 impl Clone for SessionBuilder {
 	fn clone(&self) -> Self {
 		let mut session_options_ptr = ptr::null_mut();
-		status_to_result(ortsys![unsafe CloneSessionOptions(self.session_options_ptr.as_ptr(), ptr::addr_of_mut!(session_options_ptr))])
-			.expect("error cloning session options");
+		status_to_result(ortsys![unsafe CloneSessionOptions(self.ptr(), ptr::addr_of_mut!(session_options_ptr))]).expect("error cloning session options");
 		assert_non_null_pointer(session_options_ptr, "OrtSessionOptions").expect("Cloned session option pointer is null");
 		Self {
 			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },
@@ -61,7 +60,7 @@ impl Clone for SessionBuilder {
 
 impl Drop for SessionBuilder {
 	fn drop(&mut self) {
-		ortsys![unsafe ReleaseSessionOptions(self.session_options_ptr.as_ptr())];
+		ortsys![unsafe ReleaseSessionOptions(self.ptr_mut())];
 	}
 }
 
@@ -94,7 +93,7 @@ impl SessionBuilder {
 	pub(crate) fn add_config_entry(&mut self, key: &str, value: &str) -> Result<()> {
 		let key = CString::new(key)?;
 		let value = CString::new(value)?;
-		ortsys![unsafe AddSessionConfigEntry(self.session_options_ptr.as_ptr(), key.as_ptr(), value.as_ptr())?];
+		ortsys![unsafe AddSessionConfigEntry(self.ptr_mut(), key.as_ptr(), value.as_ptr())?];
 		Ok(())
 	}
 
@@ -103,8 +102,12 @@ impl SessionBuilder {
 		self.add_config_entry(key.as_ref(), value.as_ref())?;
 		Ok(self)
 	}
+}
 
-	pub fn ptr(&self) -> *mut ort_sys::OrtSessionOptions {
+impl AsPointer for SessionBuilder {
+	type Sys = ort_sys::OrtSessionOptions;
+
+	fn ptr(&self) -> *const Self::Sys {
 		self.session_options_ptr.as_ptr()
 	}
 }

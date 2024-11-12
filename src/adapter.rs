@@ -4,11 +4,19 @@ use std::{
 	sync::Arc
 };
 
-use crate::{Allocator, Result, ortsys, util};
+use crate::{Allocator, AsPointer, Result, ortsys, util};
 
 #[derive(Debug)]
 pub(crate) struct AdapterInner {
-	pub(crate) ptr: NonNull<ort_sys::OrtLoraAdapter>
+	ptr: NonNull<ort_sys::OrtLoraAdapter>
+}
+
+impl AsPointer for AdapterInner {
+	type Sys = ort_sys::OrtLoraAdapter;
+
+	fn ptr(&self) -> *const Self::Sys {
+		self.ptr.as_ptr()
+	}
 }
 
 impl Drop for AdapterInner {
@@ -25,7 +33,7 @@ pub struct Adapter {
 impl Adapter {
 	pub fn from_file(path: impl AsRef<Path>, allocator: Option<&Allocator>) -> Result<Self> {
 		let path = util::path_to_os_char(path);
-		let allocator_ptr = allocator.map(|c| c.ptr()).unwrap_or_else(ptr::null_mut);
+		let allocator_ptr = allocator.map(|c| c.ptr().cast_mut()).unwrap_or_else(ptr::null_mut);
 		let mut ptr = ptr::null_mut();
 		ortsys![unsafe CreateLoraAdapter(path.as_ptr(), allocator_ptr, &mut ptr)?];
 		Ok(Adapter {
@@ -36,7 +44,7 @@ impl Adapter {
 	}
 
 	pub fn from_memory(bytes: &[u8], allocator: Option<&Allocator>) -> Result<Self> {
-		let allocator_ptr = allocator.map(|c| c.ptr()).unwrap_or_else(ptr::null_mut);
+		let allocator_ptr = allocator.map(|c| c.ptr().cast_mut()).unwrap_or_else(ptr::null_mut);
 		let mut ptr = ptr::null_mut();
 		ortsys![unsafe CreateLoraAdapterFromArray(bytes.as_ptr().cast(), bytes.len(), allocator_ptr, &mut ptr)?];
 		Ok(Adapter {
@@ -45,9 +53,13 @@ impl Adapter {
 			})
 		})
 	}
+}
 
-	pub fn ptr(&self) -> *mut ort_sys::OrtLoraAdapter {
-		self.inner.ptr.as_ptr()
+impl AsPointer for Adapter {
+	type Sys = ort_sys::OrtLoraAdapter;
+
+	fn ptr(&self) -> *const Self::Sys {
+		self.inner.ptr()
 	}
 }
 

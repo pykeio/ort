@@ -12,6 +12,7 @@ use ndarray::{ArcArray, Array, ArrayView, CowArray, Dimension};
 
 use super::{DynTensor, Tensor, TensorRefMut, calculate_tensor_size};
 use crate::{
+	AsPointer,
 	error::{Error, ErrorCode, Result, assert_non_null_pointer},
 	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
 	ortsys,
@@ -56,7 +57,7 @@ impl Tensor<String> {
 
 		// create tensor without data -- data is filled in later
 		ortsys![
-			unsafe CreateTensorAsOrtValue(Allocator::default().ptr.as_ptr(), shape_ptr, shape_len, TensorElementType::String.into(), &mut value_ptr)?;
+			unsafe CreateTensorAsOrtValue(Allocator::default().ptr_mut(), shape_ptr, shape_len, TensorElementType::String.into(), &mut value_ptr)?;
 			nonNull(value_ptr)
 		];
 
@@ -113,7 +114,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 
 		ortsys![
 			unsafe CreateTensorAsOrtValue(
-				allocator.ptr.as_ptr(),
+				allocator.ptr().cast_mut(),
 				shape_ptr,
 				shape_len,
 				T::into_tensor_element_type().into(),
@@ -182,7 +183,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 
 		ortsys![
 			unsafe CreateTensorWithDataAsOrtValue(
-				memory_info.ptr.as_ptr(),
+				memory_info.ptr(),
 				tensor_values_ptr,
 				ptr_len * std::mem::size_of::<T>(),
 				shape_ptr,
@@ -239,7 +240,7 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 
 		ortsys![
 			unsafe CreateTensorWithDataAsOrtValue(
-				info.ptr.as_ptr(),
+				info.ptr(),
 				data,
 				data_len,
 				shape_ptr,

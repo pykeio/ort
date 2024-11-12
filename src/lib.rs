@@ -232,6 +232,21 @@ pub fn api() -> &'static ort_sys::OrtApi {
 	unsafe { ptr.as_ref() }
 }
 
+/// Trait to access raw pointers from safe types which wrap unsafe [`ort_sys`] types.
+pub trait AsPointer {
+	/// This safe type's corresponding [`ort_sys`] type.
+	type Sys;
+
+	/// Returns the underlying [`ort_sys`] type pointer this safe type wraps. The pointer is guaranteed to be non-null.
+	fn ptr(&self) -> *const Self::Sys;
+
+	/// Returns the underlying [`ort_sys`] type pointer this safe type wraps as a mutable pointer. The pointer is
+	/// guaranteed to be non-null.
+	fn ptr_mut(&mut self) -> *mut Self::Sys {
+		self.ptr().cast_mut()
+	}
+}
+
 #[macro_export]
 macro_rules! ortsys {
 	($method:ident) => {

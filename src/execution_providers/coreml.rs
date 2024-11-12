@@ -63,9 +63,11 @@ impl ExecutionProvider for CoreMLExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "coreml"))]
 		{
+			use crate::AsPointer;
+
 			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_CoreML(options: *mut ort_sys::OrtSessionOptions, flags: u32) -> ort_sys::OrtStatusPtr);
 			let mut flags = 0;
 			if self.use_cpu_only {
@@ -77,9 +79,7 @@ impl ExecutionProvider for CoreMLExecutionProvider {
 			if self.only_enable_device_with_ane {
 				flags |= 0x004;
 			}
-			return crate::error::status_to_result(unsafe {
-				OrtSessionOptionsAppendExecutionProvider_CoreML(session_builder.session_options_ptr.as_ptr(), flags)
-			});
+			return crate::error::status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_CoreML(session_builder.ptr_mut(), flags) });
 		}
 
 		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))

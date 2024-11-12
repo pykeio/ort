@@ -104,7 +104,7 @@ pub trait ExecutionProvider: Send + Sync {
 	}
 
 	/// Attempts to register this execution provider on the given session.
-	fn register(&self, session_builder: &SessionBuilder) -> Result<()>;
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()>;
 }
 
 /// Trait used for execution providers that can have arbitrary configuration keys applied.
@@ -180,17 +180,20 @@ impl ExecutionProviderOptions {
 			.insert(CString::new(key).expect("unexpected nul in key string"), CString::new(value).expect("unexpected nul in value string"));
 	}
 
+	#[allow(unused)]
 	pub fn to_ffi(&self) -> ExecutionProviderOptionsFFI {
 		let (key_ptrs, value_ptrs) = self.0.iter().map(|(k, v)| (k.as_ptr(), v.as_ptr())).unzip();
 		ExecutionProviderOptionsFFI { key_ptrs, value_ptrs }
 	}
 }
 
+#[allow(unused)]
 pub(crate) struct ExecutionProviderOptionsFFI {
 	key_ptrs: Vec<*const c_char>,
 	value_ptrs: Vec<*const c_char>
 }
 
+#[allow(unused)]
 impl ExecutionProviderOptionsFFI {
 	pub fn key_ptrs(&self) -> *const *const c_char {
 		self.key_ptrs.as_ptr()
@@ -228,7 +231,10 @@ macro_rules! get_ep_register {
 #[allow(unused)]
 pub(crate) use get_ep_register;
 
-pub(crate) fn apply_execution_providers(session_builder: &SessionBuilder, execution_providers: impl Iterator<Item = ExecutionProviderDispatch>) -> Result<()> {
+pub(crate) fn apply_execution_providers(
+	session_builder: &mut SessionBuilder,
+	execution_providers: impl Iterator<Item = ExecutionProviderDispatch>
+) -> Result<()> {
 	let execution_providers: Vec<_> = execution_providers.collect();
 	let mut fallback_to_cpu = !execution_providers.is_empty();
 	for ex in execution_providers {

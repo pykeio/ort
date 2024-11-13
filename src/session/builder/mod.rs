@@ -7,11 +7,12 @@ use std::{
 };
 
 use crate::{
-	AsPointer, DynValue,
+	AsPointer,
 	error::{Result, assert_non_null_pointer, status_to_result},
 	memory::MemoryInfo,
 	operator::OperatorDomain,
-	ortsys
+	ortsys,
+	value::DynValue
 };
 
 mod impl_commit;
@@ -22,11 +23,12 @@ pub use self::impl_options::GraphOptimizationLevel;
 
 /// Creates a session using the builder pattern.
 ///
-/// Once configured, use the [`SessionBuilder::commit_from_file`](crate::SessionBuilder::commit_from_file)
-/// method to 'commit' the builder configuration into a [`Session`].
+/// Once configured, use the
+/// [`SessionBuilder::commit_from_file`](crate::session::builder::SessionBuilder::commit_from_file) method to 'commit'
+/// the builder configuration into a [`Session`].
 ///
 /// ```
-/// # use ort::{GraphOptimizationLevel, Session};
+/// # use ort::session::{builder::GraphOptimizationLevel, Session};
 /// # fn main() -> ort::Result<()> {
 /// let session = Session::builder()?
 /// 	.with_optimization_level(GraphOptimizationLevel::Level1)?
@@ -35,6 +37,8 @@ pub use self::impl_options::GraphOptimizationLevel;
 /// # Ok(())
 /// # }
 /// ```
+///
+/// [`Session`]: crate::session::Session
 pub struct SessionBuilder {
 	session_options_ptr: NonNull<ort_sys::OrtSessionOptions>,
 	memory_info: Option<Rc<MemoryInfo>>,
@@ -68,7 +72,7 @@ impl SessionBuilder {
 	/// Creates a new session builder.
 	///
 	/// ```
-	/// # use ort::{GraphOptimizationLevel, Session};
+	/// # use ort::session::{builder::GraphOptimizationLevel, Session};
 	/// # fn main() -> ort::Result<()> {
 	/// let session = Session::builder()?
 	/// 	.with_optimization_level(GraphOptimizationLevel::Level1)?

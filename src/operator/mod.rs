@@ -1,11 +1,13 @@
+//! Contains traits for implementing custom operator domains & kernels.
+
 use std::{
 	ffi::CString,
 	ptr::{self, NonNull}
 };
 
 pub(crate) mod bound;
-pub(crate) mod io;
-pub(crate) mod kernel;
+pub mod io;
+pub mod kernel;
 #[cfg(test)]
 mod tests;
 
@@ -35,9 +37,12 @@ pub trait Operator: Send {
 	/// Returns the execution provider this operator runs on, e.g. `CUDAExecutionProvider`.
 	///
 	/// If the returned type is not `None`, and the execution provider used by the session matches this operator's
-	/// EP type, the value will not be copied to the CPU and you may use functions like [`crate::Tensor::data_ptr`] to
-	/// access the underlying device memory, and [`super::KernelContext::compute_stream`] to access the GPU compute
+	/// EP type, the value will not be copied to the CPU and you may use functions like [`Tensor::data_ptr`] to
+	/// access the underlying device memory, and [`KernelContext::compute_stream`] to access the GPU compute
 	/// stream.
+	///
+	/// [`Tensor::data_ptr`]: crate::value::Tensor::data_ptr
+	/// [`KernelContext::compute_stream`]: crate::operator::kernel::KernelContext::compute_stream
 	fn execution_provider_type() -> Option<&'static str> {
 		None
 	}

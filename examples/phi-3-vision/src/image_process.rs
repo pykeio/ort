@@ -18,7 +18,7 @@ pub const NUM_CROPS: usize = 1;
 pub const _NUM_IMG_TOKENS: usize = 144;
 
 const OPENAI_CLIP_MEAN: [f32; 3] = [0.48145466, 0.4578275, 0.40821073];
-const OPENAI_CLIP_STD: [f32; 3] = [0.26862954, 0.26130258, 0.27577711];
+const OPENAI_CLIP_STD: [f32; 3] = [0.26862954, 0.2613026, 0.2757771];
 
 pub struct Phi3VImageProcessor {
 	num_crops: usize,

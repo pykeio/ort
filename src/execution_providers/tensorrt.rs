@@ -2,7 +2,7 @@ use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
 use crate::{
 	error::{Error, Result},
 	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
-	session::SessionBuilder
+	session::builder::SessionBuilder
 };
 
 #[derive(Debug, Default, Clone)]
@@ -290,7 +290,7 @@ impl ExecutionProvider for TensorRTExecutionProvider {
 			// The TensorRT execution provider specifically is pretty picky about requiring an environment to be initialized by the
 			// time we register it. This isn't always the case in `ort`, so if we get to this point, let's make sure we have an
 			// environment initialized.
-			let _ = crate::get_environment();
+			let _ = crate::environment::get_environment();
 
 			let mut trt_options: *mut ort_sys::OrtTensorRTProviderOptionsV2 = std::ptr::null_mut();
 			crate::ortsys![unsafe CreateTensorRTProviderOptions(&mut trt_options)?];

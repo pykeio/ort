@@ -24,10 +24,10 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{Session, Value};
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
-	/// let value = Value::from_array(array.view())?;
+	/// let value = Tensor::from_array(array.view())?.into_dyn();
 	///
 	/// let extracted = value.try_extract_tensor::<f32>()?;
 	/// assert_eq!(array.into_dyn(), extracted);
@@ -37,10 +37,12 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// # Errors
 	/// May return an error if:
-	/// - This is a [`crate::DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the
-	///   infallible [`Tensor::extract_tensor`] instead)*
+	/// - This is a [`DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the infallible
+	///   [`Tensor::extract_tensor`] instead)*
 	/// - The provided type `T` does not match the tensor's element type.
 	/// - The tensor's data is not allocated in CPU memory.
+	///
+	/// [`DynValue`]: crate::value::DynValue
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_tensor<T: PrimitiveTensorElementType>(&self) -> Result<ndarray::ArrayViewD<'_, T>> {
@@ -71,9 +73,9 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{Session, Value};
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
-	/// let value = Value::from_array(((), vec![3.14_f32]))?;
+	/// let value = Tensor::from_array(((), vec![3.14_f32]))?.into_dyn();
 	///
 	/// let extracted = value.try_extract_scalar::<f32>()?;
 	/// assert_eq!(extracted, 3.14);
@@ -85,9 +87,11 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// May return an error if:
 	/// - The tensor is not 0-dimensional.
 	/// - The provided type `T` does not match the tensor's element type.
-	/// - This is a [`crate::DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the
-	///   infallible [`Tensor::extract_tensor`] instead)*
+	/// - This is a [`DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the infallible
+	///   [`Tensor::extract_tensor`] instead)*
 	/// - The tensor's data is not allocated in CPU memory.
+	///
+	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_scalar<T: PrimitiveTensorElementType + Copy>(&self) -> Result<T> {
 		let dtype = self.dtype();
 		match dtype {
@@ -128,10 +132,10 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{Session, Value};
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
-	/// let mut value = Value::from_array(array.view())?;
+	/// let mut value = Tensor::from_array(array.view())?.into_dyn();
 	///
 	/// let mut extracted = value.try_extract_tensor_mut::<f32>()?;
 	/// extracted[[0, 0, 0, 1]] = 0.0;
@@ -146,9 +150,11 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// # Errors
 	/// May return an error if:
-	/// - This is a [`crate::DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the
-	///   infallible [`Tensor::extract_tensor_mut`] instead)*
+	/// - This is a [`DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the infallible
+	///   [`Tensor::extract_tensor_mut`] instead)*
 	/// - The provided type `T` does not match the tensor's element type.
+	///
+	/// [`DynValue`]: crate::value::DynValue
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_tensor_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<ndarray::ArrayViewMutD<'_, T>> {
@@ -182,10 +188,10 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// - the alternative function for strings, [`Tensor::try_extract_raw_string_tensor`].
 	///
 	/// ```
-	/// # use ort::{Session, Value};
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = vec![1_i64, 2, 3, 4, 5];
-	/// let value = Value::from_array(([array.len()], array.clone().into_boxed_slice()))?;
+	/// let value = Tensor::from_array(([array.len()], array.clone().into_boxed_slice()))?.into_dyn();
 	///
 	/// let (extracted_shape, extracted_data) = value.try_extract_raw_tensor::<i64>()?;
 	/// assert_eq!(extracted_data, &array);
@@ -196,9 +202,11 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// # Errors
 	/// May return an error if:
-	/// - This is a [`crate::DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the
-	///   infallible [`Tensor::extract_raw_tensor`] instead)*
+	/// - This is a [`DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the infallible
+	///   [`Tensor::extract_raw_tensor`] instead)*
 	/// - The provided type `T` does not match the tensor's element type.
+	///
+	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_raw_tensor<T: PrimitiveTensorElementType>(&self) -> Result<(Vec<i64>, &[T])> {
 		let dtype = self.dtype();
 		match dtype {
@@ -233,10 +241,10 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// See also the infallible counterpart, [`Tensor::extract_raw_tensor_mut`], for typed [`Tensor<T>`]s.
 	///
 	/// ```
-	/// # use ort::{Session, Value};
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = vec![1_i64, 2, 3, 4, 5];
-	/// let mut value = Value::from_array(([array.len()], array.clone().into_boxed_slice()))?;
+	/// let mut value = Tensor::from_array(([array.len()], array.clone().into_boxed_slice()))?.into_dyn();
 	///
 	/// let (extracted_shape, extracted_data) = value.try_extract_raw_tensor_mut::<i64>()?;
 	/// assert_eq!(extracted_data, &array);
@@ -247,9 +255,11 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// # Errors
 	/// May return an error if:
-	/// - This is a [`crate::DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the
-	///   infallible [`Tensor::extract_raw_tensor_mut`] instead)*
+	/// - This is a [`DynValue`], and the value is not actually a tensor. *(for typed [`Tensor`]s, use the infallible
+	///   [`Tensor::extract_raw_tensor_mut`] instead)*
 	/// - The provided type `T` does not match the tensor's element type.
+	///
+	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_raw_tensor_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<(Vec<i64>, &mut [T])> {
 		let dtype = self.dtype();
 		match dtype {
@@ -281,10 +291,10 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// Attempt to extract the underlying data into a Rust `ndarray`.
 	///
 	/// ```
-	/// # use ort::{Session, Tensor, TensorElementType};
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = ndarray::Array1::from_vec(vec!["hello", "world"]);
-	/// let tensor = Tensor::from_string_array(array.clone())?;
+	/// let tensor = Tensor::from_string_array(array.clone())?.into_dyn();
 	///
 	/// let extracted = tensor.try_extract_string_tensor()?;
 	/// assert_eq!(array.into_dyn(), extracted);
@@ -349,10 +359,10 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// an owned `Vec` of its data.
 	///
 	/// ```
-	/// # use ort::{Session, Tensor, TensorElementType};
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = vec!["hello", "world"];
-	/// let tensor = Tensor::from_string_array(([array.len()], array.clone().into_boxed_slice()))?;
+	/// let tensor = Tensor::from_string_array(([array.len()], array.clone().into_boxed_slice()))?.into_dyn();
 	///
 	/// let (extracted_shape, extracted_data) = tensor.try_extract_raw_string_tensor()?;
 	/// assert_eq!(extracted_data, array);
@@ -414,7 +424,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// Returns the shape of the tensor.
 	///
 	/// ```
-	/// # use ort::{Allocator, Sequence, Tensor};
+	/// # use ort::{memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let allocator = Allocator::default();
 	/// let tensor = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
@@ -446,7 +456,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{Session, Tensor, TensorElementType};
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
 	/// let tensor = Tensor::from_array(array.view())?;
@@ -466,7 +476,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{Session, Tensor, TensorElementType};
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
 	/// let mut tensor = Tensor::from_array(array.view())?;
@@ -491,7 +501,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// view into its data.
 	///
 	/// ```
-	/// # use ort::{Session, Tensor, TensorElementType};
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = vec![1_i64, 2, 3, 4, 5];
 	/// let tensor = Tensor::from_array(([array.len()], array.clone().into_boxed_slice()))?;
@@ -510,7 +520,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// into its data.
 	///
 	/// ```
-	/// # use ort::{Session, Tensor, TensorElementType};
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = vec![1_i64, 2, 3, 4, 5];
 	/// let tensor = Tensor::from_array(([array.len()], array.clone().into_boxed_slice()))?;

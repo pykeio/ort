@@ -1,4 +1,14 @@
-//! Contains the [`Session`] and [`SessionBuilder`] types for managing ONNX Runtime sessions and performing inference.
+//! Contains [`Session`], the main interface used to inference ONNX models.
+//!
+//! ```
+//! # use ort::session::Session;
+//! # fn main() -> ort::Result<()> {
+//! let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+//! let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
+//! let outputs = session.run(ort::inputs![input]?)?;
+//! # 	Ok(())
+//! # }
+//! ```
 
 use std::{
 	any::Any,
@@ -23,17 +33,19 @@ use crate::{
 };
 
 mod r#async;
-pub(crate) mod builder;
-pub(crate) mod input;
-pub(crate) mod output;
-mod run_options;
-use self::r#async::{AsyncInferenceContext, InferenceFutInner, RunOptionsRef};
+pub mod builder;
+pub mod input;
+pub mod output;
+pub mod run_options;
 pub use self::{
 	r#async::InferenceFut,
-	builder::{GraphOptimizationLevel, SessionBuilder},
 	input::{SessionInputValue, SessionInputs},
 	output::SessionOutputs,
-	run_options::{HasSelectedOutputs, NoSelectedOutputs, OutputSelector, RunOptions, SelectedOutputMarker}
+	run_options::{HasSelectedOutputs, NoSelectedOutputs, RunOptions, SelectedOutputMarker}
+};
+use self::{
+	r#async::{AsyncInferenceContext, InferenceFutInner, RunOptionsRef},
+	builder::SessionBuilder
 };
 
 /// Holds onto an [`ort_sys::OrtSession`] pointer and its associated allocator.
@@ -44,7 +56,7 @@ pub use self::{
 pub struct SharedSessionInner {
 	session_ptr: NonNull<ort_sys::OrtSession>,
 	pub(crate) allocator: Allocator,
-	/// Additional things we may need to hold onto for the duration of this session, like [`crate::OperatorDomain`]s and
+	/// Additional things we may need to hold onto for the duration of this session, like `OperatorDomain`s and
 	/// DLL handles for operator libraries.
 	_extras: Vec<Box<dyn Any>>,
 	_environment: Arc<Environment>
@@ -71,7 +83,7 @@ impl Drop for SharedSessionInner {
 /// An ONNX Runtime graph to be used for inference.
 ///
 /// ```
-/// # use ort::{GraphOptimizationLevel, Session};
+/// # use ort::session::Session;
 /// # fn main() -> ort::Result<()> {
 /// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
@@ -176,7 +188,7 @@ impl Session {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{Session, RunOptions, Value, ValueType, TensorElementType};
+	/// # use ort::{session::{run_options::RunOptions, Session}, tensor::TensorElementType, value::{Value, ValueType}};
 	/// # fn main() -> ort::Result<()> {
 	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
@@ -206,7 +218,7 @@ impl Session {
 	/// ```no_run
 	/// # // no_run because upsample.onnx is too simple of a model for the termination signal to be reliable enough
 	/// # use std::sync::Arc;
-	/// # use ort::{Session, RunOptions, Value, ValueType, TensorElementType};
+	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType}, tensor::TensorElementType};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
@@ -334,7 +346,7 @@ impl Session {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{Session, RunOptions, Value, ValueType, TensorElementType};
+	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType}, tensor::TensorElementType};
 	/// # fn main() -> ort::Result<()> { tokio_test::block_on(async {
 	/// let session = Session::builder()?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));

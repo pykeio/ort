@@ -1,3 +1,5 @@
+//! Types for managing memory & device allocations.
+
 use std::{
 	ffi::{CString, c_char, c_int, c_void},
 	mem,
@@ -12,13 +14,13 @@ use crate::{
 	session::{Session, SharedSessionInner}
 };
 
-/// A device allocator used to manage the allocation of [`crate::Value`]s.
+/// A device allocator used to manage the allocation of [`Value`]s.
 ///
 /// # Direct allocation
 /// [`Allocator`] can be used to directly allocate device memory. This can be useful if you have a
 /// postprocessing step that runs on the GPU.
 /// ```no_run
-/// # use ort::{Allocator, Session, Tensor, MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
+/// # use ort::{memory::{Allocator, MemoryInfo, MemoryType, AllocationDevice, AllocatorType}, session::Session, value::Tensor};
 /// # fn main() -> ort::Result<()> {
 /// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// let allocator = Allocator::new(
@@ -47,7 +49,7 @@ use crate::{
 /// If you create a session with a device allocator that supports pinned memory, like CUDA or ROCm, you can create
 /// an allocator for that session, and use it to allocate tensors with faster pinned memory:
 /// ```no_run
-/// # use ort::{Allocator, Session, Tensor, MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
+/// # use ort::{memory::{Allocator, MemoryInfo, MemoryType, AllocationDevice, AllocatorType}, session::Session, value::Tensor};
 /// # fn main() -> ort::Result<()> {
 /// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// let allocator = Allocator::new(
@@ -62,6 +64,8 @@ use crate::{
 /// # Ok(())
 /// # }
 /// ```
+///
+/// [`Value`]: crate::value::Value
 #[derive(Debug)]
 pub struct Allocator {
 	ptr: NonNull<ort_sys::OrtAllocator>,
@@ -97,7 +101,7 @@ impl Allocator {
 	///
 	/// # Example
 	/// ```
-	/// # use ort::Allocator;
+	/// # use ort::memory::Allocator;
 	/// let allocator = Allocator::default();
 	/// let mut mem = allocator.alloc::<i32>(5).unwrap();
 	/// unsafe {
@@ -124,7 +128,7 @@ impl Allocator {
 	/// to work with.
 	///
 	/// ```
-	/// # use ort::Allocator;
+	/// # use ort::memory::Allocator;
 	/// let allocator = Allocator::default();
 	/// let mut mem = allocator.alloc::<i32>(5).unwrap();
 	/// unsafe {
@@ -291,7 +295,7 @@ impl From<AllocatorType> for ort_sys::OrtAllocatorType {
 pub enum MemoryType {
 	/// Any CPU memory used by non-CPU execution provider.
 	CPUInput,
-	/// CPU-accessible memory output by a non-CPU execution provider, i.e. [`AllocatorDevice::CUDAPinned`].
+	/// CPU-accessible memory output by a non-CPU execution provider, i.e. [`AllocationDevice::CUDA_PINNED`].
 	CPUOutput,
 	/// The default (typically device memory) allocator for an execution provider.
 	#[default]
@@ -353,9 +357,11 @@ impl From<ort_sys::OrtMemoryInfoDeviceType> for DeviceType {
 
 /// Describes allocation properties for value memory.
 ///
-/// `MemoryInfo` is used in the creation of [`Session`]s, [`Allocator`]s, and [`crate::Value`]s to describe on which
+/// `MemoryInfo` is used in the creation of [`Session`]s, [`Allocator`]s, and [`Value`]s to describe on which
 /// device value data should reside, and how that data should be accessible with regard to the CPU (if a non-CPU device
 /// is requested).
+///
+/// [`Value`]: crate::value::Value
 #[derive(Debug)]
 pub struct MemoryInfo {
 	ptr: NonNull<ort_sys::OrtMemoryInfo>,
@@ -369,7 +375,7 @@ impl MemoryInfo {
 	/// `MemoryInfo` can be used to specify the device & memory type used by an [`Allocator`] to allocate tensors.
 	/// See [`Allocator`] for more information & potential applications.
 	/// ```no_run
-	/// # use ort::{Allocator, Session, Tensor, MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
+	/// # use ort::{memory::{Allocator, MemoryInfo, MemoryType, AllocationDevice, AllocatorType}, session::Session, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let allocator = Allocator::new(
@@ -404,7 +410,7 @@ impl MemoryInfo {
 
 	/// Returns the [`MemoryType`] described by this struct.
 	/// ```
-	/// # use ort::{MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
+	/// # use ort::memory::{MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
 	/// # fn main() -> ort::Result<()> {
 	/// let mem = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?;
 	/// assert_eq!(mem.memory_type(), MemoryType::Default);
@@ -419,7 +425,7 @@ impl MemoryInfo {
 
 	/// Returns the [`AllocatorType`] described by this struct.
 	/// ```
-	/// # use ort::{MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
+	/// # use ort::memory::{MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
 	/// # fn main() -> ort::Result<()> {
 	/// let mem = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?;
 	/// assert_eq!(mem.allocator_type(), AllocatorType::Device);
@@ -438,7 +444,7 @@ impl MemoryInfo {
 
 	/// Returns the [`AllocationDevice`] this struct was created with.
 	/// ```
-	/// # use ort::{MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
+	/// # use ort::memory::{MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
 	/// # fn main() -> ort::Result<()> {
 	/// let mem = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?;
 	/// assert_eq!(mem.allocation_device(), AllocationDevice::CPU);
@@ -465,7 +471,7 @@ impl MemoryInfo {
 
 	/// Returns the ID of the [`AllocationDevice`] described by this struct.
 	/// ```
-	/// # use ort::{MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
+	/// # use ort::memory::{MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
 	/// # fn main() -> ort::Result<()> {
 	/// let mem = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?;
 	/// assert_eq!(mem.device_id(), 0);

@@ -2,7 +2,7 @@ use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
 use crate::{
 	error::{Error, Result},
 	execution_providers::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderDispatch},
-	session::SessionBuilder
+	session::builder::SessionBuilder
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]

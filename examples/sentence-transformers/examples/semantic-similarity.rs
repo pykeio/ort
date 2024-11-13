@@ -1,7 +1,11 @@
 use std::path::Path;
 
 use ndarray::{Array2, Axis, Ix2};
-use ort::{CUDAExecutionProvider, Error, GraphOptimizationLevel, Session};
+use ort::{
+	Error,
+	execution_providers::CUDAExecutionProvider,
+	session::{Session, builder::GraphOptimizationLevel}
+};
 use tokenizers::Tokenizer;
 
 /// Example usage of a text embedding model like Sentence Transformers' `all-mini-lm-l6` model for semantic textual

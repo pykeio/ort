@@ -36,7 +36,9 @@ impl<T: ValueTypeMarker + ?Sized> From<Value<T>> for SessionInputValue<'_> {
 	}
 }
 
-/// The inputs to a [`crate::Session::run`] call.
+/// The inputs to a [`Session::run`] call.
+///
+/// [`Session::run`]: crate::session::Session::run
 pub enum SessionInputs<'i, 'v, const N: usize = 0> {
 	ValueMap(Vec<(Cow<'i, str>, SessionInputValue<'v>)>),
 	ValueSlice(&'i [SessionInputValue<'v>]),
@@ -81,7 +83,7 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 /// ```no_run
 /// # use std::{error::Error, sync::Arc};
 /// # use ndarray::Array1;
-/// # use ort::{GraphOptimizationLevel, Session};
+/// # use ort::session::{builder::GraphOptimizationLevel, Session};
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// # 	let mut session = Session::builder()?.commit_from_file("model.onnx")?;
 /// let _ = session.run(ort::inputs![Array1::from_vec(vec![1, 2, 3, 4, 5])]?);
@@ -89,12 +91,12 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 /// # }
 /// ```
 ///
-/// Note that string tensors must be created manually with [`crate::Tensor::from_string_array`].
+/// Note that string tensors must be created manually with [`Tensor::from_string_array`].
 ///
 /// ```no_run
 /// # use std::{error::Error, sync::Arc};
 /// # use ndarray::Array1;
-/// # use ort::{GraphOptimizationLevel, Session, Tensor};
+/// # use ort::{session::{builder::GraphOptimizationLevel, Session}, value::Tensor};
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// # 	let mut session = Session::builder()?.commit_from_file("model.onnx")?;
 /// let _ = session.run(ort::inputs![Tensor::from_string_array(Array1::from_vec(vec!["hello", "world"]))?]?);
@@ -107,7 +109,7 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 /// ```no_run
 /// # use std::{error::Error, sync::Arc};
 /// # use ndarray::Array1;
-/// # use ort::{GraphOptimizationLevel, Session};
+/// # use ort::session::{builder::GraphOptimizationLevel, Session};
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// # 	let mut session = Session::builder()?.commit_from_file("model.onnx")?;
 /// let _ = session.run(ort::inputs! {
@@ -116,19 +118,21 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 /// # 	Ok(())
 /// # }
 /// ```
+///
+/// [`Tensor::from_string_array`]: crate::value::Tensor::from_string_array
 #[macro_export]
 macro_rules! inputs {
 	($($v:expr),+ $(,)?) => (
 		(|| -> $crate::Result<_> {
-			Ok([$(::std::convert::Into::<$crate::SessionInputValue<'_>>::into(::std::convert::TryInto::<$crate::DynValue>::try_into($v).map_err($crate::Error::from)?)),+])
+			Ok([$(::std::convert::Into::<$crate::session::SessionInputValue<'_>>::into(::std::convert::TryInto::<$crate::value::DynValue>::try_into($v).map_err($crate::Error::from)?)),+])
 		})()
 	);
 	($($n:expr => $v:expr),+ $(,)?) => (
 		(|| -> $crate::Result<_> {
 			Ok(vec![$(
-				::std::convert::TryInto::<$crate::DynValue>::try_into($v)
+				::std::convert::TryInto::<$crate::value::DynValue>::try_into($v)
 					.map_err($crate::Error::from)
-					.map(|v| (::std::borrow::Cow::<str>::from($n), $crate::SessionInputValue::from(v)))?,)+])
+					.map(|v| (::std::borrow::Cow::<str>::from($n), $crate::session::SessionInputValue::from(v)))?,)+])
 		})()
 	);
 }

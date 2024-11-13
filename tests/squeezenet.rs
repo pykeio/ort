@@ -7,7 +7,11 @@ use std::{
 
 use image::{ImageBuffer, Pixel, Rgb, imageops::FilterType};
 use ndarray::s;
-use ort::{ArrayExtensions, Error, GraphOptimizationLevel, Session, inputs};
+use ort::{
+	Error, inputs,
+	session::{Session, builder::GraphOptimizationLevel},
+	tensor::ArrayExtensions
+};
 use test_log::test;
 
 #[test]

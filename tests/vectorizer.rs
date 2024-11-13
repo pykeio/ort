@@ -3,7 +3,11 @@
 use std::path::Path;
 
 use ndarray::{ArrayD, IxDyn};
-use ort::{GraphOptimizationLevel, Session, Tensor, inputs};
+use ort::{
+	inputs,
+	session::{Session, builder::GraphOptimizationLevel},
+	value::Tensor
+};
 use test_log::test;
 
 #[test]

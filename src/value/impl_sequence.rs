@@ -106,10 +106,10 @@ impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
 impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized + 'static> Value<SequenceValueType<T>> {
 	/// Creates a [`Sequence`] from an array of [`Value<T>`].
 	///
-	/// This `Value<T>` must be either a [`crate::Tensor`] or [`crate::Map`].
+	/// This `Value<T>` must be either a [`Tensor`] or [`Map`].
 	///
 	/// ```
-	/// # use ort::{Allocator, Sequence, Tensor};
+	/// # use ort::{memory::Allocator, value::{Sequence, Tensor}};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let allocator = Allocator::default();
 	/// let tensor1 = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
@@ -122,6 +122,9 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized + 'static> Value<Se
 	/// # 	Ok(())
 	/// # }
 	/// ```
+	///
+	/// [`Tensor`]: crate::value::Tensor
+	/// [`Map`]: crate::value::Map
 	pub fn new(values: impl IntoIterator<Item = Value<T>>) -> Result<Self> {
 		let mut value_ptr = ptr::null_mut();
 		let values: Vec<Value<T>> = values.into_iter().collect();

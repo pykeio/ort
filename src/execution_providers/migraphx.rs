@@ -3,7 +3,7 @@ use std::ffi::CString;
 use crate::{
 	error::{Error, Result},
 	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
-	session::SessionBuilder
+	session::builder::SessionBuilder
 };
 
 #[derive(Debug, Default, Clone)]

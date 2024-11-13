@@ -4,7 +4,7 @@ use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
 use crate::{
 	error::{Error, Result},
 	execution_providers::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderDispatch},
-	session::SessionBuilder
+	session::builder::SessionBuilder
 };
 
 // https://github.com/microsoft/onnxruntime/blob/ffceed9d44f2f3efb9dd69fa75fea51163c91d91/onnxruntime/contrib_ops/cpu/bert/attention_common.h#L160-L171

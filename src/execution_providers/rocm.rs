@@ -3,7 +3,7 @@ use std::os::raw::c_void;
 use crate::{
 	error::{Error, Result},
 	execution_providers::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderDispatch},
-	session::SessionBuilder
+	session::builder::SessionBuilder
 };
 
 #[derive(Debug, Clone)]

@@ -4,12 +4,12 @@ use std::{path::Path, time::Instant};
 use anyhow::Result;
 use image::DynamicImage;
 use ndarray::{Array, Array2, Array3, Array4, ArrayView, Ix3, Ix4, s};
-use ort::{Session, Tensor};
+use ort::{session::Session, value::Tensor};
 use tokenizers::Tokenizer;
 
-const VISION_MODEL_NAME: &'static str = "phi-3-v-128k-instruct-vision.onnx";
-const TEXT_EMBEDDING_MODEL_NAME: &'static str = "phi-3-v-128k-instruct-text-embedding.onnx";
-const GENERATION_MODEL_NAME: &'static str = "phi-3-v-128k-instruct-text.onnx";
+const VISION_MODEL_NAME: &str = "phi-3-v-128k-instruct-vision.onnx";
+const TEXT_EMBEDDING_MODEL_NAME: &str = "phi-3-v-128k-instruct-text-embedding.onnx";
+const GENERATION_MODEL_NAME: &str = "phi-3-v-128k-instruct-text.onnx";
 
 const MAX_LENGTH: usize = 1000; // max length of the generated text
 const EOS_TOKEN_ID: i64 = 32007; // <|end|>
@@ -37,8 +37,7 @@ fn get_image_embedding(vision_model: &Session, img: &Option<DynamicImage>) -> Re
 		]?;
 		let outputs = vision_model.run(model_inputs)?;
 		let predictions_view: ArrayView<f32, _> = outputs["visual_features"].try_extract_tensor::<f32>()?;
-		let predictions = predictions_view.into_dimensionality::<Ix3>()?.to_owned();
-		predictions
+		predictions_view.into_dimensionality::<Ix3>()?.to_owned()
 	} else {
 		Array::zeros((1, 0, 0))
 	};
@@ -71,7 +70,7 @@ fn merge_text_and_image_embeddings(
 	// Insert visual features
 	combined_embeds
 		.slice_mut(s![.., image_token_position..(image_token_position + visual_features.shape()[1]), ..])
-		.assign(&visual_features);
+		.assign(visual_features);
 
 	// Copy the remaining text embeddings
 	combined_embeds
@@ -109,13 +108,13 @@ pub async fn generate_text(
 	text: &str
 ) -> Result<()> {
 	let (inputs_embeds, mut attention_mask) = {
-		let visual_features = get_image_embedding(&vision_model, &image)?;
-		let prompt = format_chat_template(&image, text);
+		let visual_features = get_image_embedding(vision_model, image)?;
+		let prompt = format_chat_template(image, text);
 		let encoding = tokenizer.encode(prompt, true).map_err(|e| anyhow::anyhow!("Error encoding: {:?}", e))?;
 
 		let input_ids: Vec<i64> = encoding.get_ids().iter().map(|&id| id as i64).collect();
 		let input_ids: Array2<i64> = Array2::from_shape_vec((1, input_ids.len()), input_ids)?;
-		let mut inputs_embeds: Array3<f32> = get_text_embedding(&text_embedding_model, &input_ids)?;
+		let mut inputs_embeds: Array3<f32> = get_text_embedding(text_embedding_model, &input_ids)?;
 
 		let attention_mask: Vec<i64> = encoding.get_attention_mask().iter().map(|&mask| mask as i64).collect();
 		let mut attention_mask: Array2<i64> = Array2::from_shape_vec((1, attention_mask.len()), attention_mask)?;
@@ -190,7 +189,7 @@ pub async fn generate_text(
 
 		// Update current_embeds, attention_mask, and past_key_values for the next iteration
 		let new_token_id = Array2::from_elem((1, 1), next_token_id);
-		next_inputs_embeds = get_text_embedding(&text_embedding_model, &new_token_id)?;
+		next_inputs_embeds = get_text_embedding(text_embedding_model, &new_token_id)?;
 		attention_mask = Array2::ones((1, attention_mask.shape()[1] + 1));
 		for i in 0..32 {
 			past_key_values[i * 2] = model_outputs[format!("present.{}.key", i)]
@@ -213,15 +212,9 @@ async fn main() -> Result<()> {
 
 	let data_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("data");
 	let tokenizer = Tokenizer::from_file(data_dir.join("tokenizer.json")).map_err(|e| anyhow::anyhow!("Error loading tokenizer: {:?}", e))?;
-	let vision_model = Session::builder()?
-		.with_execution_providers([ort::CPUExecutionProvider::default().build()])?
-		.commit_from_file(data_dir.join(VISION_MODEL_NAME))?;
-	let text_embedding_model = Session::builder()?
-		.with_execution_providers([ort::CPUExecutionProvider::default().build()])?
-		.commit_from_file(data_dir.join(TEXT_EMBEDDING_MODEL_NAME))?;
-	let generation_model = Session::builder()?
-		.with_execution_providers([ort::CPUExecutionProvider::default().build()])?
-		.commit_from_file(data_dir.join(GENERATION_MODEL_NAME))?;
+	let vision_model = Session::builder()?.commit_from_file(data_dir.join(VISION_MODEL_NAME))?;
+	let text_embedding_model = Session::builder()?.commit_from_file(data_dir.join(TEXT_EMBEDDING_MODEL_NAME))?;
+	let generation_model = Session::builder()?.commit_from_file(data_dir.join(GENERATION_MODEL_NAME))?;
 
 	// Generate text from text
 	let image: Option<DynamicImage> = None;

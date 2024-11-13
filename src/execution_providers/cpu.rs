@@ -3,7 +3,7 @@ use crate::{
 	error::Result,
 	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
 	ortsys,
-	session::SessionBuilder
+	session::builder::SessionBuilder
 };
 
 #[derive(Debug, Default, Clone)]

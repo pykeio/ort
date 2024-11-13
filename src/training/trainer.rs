@@ -8,8 +8,11 @@ use ort_sys::c_char;
 
 use super::{Checkpoint, Optimizer, trainsys};
 use crate::{
-	Allocator, AsPointer, Result, RunOptions, SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs, Value, char_p_to_string,
-	error::{assert_non_null_pointer, status_to_result}
+	AsPointer, char_p_to_string,
+	error::{Result, assert_non_null_pointer, status_to_result},
+	memory::Allocator,
+	session::{RunOptions, builder::SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs},
+	value::Value
 };
 
 #[derive(Debug)]
@@ -34,7 +37,7 @@ impl Trainer {
 		let eval_model_path = crate::util::path_to_os_char(eval_model_path);
 		let optimizer_model_path = crate::util::path_to_os_char(optimizer_model_path);
 
-		let env = crate::get_environment()?;
+		let env = crate::environment::get_environment()?;
 
 		let mut ptr: *mut ort_sys::OrtTrainingSession = ptr::null_mut();
 		trainsys![unsafe CreateTrainingSession(env.ptr(), session_options.ptr(), ckpt.ptr.as_ptr(), training_model_path.as_ptr(), eval_model_path.as_ptr(), optimizer_model_path.as_ptr(), &mut ptr)?; nonNull(ptr)];

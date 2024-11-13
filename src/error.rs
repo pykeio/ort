@@ -1,5 +1,3 @@
-//! Types and helpers for handling ORT errors.
-
 use std::{convert::Infallible, ffi::CString, fmt, ptr};
 
 use crate::{char_p_to_string, ortsys};

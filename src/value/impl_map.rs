@@ -183,7 +183,7 @@ impl<K: PrimitiveTensorElementType + Debug + Clone + Hash + Eq + 'static, V: Pri
 	///
 	/// ```
 	/// # use std::collections::HashMap;
-	/// # use ort::Map;
+	/// # use ort::value::Map;
 	/// # fn main() -> ort::Result<()> {
 	/// let mut map = HashMap::<i64, f32>::new();
 	/// map.insert(0, 1.0);
@@ -207,7 +207,7 @@ impl<V: PrimitiveTensorElementType + Debug + Clone + 'static> Value<MapValueType
 	///
 	/// ```
 	/// # use std::collections::HashMap;
-	/// # use ort::Map;
+	/// # use ort::value::Map;
 	/// # fn main() -> ort::Result<()> {
 	/// let mut map = HashMap::<String, f32>::new();
 	/// map.insert("one".to_string(), 1.0);
@@ -231,7 +231,7 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq + 'static, V: IntoTens
 	///
 	/// ```
 	/// # use std::collections::HashMap;
-	/// # use ort::{Map, Tensor};
+	/// # use ort::value::{Map, Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// let keys = Tensor::<i64>::from_array(([4], vec![0, 1, 2, 3]))?;
 	/// let values = Tensor::<f32>::from_array(([4], vec![1., 2., 3., 4.]))?;

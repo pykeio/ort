@@ -1,42 +1,58 @@
+//! [`ExecutionProvider`]s provide hardware acceleration to [`Session`](crate::session::Session)s.
+//!
+//! Sessions can be configured with execution providers via [`SessionBuilder::with_execution_providers`]:
+//!
+//! ```no_run
+//! use ort::{execution_providers::CUDAExecutionProvider, session::Session};
+//!
+//! fn main() -> ort::Result<()> {
+//! 	let session = Session::builder()?
+//! 		.with_execution_providers([CUDAExecutionProvider::default().build()])?
+//! 		.commit_from_file("model.onnx")?;
+//!
+//! 	Ok(())
+//! }
+//! ```
+
 use std::{collections::HashMap, ffi::CString, fmt::Debug, os::raw::c_char, sync::Arc};
 
-use crate::{char_p_to_string, error::Result, ortsys, session::SessionBuilder};
+use crate::{char_p_to_string, error::Result, ortsys, session::builder::SessionBuilder};
 
-mod cpu;
+pub mod cpu;
 pub use self::cpu::CPUExecutionProvider;
-mod cuda;
-pub use self::cuda::{CUDAExecutionProvider, CUDAExecutionProviderCuDNNConvAlgoSearch};
-mod tensorrt;
+pub mod cuda;
+pub use self::cuda::CUDAExecutionProvider;
+pub mod tensorrt;
 pub use self::tensorrt::TensorRTExecutionProvider;
-mod onednn;
+pub mod onednn;
 pub use self::onednn::OneDNNExecutionProvider;
-mod acl;
+pub mod acl;
 pub use self::acl::ACLExecutionProvider;
-mod openvino;
+pub mod openvino;
 pub use self::openvino::OpenVINOExecutionProvider;
-mod coreml;
+pub mod coreml;
 pub use self::coreml::CoreMLExecutionProvider;
-mod rocm;
+pub mod rocm;
 pub use self::rocm::ROCmExecutionProvider;
-mod cann;
-pub use self::cann::{CANNExecutionProvider, CANNExecutionProviderImplementationMode, CANNExecutionProviderPrecisionMode};
-mod directml;
+pub mod cann;
+pub use self::cann::CANNExecutionProvider;
+pub mod directml;
 pub use self::directml::DirectMLExecutionProvider;
-mod tvm;
-pub use self::tvm::{TVMExecutionProvider, TVMExecutorType, TVMTuningType};
-mod nnapi;
+pub mod tvm;
+pub use self::tvm::TVMExecutionProvider;
+pub mod nnapi;
 pub use self::nnapi::NNAPIExecutionProvider;
-mod qnn;
-pub use self::qnn::{QNNExecutionProvider, QNNExecutionProviderPerformanceMode};
-mod xnnpack;
+pub mod qnn;
+pub use self::qnn::QNNExecutionProvider;
+pub mod xnnpack;
 pub use self::xnnpack::XNNPACKExecutionProvider;
-mod armnn;
+pub mod armnn;
 pub use self::armnn::ArmNNExecutionProvider;
-mod migraphx;
+pub mod migraphx;
 pub use self::migraphx::MIGraphXExecutionProvider;
-mod vitis;
+pub mod vitis;
 pub use self::vitis::VitisAIExecutionProvider;
-mod rknpu;
+pub mod rknpu;
 pub use self::rknpu::RKNPUExecutionProvider;
 
 /// ONNX Runtime works with different hardware acceleration libraries through its extensible **Execution Providers**
@@ -127,7 +143,7 @@ pub enum ArenaExtendStrategy {
 }
 
 /// Dynamic execution provider container, used to provide a list of multiple types of execution providers when
-/// configuring execution providers for a [`SessionBuilder`](crate::SessionBuilder) or
+/// configuring execution providers for a [`SessionBuilder`] or
 /// [`EnvironmentBuilder`](crate::environment::EnvironmentBuilder).
 ///
 /// See [`ExecutionProvider`] for more info on execution providers.

@@ -1,7 +1,11 @@
 use std::path::Path;
 
 use image::{ImageBuffer, Luma, Pixel, imageops::FilterType};
-use ort::{ArrayExtensions, GraphOptimizationLevel, Session, inputs};
+use ort::{
+	inputs,
+	session::{Session, builder::GraphOptimizationLevel},
+	tensor::ArrayExtensions
+};
 use test_log::test;
 
 #[test]

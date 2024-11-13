@@ -1,7 +1,7 @@
 use crate::{
 	error::{Error, Result},
 	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
-	session::SessionBuilder
+	session::builder::SessionBuilder
 };
 
 #[cfg(all(not(feature = "load-dynamic"), feature = "nnapi"))]

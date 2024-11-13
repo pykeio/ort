@@ -1,3 +1,21 @@
+//! [`Value`]s are data containers used as inputs/outputs in ONNX Runtime graphs.
+//!
+//! The most common type of value is [`Tensor`]:
+//! ```
+//! # use ort::value::Tensor;
+//! # fn main() -> ort::Result<()> {
+//! // Create a tensor from a raw data vector
+//! let tensor = Tensor::from_array(([1usize, 2, 3], vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0].into_boxed_slice()))?;
+//!
+//! // Create a tensor from an `ndarray::Array`
+//! #[cfg(feature = "ndarray")]
+//! let tensor = Tensor::from_array(ndarray::Array4::<f32>::zeros((1, 16, 16, 3)))?;
+//! # 	Ok(())
+//! # }
+//! ```
+//!
+//! ONNX Runtime also supports [`Sequence`]s and [`Map`]s, though they are less commonly used.
+
 use std::{
 	any::Any,
 	fmt::{self, Debug},
@@ -31,7 +49,7 @@ use crate::{
 ///
 /// ```
 /// # use std::sync::Arc;
-/// # use ort::{Session, Tensor, ValueType, TensorElementType};
+/// # use ort::{session::Session, value::{ValueType, Tensor}, tensor::TensorElementType};
 /// # fn main() -> ort::Result<()> {
 /// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// // `ValueType`s can be obtained from session inputs/outputs:
@@ -58,9 +76,12 @@ pub enum ValueType {
 		/// Element type of the tensor.
 		ty: TensorElementType,
 		/// Dimensions of the tensor. If an exact dimension is not known (i.e. a dynamic dimension as part of an
-		/// [`crate::Input`]/[`crate::Output`]), the dimension will be `-1`.
+		/// [`Input`]/[`Output`]), the dimension will be `-1`.
 		///
 		/// Actual tensor values, which have a known dimension, will always have positive (>1) dimensions.
+		///
+		/// [`Input`]: crate::session::Input
+		/// [`Output`]: crate::session::Output
 		dimensions: Vec<i64>
 	},
 	/// A sequence (vector) of other `Value`s.
@@ -124,9 +145,9 @@ impl ValueType {
 	/// Returns the dimensions of this value type if it is a tensor, or `None` if it is a sequence or map.
 	///
 	/// ```
-	/// # use ort::{Value, ValueType, TensorElementType};
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
-	/// let value = Value::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
+	/// let value = Tensor::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
 	/// assert_eq!(value.dtype().tensor_dimensions(), Some(&vec![5]));
 	/// # 	Ok(())
 	/// # }
@@ -142,9 +163,9 @@ impl ValueType {
 	/// Returns the element type of this value type if it is a tensor, or `None` if it is a sequence or map.
 	///
 	/// ```
-	/// # use ort::{Value, ValueType, TensorElementType};
+	/// # use ort::{tensor::TensorElementType, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
-	/// let value = Value::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
+	/// let value = Tensor::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
 	/// assert_eq!(value.dtype().tensor_type(), Some(TensorElementType::Int64));
 	/// # 	Ok(())
 	/// # }
@@ -358,10 +379,10 @@ impl<Type: ValueTypeMarker + ?Sized> DerefMut for ValueRefMut<'_, Type> {
 /// (aka array/vector), or [`Map`].
 ///
 /// ## Creation
-/// Values can be created via methods like [`Tensor::from_array`], or as the output from running a [`crate::Session`].
+/// Values can be created via methods like [`Tensor::from_array`], or as the output from running a [`Session`].
 ///
 /// ```
-/// # use ort::{Session, Tensor, ValueType, TensorElementType};
+/// # use ort::{session::Session, value::Tensor};
 /// # fn main() -> ort::Result<()> {
 /// # 	let upsample = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// // Create a Tensor value from a raw data vector
@@ -391,6 +412,8 @@ impl<Type: ValueTypeMarker + ?Sized> DerefMut for ValueRefMut<'_, Type> {
 /// If the type was created from Rust (via a method like [`Tensor::from_array`] or via downcasting), you can directly
 /// extract the data using the infallible extract methods:
 /// - [`Tensor::extract_tensor`], [`Tensor::extract_raw_tensor`]
+///
+/// [`Session`]: crate::session::Session
 #[derive(Debug)]
 pub struct Value<Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
 	pub(crate) inner: Arc<ValueInner>,
@@ -467,9 +490,10 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 
 	/// Construct a [`Value`] from a C++ [`ort_sys::OrtValue`] pointer.
 	///
-	/// If the value belongs to a session (i.e. if it is returned from [`crate::Session::run`] or
-	/// [`crate::IoBinding::run`]), you must provide the [`SharedSessionInner`] (acquired from
-	/// [`crate::Session::inner`]). This ensures the session is not dropped until any values owned by it is.
+	/// If the value belongs to a session (i.e. if it is returned from [`Session::run`](crate::session::Session::run) or
+	/// [`IoBinding::run`](crate::io_binding::IoBinding::run)), you must provide the [`SharedSessionInner`] (acquired
+	/// from [`Session::inner`](crate::session::Session::inner)). This ensures the session is not dropped until any
+	/// values owned by it is.
 	///
 	/// # Safety
 	///
@@ -512,10 +536,10 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	/// Returns `true` if this value is a tensor, or `false` if it is another type (sequence, map).
 	///
 	/// ```
-	/// # use ort::Value;
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// // Create a tensor from a raw data vector
-	/// let tensor_value = Value::from_array(([3usize], vec![1.0_f32, 2.0, 3.0].into_boxed_slice()))?;
+	/// let tensor_value = Tensor::from_array(([3usize], vec![1.0_f32, 2.0, 3.0].into_boxed_slice()))?;
 	/// assert!(tensor_value.is_tensor()?);
 	/// # 	Ok(())
 	/// # }
@@ -646,8 +670,8 @@ pub(crate) unsafe fn extract_data_type_from_map_info(info_ptr: *const ort_sys::O
 
 #[cfg(test)]
 mod tests {
-	use super::{DynTensorValueType, Map, Sequence, Tensor, TensorRef, TensorValueType};
-	use crate::{Allocator, TensorRefMut};
+	use super::{DynTensorValueType, Map, Sequence, Tensor, TensorRef, TensorRefMut, TensorValueType};
+	use crate::memory::Allocator;
 
 	#[test]
 	fn test_casting_tensor() -> crate::Result<()> {

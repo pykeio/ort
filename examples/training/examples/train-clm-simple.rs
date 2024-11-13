@@ -6,7 +6,12 @@ use std::{
 
 use kdam::BarExt;
 use ndarray::{Array1, Array2, ArrayViewD, Axis, concatenate, s};
-use ort::{Allocator, CUDAExecutionProvider, CheckpointStrategy, Session, SessionBuilder, Trainer, TrainerCallbacks, TrainingArguments};
+use ort::{
+	execution_providers::CUDAExecutionProvider,
+	memory::Allocator,
+	session::{Session, builder::SessionBuilder},
+	training::{CheckpointStrategy, Trainer, TrainerCallbacks, TrainerControl, TrainerState, TrainingArguments}
+};
 use rand::RngCore;
 use tokenizers::Tokenizer;
 
@@ -26,7 +31,7 @@ impl LoggerCallback {
 }
 
 impl TrainerCallbacks for LoggerCallback {
-	fn train_step(&mut self, train_loss: f32, state: &ort::TrainerState, _: &mut ort::TrainerControl<'_>) -> ort::Result<()> {
+	fn train_step(&mut self, train_loss: f32, state: &TrainerState, _: &mut TrainerControl<'_>) -> ort::Result<()> {
 		self.progress_bar.total = state.max_steps;
 		self.progress_bar.set_postfix(format!("loss={train_loss:.3}"));
 		let _ = self.progress_bar.update_to(state.iter_step);

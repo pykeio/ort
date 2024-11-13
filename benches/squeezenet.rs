@@ -3,7 +3,7 @@ use std::{path::Path, sync::Arc};
 use glassbench::{Bench, pretend_used};
 use image::{ImageBuffer, Pixel, Rgb, imageops::FilterType};
 use ndarray::{Array4, s};
-use ort::{GraphOptimizationLevel, Session};
+use ort::session::{Session, builder::GraphOptimizationLevel};
 
 fn load_squeezenet_data() -> ort::Result<(Session, Array4<f32>)> {
 	const IMAGE_TO_LOAD: &str = "mushroom.png";

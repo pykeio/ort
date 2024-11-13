@@ -74,7 +74,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// accessing it.
 	///
 	/// ```
-	/// # use ort::{Allocator, Tensor};
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let mut tensor = Tensor::<i64>::from_array((vec![5], vec![0, 1, 2, 3, 4]))?;
 	/// let ptr = tensor.data_ptr_mut()?.cast::<i64>();
@@ -102,7 +102,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// accessing it.
 	///
 	/// ```
-	/// # use ort::{Allocator, Tensor};
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let tensor = Tensor::<i64>::from_array((vec![5], vec![0, 1, 2, 3, 4]))?;
 	/// let ptr = tensor.data_ptr()?.cast::<i64>();
@@ -119,7 +119,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// Returns information about the device this tensor is allocated on.
 	///
 	/// ```
-	/// # use ort::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType, Session, Tensor};
+	/// # use ort::{memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType}, session::Session, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// let tensor = Tensor::<f32>::new(&Allocator::default(), [1, 3, 224, 224])?;
 	/// // Tensors are allocated on CPU by default.
@@ -149,7 +149,7 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// Converts from a strongly-typed [`Tensor<T>`] to a type-erased [`DynTensor`].
 	///
 	/// ```
-	/// # use ort::{Allocator, DynTensor, Tensor};
+	/// # use ort::{memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// let tensor = Tensor::<f32>::new(&Allocator::default(), [1, 3, 224, 224])?;
 	/// let tensor_dyn = tensor.upcast();
@@ -166,7 +166,7 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// Creates a type-erased [`DynTensorRef`] from a strongly-typed [`Tensor<T>`].
 	///
 	/// ```
-	/// # use ort::{Allocator, DynTensor, Tensor};
+	/// # use ort::{memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// let tensor = Tensor::<f32>::new(&Allocator::default(), [1, 3, 224, 224])?;
 	/// let tensor_dyn = tensor.upcast_ref();
@@ -188,7 +188,7 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// Converts from a strongly-typed [`Tensor<T>`] to a mutable reference to a type-erased [`DynTensor`].
 	///
 	/// ```
-	/// # use ort::{Allocator, DynTensor, Tensor};
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let mut tensor = Tensor::<i64>::from_array((vec![5], vec![1, 2, 3, 4, 5]))?;
 	/// let mut tensor_dyn = tensor.upcast_mut();
@@ -274,7 +274,8 @@ mod tests {
 
 	use ndarray::{ArcArray1, Array1, CowArray};
 
-	use crate::{Allocator, Tensor, TensorElementType, ValueType};
+	use super::Tensor;
+	use crate::{memory::Allocator, tensor::TensorElementType, value::ValueType};
 
 	#[test]
 	#[cfg(feature = "ndarray")]

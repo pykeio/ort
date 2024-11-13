@@ -52,7 +52,7 @@ ONNX Runtime must be compiled with support for each execution provider. pyke pro
 In order to configure sessions to use certain execution providers, you must **register** them when creating an environment or session. You can do this via the `SessionBuilder::with_execution_providers` method. For example, to register the CUDA execution provider for a session:
 
 ```rust
-use ort::{CUDAExecutionProvider, Session};
+use ort::{execution_providers::CUDAExecutionProvider, session::Session};
 
 fn main() -> anyhow::Result<()> {
     let session = Session::builder()?
@@ -66,7 +66,10 @@ fn main() -> anyhow::Result<()> {
 You can, of course, specify multiple execution providers. `ort` will register all EPs specified, in order. If an EP does not support a certain operator in a graph, it will fall back to the next successfully registered EP, or to the CPU if all else fails.
 
 ```rust
-use ort::{CoreMLExecutionProvider, CUDAExecutionProvider, DirectMLExecutionProvider, TensorRTExecutionProvider, Session};
+use ort::{
+    execution_providers::{CoreMLExecutionProvider, CUDAExecutionProvider, DirectMLExecutionProvider, TensorRTExecutionProvider},
+    session::Session
+};
 
 fn main() -> anyhow::Result<()> {
     let session = Session::builder()?
@@ -89,7 +92,7 @@ fn main() -> anyhow::Result<()> {
 EPs have configuration options to control behavior or increase performance. Each `XXXExecutionProvider` struct returns a builder with configuration methods. See the [API reference](https://docs.rs/ort/2.0.0-rc.8/ort/index.html?search=ExecutionProvider) for the EP structs for more information on which options are supported and what they do.
 
 ```rust
-use ort::{CoreMLExecutionProvider, Session};
+use ort::{execution_providers::CoreMLExecutionProvider, session::Session};
 
 fn main() -> anyhow::Result<()> {
     let session = Session::builder()?
@@ -112,7 +115,7 @@ fn main() -> anyhow::Result<()> {
 
 You can configure an EP to return an error on failure by adding `.error_on_failure()` after you `.build()` it. In this example, if CUDA doesn't register successfully, the program will exit with an error at `with_execution_providers`:
 ```rust
-use ort::{CoreMLExecutionProvider, Session};
+use ort::{execution_providers::CoreMLExecutionProvider, session::Session};
 
 fn main() -> anyhow::Result<()> {
     let session = Session::builder()?
@@ -128,7 +131,10 @@ fn main() -> anyhow::Result<()> {
 If you require more complex error handling, you can also manually register execution providers via the `ExecutionProvider::register` method:
 
 ```rust
-use ort::{CUDAExecutionProvider, ExecutionProvider, Session};
+use ort::{
+    execution_providers::{CUDAExecutionProvider, ExecutionProvider},
+    session::Session
+};
 
 fn main() -> anyhow::Result<()> {
     let builder = Session::builder()?;
@@ -148,7 +154,10 @@ fn main() -> anyhow::Result<()> {
 You can also check whether ONNX Runtime is even compiled with support for the execution provider with the `is_available` method.
 
 ```rust
-use ort::{CoreMLExecutionProvider, ExecutionProvider, Session};
+use ort::{
+    execution_providers::{CoreMLExecutionProvider, ExecutionProvider},
+    session::Session
+};
 
 fn main() -> anyhow::Result<()> {
     let builder = Session::builder()?;
@@ -172,7 +181,7 @@ fn main() -> anyhow::Result<()> {
 You can configure `ort` to attempt to register a list of execution providers for all sessions created in an environment.
 
 ```rust
-use ort::{CUDAExecutionProvider, Session};
+use ort::{execution_providers::CUDAExecutionProvider, session::Session};
 
 fn main() -> anyhow::Result<()> {
     ort::init()

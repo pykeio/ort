@@ -94,6 +94,8 @@ impl SessionBuilder {
 
 	/// Enables profiling. Profile information will be writen to `profiling_file` after profiling completes.
 	/// See [`Session::end_profiling`].
+	///
+	/// [`Session::end_profiling`]: crate::session::Session::end_profiling
 	pub fn with_profiling<S: AsRef<Path>>(mut self, profiling_file: S) -> Result<Self> {
 		let profiling_file = crate::util::path_to_os_char(profiling_file);
 		ortsys![unsafe EnableProfiling(self.ptr_mut(), profiling_file.as_ptr())?];

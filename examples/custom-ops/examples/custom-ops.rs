@@ -1,5 +1,13 @@
 use ndarray::Array2;
-use ort::{Kernel, KernelAttributes, KernelContext, Operator, OperatorDomain, OperatorInput, OperatorOutput, Session, TensorElementType};
+use ort::{
+	operator::{
+		Operator, OperatorDomain,
+		io::{OperatorInput, OperatorOutput},
+		kernel::{Kernel, KernelAttributes, KernelContext}
+	},
+	session::Session,
+	tensor::TensorElementType
+};
 
 struct CustomOpOne;
 struct CustomOpOneKernel;

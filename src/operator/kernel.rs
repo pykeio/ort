@@ -99,7 +99,7 @@ impl AsPointer for KernelAttributes {
 	}
 }
 
-pub trait GetKernelAttribute<'s> {
+pub(crate) trait GetKernelAttribute<'s> {
 	fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
 	where
 		Self: Sized;

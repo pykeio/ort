@@ -1,10 +1,15 @@
 use std::{ops::Mul, path::Path};
 
-use cudarc::driver::{sys::CUdeviceptr, CudaDevice, DevicePtr, DevicePtrMut};
-use image::{imageops::FilterType, GenericImageView, ImageBuffer, Rgba};
+use cudarc::driver::{CudaDevice, DevicePtr, DevicePtrMut, sys::CUdeviceptr};
+use image::{GenericImageView, ImageBuffer, Rgba, imageops::FilterType};
 use ndarray::Array;
-use ort::{AllocationDevice, AllocatorType, CUDAExecutionProvider, ExecutionProvider, MemoryInfo, MemoryType, Session, TensorRefMut};
-use show_image::{event, AsImageView, WindowOptions};
+use ort::{
+	execution_providers::{CUDAExecutionProvider, ExecutionProvider},
+	memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
+	session::Session,
+	value::TensorRefMut
+};
+use show_image::{AsImageView, WindowOptions, event};
 
 #[show_image::main]
 fn main() -> anyhow::Result<()> {
@@ -66,13 +71,10 @@ fn main() -> anyhow::Result<()> {
 	let window = show_image::context()
 		.run_function_wait(move |context| -> Result<_, String> {
 			let mut window = context
-				.create_window(
-					"ort + modnet",
-					WindowOptions {
-						size: Some([img_width, img_height]),
-						..WindowOptions::default()
-					}
-				)
+				.create_window("ort + modnet", WindowOptions {
+					size: Some([img_width, img_height]),
+					..WindowOptions::default()
+				})
 				.map_err(|e| e.to_string())?;
 			window.set_image("photo", &output.as_image_view().map_err(|e| e.to_string())?);
 			Ok(window.proxy())

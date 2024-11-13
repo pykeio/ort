@@ -16,9 +16,9 @@ Sessions in `ort` return a map of `DynValue`s. You can determine a value's type 
 ## Downcasting
 **Downcasting** means to convert a `Dyn` type like `DynValue` to stronger type like `DynTensor`. Downcasting can be performed using the `.downcast()` function on `DynValue`:
 ```rs
-let value: ort::DynValue = outputs.remove("output0").unwrap();
+let value: ort::value::DynValue = outputs.remove("output0").unwrap();
 
-let dyn_tensor: ort::DynTensor = value.downcast()?;
+let dyn_tensor: ort::value::DynTensor = value.downcast()?;
 ```
 
 If `value` is not actually a tensor, the `downcast()` call will fail.
@@ -30,9 +30,9 @@ If `value` is not actually a tensor, the `downcast()` call will fail.
 
 The strongly typed variants of these types - `Tensor<T>`, `Sequence<T>`, and `Map<K, V>`, can be directly downcasted to, too:
 ```rs
-let dyn_value: ort::DynValue = outputs.remove("output0").unwrap();
+let dyn_value: ort::value::DynValue = outputs.remove("output0").unwrap();
 
-let f32_tensor: ort::Tensor<f32> = dyn_value.downcast()?;
+let f32_tensor: ort::value::Tensor<f32> = dyn_value.downcast()?;
 ```
 
 If `value` is not a tensor, **or** if the element type of the value does not match what was requested (`f32`), the `downcast()` call will fail.
@@ -43,7 +43,7 @@ Stronger typed values have infallible variants of the `.try_extract_*` methods:
 let f32_array: ArrayViewD<f32> = dyn_value.try_extract_tensor()?;
 
 // Or, we can first onvert it to a tensor, and then extract afterwards:
-let tensor: ort::Tensor<f32> = dyn_value.downcast()?;
+let tensor: ort::value::Tensor<f32> = dyn_value.downcast()?;
 let f32_array = tensor.extract_tensor(); // no `?` required, this will never fail!
 ```
 
@@ -89,16 +89,16 @@ View types are suffixed with `Ref` or `RefMut` for shared/mutable variants respe
 
 These views can be acquired with `.view()` or `.view_mut()` on a value type:
 ```rs
-let my_tensor: ort::Tensor<f32> = Tensor::new(...)?;
+let my_tensor: ort::value::Tensor<f32> = Tensor::new(...)?;
 
-let tensor_view: ort::TensorRef<'_, f32> = my_tensor.view();
+let tensor_view: ort::value::TensorRef<'_, f32> = my_tensor.view();
 ```
 
 Views act identically to a borrow of their type - `TensorRef` supports `extract_tensor`, `TensorRefMut` supports `extract_tensor_mut`. The same is true for sequences & maps. Views also support down/upcasting via `.downcast()` & `.into_dyn()` (but not `.upcast()` at the moment).
 
 You can also directly downcast a value to a stronger-typed view using `.downcast_ref()` and `.downcast_mut()`:
 ```rs
-let tensor_view: ort::TensorRef<'_, f32> = dyn_value.downcast_ref()?;
+let tensor_view: ort::value::TensorRef<'_, f32> = dyn_value.downcast_ref()?;
 // is equivalent to
-let tensor_view: ort::TensorRef<'_, f32> = dyn_value.view().downcast()?;
+let tensor_view: ort::value::TensorRef<'_, f32> = dyn_value.view().downcast()?;
 ```

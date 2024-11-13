@@ -9,11 +9,11 @@ use crate::{
 	value::{DynValue, Value, ValueTypeMarker}
 };
 
-/// Allows selecting/deselecting/preallocating the outputs of a [`crate::Session`] inference call.
+/// Allows selecting/deselecting/preallocating the outputs of a [`Session`] inference call.
 ///
 /// ```
 /// # use std::sync::Arc;
-/// # use ort::{Session, Allocator, RunOptions, OutputSelector, Tensor};
+/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
 /// # fn main() -> ort::Result<()> {
 /// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// let input = Tensor::<f32>::new(&Allocator::default(), [1, 64, 64, 3])?;
@@ -33,6 +33,8 @@ use crate::{
 /// # 	Ok(())
 /// # }
 /// ```
+///
+/// [`Session`]: crate::session::Session
 #[derive(Debug)]
 pub struct OutputSelector {
 	use_defaults: bool,
@@ -90,7 +92,7 @@ impl OutputSelector {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{Session, Allocator, RunOptions, OutputSelector, Tensor};
+	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = Tensor::<f32>::new(&Allocator::default(), [1, 64, 64, 3])?;
@@ -144,17 +146,22 @@ impl SelectedOutputMarker for HasSelectedOutputs {}
 ///   performance/errors in inference servers.
 /// - **Termination**: Allows for terminating an inference call from another thread; when [`RunOptions::terminate`] is
 ///   called, any sessions currently running under that [`RunOptions`] instance will halt graph execution as soon as the
-///   termination signal is received. This allows for [`crate::Session::run_async`]'s cancel-safety.
+///   termination signal is received. This allows for [`Session::run_async`]'s cancel-safety.
 /// - **Output specification**: Certain session outputs can be [disabled](`OutputSelector::without`) or
 ///   [pre-allocated](`OutputSelector::preallocate`). Disabling an output might mean ONNX Runtime will not execute parts
 ///   of the graph that are only used by that output. Pre-allocation can reduce expensive re-allocations by allowing you
 ///   to use the same memory across runs.
 ///
 /// [`RunOptions`] can be passed to most places where a session can be inferred, e.g.
-/// [`crate::Session::run_with_options`], [`crate::Session::run_async_with_options`],
-/// [`crate::IoBinding::run_with_options`]. Some of these patterns (notably `IoBinding`) do not accept
+/// [`Session::run_with_options`], [`Session::run_async_with_options`],
+/// [`IoBinding::run_with_options`]. Some of these patterns (notably `IoBinding`) do not accept
 /// [`OutputSelector`], hence [`RunOptions`] contains an additional type parameter that marks whether or not outputs
 /// have been selected.
+///
+/// [`Session::run_async`]: crate::session::Session::run_async
+/// [`Session::run_async_with_options`]: crate::session::Session::run_async_with_options
+/// [`Session::run_with_options`]: crate::session::Session::run_with_options
+/// [`IoBinding::run_with_options`]: crate::io_binding::IoBinding::run_with_options
 #[derive(Debug)]
 pub struct RunOptions<O: SelectedOutputMarker = NoSelectedOutputs> {
 	run_options_ptr: NonNull<ort_sys::OrtRunOptions>,
@@ -191,7 +198,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{Session, Allocator, RunOptions, OutputSelector, Tensor};
+	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = Tensor::<f32>::new(&Allocator::default(), [1, 64, 64, 3])?;
@@ -236,7 +243,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// ```no_run
 	/// # // no_run because upsample.onnx is too simple of a model for the termination signal to be reliable enough
 	/// # use std::sync::Arc;
-	/// # use ort::{Session, RunOptions, Value, ValueType, TensorElementType};
+	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, value::Value};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
@@ -265,7 +272,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	///
 	/// ```no_run
 	/// # use std::sync::Arc;
-	/// # use ort::{Session, RunOptions, Value, ValueType, TensorElementType};
+	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, value::Value};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
@@ -294,7 +301,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// like CUDA:
 	/// ```no_run
 	/// # use std::sync::Arc;
-	/// # use ort::{Session, RunOptions, Value, ValueType, TensorElementType};
+	/// # use ort::session::run_options::RunOptions;
 	/// # fn main() -> ort::Result<()> {
 	/// let mut run_options = RunOptions::new()?;
 	/// run_options.add_config_entry("gpu_graph_id", "1")?;

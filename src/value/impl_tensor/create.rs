@@ -21,7 +21,7 @@ use crate::{
 };
 
 impl Tensor<String> {
-	/// Construct a [`DynTensor`] from an array of strings.
+	/// Construct a [`Tensor`] from an array of strings.
 	///
 	/// Just like numeric tensors, string tensors can be created from:
 	/// - (with feature `ndarray`) a shared reference to a [`ndarray::CowArray`] (`&CowArray<'_, T, D>`);
@@ -34,15 +34,15 @@ impl Tensor<String> {
 	///   * and `data` is one of `Vec<T>`, `Box<[T]>`, `Arc<Box<[T]>>`, or `&[T]`.
 	///
 	/// ```
-	/// # use ort::{Session, Value};
+	/// # use ort::{session::Session, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// // Create a string tensor from a raw data vector
 	/// let data = vec!["hello", "world"];
-	/// let value = Value::from_string_array(([data.len()], data.into_boxed_slice()))?;
+	/// let value = Tensor::from_string_array(([data.len()], data.into_boxed_slice()))?;
 	///
 	/// // Create a string tensor from an `ndarray::Array`
 	/// #[cfg(feature = "ndarray")]
-	/// let value = Value::from_string_array(ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap())?;
+	/// let value = Tensor::from_string_array(ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap())?;
 	/// # 	Ok(())
 	/// # }
 	/// ```
@@ -93,7 +93,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// This can be used to create a tensor with data on a certain device. For example, to create a tensor with pinned
 	/// (CPU) memory for use with CUDA:
 	/// ```no_run
-	/// # use ort::{Allocator, Session, Tensor, MemoryInfo, MemoryType, AllocationDevice, AllocatorType};
+	/// # use ort::{memory::{Allocator, MemoryInfo, MemoryType, AllocationDevice, AllocatorType}, session::Session, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let allocator = Allocator::new(
@@ -146,7 +146,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	///   * and `data` is one of `Vec<T>`, `Box<[T]>`, `Arc<Box<[T]>>`, or `&[T]`.
 	///
 	/// ```
-	/// # use ort::Tensor;
+	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// // Create a tensor from a raw data vector
 	/// let tensor = Tensor::from_array(([1usize, 2, 3], vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0].into_boxed_slice()))?;
@@ -592,7 +592,7 @@ macro_rules! impl_try_from {
 					Tensor::from_array(value).map(|c| c.upcast())
 				}
 			}
-			impl<T: PrimitiveTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for crate::DynValue {
+			impl<T: PrimitiveTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for crate::value::DynValue {
 				type Error = Error;
 				fn try_from(value: $t) -> Result<Self, Self::Error> {
 					Tensor::from_array(value).map(|c| c.into_dyn())
@@ -617,7 +617,7 @@ macro_rules! impl_try_from {
 				}
 			}
 			#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-			impl<T: PrimitiveTensorElementType + Debug + Clone + 'static, D: ndarray::Dimension + 'static> TryFrom<$t> for crate::DynValue {
+			impl<T: PrimitiveTensorElementType + Debug + Clone + 'static, D: ndarray::Dimension + 'static> TryFrom<$t> for crate::value::DynValue {
 				type Error = Error;
 				fn try_from(value: $t) -> Result<Self, Self::Error> {
 					Tensor::from_array(value).map(|c| c.into_dyn())

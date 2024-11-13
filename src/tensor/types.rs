@@ -119,6 +119,8 @@ pub trait IntoTensorElementType {
 	crate::private_trait!();
 }
 
+/// A superset of [`IntoTensorElementType`] that represents traits whose underlying memory is identical between Rust and
+/// C++ (i.e., every type except `String`).
 pub trait PrimitiveTensorElementType: IntoTensorElementType {
 	crate::private_trait!();
 }

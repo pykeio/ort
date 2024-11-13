@@ -1,6 +1,6 @@
 use std::{env, process};
 
-use ort::{Session, TensorElementType, ValueType};
+use ort::{session::Session, tensor::TensorElementType, value::ValueType};
 
 fn display_element_type(t: TensorElementType) -> &'static str {
 	match t {

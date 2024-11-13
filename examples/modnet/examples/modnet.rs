@@ -4,7 +4,7 @@ use std::{ops::Mul, path::Path};
 
 use image::{GenericImageView, ImageBuffer, Rgba, imageops::FilterType};
 use ndarray::Array;
-use ort::{CUDAExecutionProvider, Session, inputs};
+use ort::{execution_providers::CUDAExecutionProvider, inputs, session::Session};
 use show_image::{AsImageView, WindowOptions, event};
 
 #[show_image::main]

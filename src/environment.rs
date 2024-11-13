@@ -1,3 +1,16 @@
+//! An [`Environment`] is a process-global structure, under which [`Session`](crate::session::Session)s are created.
+//!
+//! Environments can be configured via [`ort::init`](init):
+//! ```
+//! # use ort::execution_providers::CUDAExecutionProvider;
+//! # fn main() -> ort::Result<()> {
+//! ort::init()
+//! 	.with_execution_providers([CUDAExecutionProvider::default().build()])
+//! 	.commit()?;
+//! # Ok(())
+//! # }
+//! ```
+
 use std::{
 	ffi::{self, CStr, CString},
 	ptr::{self, NonNull},
@@ -19,7 +32,7 @@ unsafe impl Sync for EnvironmentSingleton {}
 
 static G_ENV: EnvironmentSingleton = EnvironmentSingleton { lock: RwLock::new(None) };
 
-/// An `Environment` is a process-global structure, under which [`Session`](crate::Session)s are created.
+/// An `Environment` is a process-global structure, under which [`Session`](crate::session::Session)s are created.
 ///
 /// Environments can be used to [configure global thread pools](EnvironmentBuilder::with_global_thread_pool), in
 /// which all sessions share threads from the environment's pool, and configuring [default execution
@@ -124,12 +137,14 @@ impl EnvironmentBuilder {
 
 	/// Sets a list of execution providers which all sessions created in this environment will register.
 	///
-	/// If a session is created in this environment with [`crate::SessionBuilder::with_execution_providers`], those EPs
+	/// If a session is created in this environment with [`SessionBuilder::with_execution_providers`], those EPs
 	/// will take precedence over the environment's EPs.
 	///
 	/// Execution providers will only work if the corresponding Cargo feature is enabled and ONNX Runtime was built
 	/// with support for the corresponding execution provider. Execution providers that do not have their corresponding
 	/// feature enabled will emit a warning.
+	///
+	/// [`SessionBuilder::with_execution_providers`]: crate::session::builder::SessionBuilder::with_execution_providers
 	#[must_use = "commit() must be called in order for the environment to take effect"]
 	pub fn with_execution_providers(mut self, execution_providers: impl AsRef<[ExecutionProviderDispatch]>) -> Self {
 		self.execution_providers = execution_providers.as_ref().to_vec();
@@ -226,7 +241,7 @@ impl EnvironmentBuilder {
 /// Creates an ONNX Runtime environment.
 ///
 /// ```
-/// # use ort::CUDAExecutionProvider;
+/// # use ort::execution_providers::CUDAExecutionProvider;
 /// # fn main() -> ort::Result<()> {
 /// ort::init()
 /// 	.with_execution_providers([CUDAExecutionProvider::default().build()])
@@ -239,8 +254,10 @@ impl EnvironmentBuilder {
 /// - It is not required to call this function. If this is not called by the time any other `ort` APIs are used, a
 ///   default environment will be created.
 /// - **Library crates that use `ort` shouldn't create their own environment.** Let downstream applications create it.
-/// - In order for environment settings to apply, this must be called **before** you use other APIs like
-///   [`crate::Session`], and you *must* call `.commit()` on the builder returned by this function.
+/// - In order for environment settings to apply, this must be called **before** you use other APIs like [`Session`],
+///   and you *must* call `.commit()` on the builder returned by this function.
+///
+/// [`Session`]: crate::session::Session
 #[must_use = "commit() must be called in order for the environment to take effect"]
 pub fn init() -> EnvironmentBuilder {
 	EnvironmentBuilder::new()
@@ -252,7 +269,7 @@ pub fn init() -> EnvironmentBuilder {
 /// This must be called before any other `ort` APIs are used in order for the correct dynamic library to be loaded.
 ///
 /// ```no_run
-/// # use ort::CUDAExecutionProvider;
+/// # use ort::execution_providers::CUDAExecutionProvider;
 /// # fn main() -> ort::Result<()> {
 /// let lib_path = std::env::current_exe().unwrap().parent().unwrap().join("lib");
 /// ort::init_from(lib_path.join("onnxruntime.dll"))
@@ -263,8 +280,10 @@ pub fn init() -> EnvironmentBuilder {
 /// ```
 ///
 /// # Notes
-/// - In order for environment settings to apply, this must be called **before** you use other APIs like
-///   [`crate::Session`], and you *must* call `.commit()` on the builder returned by this function.
+/// - In order for environment settings to apply, this must be called **before** you use other APIs like [`Session`],
+///   and you *must* call `.commit()` on the builder returned by this function.
+///
+/// [`Session`]: crate::session::Session
 #[cfg(feature = "load-dynamic")]
 #[cfg_attr(docsrs, doc(cfg(feature = "load-dynamic")))]
 #[must_use = "commit() must be called in order for the environment to take effect"]

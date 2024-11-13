@@ -4,7 +4,11 @@ use std::path::Path;
 
 use image::{GenericImageView, imageops::FilterType};
 use ndarray::{Array, Axis, s};
-use ort::{CUDAExecutionProvider, Session, SessionOutputs, inputs};
+use ort::{
+	execution_providers::CUDAExecutionProvider,
+	inputs,
+	session::{Session, SessionOutputs}
+};
 use raqote::{DrawOptions, DrawTarget, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle};
 use show_image::{AsImageView, WindowOptions, event};
 

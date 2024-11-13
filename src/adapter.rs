@@ -1,10 +1,12 @@
+//! An input adapter, allowing for loading many static inputs from disk at once.
+
 use std::{
 	path::Path,
 	ptr::{self, NonNull},
 	sync::Arc
 };
 
-use crate::{Allocator, AsPointer, Result, ortsys, util};
+use crate::{AsPointer, Result, memory::Allocator, ortsys, util};
 
 #[derive(Debug)]
 pub(crate) struct AdapterInner {
@@ -25,15 +27,15 @@ impl Drop for AdapterInner {
 	}
 }
 
-/// An input adapter, allowing for loading many inputs from disk at once.
+/// An input adapter, allowing for loading many static inputs from disk at once.
 ///
 /// [`Adapter`] essentially acts as a collection of predefined inputs allocated on a specific device that can easily be
-/// swapped out between session runs via [`crate::RunOptions::add_adapter`]. With slight modifications to the session
+/// swapped out between session runs via [`RunOptions::add_adapter`]. With slight modifications to the session
 /// graph, [`Adapter`] can be used as low-rank adapters (LoRAs) or as containers of style embeddings.
 ///
 /// # Example
 /// ```
-/// # use ort::{Adapter, RunOptions, Session, Tensor};
+/// # use ort::{adapter::Adapter, session::{run_options::RunOptions, Session}, value::Tensor};
 /// # fn main() -> ort::Result<()> {
 /// let model = Session::builder()?.commit_from_file("tests/data/lora_model.onnx")?;
 /// let lora = Adapter::from_file("tests/data/adapter.orl", None)?;
@@ -46,6 +48,8 @@ impl Drop for AdapterInner {
 /// # Ok(())
 /// # }
 /// ```
+///
+/// [`RunOptions::add_adapter`]: crate::session::run_options::RunOptions::add_adapter
 #[derive(Debug, Clone)]
 pub struct Adapter {
 	pub(crate) inner: Arc<AdapterInner>
@@ -58,7 +62,13 @@ impl Adapter {
 	/// Note that providing a CPU allocator will return an error; only device allocators are expected.
 	///
 	/// ```
-	/// # use ort::{Adapter, CUDAExecutionProvider, DeviceType, RunOptions, Session, Tensor};
+	/// # use ort::{
+	/// # 	adapter::Adapter,
+	/// # 	execution_providers::CUDAExecutionProvider,
+	/// # 	memory::DeviceType,
+	/// # 	session::{run_options::RunOptions, Session},
+	/// # 	value::Tensor
+	/// # };
 	/// # fn main() -> ort::Result<()> {
 	/// let model = Session::builder()?
 	/// 	.with_execution_providers([CUDAExecutionProvider::default().build()])?
@@ -97,7 +107,13 @@ impl Adapter {
 	/// Note that providing a CPU allocator will return an error; only device allocators are expected.
 	///
 	/// ```
-	/// # use ort::{Adapter, CUDAExecutionProvider, DeviceType, RunOptions, Session, Tensor};
+	/// # use ort::{
+	/// # 	adapter::Adapter,
+	/// # 	execution_providers::CUDAExecutionProvider,
+	/// # 	memory::DeviceType,
+	/// # 	session::{run_options::RunOptions, Session},
+	/// # 	value::Tensor
+	/// # };
 	/// # fn main() -> ort::Result<()> {
 	/// let model = Session::builder()?
 	/// 	.with_execution_providers([CUDAExecutionProvider::default().build()])?
@@ -143,7 +159,10 @@ mod tests {
 	use std::fs;
 
 	use super::Adapter;
-	use crate::{RunOptions, Session, Tensor};
+	use crate::{
+		session::{RunOptions, Session},
+		value::Tensor
+	};
 
 	#[test]
 	fn test_lora() -> crate::Result<()> {

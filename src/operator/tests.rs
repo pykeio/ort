@@ -1,6 +1,15 @@
 use ndarray::{Array2, arr2};
 
-use crate::{Kernel, KernelAttributes, KernelContext, Operator, OperatorDomain, OperatorInput, OperatorOutput, Result, Session, TensorElementType};
+use crate::{
+	Result,
+	operator::{
+		Operator, OperatorDomain,
+		io::{OperatorInput, OperatorOutput},
+		kernel::{Kernel, KernelAttributes, KernelContext}
+	},
+	session::Session,
+	tensor::TensorElementType
+};
 
 struct CustomOpOne;
 struct CustomOpOneKernel;

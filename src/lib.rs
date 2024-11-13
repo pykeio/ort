@@ -1,4 +1,4 @@
-#![doc(html_logo_url = "https://raw.githubusercontent.com/pykeio/ort/v2/docs/icon.png")]
+#![doc(html_logo_url = "https://ort.pyke.io/assets/icon.png")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(clippy::tabs_in_doc_comments, clippy::arc_with_non_send_sync)]
 #![allow(clippy::macro_metavars_in_unsafe)]
@@ -15,20 +15,21 @@
 #[cfg(all(test, not(feature = "fetch-models")))]
 compile_error!("`cargo test --features fetch-models`!!1!");
 
-pub(crate) mod adapter;
-pub(crate) mod environment;
-pub(crate) mod error;
-pub(crate) mod execution_providers;
-pub(crate) mod io_binding;
-pub(crate) mod memory;
-pub(crate) mod metadata;
-pub(crate) mod operator;
-pub(crate) mod session;
-pub(crate) mod tensor;
+pub mod adapter;
+pub mod environment;
+pub mod error;
+pub mod execution_providers;
+pub mod io_binding;
+pub mod memory;
+pub mod metadata;
+pub mod operator;
+pub mod session;
+pub mod tensor;
 #[cfg(feature = "training")]
-pub(crate) mod training;
+#[cfg_attr(docsrs, doc(cfg(feature = "training")))]
+pub mod training;
 pub(crate) mod util;
-pub(crate) mod value;
+pub mod value;
 
 #[cfg(feature = "load-dynamic")]
 use std::sync::Arc;
@@ -43,36 +44,9 @@ pub use ort_sys as sys;
 
 #[cfg(feature = "load-dynamic")]
 pub use self::environment::init_from;
-#[cfg(feature = "ndarray")]
-#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-pub use self::tensor::ArrayExtensions;
-#[cfg(feature = "training")]
-#[cfg_attr(docsrs, doc(cfg(feature = "training")))]
-pub use self::training::*;
 pub use self::{
-	adapter::Adapter,
-	environment::{Environment, EnvironmentBuilder, EnvironmentGlobalThreadPoolOptions, get_environment, init},
-	error::{Error, ErrorCode, Result},
-	execution_providers::*,
-	io_binding::IoBinding,
-	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
-	metadata::ModelMetadata,
-	operator::{
-		InferShapeFn, Operator, OperatorDomain,
-		io::{OperatorInput, OperatorOutput},
-		kernel::{Kernel, KernelAttributes, KernelContext}
-	},
-	session::{
-		GraphOptimizationLevel, HasSelectedOutputs, InMemorySession, InferenceFut, Input, NoSelectedOutputs, Output, OutputSelector, OverridableInitializer,
-		RunOptions, SelectedOutputMarker, Session, SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs, SharedSessionInner
-	},
-	tensor::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType, Utf8Data},
-	value::{
-		DowncastableTarget, DynMap, DynMapRef, DynMapRefMut, DynMapValueType, DynSequence, DynSequenceRef, DynSequenceRefMut, DynSequenceValueType, DynTensor,
-		DynTensorRef, DynTensorRefMut, DynTensorValueType, DynValue, DynValueTypeMarker, Map, MapRef, MapRefMut, MapValueType, MapValueTypeMarker, Sequence,
-		SequenceRef, SequenceRefMut, SequenceValueType, SequenceValueTypeMarker, Tensor, TensorRef, TensorRefMut, TensorValueType, TensorValueTypeMarker,
-		Value, ValueRef, ValueRefMut, ValueType, ValueTypeMarker
-	}
+	environment::init,
+	error::{Error, ErrorCode, Result}
 };
 
 #[cfg(not(all(target_arch = "x86", target_os = "windows")))]

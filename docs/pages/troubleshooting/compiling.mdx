@@ -1,20 +1,20 @@
-## The trait bound `ort::Value: From<...>` is not satisfied
+## The trait bound `ort::value::Value: From<...>` is not satisfied
 An error like this might come up when attempting to upgrade from an earlier (1.x) version of `ort` to a more recent version:
 ```
-error[E0277]: the trait bound `ort::Value: From<ArrayBase<OwnedRepr<f32>, Dim<[usize; 3]>>>` is not satisfied
+error[E0277]: the trait bound `ort::value::Value: From<ArrayBase<OwnedRepr<f32>, Dim<[usize; 3]>>>` is not satisfied
   --> src/main.rs:72:16
    |
 72 |           let inputs = ort::inputs![
    |  ______________________^
 73 | |             input1,
 74 | |         ]?;
-   | |_________^ the trait `From<ArrayBase<OwnedRepr<f32>, Dim<[usize; 3]>>>` is not implemented for `ort::Value`, which is required by `ort::Value: TryFrom<ArrayBase<OwnedRepr<f32>, Dim<[usize; 3]>>>`
+   | |_________^ the trait `From<ArrayBase<OwnedRepr<f32>, Dim<[usize; 3]>>>` is not implemented for `ort::value::Value`, which is required by `ort::value::Value: TryFrom<ArrayBase<OwnedRepr<f32>, Dim<[usize; 3]>>>`
    |
    = help: the following other types implement trait `From<T>`:
-             `ort::Value` implements `From<ort::Value<DynTensorValueType>>`
-             `ort::Value` implements `From<ort::Value<TensorValueType<T>>>`
-   = note: required for `ArrayBase<OwnedRepr<f32>, Dim<[usize; 3]>>` to implement `Into<ort::Value>`
-   = note: required for `ort::Value` to implement `TryFrom<ArrayBase<OwnedRepr<i64>, Dim<[usize; 2]>>>`
+             `ort::value::Value` implements `From<ort::value::Value<DynTensorValueType>>`
+             `ort::value::Value` implements `From<ort::value::Value<TensorValueType<T>>>`
+   = note: required for `ArrayBase<OwnedRepr<f32>, Dim<[usize; 3]>>` to implement `Into<ort::value::Value>`
+   = note: required for `ort::value::Value` to implement `TryFrom<ArrayBase<OwnedRepr<i64>, Dim<[usize; 2]>>>`
    = note: this error originates in the macro `ort::inputs` (in Nightly builds, run with -Z macro-backtrace for more info)
 ```
 

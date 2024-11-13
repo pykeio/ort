@@ -6,7 +6,12 @@ use std::{
 
 use kdam::BarExt;
 use ndarray::{Array1, Array2, ArrayViewD, Axis, concatenate, s};
-use ort::{Allocator, CUDAExecutionProvider, Checkpoint, Session, SessionBuilder, Trainer};
+use ort::{
+	execution_providers::CUDAExecutionProvider,
+	memory::Allocator,
+	session::{Session, builder::SessionBuilder},
+	training::{Checkpoint, Trainer}
+};
 use rand::RngCore;
 use tokenizers::Tokenizer;
 

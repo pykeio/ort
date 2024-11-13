@@ -8,14 +8,17 @@ use std::{
 	sync::Arc
 };
 
-use crate::{ValueRef, ValueRefMut, memory::Allocator, value::DynValue};
+use crate::{
+	memory::Allocator,
+	value::{DynValue, ValueRef, ValueRefMut}
+};
 
-/// The outputs returned by a [`crate::Session`] inference call.
+/// The outputs returned by a [`Session`] inference call.
 ///
 /// This type allows session outputs to be retrieved by index or by name.
 ///
 /// ```
-/// # use ort::{GraphOptimizationLevel, Session};
+/// # use ort::session::{builder::GraphOptimizationLevel, Session};
 /// # fn main() -> ort::Result<()> {
 /// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
@@ -28,6 +31,8 @@ use crate::{ValueRef, ValueRefMut, memory::Allocator, value::DynValue};
 /// # 	Ok(())
 /// # }
 /// ```
+///
+/// [`Session`]: crate::session::Session
 #[derive(Debug)]
 pub struct SessionOutputs<'r, 's> {
 	keys: Vec<&'r str>,

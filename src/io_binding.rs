@@ -1,3 +1,5 @@
+//! Enables binding of session inputs and/or outputs to pre-allocated memory.
+
 use std::{
 	collections::HashMap,
 	ffi::CString,
@@ -8,11 +10,11 @@ use std::{
 };
 
 use crate::{
-	AsPointer, SharedSessionInner,
+	AsPointer,
 	error::Result,
 	memory::MemoryInfo,
 	ortsys,
-	session::{NoSelectedOutputs, RunOptions, Session, output::SessionOutputs},
+	session::{NoSelectedOutputs, RunOptions, Session, SharedSessionInner, output::SessionOutputs},
 	value::{DynValue, Value, ValueInner, ValueTypeMarker}
 };
 
@@ -36,7 +38,13 @@ use crate::{
 /// A diffusion model which takes a text condition input.
 ///
 /// ```no_run
-/// # use ort::{Allocator, AllocatorType, AllocationDevice, CUDAExecutionProvider, MemoryInfo, MemoryType, Session, Tensor, IoBinding};
+/// # use ort::{
+/// # 	execution_providers::CUDAExecutionProvider,
+/// # 	io_binding::IoBinding,
+/// # 	memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType},
+/// # 	session::Session,
+/// # 	value::Tensor
+/// # };
 /// # fn main() -> ort::Result<()> {
 /// let text_encoder = Session::builder()?
 /// 	.with_execution_providers([CUDAExecutionProvider::default().build()])?
@@ -46,13 +54,10 @@ use crate::{
 /// 	.commit_from_file("unet.onnx")?;
 ///
 /// let text_condition = text_encoder
-/// 	.run(ort::inputs![Tensor::<i64>::from_array((
-/// 		vec![27],
-/// 		vec![
-/// 			23763, 15460, 473, 68, 312, 265, 17463, 4098, 304, 1077, 283, 198, 7676, 5976, 272, 285, 3609, 435,
-/// 			21680, 321, 265, 300, 1689, 64, 285, 4763, 64
-/// 		]
-/// 	))?]?)?
+/// 	.run(ort::inputs![Tensor::<i64>::from_array((vec![27], vec![
+/// 		23763, 15460, 473, 68, 312, 265, 17463, 4098, 304, 1077, 283, 198, 7676, 5976, 272, 285, 3609, 435, 21680,
+/// 		321, 265, 300, 1689, 64, 285, 4763, 64
+/// 	]))?]?)?
 /// 	.remove("output0")
 /// 	.unwrap();
 ///
@@ -129,11 +134,13 @@ impl IoBinding {
 
 	/// Bind a session output to a pre-allocated [`Value`].
 	///
-	/// This allows for the pre-allocation and reuse of memory in the session output (see [`crate::Tensor::new`]). Any
+	/// This allows for the pre-allocation and reuse of memory in the session output (see [`Tensor::new`]). Any
 	/// subsequent runs via [`IoBinding::run`] will reuse the same tensor to store the output instead of creating a new
 	/// one each time.
 	///
 	/// The output will be accessible in the value returned by [`IoBinding::run`], under the name specified by `name`.
+	///
+	/// [`Tensor::new`]: crate::value::Tensor::new
 	pub fn bind_output<T: ValueTypeMarker, S: AsRef<str>>(&mut self, name: S, ort_value: Value<T>) -> Result<()> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
@@ -267,7 +274,13 @@ mod tests {
 	use image::{ImageBuffer, Luma, Pixel};
 	use ndarray::{Array2, Array4, Axis};
 
-	use crate::{AllocationDevice, AllocatorType, ArrayExtensions, MemoryInfo, MemoryType, Result, Session, Tensor, TensorValueTypeMarker, Value};
+	use crate::{
+		Result,
+		memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
+		session::Session,
+		tensor::ArrayExtensions,
+		value::{Tensor, TensorValueTypeMarker, Value}
+	};
 
 	fn get_image() -> Array4<f32> {
 		let image_buffer: ImageBuffer<Luma<u8>, Vec<u8>> = image::open("tests/data/mnist_5.jpg").expect("failed to load image").to_luma8();

@@ -52,7 +52,7 @@ Your model will need to be converted to an ONNX graph before you can use it.
 Once you've got a model, load it via `ort` by creating a [`Session`](/fundamentals/session):
 
 ```rust
-use ort::{GraphOptimizationLevel, Session};
+use ort::session::{builder::GraphOptimizationLevel, Session};
 
 let model = Session::builder()?
     .with_optimization_level(GraphOptimizationLevel::Level3)?

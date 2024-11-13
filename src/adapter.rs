@@ -25,12 +25,59 @@ impl Drop for AdapterInner {
 	}
 }
 
+/// An input adapter, allowing for loading many inputs from disk at once.
+///
+/// [`Adapter`] essentially acts as a collection of predefined inputs allocated on a specific device that can easily be
+/// swapped out between session runs via [`crate::RunOptions::add_adapter`]. With slight modifications to the session
+/// graph, [`Adapter`] can be used as low-rank adapters (LoRAs) or as containers of style embeddings.
+///
+/// # Example
+/// ```
+/// # use ort::{Adapter, RunOptions, Session, Tensor};
+/// # fn main() -> ort::Result<()> {
+/// let model = Session::builder()?.commit_from_file("tests/data/lora_model.onnx")?;
+/// let lora = Adapter::from_file("tests/data/adapter.orl", None)?;
+///
+/// let mut run_options = RunOptions::new()?;
+/// run_options.add_adapter(&lora)?;
+///
+/// let outputs =
+/// 	model.run_with_options(ort::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?]?, &run_options)?;
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug, Clone)]
 pub struct Adapter {
 	pub(crate) inner: Arc<AdapterInner>
 }
 
 impl Adapter {
+	/// Loads an [`Adapter`] from a file.
+	///
+	/// An optional [`Allocator`] can be provided to specify the device on which the inputs should be allocated on.
+	/// Note that providing a CPU allocator will return an error; only device allocators are expected.
+	///
+	/// ```
+	/// # use ort::{Adapter, CUDAExecutionProvider, DeviceType, RunOptions, Session, Tensor};
+	/// # fn main() -> ort::Result<()> {
+	/// let model = Session::builder()?
+	/// 	.with_execution_providers([CUDAExecutionProvider::default().build()])?
+	/// 	.commit_from_file("tests/data/lora_model.onnx")?;
+	///
+	/// let allocator = model.allocator();
+	/// let lora = Adapter::from_file(
+	/// 	"tests/data/adapter.orl",
+	/// 	if allocator.memory_info().device_type() == DeviceType::CPU { None } else { Some(&allocator) }
+	/// )?;
+	///
+	/// let mut run_options = RunOptions::new()?;
+	/// run_options.add_adapter(&lora)?;
+	///
+	/// let outputs =
+	/// 	model.run_with_options(ort::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?]?, &run_options)?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	pub fn from_file(path: impl AsRef<Path>, allocator: Option<&Allocator>) -> Result<Self> {
 		let path = util::path_to_os_char(path);
 		let allocator_ptr = allocator.map(|c| c.ptr().cast_mut()).unwrap_or_else(ptr::null_mut);
@@ -43,6 +90,34 @@ impl Adapter {
 		})
 	}
 
+	/// Loads an [`Adapter`] from memory. The adapter's values will be copied either to the CPU or the given allocator
+	/// if one is provided.
+	///
+	/// An [`Allocator`] can be provided to specify the device on which the inputs should be allocated on.
+	/// Note that providing a CPU allocator will return an error; only device allocators are expected.
+	///
+	/// ```
+	/// # use ort::{Adapter, CUDAExecutionProvider, DeviceType, RunOptions, Session, Tensor};
+	/// # fn main() -> ort::Result<()> {
+	/// let model = Session::builder()?
+	/// 	.with_execution_providers([CUDAExecutionProvider::default().build()])?
+	/// 	.commit_from_file("tests/data/lora_model.onnx")?;
+	///
+	/// let bytes = std::fs::read("tests/data/adapter.orl").unwrap();
+	/// let allocator = model.allocator();
+	/// let lora = Adapter::from_memory(
+	/// 	&bytes,
+	/// 	if allocator.memory_info().device_type() == DeviceType::CPU { None } else { Some(&allocator) }
+	/// )?;
+	///
+	/// let mut run_options = RunOptions::new()?;
+	/// run_options.add_adapter(&lora)?;
+	///
+	/// let outputs =
+	/// 	model.run_with_options(ort::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?]?, &run_options)?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	pub fn from_memory(bytes: &[u8], allocator: Option<&Allocator>) -> Result<Self> {
 		let allocator_ptr = allocator.map(|c| c.ptr().cast_mut()).unwrap_or_else(ptr::null_mut);
 		let mut ptr = ptr::null_mut();

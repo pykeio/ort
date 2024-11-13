@@ -11,7 +11,7 @@ use crate::{
 	AsPointer, char_p_to_string,
 	error::{Result, assert_non_null_pointer, status_to_result},
 	memory::Allocator,
-	session::{RunOptions, builder::SessionBuilder, SessionInputValue, SessionInputs, SessionOutputs},
+	session::{RunOptions, SessionInputValue, SessionInputs, SessionOutputs, builder::SessionBuilder},
 	value::Value
 };
 

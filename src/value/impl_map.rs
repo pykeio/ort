@@ -81,11 +81,11 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 		match self.dtype() {
 			ValueType::Map { key, value } => {
 				let k_type = K::into_tensor_element_type();
-				if k_type != key {
+				if k_type != *key {
 					return Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot extract Map<{:?}, _> (value has K type {:?})", k_type, key)));
 				}
 				let v_type = V::into_tensor_element_type();
-				if v_type != value {
+				if v_type != *value {
 					return Err(Error::new_with_code(
 						ErrorCode::InvalidArgument,
 						format!("Cannot extract Map<{}, {}> from Map<{}, {}>", K::into_tensor_element_type(), V::into_tensor_element_type(), k_type, v_type)
@@ -100,7 +100,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 				if K::into_tensor_element_type() != TensorElementType::String {
 					let dtype = key_value.dtype();
 					let (key_tensor_shape, key_tensor) = match dtype {
-						ValueType::Tensor { ty, dimensions } => {
+						ValueType::Tensor { ty, dimensions, .. } => {
 							let mem = key_value.memory_info();
 							if !mem.is_cpu_accessible() {
 								return Err(Error::new(format!(
@@ -109,13 +109,13 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 								)));
 							}
 
-							if ty == K::into_tensor_element_type() {
+							if *ty == K::into_tensor_element_type() {
 								let mut output_array_ptr: *mut K = ptr::null_mut();
 								let output_array_ptr_ptr: *mut *mut K = &mut output_array_ptr;
 								let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
 								ortsys![unsafe GetTensorMutableData(key_tensor_ptr, output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
-								let len = calculate_tensor_size(&dimensions);
+								let len = calculate_tensor_size(dimensions);
 								(dimensions, unsafe { std::slice::from_raw_parts(output_array_ptr, len) })
 							} else {
 								return Err(Error::new_with_code(
@@ -251,10 +251,15 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq + 'static, V: IntoTens
 			nonNull(value_ptr)
 		];
 		Ok(Value {
-			inner: Arc::new(ValueInner::RustOwned {
+			inner: Arc::new(ValueInner {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
-				_array: Box::new(values),
-				_memory_info: None
+				dtype: ValueType::Map {
+					key: K::into_tensor_element_type(),
+					value: V::into_tensor_element_type()
+				},
+				drop: true,
+				memory_info: None,
+				_backing: Some(Box::new(values))
 			}),
 			_markers: PhantomData
 		})

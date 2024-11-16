@@ -116,15 +116,7 @@ impl OutputSelector {
 			.map(|o| &o.name)
 			.filter(|n| !self.default_blocklist.contains(n))
 			.chain(self.allowlist.iter())
-			.map(|n| {
-				(
-					n.as_str(),
-					self.preallocated_outputs.get(n).map(|v| DynValue {
-						inner: Arc::clone(&v.inner),
-						_markers: PhantomData
-					})
-				)
-			})
+			.map(|n| (n.as_str(), self.preallocated_outputs.get(n).map(DynValue::clone_of)))
 			.unzip()
 	}
 }

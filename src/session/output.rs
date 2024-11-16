@@ -1,11 +1,9 @@
 use std::{
 	ffi::c_void,
 	iter::FusedIterator,
-	marker::PhantomData,
 	mem::ManuallyDrop,
 	ops::{Index, IndexMut},
-	ptr,
-	sync::Arc
+	ptr
 };
 
 use crate::{
@@ -113,10 +111,7 @@ impl<'r, 's> SessionOutputs<'r, 's> {
 			if &key == k {
 				*k = "";
 				self.effective_len -= 1;
-				return Some(DynValue {
-					inner: Arc::clone(&self.values[i].inner),
-					_markers: PhantomData
-				});
+				return Some(DynValue::clone_of(&self.values[i]));
 			}
 		}
 		None

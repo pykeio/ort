@@ -400,6 +400,19 @@ impl MemoryInfo {
 		})
 	}
 
+	pub(crate) fn from_value(value_ptr: *mut ort_sys::OrtValue) -> Option<Self> {
+		let mut is_tensor = 0;
+		ortsys![unsafe IsTensor(value_ptr, &mut is_tensor)]; // infallible
+		if is_tensor != 0 {
+			let mut memory_info_ptr: *const ort_sys::OrtMemoryInfo = std::ptr::null_mut();
+			// infallible, and `memory_info_ptr` will never be null
+			ortsys![unsafe GetTensorMemoryInfo(value_ptr, &mut memory_info_ptr)];
+			Some(Self::from_raw(unsafe { NonNull::new_unchecked(memory_info_ptr.cast_mut()) }, false))
+		} else {
+			None
+		}
+	}
+
 	pub(crate) fn from_raw(ptr: NonNull<ort_sys::OrtMemoryInfo>, should_release: bool) -> Self {
 		MemoryInfo { ptr, should_release }
 	}

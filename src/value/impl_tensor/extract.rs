@@ -48,15 +48,14 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	pub fn try_extract_tensor<T: PrimitiveTensorElementType>(&self) -> Result<ndarray::ArrayViewD<'_, T>> {
 		use crate::AsPointer;
 
-		let dtype = self.dtype();
-		match dtype {
-			ValueType::Tensor { ty, dimensions } => {
+		match self.dtype() {
+			ValueType::Tensor { ty, dimensions, .. } => {
 				let mem = self.memory_info();
 				if !mem.is_cpu_accessible() {
 					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", mem.allocation_device().as_str())));
 				}
 
-				if ty == T::into_tensor_element_type() {
+				if *ty == T::into_tensor_element_type() {
 					Ok(extract_primitive_array(IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>()), self.ptr())?)
 				} else {
 					Err(Error::new_with_code(
@@ -93,15 +92,14 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_scalar<T: PrimitiveTensorElementType + Copy>(&self) -> Result<T> {
-		let dtype = self.dtype();
-		match dtype {
-			ValueType::Tensor { ty, dimensions } => {
+		match self.dtype() {
+			ValueType::Tensor { ty, dimensions, .. } => {
 				let mem = self.memory_info();
 				if !mem.is_cpu_accessible() {
 					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", mem.allocation_device().as_str())));
 				}
 
-				if ty == T::into_tensor_element_type() {
+				if *ty == T::into_tensor_element_type() {
 					if !dimensions.is_empty() {
 						return Err(Error::new_with_code(
 							ErrorCode::InvalidArgument,
@@ -158,15 +156,14 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_tensor_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<ndarray::ArrayViewMutD<'_, T>> {
-		let dtype = self.dtype();
-		match dtype {
-			ValueType::Tensor { ty, dimensions } => {
+		match self.dtype() {
+			ValueType::Tensor { ty, dimensions, .. } => {
 				let mem = self.memory_info();
 				if !mem.is_cpu_accessible() {
 					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", mem.allocation_device().as_str())));
 				}
 
-				if ty == T::into_tensor_element_type() {
+				if *ty == T::into_tensor_element_type() {
 					Ok(extract_primitive_array_mut(IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>()), self.ptr_mut())?)
 				} else {
 					Err(Error::new_with_code(
@@ -207,22 +204,21 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// - The provided type `T` does not match the tensor's element type.
 	///
 	/// [`DynValue`]: crate::value::DynValue
-	pub fn try_extract_raw_tensor<T: PrimitiveTensorElementType>(&self) -> Result<(Vec<i64>, &[T])> {
-		let dtype = self.dtype();
-		match dtype {
-			ValueType::Tensor { ty, dimensions } => {
+	pub fn try_extract_raw_tensor<T: PrimitiveTensorElementType>(&self) -> Result<(&[i64], &[T])> {
+		match self.dtype() {
+			ValueType::Tensor { ty, dimensions, .. } => {
 				let mem = self.memory_info();
 				if !mem.is_cpu_accessible() {
 					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", mem.allocation_device().as_str())));
 				}
 
-				if ty == T::into_tensor_element_type() {
+				if *ty == T::into_tensor_element_type() {
 					let mut output_array_ptr: *mut T = ptr::null_mut();
 					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
 					let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
 					ortsys![unsafe GetTensorMutableData(self.ptr().cast_mut(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
-					let len = calculate_tensor_size(&dimensions);
+					let len = calculate_tensor_size(dimensions);
 					Ok((dimensions, unsafe { std::slice::from_raw_parts(output_array_ptr, len) }))
 				} else {
 					Err(Error::new_with_code(
@@ -260,22 +256,22 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// - The provided type `T` does not match the tensor's element type.
 	///
 	/// [`DynValue`]: crate::value::DynValue
-	pub fn try_extract_raw_tensor_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<(Vec<i64>, &mut [T])> {
+	pub fn try_extract_raw_tensor_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<(&[i64], &mut [T])> {
 		let dtype = self.dtype();
 		match dtype {
-			ValueType::Tensor { ty, dimensions } => {
+			ValueType::Tensor { ty, dimensions, .. } => {
 				let mem = self.memory_info();
 				if !mem.is_cpu_accessible() {
 					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", mem.allocation_device().as_str())));
 				}
 
-				if ty == T::into_tensor_element_type() {
+				if *ty == T::into_tensor_element_type() {
 					let mut output_array_ptr: *mut T = ptr::null_mut();
 					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
 					let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
-					ortsys![unsafe GetTensorMutableData(self.ptr_mut(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
+					ortsys![unsafe GetTensorMutableData(self.ptr().cast_mut(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
-					let len = calculate_tensor_size(&dimensions);
+					let len = calculate_tensor_size(dimensions);
 					Ok((dimensions, unsafe { std::slice::from_raw_parts_mut(output_array_ptr, len) }))
 				} else {
 					Err(Error::new_with_code(
@@ -304,16 +300,15 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_string_tensor(&self) -> Result<ndarray::ArrayD<String>> {
-		let dtype = self.dtype();
-		match dtype {
-			ValueType::Tensor { ty, dimensions } => {
+		match self.dtype() {
+			ValueType::Tensor { ty, dimensions, .. } => {
 				let mem = self.memory_info();
 				if !mem.is_cpu_accessible() {
 					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", mem.allocation_device().as_str())));
 				}
 
-				if ty == TensorElementType::String {
-					let len = calculate_tensor_size(&dimensions);
+				if *ty == TensorElementType::String {
+					let len = calculate_tensor_size(dimensions);
 
 					// Total length of string data, not including \0 suffix
 					let mut total_length = 0;
@@ -370,17 +365,16 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn try_extract_raw_string_tensor(&self) -> Result<(Vec<i64>, Vec<String>)> {
-		let dtype = self.dtype();
-		match dtype {
-			ValueType::Tensor { ty, dimensions } => {
+	pub fn try_extract_raw_string_tensor(&self) -> Result<(&[i64], Vec<String>)> {
+		match self.dtype() {
+			ValueType::Tensor { ty, dimensions, .. } => {
 				let mem = self.memory_info();
 				if !mem.is_cpu_accessible() {
 					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", mem.allocation_device().as_str())));
 				}
 
-				if ty == TensorElementType::String {
-					let len = calculate_tensor_size(&dimensions);
+				if *ty == TensorElementType::String {
+					let len = calculate_tensor_size(dimensions);
 
 					// Total length of string data, not including \0 suffix
 					let mut total_length = 0;
@@ -512,7 +506,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn extract_raw_tensor(&self) -> (Vec<i64>, &[T]) {
+	pub fn extract_raw_tensor(&self) -> (&[i64], &[T]) {
 		self.try_extract_raw_tensor().expect("Failed to extract tensor")
 	}
 
@@ -531,7 +525,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn extract_raw_tensor_mut(&mut self) -> (Vec<i64>, &mut [T]) {
+	pub fn extract_raw_tensor_mut(&mut self) -> (&[i64], &mut [T]) {
 		self.try_extract_raw_tensor_mut().expect("Failed to extract tensor")
 	}
 }

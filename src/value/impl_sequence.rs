@@ -87,7 +87,7 @@ impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
 
 					let value = unsafe { Value::from_ptr(NonNull::new_unchecked(value_ptr), None) };
 					let value_type = value.dtype();
-					if !OtherType::can_downcast(&value.dtype()) {
+					if !OtherType::can_downcast(value.dtype()) {
 						return Err(Error::new_with_code(
 							ErrorCode::InvalidArgument,
 							format!("Cannot extract Sequence<{}> from {value_type:?}", OtherType::format())
@@ -134,10 +134,14 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized + 'static> Value<Se
 			nonNull(value_ptr)
 		];
 		Ok(Value {
-			inner: Arc::new(ValueInner::RustOwned {
+			inner: Arc::new(ValueInner {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
-				_array: Box::new(values),
-				_memory_info: None
+				// 1. `CreateValue` enforces that we have at least 1 value
+				// 2. `CreateValue` internally uses the first value to determine the element type, so we do the same here
+				dtype: ValueType::Sequence(Box::new(values[0].inner.dtype.clone())),
+				drop: true,
+				memory_info: None,
+				_backing: Some(Box::new(values))
 			}),
 			_markers: PhantomData
 		})

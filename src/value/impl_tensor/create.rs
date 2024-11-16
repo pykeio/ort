@@ -17,7 +17,7 @@ use crate::{
 	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
 	ortsys,
 	tensor::{PrimitiveTensorElementType, TensorElementType, Utf8Data},
-	value::{DynValue, Value, ValueInner}
+	value::{DynValue, Value, ValueInner, ValueType}
 };
 
 impl Tensor<String> {
@@ -76,10 +76,16 @@ impl Tensor<String> {
 		ortsys![unsafe FillStringTensor(value_ptr, string_pointers.as_ptr(), string_pointers.len())?];
 
 		Ok(Value {
-			inner: Arc::new(ValueInner::RustOwned {
+			inner: Arc::new(ValueInner {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
-				_array: Box::new(()),
-				_memory_info: None
+				dtype: ValueType::Tensor {
+					ty: TensorElementType::String,
+					dimensions: shape,
+					dimension_symbols: vec![None; shape_len]
+				},
+				memory_info: MemoryInfo::from_value(value_ptr),
+				drop: true,
+				_backing: None
 			}),
 			_markers: PhantomData
 		})
@@ -124,10 +130,16 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 		];
 
 		Ok(Value {
-			inner: Arc::new(ValueInner::RustOwned {
+			inner: Arc::new(ValueInner {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
-				_array: Box::new(()),
-				_memory_info: None
+				dtype: ValueType::Tensor {
+					ty: T::into_tensor_element_type(),
+					dimensions: shape,
+					dimension_symbols: vec![None; shape_len]
+				},
+				drop: true,
+				memory_info: MemoryInfo::from_value(value_ptr),
+				_backing: None
 			}),
 			_markers: PhantomData
 		})
@@ -195,10 +207,16 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 		];
 
 		Ok(Value {
-			inner: Arc::new(ValueInner::RustOwned {
+			inner: Arc::new(ValueInner {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
-				_array: guard,
-				_memory_info: Some(memory_info)
+				dtype: ValueType::Tensor {
+					ty: T::into_tensor_element_type(),
+					dimensions: shape,
+					dimension_symbols: vec![None; shape_len]
+				},
+				drop: true,
+				memory_info: Some(memory_info),
+				_backing: Some(guard)
 			}),
 			_markers: PhantomData
 		})
@@ -252,10 +270,16 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 		];
 
 		Ok(TensorRefMut::new(Value {
-			inner: Arc::new(ValueInner::CppOwned {
+			inner: Arc::new(ValueInner {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
+				dtype: ValueType::Tensor {
+					ty: T::into_tensor_element_type(),
+					dimensions: shape,
+					dimension_symbols: vec![None; shape_len]
+				},
 				drop: true,
-				_session: None
+				memory_info: Some(info),
+				_backing: None
 			}),
 			_markers: PhantomData
 		}))

@@ -4,7 +4,6 @@ use std::{
 	collections::HashMap,
 	ffi::CString,
 	fmt::Debug,
-	marker::PhantomData,
 	ptr::{self, NonNull},
 	sync::Arc
 };
@@ -214,7 +213,7 @@ impl IoBinding {
 		let run_options_ptr = if let Some(run_options) = run_options { run_options.ptr() } else { std::ptr::null() };
 		ortsys![unsafe RunWithBinding(self.session.ptr().cast_mut(), run_options_ptr, self.ptr())?];
 
-		let owned_ptrs: HashMap<*mut ort_sys::OrtValue, &Arc<ValueInner>> = self.output_values.values().map(|c| (c.ptr().cast_mut(), &c.inner)).collect();
+		let owned_ptrs: HashMap<*mut ort_sys::OrtValue, &Value> = self.output_values.values().map(|c| (c.ptr().cast_mut(), c)).collect();
 		let mut count = self.output_names.len();
 		if count > 0 {
 			let mut output_values_ptr: *mut *mut ort_sys::OrtValue = ptr::null_mut();
@@ -223,11 +222,8 @@ impl IoBinding {
 			let output_values = unsafe { std::slice::from_raw_parts(output_values_ptr, count).to_vec() }
 				.into_iter()
 				.map(|v| unsafe {
-					if let Some(inner) = owned_ptrs.get(&v) {
-						DynValue {
-							inner: Arc::clone(*inner),
-							_markers: PhantomData
-						}
+					if let Some(value) = owned_ptrs.get(&v) {
+						DynValue::clone_of(value)
 					} else {
 						DynValue::from_ptr(
 							NonNull::new(v).expect("OrtValue ptrs returned by GetBoundOutputValues should not be null"),

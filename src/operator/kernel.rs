@@ -7,7 +7,7 @@ use std::{
 use crate::{
 	AsPointer,
 	error::{Error, Result, status_to_result},
-	memory::{Allocator, MemoryInfo},
+	memory::{Allocator, MemoryInfo, MemoryType},
 	ortsys,
 	session::{Input, Output},
 	value::{DowncastableTarget, DynValue, Value, ValueRef, ValueRefMut, ValueType}
@@ -88,6 +88,12 @@ impl KernelAttributes {
 		let mut name = vec![0u8; name_len];
 		ortsys![unsafe KernelInfo_GetNodeName(self.0.as_ptr(), name.as_mut_ptr().cast::<c_char>(), &mut name_len)?];
 		CString::from_vec_with_nul(name).map_err(Error::wrap)?.into_string().map_err(Error::wrap)
+	}
+
+	pub fn allocator(&self, mem_type: MemoryType) -> Result<Allocator> {
+		let mut ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
+		ortsys![unsafe KernelInfoGetAllocator(self.0.as_ptr(), mem_type.into(), &mut ptr)?];
+		Ok(unsafe { Allocator::from_raw_unchecked(ptr) })
 	}
 }
 

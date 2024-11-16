@@ -5,7 +5,6 @@ use std::{
 	fmt::Debug,
 	marker::PhantomData,
 	ops::{Index, IndexMut},
-	ptr::NonNull,
 	sync::Arc
 };
 
@@ -137,11 +136,8 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub fn memory_info(&self) -> MemoryInfo {
-		let mut memory_info_ptr: *const ort_sys::OrtMemoryInfo = std::ptr::null_mut();
-		// infallible, and `memory_info_ptr` will never be null
-		ortsys![unsafe GetTensorMemoryInfo(self.ptr(), &mut memory_info_ptr)];
-		MemoryInfo::from_raw(unsafe { NonNull::new_unchecked(memory_info_ptr.cast_mut()) }, false)
+	pub fn memory_info(&self) -> &MemoryInfo {
+		unsafe { self.inner.memory_info.as_ref().unwrap_unchecked() }
 	}
 }
 
@@ -282,11 +278,11 @@ mod tests {
 	fn test_tensor_value() -> crate::Result<()> {
 		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
 		let value = Tensor::from_array(Array1::from_vec(v.clone()))?;
-		assert!(value.is_tensor()?);
 		assert_eq!(value.dtype().tensor_type(), Some(TensorElementType::Float32));
-		assert_eq!(value.dtype(), ValueType::Tensor {
+		assert_eq!(value.dtype(), &ValueType::Tensor {
 			ty: TensorElementType::Float32,
-			dimensions: vec![v.len() as i64]
+			dimensions: vec![v.len() as i64],
+			dimension_symbols: vec![None]
 		});
 
 		let (shape, data) = value.extract_raw_tensor();

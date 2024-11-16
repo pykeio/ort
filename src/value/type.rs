@@ -17,14 +17,22 @@ use crate::{ortsys, tensor::TensorElementType};
 /// assert_eq!(input.input_type, ValueType::Tensor {
 /// 	ty: TensorElementType::Float32,
 /// 	// Our model has 3 dynamic dimensions, represented by -1
-/// 	dimensions: vec![-1, -1, -1, 3]
+/// 	dimensions: vec![-1, -1, -1, 3],
+/// 	// Dynamic dimensions may also have names.
+/// 	dimension_symbols: vec![
+/// 		Some("unk__31".to_string()),
+/// 		Some("unk__32".to_string()),
+/// 		Some("unk__33".to_string()),
+/// 		None
+/// 	]
 /// });
 ///
-/// // Or by `Value`s created in Rust or output by a session.
+/// // ...or by `Value`s created in Rust or output by a session.
 /// let value = Tensor::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
-/// assert_eq!(value.dtype(), ValueType::Tensor {
+/// assert_eq!(value.dtype(), &ValueType::Tensor {
 /// 	ty: TensorElementType::Int64,
-/// 	dimensions: vec![5]
+/// 	dimensions: vec![5],
+/// 	dimension_symbols: vec![None]
 /// });
 /// # 	Ok(())
 /// # }
@@ -224,7 +232,7 @@ unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys::OrtTensor
 
 	let dimension_symbols = symbolic_dims
 		.into_iter()
-		.map(|c| if !c.is_null() { CStr::from_ptr(c).to_str().ok().map(str::to_string) } else { None })
+		.map(|c| if !c.is_null() && *c != 0 { CStr::from_ptr(c).to_str().ok().map(str::to_string) } else { None })
 		.collect();
 
 	ValueType::Tensor {

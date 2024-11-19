@@ -1,4 +1,10 @@
-use std::{collections::HashMap, ffi::CString, marker::PhantomData, ptr::NonNull, sync::Arc};
+use std::{
+	collections::HashMap,
+	ffi::{CStr, CString, c_char},
+	marker::PhantomData,
+	ptr::{self, NonNull},
+	sync::Arc
+};
 
 use crate::{
 	AsPointer,
@@ -225,6 +231,16 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 		let tag = CString::new(tag.as_ref())?;
 		ortsys![unsafe RunOptionsSetRunTag(self.run_options_ptr.as_ptr(), tag.as_ptr())?];
 		Ok(())
+	}
+
+	pub fn tag(&self) -> Result<String> {
+		let mut tag_ptr: *const c_char = ptr::null();
+		ortsys![unsafe RunOptionsGetRunTag(self.run_options_ptr.as_ptr(), &mut tag_ptr)?];
+		if tag_ptr.is_null() {
+			Ok(String::default())
+		} else {
+			Ok(unsafe { CStr::from_ptr(tag_ptr) }.to_string_lossy().into())
+		}
 	}
 
 	/// Sets the termination flag for the runs associated with this [`RunOptions`].

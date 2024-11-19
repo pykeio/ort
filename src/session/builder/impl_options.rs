@@ -1,7 +1,9 @@
 use std::{
+	any::Any,
 	borrow::Cow,
 	ffi::{CString, c_char},
 	path::Path,
+	ptr,
 	rc::Rc,
 	sync::Arc
 };
@@ -9,6 +11,7 @@ use std::{
 use super::SessionBuilder;
 use crate::{
 	AsPointer,
+	environment::{self, ThreadManager},
 	error::Result,
 	execution_providers::{ExecutionProviderDispatch, apply_execution_providers},
 	memory::MemoryInfo,
@@ -168,6 +171,45 @@ impl SessionBuilder {
 		self.external_initializer_buffers.push(buffer);
 		Ok(self)
 	}
+
+	pub fn with_log_id(mut self, id: impl AsRef<str>) -> Result<Self> {
+		let id = CString::new(id.as_ref())?;
+		ortsys![unsafe SetSessionLogId(self.ptr_mut(), id.as_ptr())?];
+		Ok(self)
+	}
+
+	pub fn with_dimension_override(mut self, name: impl AsRef<str>, size: i64) -> Result<Self> {
+		let name = CString::new(name.as_ref())?;
+		ortsys![unsafe AddFreeDimensionOverrideByName(self.ptr_mut(), name.as_ptr(), size)?];
+		Ok(self)
+	}
+
+	pub fn with_dimension_override_by_denotation(mut self, denotation: impl AsRef<str>, size: i64) -> Result<Self> {
+		let denotation = CString::new(denotation.as_ref())?;
+		ortsys![unsafe AddFreeDimensionOverride(self.ptr_mut(), denotation.as_ptr(), size)?];
+		Ok(self)
+	}
+
+	pub fn with_prepacked_weights(mut self, weights: &PrepackedWeights) -> Result<Self> {
+		self.prepacked_weights = Some(weights.clone());
+		Ok(self)
+	}
+
+	/// Configures this environment to use its own thread pool instead of defaulting to the
+	/// [`Environment`](crate::environment::Environment)'s global thread pool if one was defined.
+	pub fn with_independent_thread_pool(mut self) -> Result<Self> {
+		self.no_global_thread_pool = true;
+		Ok(self)
+	}
+
+	pub fn with_thread_manager<T: ThreadManager + Any + 'static>(mut self, manager: T) -> Result<Self> {
+		let manager = Rc::new(manager);
+		ortsys![unsafe SessionOptionsSetCustomThreadCreationOptions(self.ptr_mut(), (&*manager as *const T) as *mut std::ffi::c_void)?];
+		ortsys![unsafe SessionOptionsSetCustomCreateThreadFn(self.ptr_mut(), Some(environment::thread_create::<T>))?];
+		ortsys![unsafe SessionOptionsSetCustomJoinThreadFn(self.ptr_mut(), Some(environment::thread_join::<T>))?];
+		self.thread_manager = Some(manager as Rc<dyn Any>);
+		Ok(self)
+	}
 }
 
 /// ONNX Runtime provides various graph optimizations to improve performance. Graph optimizations are essentially
@@ -258,5 +300,42 @@ impl From<GraphOptimizationLevel> for ort_sys::GraphOptimizationLevel {
 			GraphOptimizationLevel::Level2 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_EXTENDED,
 			GraphOptimizationLevel::Level3 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_ALL
 		}
+	}
+}
+
+#[derive(Debug)]
+struct PrepackedWeightsInner(*mut ort_sys::OrtPrepackedWeightsContainer);
+
+impl Drop for PrepackedWeightsInner {
+	fn drop(&mut self) {
+		ortsys![unsafe ReleasePrepackedWeightsContainer(self.0)];
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct PrepackedWeights {
+	inner: Arc<PrepackedWeightsInner>
+}
+
+impl PrepackedWeights {
+	#[allow(clippy::new_without_default)]
+	pub fn new() -> Self {
+		let mut ptr: *mut ort_sys::OrtPrepackedWeightsContainer = ptr::null_mut();
+		ortsys![unsafe CreatePrepackedWeightsContainer(&mut ptr).expect("")];
+		Self {
+			inner: Arc::new(PrepackedWeightsInner(ptr))
+		}
+	}
+}
+
+impl AsPointer for PrepackedWeights {
+	type Sys = ort_sys::OrtPrepackedWeightsContainer;
+
+	fn ptr(&self) -> *const Self::Sys {
+		self.inner.0
+	}
+
+	fn ptr_mut(&mut self) -> *mut Self::Sys {
+		self.inner.0
 	}
 }

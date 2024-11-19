@@ -472,6 +472,46 @@ impl Session {
 		assert_non_null_pointer(profiling_name, "ProfilingName")?;
 		dangerous::raw_pointer_to_string(&self.inner.allocator, profiling_name)
 	}
+
+	/// Sets this session's [workload type][`WorkloadType`] to instruct execution providers to prioritize performance or
+	/// efficiency.
+	///
+	/// ```
+	/// # use std::sync::Arc;
+	/// # use ort::{session::{run_options::RunOptions, Session, WorkloadType}, tensor::TensorElementType, value::{Value, ValueType}};
+	/// # fn main() -> ort::Result<()> {
+	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// session.set_workload_type(WorkloadType::Efficient)?;
+	///
+	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
+	/// let outputs = session.run(ort::inputs![input]?)?;
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	pub fn set_workload_type(&self, workload_type: WorkloadType) -> Result<()> {
+		static KEY: &[u8] = b"ep.dynamic.workload_type\0";
+		match workload_type {
+			WorkloadType::Default => self.set_dynamic_option(KEY.as_ptr().cast(), b"Default\0".as_ptr().cast()),
+			WorkloadType::Efficient => self.set_dynamic_option(KEY.as_ptr().cast(), b"Efficient\0".as_ptr().cast())
+		}
+	}
+
+	pub(crate) fn set_dynamic_option(&self, key: *const c_char, value: *const c_char) -> Result<()> {
+		ortsys![unsafe SetEpDynamicOptions(self.inner.session_ptr.as_ptr(), &key, &value, 1)?];
+		Ok(())
+	}
+}
+
+/// Workload type, used to signal to execution providers whether to prioritize performance or efficiency.
+///
+/// See [`Session::set_workload_type`].
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkloadType {
+	/// Prioritize performance. This is the default behavior when the workload type is not overridden.
+	#[default]
+	Default,
+	/// Prioritize efficiency, by i.e. reducing scheduling priority and/or offloading to efficiency cores.
+	Efficient
 }
 
 // https://github.com/microsoft/onnxruntime/issues/114

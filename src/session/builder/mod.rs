@@ -1,4 +1,5 @@
 use std::{
+	any::Any,
 	borrow::Cow,
 	ffi::CString,
 	ptr::{self, NonNull},
@@ -19,7 +20,7 @@ mod impl_commit;
 mod impl_config_keys;
 mod impl_options;
 
-pub use self::impl_options::GraphOptimizationLevel;
+pub use self::impl_options::{GraphOptimizationLevel, PrepackedWeights};
 
 /// Creates a session using the builder pattern.
 ///
@@ -44,7 +45,10 @@ pub struct SessionBuilder {
 	memory_info: Option<Rc<MemoryInfo>>,
 	operator_domains: Vec<Arc<OperatorDomain>>,
 	external_initializers: Vec<Rc<DynValue>>,
-	external_initializer_buffers: Vec<Cow<'static, [u8]>>
+	external_initializer_buffers: Vec<Cow<'static, [u8]>>,
+	prepacked_weights: Option<PrepackedWeights>,
+	thread_manager: Option<Rc<dyn Any>>,
+	no_global_thread_pool: bool
 }
 
 impl Clone for SessionBuilder {
@@ -57,7 +61,10 @@ impl Clone for SessionBuilder {
 			memory_info: self.memory_info.clone(),
 			operator_domains: self.operator_domains.clone(),
 			external_initializers: self.external_initializers.clone(),
-			external_initializer_buffers: self.external_initializer_buffers.clone()
+			external_initializer_buffers: self.external_initializer_buffers.clone(),
+			prepacked_weights: self.prepacked_weights.clone(),
+			thread_manager: self.thread_manager.clone(),
+			no_global_thread_pool: self.no_global_thread_pool
 		}
 	}
 }
@@ -90,7 +97,10 @@ impl SessionBuilder {
 			memory_info: None,
 			operator_domains: Vec::new(),
 			external_initializers: Vec::new(),
-			external_initializer_buffers: Vec::new()
+			external_initializer_buffers: Vec::new(),
+			prepacked_weights: None,
+			thread_manager: None,
+			no_global_thread_pool: false
 		})
 	}
 

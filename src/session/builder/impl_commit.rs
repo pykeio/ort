@@ -76,12 +76,16 @@ impl SessionBuilder {
 		let env = get_environment()?;
 		apply_execution_providers(&mut self, env.execution_providers.iter().cloned())?;
 
-		if env.has_global_threadpool {
+		if env.has_global_threadpool && !self.no_global_thread_pool {
 			ortsys![unsafe DisablePerSessionThreads(self.ptr_mut())?];
 		}
 
 		let mut session_ptr: *mut ort_sys::OrtSession = std::ptr::null_mut();
-		ortsys![unsafe CreateSession(env.ptr(), model_path.as_ptr(), self.ptr(), &mut session_ptr)?; nonNull(session_ptr)];
+		if let Some(prepacked_weights) = self.prepacked_weights.as_ref() {
+			ortsys![unsafe CreateSessionWithPrepackedWeightsContainer(env.ptr(), model_path.as_ptr(), self.ptr(), prepacked_weights.ptr().cast_mut(), &mut session_ptr)?; nonNull(session_ptr)];
+		} else {
+			ortsys![unsafe CreateSession(env.ptr(), model_path.as_ptr(), self.ptr(), &mut session_ptr)?; nonNull(session_ptr)];
+		}
 
 		let session_ptr = unsafe { NonNull::new_unchecked(session_ptr) };
 
@@ -104,7 +108,13 @@ impl SessionBuilder {
 			.map(|i| dangerous::extract_output(session_ptr, &allocator, i))
 			.collect::<Result<Vec<Output>>>()?;
 
-		let extras = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>).collect();
+		let mut extras: Vec<Box<dyn Any>> = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>).collect();
+		if let Some(prepacked_weights) = self.prepacked_weights.take() {
+			extras.push(Box::new(prepacked_weights) as Box<dyn Any>);
+		}
+		if let Some(thread_manager) = self.thread_manager.take() {
+			extras.push(Box::new(thread_manager) as Box<dyn Any>);
+		}
 
 		Ok(Session {
 			inner: Arc::new(SharedSessionInner {
@@ -141,16 +151,23 @@ impl SessionBuilder {
 		let env = get_environment()?;
 		apply_execution_providers(&mut self, env.execution_providers.iter().cloned())?;
 
-		if env.has_global_threadpool {
+		if env.has_global_threadpool && !self.no_global_thread_pool {
 			ortsys![unsafe DisablePerSessionThreads(self.ptr_mut())?];
 		}
 
 		let model_data = model_bytes.as_ptr().cast::<std::ffi::c_void>();
 		let model_data_length = model_bytes.len();
-		ortsys![
-			unsafe CreateSessionFromArray(env.ptr(), model_data, model_data_length, self.ptr(), &mut session_ptr)?;
-			nonNull(session_ptr)
-		];
+		if let Some(prepacked_weights) = self.prepacked_weights.as_ref() {
+			ortsys![
+				unsafe CreateSessionFromArrayWithPrepackedWeightsContainer(env.ptr(), model_data, model_data_length, self.ptr(), prepacked_weights.ptr().cast_mut(), &mut session_ptr)?;
+				nonNull(session_ptr)
+			];
+		} else {
+			ortsys![
+				unsafe CreateSessionFromArray(env.ptr(), model_data, model_data_length, self.ptr(), &mut session_ptr)?;
+				nonNull(session_ptr)
+			];
+		}
 
 		let session_ptr = unsafe { NonNull::new_unchecked(session_ptr) };
 
@@ -173,7 +190,13 @@ impl SessionBuilder {
 			.map(|i| dangerous::extract_output(session_ptr, &allocator, i))
 			.collect::<Result<Vec<Output>>>()?;
 
-		let extras = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>).collect();
+		let mut extras: Vec<Box<dyn Any>> = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>).collect();
+		if let Some(prepacked_weights) = self.prepacked_weights.take() {
+			extras.push(Box::new(prepacked_weights) as Box<dyn Any>);
+		}
+		if let Some(thread_manager) = self.thread_manager.take() {
+			extras.push(Box::new(thread_manager) as Box<dyn Any>);
+		}
 
 		let session = Session {
 			inner: Arc::new(SharedSessionInner {

@@ -29,7 +29,7 @@ use std::{
 mod impl_map;
 mod impl_sequence;
 mod impl_tensor;
-mod r#type;
+pub(crate) mod r#type;
 
 pub use self::{
 	impl_map::{DynMap, DynMapRef, DynMapRefMut, DynMapValueType, Map, MapRef, MapRefMut, MapValueType, MapValueTypeMarker},

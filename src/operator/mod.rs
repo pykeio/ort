@@ -16,9 +16,12 @@ use self::{
 	io::{OperatorInput, OperatorOutput},
 	kernel::{DummyKernel, Kernel, KernelAttributes}
 };
-use crate::{AsPointer, error::Result, ortsys};
-
-pub type InferShapeFn = dyn FnMut(*mut ort_sys::OrtShapeInferContext) -> crate::Result<()>;
+use crate::{
+	AsPointer, Error,
+	error::Result,
+	ortsys,
+	value::{ValueType, r#type::extract_data_type_from_tensor_info}
+};
 
 /// A custom operator descriptor, which describes the expected inputs & outputs of a graph operator.
 ///
@@ -81,6 +84,46 @@ impl Operator for DummyOperator {
 	}
 	fn outputs() -> Vec<OperatorOutput> {
 		unimplemented!()
+	}
+}
+
+pub type InferShapeFn = dyn FnMut(&mut ShapeInferenceContext) -> crate::Result<()> + 'static;
+
+pub struct ShapeInferenceContext {
+	ptr: *mut ort_sys::OrtShapeInferContext
+}
+
+impl ShapeInferenceContext {
+	pub fn inputs(&self) -> Vec<ValueType> {
+		let mut count = 0;
+		ortsys![unsafe ShapeInferContext_GetInputCount(self.ptr(), &mut count).expect("failed to get input count")];
+
+		let mut tys = Vec::with_capacity(count);
+		for i in 0..count {
+			let mut ty_info = ptr::null_mut();
+			ortsys![unsafe ShapeInferContext_GetInputTypeShape(self.ptr(), i, &mut ty_info).expect("failed to get info type")];
+			tys.push(unsafe { extract_data_type_from_tensor_info(ty_info) });
+		}
+		tys
+	}
+
+	pub fn set_output(&mut self, idx: usize, ty: &ValueType) -> Result<()> {
+		match ty.to_tensor_type_info() {
+			Some(ty_ptr) => {
+				ortsys![unsafe ShapeInferContext_SetOutputTypeShape(self.ptr(), idx, ty_ptr)?];
+				ortsys![unsafe ReleaseTensorTypeAndShapeInfo(ty_ptr)];
+				Ok(())
+			}
+			None => Err(Error::new("only tensors are supported"))
+		}
+	}
+}
+
+impl AsPointer for ShapeInferenceContext {
+	type Sys = ort_sys::OrtShapeInferContext;
+
+	fn ptr(&self) -> *const Self::Sys {
+		self.ptr
 	}
 }
 

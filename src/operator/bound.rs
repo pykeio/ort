@@ -5,7 +5,7 @@ use std::{
 };
 
 use super::{
-	DummyOperator, Operator,
+	DummyOperator, Operator, ShapeInferenceContext,
 	io::InputOutputCharacteristic,
 	kernel::{Kernel, KernelAttributes, KernelContext}
 };
@@ -203,8 +203,11 @@ impl<O: Operator> BoundOperator<O> {
 	}
 
 	extern_system_fn! {
-		pub(crate) unsafe fn InferOutputShapeFn(_: *const ort_sys::OrtCustomOp, arg1: *mut ort_sys::OrtShapeInferContext) -> *mut ort_sys::OrtStatus {
-			O::get_infer_shape_function().expect("missing infer shape function")(arg1).into_status()
+		pub(crate) unsafe fn InferOutputShapeFn(_: *const ort_sys::OrtCustomOp, ctx: *mut ort_sys::OrtShapeInferContext) -> *mut ort_sys::OrtStatus {
+			let mut ctx = ShapeInferenceContext {
+				ptr: ctx
+			};
+			O::get_infer_shape_function().expect("missing infer shape function")(&mut ctx).into_status()
 		}
 	}
 }

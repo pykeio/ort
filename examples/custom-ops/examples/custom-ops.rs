@@ -30,6 +30,14 @@ impl Operator for CustomOpOne {
 	fn outputs() -> Vec<OperatorOutput> {
 		vec![OperatorOutput::required(TensorElementType::Float32)]
 	}
+
+	fn get_infer_shape_function() -> Option<Box<ort::operator::InferShapeFn>> {
+		Some(Box::new(|ctx| {
+			let inputs = ctx.inputs();
+			ctx.set_output(0, &inputs[0])?;
+			Ok(())
+		}))
+	}
 }
 
 impl Kernel for CustomOpOneKernel {

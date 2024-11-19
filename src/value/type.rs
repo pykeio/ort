@@ -1,5 +1,5 @@
 use std::{
-	ffi::{CStr, c_char},
+	ffi::{CStr, CString, c_char},
 	fmt, ptr
 };
 
@@ -132,6 +132,32 @@ impl ValueType {
 		ortsys![unsafe ReleaseTypeInfo(typeinfo_ptr)];
 		io_type
 	}
+
+	pub(crate) fn to_tensor_type_info(&self) -> Option<*mut ort_sys::OrtTensorTypeAndShapeInfo> {
+		match self {
+			Self::Tensor { ty, dimensions, dimension_symbols } => {
+				let mut info_ptr = ptr::null_mut();
+				ortsys![unsafe CreateTensorTypeAndShapeInfo(&mut info_ptr)];
+				ortsys![unsafe SetTensorElementType(info_ptr, (*ty).into())];
+				ortsys![unsafe SetDimensions(info_ptr, dimensions.as_ptr(), dimensions.len())];
+				let dimension_symbols: Vec<*const c_char> = dimension_symbols
+					.iter()
+					.cloned()
+					.map(|s| CString::new(s.unwrap_or_default()))
+					.map(|s| s.map_or(ptr::null(), |s| s.into_raw().cast_const()))
+					.collect();
+				ortsys![unsafe SetSymbolicDimensions(info_ptr, dimension_symbols.as_ptr().cast_mut(), dimension_symbols.len())];
+				for p in dimension_symbols {
+					if !p.is_null() {
+						drop(unsafe { CString::from_raw(p.cast_mut().cast()) });
+					}
+				}
+				Some(info_ptr)
+			}
+			_ => None
+		}
+	}
+
 	/// Returns the dimensions of this value type if it is a tensor, or `None` if it is a sequence or map.
 	///
 	/// ```
@@ -216,7 +242,7 @@ impl fmt::Display for ValueType {
 	}
 }
 
-unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo) -> ValueType {
+pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo) -> ValueType {
 	let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
 	ortsys![GetTensorElementType(info_ptr, &mut type_sys)];
 	assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
@@ -258,5 +284,26 @@ unsafe fn extract_data_type_from_map_info(info_ptr: *const ort_sys::OrtMapTypeIn
 	ValueType::Map {
 		key: key_type_sys.into(),
 		value: value_type_sys.into()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::ValueType;
+	use crate::{ortsys, tensor::TensorElementType};
+
+	#[test]
+	fn test_to_from_tensor_info() -> crate::Result<()> {
+		let ty = ValueType::Tensor {
+			ty: TensorElementType::Float32,
+			dimensions: vec![-1, 32, 4, 32],
+			dimension_symbols: vec![Some("d1".to_string()), None, None, None]
+		};
+		let ty_ptr = ty.to_tensor_type_info().expect("");
+		let ty_d = unsafe { super::extract_data_type_from_tensor_info(ty_ptr) };
+		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(ty_ptr)];
+		assert_eq!(ty, ty_d);
+
+		Ok(())
 	}
 }

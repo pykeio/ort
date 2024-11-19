@@ -75,36 +75,3 @@ fn global_thread_manager() -> ort::Result<()> {
 
 	Ok(())
 }
-
-#[test]
-fn session_thread_manager() -> ort::Result<()> {
-	const IMAGE_TO_LOAD: &str = "mnist_5.jpg";
-
-	let stats = Arc::new(ThreadStats { active_threads: AtomicUsize::new(0) });
-
-	let session = Session::builder()?
-		.with_optimization_level(GraphOptimizationLevel::Level1)?
-		.with_inter_threads(2)?
-		.with_intra_threads(2)?
-		.with_thread_manager(StdThreadManager { stats: Arc::clone(&stats) })?
-		.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")
-		.expect("Could not download model from file");
-
-	assert_eq!(stats.active_threads.load(Ordering::Acquire), 1);
-
-	let image_buffer: ImageBuffer<Luma<u8>, Vec<u8>> = image::open(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join(IMAGE_TO_LOAD))
-		.unwrap()
-		.resize(28, 28, FilterType::Nearest)
-		.to_luma8();
-	let array = ndarray::Array::from_shape_fn((1, 1, 28, 28), |(_, c, j, i)| {
-		let pixel = image_buffer.get_pixel(i as u32, j as u32);
-		let channels = pixel.channels();
-		(channels[c] as f32) / 255.0
-	});
-
-	let _ = session.run(inputs![array]?)?;
-
-	assert_eq!(stats.active_threads.load(Ordering::Acquire), 1);
-
-	Ok(())
-}

@@ -6,11 +6,11 @@ export default {
 	},
 	"link-api": {
 		"title": "API Reference ↗",
-		"href": "https://docs.rs/ort/2.0.0-rc.8/ort/"
+		"href": "https://docs.rs/ort/2.0.0-rc.9/ort/"
 	},
 	"link-crates": {
 		"title": "Crates.io ↗",
-		"href": "https://crates.io/crates/ort/2.0.0-rc.8",
+		"href": "https://crates.io/crates/ort/2.0.0-rc.9",
 		"newWindow": true
 	},
 	"-- Docs": {

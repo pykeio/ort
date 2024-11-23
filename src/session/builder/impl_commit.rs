@@ -30,7 +30,7 @@ impl SessionBuilder {
 			let _ = write!(&mut s, "{:02x}", b);
 			s
 		});
-		let model_filepath = download_dir.join(model_filename);
+		let model_filepath = download_dir.join(&model_filename);
 		let downloaded_path = if model_filepath.exists() {
 			tracing::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), "Model already exists, skipping download");
 			model_filepath
@@ -46,15 +46,27 @@ impl SessionBuilder {
 			tracing::info!(len, "Downloading {} bytes", len);
 
 			let mut reader = resp.into_reader();
+			let temp_filepath = download_dir.join(format!("tmp_{}.{model_filename}", ort_sys::internal::random_identifier()));
 
-			let f = std::fs::File::create(&model_filepath).expect("Failed to create model file");
+			let f = std::fs::File::create(&temp_filepath).expect("Failed to create model file");
 			let mut writer = std::io::BufWriter::new(f);
 
 			let bytes_io_count = std::io::copy(&mut reader, &mut writer).map_err(Error::wrap)?;
-			if bytes_io_count == len as u64 {
-				model_filepath
-			} else {
+			if bytes_io_count != len as u64 {
 				return Err(Error::new(format!("Failed to download entire model; file only has {bytes_io_count} bytes, expected {len}")));
+			}
+
+			drop(writer);
+
+			match std::fs::rename(&temp_filepath, &model_filepath) {
+				Ok(()) => model_filepath,
+				Err(e) => match e.kind() {
+					std::io::ErrorKind::AlreadyExists => {
+						let _ = std::fs::remove_file(temp_filepath);
+						model_filepath
+					}
+					_ => return Err(Error::new(format!("Failed to download model: {e}")))
+				}
 			}
 		};
 

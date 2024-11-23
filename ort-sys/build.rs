@@ -475,7 +475,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					match std::fs::rename(&temp_extract_dir, bin_extract_dir) {
 						Ok(()) => {}
 						Err(e) => match e.kind() {
-							io::ErrorKind::AlreadyExists | io::ErrorKind::DirectoryNotEmpty => {
+							io::ErrorKind::AlreadyExists => {
 								let _ = fs::remove_dir_all(temp_extract_dir);
 							}
 							_ => panic!("failed to extract downloaded binaries: {e}")

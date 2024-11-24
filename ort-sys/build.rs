@@ -472,13 +472,14 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 				}
 				extract_tgz(&downloaded_file, &temp_extract_dir);
 				if should_rename {
-					match std::fs::rename(&temp_extract_dir, bin_extract_dir) {
+					match std::fs::rename(&temp_extract_dir, &bin_extract_dir) {
 						Ok(()) => {}
-						Err(e) => match e.kind() {
-							io::ErrorKind::AlreadyExists => {
+						Err(e) => {
+							if bin_extract_dir.exists() {
 								let _ = fs::remove_dir_all(temp_extract_dir);
+							} else {
+								panic!("failed to extract downloaded binaries: {e}");
 							}
-							_ => panic!("failed to extract downloaded binaries: {e}")
 						}
 					}
 				}

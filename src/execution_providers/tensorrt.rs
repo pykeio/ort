@@ -135,7 +135,7 @@ impl TensorRTExecutionProvider {
 
 	#[must_use]
 	pub fn with_context_memory_sharing(mut self, enable: bool) -> Self {
-		self.options.set("trt_enable_context_memory_sharing", if enable { "1" } else { "0" });
+		self.options.set("trt_context_memory_sharing_enable", if enable { "1" } else { "0" });
 		self
 	}
 

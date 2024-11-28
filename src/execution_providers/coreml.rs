@@ -13,7 +13,10 @@ extern "C" {
 pub struct CoreMLExecutionProvider {
 	use_cpu_only: bool,
 	enable_on_subgraph: bool,
-	only_enable_device_with_ane: bool
+	only_enable_device_with_ane: bool,
+	only_static_input_shapes: bool,
+	mlprogram: bool,
+	use_cpu_and_gpu: bool
 }
 
 impl CoreMLExecutionProvider {
@@ -38,6 +41,28 @@ impl CoreMLExecutionProvider {
 	#[must_use]
 	pub fn with_ane_only(mut self) -> Self {
 		self.only_enable_device_with_ane = true;
+		self
+	}
+
+	/// Only allow the CoreML EP to take nodes with inputs that have static shapes. By default the CoreML EP will also
+	/// allow inputs with dynamic shapes, however performance may be negatively impacted by inputs with dynamic shapes.
+	#[must_use]
+	pub fn with_static_input_shapes(mut self) -> Self {
+		self.only_static_input_shapes = true;
+		self
+	}
+
+	/// Create an MLProgram format model. Requires Core ML 5 or later (iOS 15+ or macOS 12+). The default is for a
+	/// NeuralNetwork model to be created as that requires Core ML 3 or later (iOS 13+ or macOS 10.15+).
+	#[must_use]
+	pub fn with_mlprogram(mut self) -> Self {
+		self.mlprogram = true;
+		self
+	}
+
+	#[must_use]
+	pub fn with_cpu_and_gpu(mut self) -> Self {
+		self.use_cpu_and_gpu = true;
 		self
 	}
 
@@ -78,6 +103,15 @@ impl ExecutionProvider for CoreMLExecutionProvider {
 			}
 			if self.only_enable_device_with_ane {
 				flags |= 0x004;
+			}
+			if self.only_static_input_shapes {
+				flags |= 0x008;
+			}
+			if self.mlprogram {
+				flags |= 0x010;
+			}
+			if self.use_cpu_and_gpu {
+				flags |= 0x020;
 			}
 			return crate::error::status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_CoreML(session_builder.ptr_mut(), flags) });
 		}

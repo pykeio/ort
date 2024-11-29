@@ -49,23 +49,6 @@ pub use self::{
 	error::{Error, ErrorCode, Result}
 };
 
-#[cfg(not(all(target_arch = "x86", target_os = "windows")))]
-macro_rules! extern_system_fn {
-	($(#[$meta:meta])* fn $($tt:tt)*) => ($(#[$meta])* extern "C" fn $($tt)*);
-	($(#[$meta:meta])* $vis:vis fn $($tt:tt)*) => ($(#[$meta])* $vis extern "C" fn $($tt)*);
-	($(#[$meta:meta])* unsafe fn $($tt:tt)*) => ($(#[$meta])* unsafe extern "C" fn $($tt)*);
-	($(#[$meta:meta])* $vis:vis unsafe fn $($tt:tt)*) => ($(#[$meta])* $vis unsafe extern "C" fn $($tt)*);
-}
-#[cfg(all(target_arch = "x86", target_os = "windows"))]
-macro_rules! extern_system_fn {
-	($(#[$meta:meta])* fn $($tt:tt)*) => ($(#[$meta])* extern "stdcall" fn $($tt)*);
-	($(#[$meta:meta])* $vis:vis fn $($tt:tt)*) => ($(#[$meta])* $vis extern "stdcall" fn $($tt)*);
-	($(#[$meta:meta])* unsafe fn $($tt:tt)*) => ($(#[$meta])* unsafe extern "stdcall" fn $($tt)*);
-	($(#[$meta:meta])* $vis:vis unsafe fn $($tt:tt)*) => ($(#[$meta])* $vis unsafe extern "stdcall" fn $($tt)*);
-}
-
-pub(crate) use extern_system_fn;
-
 /// The minor version of ONNX Runtime used by this version of `ort`.
 pub const MINOR_VERSION: u32 = ort_sys::ORT_API_VERSION;
 
@@ -167,7 +150,7 @@ pub fn api() -> &'static ort_sys::OrtApi {
 				let base: *const ort_sys::OrtApiBase = base_getter();
 				assert_ne!(base, ptr::null());
 
-				let get_version_string: extern_system_fn! { unsafe fn () -> *const c_char } =
+				let get_version_string: unsafe extern "system" fn() -> *const c_char =
 					(*base).GetVersionString.expect("`GetVersionString` must be present in `OrtApiBase`");
 				let version_string = get_version_string();
 				let version_string = CStr::from_ptr(version_string).to_string_lossy();
@@ -187,7 +170,7 @@ pub fn api() -> &'static ort_sys::OrtApi {
 					),
 					std::cmp::Ordering::Equal => {}
 				};
-				let get_api: extern_system_fn! { unsafe fn(u32) -> *const ort_sys::OrtApi } =
+				let get_api: unsafe extern "system" fn(u32) -> *const ort_sys::OrtApi =
 					(*base).GetApi.expect("`GetApi` must be present in `OrtApiBase`");
 				let api: *const ort_sys::OrtApi = get_api(ort_sys::ORT_API_VERSION);
 				ApiPointer(NonNull::new(api.cast_mut()).expect("Failed to initialize ORT API"))
@@ -196,7 +179,7 @@ pub fn api() -> &'static ort_sys::OrtApi {
 			unsafe {
 				let base: *const ort_sys::OrtApiBase = ort_sys::OrtGetApiBase();
 				assert_ne!(base, ptr::null());
-				let get_api: extern_system_fn! { unsafe fn(u32) -> *const ort_sys::OrtApi } =
+				let get_api: unsafe extern "system" fn(u32) -> *const ort_sys::OrtApi =
 					(*base).GetApi.expect("`GetApi` must be present in `OrtApiBase`");
 				let api: *const ort_sys::OrtApi = get_api(ort_sys::ORT_API_VERSION);
 				ApiPointer(NonNull::new(api.cast_mut()).expect("Failed to initialize ORT API"))

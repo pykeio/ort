@@ -24,7 +24,6 @@ use crate::{
 	AsPointer, char_p_to_string,
 	environment::Environment,
 	error::{Error, ErrorCode, Result, assert_non_null_pointer, status_to_result},
-	extern_system_fn,
 	io_binding::IoBinding,
 	memory::Allocator,
 	metadata::ModelMetadata,
@@ -558,7 +557,7 @@ mod dangerous {
 	}
 
 	fn extract_io_count(
-		f: extern_system_fn! { unsafe fn(*const ort_sys::OrtSession, *mut usize) -> *mut ort_sys::OrtStatus },
+		f: unsafe extern "system" fn(*const ort_sys::OrtSession, *mut usize) -> *mut ort_sys::OrtStatus,
 		session_ptr: NonNull<ort_sys::OrtSession>
 	) -> Result<usize> {
 		let mut num_nodes = 0;
@@ -590,12 +589,7 @@ mod dangerous {
 	}
 
 	fn extract_io_name(
-		f: extern_system_fn! { unsafe fn(
-			*const ort_sys::OrtSession,
-			usize,
-			*mut ort_sys::OrtAllocator,
-			*mut *mut c_char,
-		) -> *mut ort_sys::OrtStatus },
+		f: unsafe extern "system" fn(*const ort_sys::OrtSession, usize, *mut ort_sys::OrtAllocator, *mut *mut c_char) -> *mut ort_sys::OrtStatus,
 		session_ptr: NonNull<ort_sys::OrtSession>,
 		allocator: &Allocator,
 		i: usize
@@ -624,11 +618,7 @@ mod dangerous {
 	}
 
 	fn extract_io(
-		f: extern_system_fn! { unsafe fn(
-			*const ort_sys::OrtSession,
-			usize,
-			*mut *mut ort_sys::OrtTypeInfo,
-		) -> *mut ort_sys::OrtStatus },
+		f: unsafe extern "system" fn(*const ort_sys::OrtSession, usize, *mut *mut ort_sys::OrtTypeInfo) -> *mut ort_sys::OrtStatus,
 		session_ptr: NonNull<ort_sys::OrtSession>,
 		i: usize
 	) -> Result<ValueType> {

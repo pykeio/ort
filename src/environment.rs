@@ -24,7 +24,7 @@ use tracing::{Level, debug};
 
 #[cfg(feature = "load-dynamic")]
 use crate::G_ORT_DYLIB_PATH;
-use crate::{AsPointer, error::Result, execution_providers::ExecutionProviderDispatch, extern_system_fn, ortsys};
+use crate::{AsPointer, error::Result, execution_providers::ExecutionProviderDispatch, ortsys};
 
 struct EnvironmentSingleton {
 	lock: RwLock<Option<Arc<Environment>>>
@@ -172,7 +172,7 @@ pub trait ThreadManager {
 	fn join(thread: Self::Thread) -> crate::Result<()>;
 }
 
-pub(crate) unsafe extern "C" fn thread_create<T: ThreadManager + Any>(
+pub(crate) unsafe extern "system" fn thread_create<T: ThreadManager + Any>(
 	ort_custom_thread_creation_options: *mut c_void,
 	ort_thread_worker_fn: ort_sys::OrtThreadWorkerFn,
 	ort_worker_fn_param: *mut c_void
@@ -201,7 +201,7 @@ pub(crate) unsafe extern "C" fn thread_create<T: ThreadManager + Any>(
 	}
 }
 
-pub(crate) unsafe extern "C" fn thread_join<T: ThreadManager + Any>(ort_custom_thread_handle: ort_sys::OrtCustomThreadHandle) {
+pub(crate) unsafe extern "system" fn thread_join<T: ThreadManager + Any>(ort_custom_thread_handle: ort_sys::OrtCustomThreadHandle) {
 	let handle = Box::from_raw(ort_custom_thread_handle.cast_mut().cast::<<T as ThreadManager>::Thread>());
 	if let Err(e) = <T as ThreadManager>::join(*handle) {
 		tracing::error!("Failed to join thread using manager: {e}");
@@ -395,29 +395,29 @@ pub fn init_from(path: impl ToString) -> EnvironmentBuilder {
 	EnvironmentBuilder::new()
 }
 
-extern_system_fn! {
-	/// Callback from C that will handle ONNX logging, forwarding ONNX's logs to the `tracing` crate.
-	pub(crate) fn custom_logger(_params: *mut ffi::c_void, severity: ort_sys::OrtLoggingLevel, _: *const c_char, id: *const c_char, code_location: *const c_char, message: *const c_char) {
-		assert_ne!(code_location, ptr::null());
-		let code_location = unsafe { CStr::from_ptr(code_location) }.to_str().unwrap_or("<decode error>");
-		assert_ne!(message, ptr::null());
-		let message = unsafe { CStr::from_ptr(message) }.to_str().unwrap_or("<decode error>");
-		assert_ne!(id, ptr::null());
-		let id = unsafe { CStr::from_ptr(id) }.to_str().unwrap_or("<decode error>");
+/// Callback from C that will handle ONNX logging, forwarding ONNX's logs to the `tracing` crate.
+pub(crate) extern "system" fn custom_logger(
+	_params: *mut ffi::c_void,
+	severity: ort_sys::OrtLoggingLevel,
+	_: *const c_char,
+	id: *const c_char,
+	code_location: *const c_char,
+	message: *const c_char
+) {
+	assert_ne!(code_location, ptr::null());
+	let code_location = unsafe { CStr::from_ptr(code_location) }.to_str().unwrap_or("<decode error>");
+	assert_ne!(message, ptr::null());
+	let message = unsafe { CStr::from_ptr(message) }.to_str().unwrap_or("<decode error>");
+	assert_ne!(id, ptr::null());
+	let id = unsafe { CStr::from_ptr(id) }.to_str().unwrap_or("<decode error>");
 
-		let span = tracing::span!(
-			Level::TRACE,
-			"ort",
-			id = id,
-			location = code_location
-		);
+	let span = tracing::span!(Level::TRACE, "ort", id = id, location = code_location);
 
-		match severity {
-			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE => tracing::event!(parent: &span, Level::TRACE, "{message}"),
-			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_INFO => tracing::event!(parent: &span, Level::DEBUG, "{message}"),
-			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING => tracing::event!(parent: &span, Level::INFO, "{message}"),
-			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_ERROR => tracing::event!(parent: &span, Level::WARN, "{message}"),
-			ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_FATAL=> tracing::event!(parent: &span, Level::ERROR, "{message}")
-		}
+	match severity {
+		ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE => tracing::event!(parent: &span, Level::TRACE, "{message}"),
+		ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_INFO => tracing::event!(parent: &span, Level::DEBUG, "{message}"),
+		ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING => tracing::event!(parent: &span, Level::INFO, "{message}"),
+		ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_ERROR => tracing::event!(parent: &span, Level::WARN, "{message}"),
+		ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_FATAL => tracing::event!(parent: &span, Level::ERROR, "{message}")
 	}
 }

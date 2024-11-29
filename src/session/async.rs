@@ -133,30 +133,28 @@ pub(crate) struct AsyncInferenceContext<'r, 's> {
 	pub(crate) output_value_ptrs: Vec<*mut ort_sys::OrtValue>
 }
 
-crate::extern_system_fn! {
-	pub(crate) fn async_callback(user_data: *mut c_void, _: *mut *mut ort_sys::OrtValue, _: usize, status: *mut OrtStatus) {
-		let ctx = unsafe { Box::from_raw(user_data.cast::<AsyncInferenceContext<'_, '_>>()) };
+pub(crate) extern "system" fn async_callback(user_data: *mut c_void, _: *mut *mut ort_sys::OrtValue, _: usize, status: *mut OrtStatus) {
+	let ctx = unsafe { Box::from_raw(user_data.cast::<AsyncInferenceContext<'_, '_>>()) };
 
-		// Reconvert name ptrs to CString so drop impl is called and memory is freed
-		for p in ctx.input_name_ptrs {
-			drop(unsafe { CString::from_raw(p.cast_mut().cast()) });
-		}
-
-		if let Err(e) = crate::error::status_to_result(status) {
-			ctx.inner.emplace_value(Err(e));
-			ctx.inner.wake();
-			return;
-		}
-
-		let outputs: Vec<Value> = ctx
-			.output_value_ptrs
-			.into_iter()
-			.map(|tensor_ptr| unsafe {
-				Value::from_ptr(NonNull::new(tensor_ptr).expect("OrtValue ptr returned from session Run should not be null"), Some(Arc::clone(ctx.session_inner)))
-			})
-			.collect();
-
-		ctx.inner.emplace_value(Ok(SessionOutputs::new(ctx.output_names, outputs)));
-		ctx.inner.wake();
+	// Reconvert name ptrs to CString so drop impl is called and memory is freed
+	for p in ctx.input_name_ptrs {
+		drop(unsafe { CString::from_raw(p.cast_mut().cast()) });
 	}
+
+	if let Err(e) = crate::error::status_to_result(status) {
+		ctx.inner.emplace_value(Err(e));
+		ctx.inner.wake();
+		return;
+	}
+
+	let outputs: Vec<Value> = ctx
+		.output_value_ptrs
+		.into_iter()
+		.map(|tensor_ptr| unsafe {
+			Value::from_ptr(NonNull::new(tensor_ptr).expect("OrtValue ptr returned from session Run should not be null"), Some(Arc::clone(ctx.session_inner)))
+		})
+		.collect();
+
+	ctx.inner.emplace_value(Ok(SessionOutputs::new(ctx.output_names, outputs)));
+	ctx.inner.wake();
 }

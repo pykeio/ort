@@ -5,7 +5,7 @@ use super::{
 	io::{self, InputOutputCharacteristic},
 	kernel::{Kernel, KernelAttributes, KernelContext}
 };
-use crate::{Result, error::IntoStatus, extern_system_fn};
+use crate::{Result, error::IntoStatus};
 
 #[repr(C)] // <- important! a defined layout allows us to store extra data after the `OrtCustomOp` that we can retrieve later
 pub(crate) struct BoundOperator {
@@ -62,168 +62,140 @@ impl BoundOperator {
 		})
 	}
 
-	unsafe fn safe<'a>(op: *const ort_sys::OrtCustomOp) -> &'a BoundOperator {
-		&*op.cast()
+	fn safe<'a>(op: *const ort_sys::OrtCustomOp) -> &'a BoundOperator {
+		unsafe { &*op.cast() }
 	}
 
-	extern_system_fn! {
-		pub(crate) unsafe fn create_kernel(
-			op: *const ort_sys::OrtCustomOp,
-			_: *const ort_sys::OrtApi,
-			info: *const ort_sys::OrtKernelInfo,
-			kernel_ptr: *mut *mut ort_sys::c_void
-		) -> *mut ort_sys::OrtStatus {
-			let safe = Self::safe(op);
-			let kernel = match safe.operator.create_kernel(&KernelAttributes::new(info)) {
-				Ok(kernel) => kernel,
-				e => return e.into_status()
-			};
-			*kernel_ptr = (Box::leak(Box::new(kernel)) as *mut Box<dyn Kernel>).cast();
-			Ok(()).into_status()
-		}
+	pub(crate) extern "system" fn create_kernel(
+		op: *const ort_sys::OrtCustomOp,
+		_: *const ort_sys::OrtApi,
+		info: *const ort_sys::OrtKernelInfo,
+		kernel_ptr: *mut *mut ort_sys::c_void
+	) -> *mut ort_sys::OrtStatus {
+		let safe = Self::safe(op);
+		let kernel = match safe.operator.create_kernel(&KernelAttributes::new(info)) {
+			Ok(kernel) => kernel,
+			e => return e.into_status()
+		};
+		unsafe { *kernel_ptr = (Box::leak(Box::new(kernel)) as *mut Box<dyn Kernel>).cast() };
+		Ok(()).into_status()
 	}
 
-	extern_system_fn! {
-		pub(crate) unsafe fn compute_kernel(kernel_ptr: *mut ort_sys::c_void, context: *mut ort_sys::OrtKernelContext) -> *mut ort_sys::OrtStatus {
-			let context = KernelContext::new(context);
-			unsafe { &mut *kernel_ptr.cast::<Box<dyn Kernel>>() }.compute(&context).into_status()
-		}
+	pub(crate) extern "system" fn compute_kernel(kernel_ptr: *mut ort_sys::c_void, context: *mut ort_sys::OrtKernelContext) -> *mut ort_sys::OrtStatus {
+		let context = KernelContext::new(context);
+		unsafe { &mut *kernel_ptr.cast::<Box<dyn Kernel>>() }.compute(&context).into_status()
 	}
 
-	extern_system_fn! {
-		pub(crate) unsafe fn destroy_kernel(op_kernel: *mut ort_sys::c_void) {
-			drop(Box::from_raw(op_kernel.cast::<Box<dyn Kernel>>()));
-		}
+	pub(crate) extern "system" fn destroy_kernel(op_kernel: *mut ort_sys::c_void) {
+		drop(unsafe { Box::from_raw(op_kernel.cast::<Box<dyn Kernel>>()) });
 	}
 
-	extern_system_fn! {
-		pub(crate) unsafe fn get_name(op: *const ort_sys::OrtCustomOp) -> *const ort_sys::c_char {
-			let safe = Self::safe(op);
-			safe.name.as_ptr()
-		}
-	}
-	extern_system_fn! {
-		pub(crate) unsafe fn get_execution_provider_type(op: *const ort_sys::OrtCustomOp) -> *const ort_sys::c_char {
-			let safe = Self::safe(op);
-			safe.execution_provider_type.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null)
-		}
+	pub(crate) extern "system" fn get_name(op: *const ort_sys::OrtCustomOp) -> *const ort_sys::c_char {
+		let safe = Self::safe(op);
+		safe.name.as_ptr()
 	}
 
-	extern_system_fn! {
-		pub(crate) unsafe fn get_min_version(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
-			let safe = Self::safe(op);
-			safe.operator.min_version() as _
-		}
-	}
-	extern_system_fn! {
-		pub(crate) unsafe fn get_max_version(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
-			let safe = Self::safe(op);
-			safe.operator.max_version() as _
-		}
+	pub(crate) extern "system" fn get_execution_provider_type(op: *const ort_sys::OrtCustomOp) -> *const ort_sys::c_char {
+		let safe = Self::safe(op);
+		safe.execution_provider_type.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null)
 	}
 
-	extern_system_fn! {
-		pub(crate) unsafe fn get_input_memory_type(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtMemType {
-			let safe = Self::safe(op);
-			safe.inputs[index].memory_type.into()
-		}
-	}
-	extern_system_fn! {
-		pub(crate) unsafe fn get_input_characteristic(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtCustomOpInputOutputCharacteristic {
-			let safe = Self::safe(op);
-			safe.inputs[index].characteristic.into()
-		}
-	}
-	extern_system_fn! {
-		pub(crate) unsafe fn get_output_characteristic(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtCustomOpInputOutputCharacteristic {
-			let safe = Self::safe(op);
-			safe.outputs[index].characteristic.into()
-		}
-	}
-	extern_system_fn! {
-		pub(crate) unsafe fn get_input_type_count(op: *const ort_sys::OrtCustomOp) -> usize {
-			let safe = Self::safe(op);
-			safe.inputs.len()
-		}
-	}
-	extern_system_fn! {
-		pub(crate) unsafe fn get_output_type_count(op: *const ort_sys::OrtCustomOp) -> usize {
-			let safe = Self::safe(op);
-			safe.outputs.len()
-		}
-	}
-	extern_system_fn! {
-		pub(crate) unsafe fn get_input_type(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::ONNXTensorElementDataType {
-			let safe = Self::safe(op);
-			safe.inputs[index]
-				.r#type
-				.map(|c| c.into())
-				.unwrap_or(ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED)
-		}
-	}
-	extern_system_fn! {
-		pub(crate) unsafe fn get_output_type(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::ONNXTensorElementDataType {
-			let safe = Self::safe(op);
-			safe.outputs[index]
-				.r#type
-				.map(|c| c.into())
-				.unwrap_or(ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED)
-		}
-	}
-	extern_system_fn! {
-		pub(crate) unsafe fn get_variadic_input_min_arity(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
-			let safe = Self::safe(op);
-			safe.inputs
-				.iter()
-				.find(|c| c.characteristic == InputOutputCharacteristic::Variadic)
-				.and_then(|c| c.variadic_min_arity)
-				.unwrap_or(1)
-				.try_into()
-				.expect("input minimum arity overflows i32")
-		}
-	}
-	extern_system_fn! {
-		pub(crate) unsafe fn get_variadic_input_homogeneity(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
-			let safe = Self::safe(op);
-			safe.inputs
-				.iter()
-				.find(|c| c.characteristic == InputOutputCharacteristic::Variadic)
-				.and_then(|c| c.variadic_homogeneity)
-				.unwrap_or(false)
-				.into()
-		}
-	}
-	extern_system_fn! {
-		pub(crate) unsafe fn get_variadic_output_min_arity(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
-			let safe = Self::safe(op);
-			safe.outputs
-				.iter()
-				.find(|c| c.characteristic == InputOutputCharacteristic::Variadic)
-				.and_then(|c| c.variadic_min_arity)
-				.unwrap_or(1)
-				.try_into()
-				.expect("output minimum arity overflows i32")
-		}
-	}
-	extern_system_fn! {
-		pub(crate) unsafe fn get_variadic_output_homogeneity(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
-			let safe = Self::safe(op);
-			safe.outputs
-				.iter()
-				.find(|c| c.characteristic == InputOutputCharacteristic::Variadic)
-				.and_then(|c| c.variadic_homogeneity)
-				.unwrap_or(false)
-				.into()
-		}
+	pub(crate) extern "system" fn get_min_version(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
+		let safe = Self::safe(op);
+		safe.operator.min_version() as _
 	}
 
-	extern_system_fn! {
-		pub(crate) unsafe fn infer_output_shape(op: *const ort_sys::OrtCustomOp, ctx: *mut ort_sys::OrtShapeInferContext) -> *mut ort_sys::OrtStatus {
-			let safe = Self::safe(op);
-			let mut ctx = ShapeInferenceContext {
-				ptr: ctx
-			};
-			safe.operator.infer_shape(&mut ctx).into_status()
-		}
+	pub(crate) extern "system" fn get_max_version(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
+		let safe = Self::safe(op);
+		safe.operator.max_version() as _
+	}
+
+	pub(crate) extern "system" fn get_input_memory_type(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtMemType {
+		let safe = Self::safe(op);
+		safe.inputs[index].memory_type.into()
+	}
+
+	pub(crate) extern "system" fn get_input_characteristic(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtCustomOpInputOutputCharacteristic {
+		let safe = Self::safe(op);
+		safe.inputs[index].characteristic.into()
+	}
+
+	pub(crate) extern "system" fn get_output_characteristic(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtCustomOpInputOutputCharacteristic {
+		let safe = Self::safe(op);
+		safe.outputs[index].characteristic.into()
+	}
+
+	pub(crate) extern "system" fn get_input_type_count(op: *const ort_sys::OrtCustomOp) -> usize {
+		let safe = Self::safe(op);
+		safe.inputs.len()
+	}
+
+	pub(crate) extern "system" fn get_output_type_count(op: *const ort_sys::OrtCustomOp) -> usize {
+		let safe = Self::safe(op);
+		safe.outputs.len()
+	}
+
+	pub(crate) extern "system" fn get_input_type(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::ONNXTensorElementDataType {
+		let safe = Self::safe(op);
+		safe.inputs[index]
+			.r#type
+			.map(|c| c.into())
+			.unwrap_or(ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED)
+	}
+
+	pub(crate) extern "system" fn get_output_type(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::ONNXTensorElementDataType {
+		let safe = Self::safe(op);
+		safe.outputs[index]
+			.r#type
+			.map(|c| c.into())
+			.unwrap_or(ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED)
+	}
+
+	pub(crate) extern "system" fn get_variadic_input_min_arity(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
+		let safe = Self::safe(op);
+		safe.inputs
+			.iter()
+			.find(|c| c.characteristic == InputOutputCharacteristic::Variadic)
+			.and_then(|c| c.variadic_min_arity)
+			.unwrap_or(1)
+			.try_into()
+			.expect("input minimum arity overflows i32")
+	}
+
+	pub(crate) extern "system" fn get_variadic_input_homogeneity(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
+		let safe = Self::safe(op);
+		safe.inputs
+			.iter()
+			.find(|c| c.characteristic == InputOutputCharacteristic::Variadic)
+			.and_then(|c| c.variadic_homogeneity)
+			.unwrap_or(false)
+			.into()
+	}
+
+	pub(crate) extern "system" fn get_variadic_output_min_arity(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
+		let safe = Self::safe(op);
+		safe.outputs
+			.iter()
+			.find(|c| c.characteristic == InputOutputCharacteristic::Variadic)
+			.and_then(|c| c.variadic_min_arity)
+			.unwrap_or(1)
+			.try_into()
+			.expect("output minimum arity overflows i32")
+	}
+
+	pub(crate) extern "system" fn get_variadic_output_homogeneity(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
+		let safe = Self::safe(op);
+		safe.outputs
+			.iter()
+			.find(|c| c.characteristic == InputOutputCharacteristic::Variadic)
+			.and_then(|c| c.variadic_homogeneity)
+			.unwrap_or(false)
+			.into()
+	}
+
+	pub(crate) extern "system" fn infer_output_shape(op: *const ort_sys::OrtCustomOp, ctx: *mut ort_sys::OrtShapeInferContext) -> *mut ort_sys::OrtStatus {
+		let safe = Self::safe(op);
+		let mut ctx = ShapeInferenceContext { ptr: ctx };
+		safe.operator.infer_shape(&mut ctx).into_status()
 	}
 }

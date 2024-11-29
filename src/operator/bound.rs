@@ -1,168 +1,180 @@
-use std::{
-	ffi::CString,
-	marker::PhantomData,
-	ptr::{self, NonNull}
-};
+use std::{ffi::CString, ptr};
 
 use super::{
-	DummyOperator, Operator, ShapeInferenceContext,
-	io::InputOutputCharacteristic,
+	Operator, ShapeInferenceContext,
+	io::{self, InputOutputCharacteristic},
 	kernel::{Kernel, KernelAttributes, KernelContext}
 };
-use crate::{error::IntoStatus, extern_system_fn};
+use crate::{Result, error::IntoStatus, extern_system_fn};
 
 #[repr(C)] // <- important! a defined layout allows us to store extra data after the `OrtCustomOp` that we can retrieve later
-pub(crate) struct BoundOperator<O: Operator> {
+pub(crate) struct BoundOperator {
 	implementation: ort_sys::OrtCustomOp,
 	name: CString,
 	execution_provider_type: Option<CString>,
-	_operator: PhantomData<O>
+	inputs: Vec<io::OperatorInput>,
+	outputs: Vec<io::OperatorOutput>,
+	operator: Box<dyn Operator>
 }
 
+unsafe impl Send for BoundOperator {}
+
 #[allow(non_snake_case, clippy::unnecessary_cast)]
-impl<O: Operator> BoundOperator<O> {
-	pub(crate) fn new(name: CString, execution_provider_type: Option<CString>) -> Self {
-		Self {
+impl BoundOperator {
+	pub(crate) fn new<O: Operator + 'static>(operator: O) -> Result<Self> {
+		let name = CString::new(operator.name())?;
+		let execution_provider_type = operator.execution_provider_type().map(CString::new).transpose()?;
+
+		Ok(Self {
 			implementation: ort_sys::OrtCustomOp {
 				version: ort_sys::ORT_API_VERSION,
-				GetStartVersion: Some(BoundOperator::<O>::GetStartVersion),
-				GetEndVersion: Some(BoundOperator::<O>::GetEndVersion),
+				GetStartVersion: Some(BoundOperator::get_min_version),
+				GetEndVersion: Some(BoundOperator::get_max_version),
 				CreateKernel: None,
-				CreateKernelV2: Some(BoundOperator::<O>::CreateKernelV2),
-				GetInputCharacteristic: Some(BoundOperator::<O>::GetInputCharacteristic),
-				GetInputMemoryType: Some(BoundOperator::<O>::GetInputMemoryType),
-				GetInputType: Some(BoundOperator::<O>::GetInputType),
-				GetInputTypeCount: Some(BoundOperator::<O>::GetInputTypeCount),
-				GetName: Some(BoundOperator::<O>::GetName),
-				GetExecutionProviderType: Some(BoundOperator::<O>::GetExecutionProviderType),
-				GetOutputCharacteristic: Some(BoundOperator::<O>::GetOutputCharacteristic),
-				GetOutputType: Some(BoundOperator::<O>::GetOutputType),
-				GetOutputTypeCount: Some(BoundOperator::<O>::GetOutputTypeCount),
-				GetVariadicInputHomogeneity: Some(BoundOperator::<O>::GetVariadicInputHomogeneity),
-				GetVariadicInputMinArity: Some(BoundOperator::<O>::GetVariadicInputMinArity),
-				GetVariadicOutputHomogeneity: Some(BoundOperator::<O>::GetVariadicOutputHomogeneity),
-				GetVariadicOutputMinArity: Some(BoundOperator::<O>::GetVariadicOutputMinArity),
+				CreateKernelV2: Some(BoundOperator::create_kernel),
+				GetInputCharacteristic: Some(BoundOperator::get_input_characteristic),
+				GetInputMemoryType: Some(BoundOperator::get_input_memory_type),
+				GetInputType: Some(BoundOperator::get_input_type),
+				GetInputTypeCount: Some(BoundOperator::get_input_type_count),
+				GetName: Some(BoundOperator::get_name),
+				GetExecutionProviderType: Some(BoundOperator::get_execution_provider_type),
+				GetOutputCharacteristic: Some(BoundOperator::get_output_characteristic),
+				GetOutputType: Some(BoundOperator::get_output_type),
+				GetOutputTypeCount: Some(BoundOperator::get_output_type_count),
+				GetVariadicInputHomogeneity: Some(BoundOperator::get_variadic_input_homogeneity),
+				GetVariadicInputMinArity: Some(BoundOperator::get_variadic_input_min_arity),
+				GetVariadicOutputHomogeneity: Some(BoundOperator::get_variadic_output_homogeneity),
+				GetVariadicOutputMinArity: Some(BoundOperator::get_variadic_output_min_arity),
 				GetAliasMap: None,
 				ReleaseAliasMap: None,
 				GetMayInplace: None,
 				ReleaseMayInplace: None,
-				InferOutputShapeFn: if O::get_infer_shape_function().is_some() {
-					Some(BoundOperator::<O>::InferOutputShapeFn)
-				} else {
-					None
-				},
+				InferOutputShapeFn: Some(BoundOperator::infer_output_shape),
 				KernelCompute: None,
-				KernelComputeV2: Some(BoundOperator::<O>::ComputeKernelV2),
-				KernelDestroy: Some(BoundOperator::<O>::KernelDestroy)
+				KernelComputeV2: Some(BoundOperator::compute_kernel),
+				KernelDestroy: Some(BoundOperator::destroy_kernel)
 			},
 			name,
 			execution_provider_type,
-			_operator: PhantomData
-		}
+			inputs: operator.inputs(),
+			outputs: operator.outputs(),
+			operator: Box::new(operator)
+		})
 	}
 
-	unsafe fn safe<'a>(op: *const ort_sys::OrtCustomOp) -> &'a BoundOperator<O> {
+	unsafe fn safe<'a>(op: *const ort_sys::OrtCustomOp) -> &'a BoundOperator {
 		&*op.cast()
 	}
 
 	extern_system_fn! {
-		pub(crate) unsafe fn CreateKernelV2(
-			_: *const ort_sys::OrtCustomOp,
+		pub(crate) unsafe fn create_kernel(
+			op: *const ort_sys::OrtCustomOp,
 			_: *const ort_sys::OrtApi,
 			info: *const ort_sys::OrtKernelInfo,
 			kernel_ptr: *mut *mut ort_sys::c_void
 		) -> *mut ort_sys::OrtStatus {
-			let kernel = match O::create_kernel(&KernelAttributes::new(info)) {
+			let safe = Self::safe(op);
+			let kernel = match safe.operator.create_kernel(&KernelAttributes::new(info)) {
 				Ok(kernel) => kernel,
 				e => return e.into_status()
 			};
-			*kernel_ptr = (Box::leak(Box::new(kernel)) as *mut O::Kernel).cast();
+			*kernel_ptr = (Box::leak(Box::new(kernel)) as *mut Box<dyn Kernel>).cast();
 			Ok(()).into_status()
 		}
 	}
 
 	extern_system_fn! {
-		pub(crate) unsafe fn ComputeKernelV2(kernel_ptr: *mut ort_sys::c_void, context: *mut ort_sys::OrtKernelContext) -> *mut ort_sys::OrtStatus {
+		pub(crate) unsafe fn compute_kernel(kernel_ptr: *mut ort_sys::c_void, context: *mut ort_sys::OrtKernelContext) -> *mut ort_sys::OrtStatus {
 			let context = KernelContext::new(context);
-			O::Kernel::compute(unsafe { &mut *kernel_ptr.cast::<O::Kernel>() }, &context).into_status()
+			unsafe { &mut *kernel_ptr.cast::<Box<dyn Kernel>>() }.compute(&context).into_status()
 		}
 	}
 
 	extern_system_fn! {
-		pub(crate) unsafe fn KernelDestroy(op_kernel: *mut ort_sys::c_void) {
-			drop(Box::from_raw(op_kernel.cast::<O::Kernel>()));
+		pub(crate) unsafe fn destroy_kernel(op_kernel: *mut ort_sys::c_void) {
+			drop(Box::from_raw(op_kernel.cast::<Box<dyn Kernel>>()));
 		}
 	}
 
 	extern_system_fn! {
-		pub(crate) unsafe fn GetName(op: *const ort_sys::OrtCustomOp) -> *const ort_sys::c_char {
+		pub(crate) unsafe fn get_name(op: *const ort_sys::OrtCustomOp) -> *const ort_sys::c_char {
 			let safe = Self::safe(op);
 			safe.name.as_ptr()
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetExecutionProviderType(op: *const ort_sys::OrtCustomOp) -> *const ort_sys::c_char {
+		pub(crate) unsafe fn get_execution_provider_type(op: *const ort_sys::OrtCustomOp) -> *const ort_sys::c_char {
 			let safe = Self::safe(op);
 			safe.execution_provider_type.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null)
 		}
 	}
 
 	extern_system_fn! {
-		pub(crate) unsafe fn GetStartVersion(_: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
-			O::min_version()
+		pub(crate) unsafe fn get_min_version(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
+			let safe = Self::safe(op);
+			safe.operator.min_version() as _
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetEndVersion(_: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
-			O::max_version()
+		pub(crate) unsafe fn get_max_version(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
+			let safe = Self::safe(op);
+			safe.operator.max_version() as _
 		}
 	}
 
 	extern_system_fn! {
-		pub(crate) unsafe fn GetInputMemoryType(_: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtMemType {
-			O::inputs()[index].memory_type.into()
+		pub(crate) unsafe fn get_input_memory_type(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtMemType {
+			let safe = Self::safe(op);
+			safe.inputs[index].memory_type.into()
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetInputCharacteristic(_: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtCustomOpInputOutputCharacteristic {
-			O::inputs()[index].characteristic.into()
+		pub(crate) unsafe fn get_input_characteristic(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtCustomOpInputOutputCharacteristic {
+			let safe = Self::safe(op);
+			safe.inputs[index].characteristic.into()
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetOutputCharacteristic(_: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtCustomOpInputOutputCharacteristic {
-			O::outputs()[index].characteristic.into()
+		pub(crate) unsafe fn get_output_characteristic(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtCustomOpInputOutputCharacteristic {
+			let safe = Self::safe(op);
+			safe.outputs[index].characteristic.into()
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetInputTypeCount(_: *const ort_sys::OrtCustomOp) -> usize {
-			O::inputs().len()
+		pub(crate) unsafe fn get_input_type_count(op: *const ort_sys::OrtCustomOp) -> usize {
+			let safe = Self::safe(op);
+			safe.inputs.len()
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetOutputTypeCount(_: *const ort_sys::OrtCustomOp) -> usize {
-			O::outputs().len()
+		pub(crate) unsafe fn get_output_type_count(op: *const ort_sys::OrtCustomOp) -> usize {
+			let safe = Self::safe(op);
+			safe.outputs.len()
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetInputType(_: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::ONNXTensorElementDataType {
-			O::inputs()[index]
+		pub(crate) unsafe fn get_input_type(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::ONNXTensorElementDataType {
+			let safe = Self::safe(op);
+			safe.inputs[index]
 				.r#type
 				.map(|c| c.into())
 				.unwrap_or(ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED)
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetOutputType(_: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::ONNXTensorElementDataType {
-			O::outputs()[index]
+		pub(crate) unsafe fn get_output_type(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::ONNXTensorElementDataType {
+			let safe = Self::safe(op);
+			safe.outputs[index]
 				.r#type
 				.map(|c| c.into())
 				.unwrap_or(ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED)
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetVariadicInputMinArity(_: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
-			O::inputs()
-				.into_iter()
+		pub(crate) unsafe fn get_variadic_input_min_arity(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
+			let safe = Self::safe(op);
+			safe.inputs
+				.iter()
 				.find(|c| c.characteristic == InputOutputCharacteristic::Variadic)
 				.and_then(|c| c.variadic_min_arity)
 				.unwrap_or(1)
@@ -171,9 +183,10 @@ impl<O: Operator> BoundOperator<O> {
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetVariadicInputHomogeneity(_: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
-			O::inputs()
-				.into_iter()
+		pub(crate) unsafe fn get_variadic_input_homogeneity(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
+			let safe = Self::safe(op);
+			safe.inputs
+				.iter()
 				.find(|c| c.characteristic == InputOutputCharacteristic::Variadic)
 				.and_then(|c| c.variadic_homogeneity)
 				.unwrap_or(false)
@@ -181,9 +194,10 @@ impl<O: Operator> BoundOperator<O> {
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetVariadicOutputMinArity(_: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
-			O::outputs()
-				.into_iter()
+		pub(crate) unsafe fn get_variadic_output_min_arity(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
+			let safe = Self::safe(op);
+			safe.outputs
+				.iter()
 				.find(|c| c.characteristic == InputOutputCharacteristic::Variadic)
 				.and_then(|c| c.variadic_min_arity)
 				.unwrap_or(1)
@@ -192,9 +206,10 @@ impl<O: Operator> BoundOperator<O> {
 		}
 	}
 	extern_system_fn! {
-		pub(crate) unsafe fn GetVariadicOutputHomogeneity(_: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
-			O::outputs()
-				.into_iter()
+		pub(crate) unsafe fn get_variadic_output_homogeneity(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
+			let safe = Self::safe(op);
+			safe.outputs
+				.iter()
 				.find(|c| c.characteristic == InputOutputCharacteristic::Variadic)
 				.and_then(|c| c.variadic_homogeneity)
 				.unwrap_or(false)
@@ -203,34 +218,12 @@ impl<O: Operator> BoundOperator<O> {
 	}
 
 	extern_system_fn! {
-		pub(crate) unsafe fn InferOutputShapeFn(_: *const ort_sys::OrtCustomOp, ctx: *mut ort_sys::OrtShapeInferContext) -> *mut ort_sys::OrtStatus {
+		pub(crate) unsafe fn infer_output_shape(op: *const ort_sys::OrtCustomOp, ctx: *mut ort_sys::OrtShapeInferContext) -> *mut ort_sys::OrtStatus {
+			let safe = Self::safe(op);
 			let mut ctx = ShapeInferenceContext {
 				ptr: ctx
 			};
-			O::get_infer_shape_function().expect("missing infer shape function")(&mut ctx).into_status()
+			safe.operator.infer_shape(&mut ctx).into_status()
 		}
-	}
-}
-
-pub(crate) struct ErasedBoundOperator(NonNull<()>);
-
-unsafe impl Send for ErasedBoundOperator {}
-
-impl ErasedBoundOperator {
-	pub(crate) fn new<O: Operator>(bound: BoundOperator<O>) -> Self {
-		ErasedBoundOperator(NonNull::from(unsafe {
-			// horrible horrible horrible horrible horrible horrible horrible horrible horrible
-			&mut *(Box::leak(Box::new(bound)) as *mut _ as *mut ())
-		}))
-	}
-
-	pub(crate) fn op_ptr(&self) -> *mut ort_sys::OrtCustomOp {
-		self.0.as_ptr().cast()
-	}
-}
-
-impl Drop for ErasedBoundOperator {
-	fn drop(&mut self) {
-		drop(unsafe { Box::from_raw(self.0.as_ptr().cast::<BoundOperator<DummyOperator>>()) });
 	}
 }

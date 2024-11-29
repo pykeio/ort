@@ -17,11 +17,12 @@ pub trait Kernel {
 	fn compute(&mut self, ctx: &KernelContext) -> crate::Result<()>;
 }
 
-pub(crate) struct DummyKernel;
-
-impl Kernel for DummyKernel {
-	fn compute(&mut self, _: &KernelContext) -> crate::Result<()> {
-		unimplemented!()
+impl<F> Kernel for F
+where
+	F: FnMut(&KernelContext) -> crate::Result<()>
+{
+	fn compute(&mut self, ctx: &KernelContext) -> crate::Result<()> {
+		self(ctx)
 	}
 }
 

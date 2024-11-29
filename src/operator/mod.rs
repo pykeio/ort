@@ -12,9 +12,9 @@ pub mod kernel;
 mod tests;
 
 use self::{
-	bound::{BoundOperator, ErasedBoundOperator},
+	bound::BoundOperator,
 	io::{OperatorInput, OperatorOutput},
-	kernel::{DummyKernel, Kernel, KernelAttributes}
+	kernel::{Kernel, KernelAttributes}
 };
 use crate::{
 	AsPointer, Error,
@@ -32,10 +32,8 @@ use crate::{
 /// [`Operator`] structs can return the same name in [`Operator::name`] so that they are usable as simply
 /// `my.domain:Sort` in the graph.
 pub trait Operator: Send {
-	type Kernel: Kernel;
-
 	/// Returns the name of the operator.
-	fn name() -> &'static str;
+	fn name(&self) -> &str;
 
 	/// Returns the execution provider this operator runs on, e.g. `CUDAExecutionProvider`.
 	///
@@ -46,48 +44,27 @@ pub trait Operator: Send {
 	///
 	/// [`Tensor::data_ptr`]: crate::value::Tensor::data_ptr
 	/// [`KernelContext::compute_stream`]: crate::operator::kernel::KernelContext::compute_stream
-	fn execution_provider_type() -> Option<&'static str> {
+	fn execution_provider_type(&self) -> Option<&str> {
 		None
 	}
 
-	fn inputs() -> Vec<OperatorInput>;
-	fn outputs() -> Vec<OperatorOutput>;
+	fn inputs(&self) -> Vec<OperatorInput>;
+	fn outputs(&self) -> Vec<OperatorOutput>;
 
-	fn create_kernel(attributes: &KernelAttributes) -> crate::Result<Self::Kernel>;
+	fn create_kernel(&self, attributes: &KernelAttributes) -> crate::Result<Box<dyn Kernel>>;
 
-	fn min_version() -> ort_sys::c_int {
+	fn min_version(&self) -> i32 {
 		1
 	}
-	fn max_version() -> ort_sys::c_int {
-		ort_sys::c_int::MAX
+	fn max_version(&self) -> i32 {
+		i32::MAX
 	}
 
-	fn get_infer_shape_function() -> Option<Box<InferShapeFn>> {
-		None
+	fn infer_shape(&self, ctx: &mut ShapeInferenceContext) -> crate::Result<()> {
+		let _ = ctx;
+		Ok(())
 	}
 }
-
-/// Dummy type implementing [`Operator`] used by [`ErasedBoundOperator`] to cheat the type system.
-struct DummyOperator;
-
-impl Operator for DummyOperator {
-	type Kernel = DummyKernel;
-
-	fn name() -> &'static str {
-		unimplemented!()
-	}
-	fn create_kernel(_: &KernelAttributes) -> crate::Result<Self::Kernel> {
-		unimplemented!()
-	}
-	fn inputs() -> Vec<OperatorInput> {
-		unimplemented!()
-	}
-	fn outputs() -> Vec<OperatorOutput> {
-		unimplemented!()
-	}
-}
-
-pub type InferShapeFn = dyn FnMut(&mut ShapeInferenceContext) -> crate::Result<()> + 'static;
 
 pub struct ShapeInferenceContext {
 	ptr: *mut ort_sys::OrtShapeInferContext
@@ -130,7 +107,8 @@ impl AsPointer for ShapeInferenceContext {
 pub struct OperatorDomain {
 	ptr: NonNull<ort_sys::OrtCustomOpDomain>,
 	_name: CString,
-	operators: Vec<ErasedBoundOperator>
+	#[allow(clippy::vec_box)]
+	operators: Vec<Box<BoundOperator>>
 }
 
 impl OperatorDomain {
@@ -146,12 +124,11 @@ impl OperatorDomain {
 	}
 
 	#[allow(clippy::should_implement_trait)]
-	pub fn add<O: Operator>(mut self) -> Result<Self> {
-		let name = O::name();
-
-		let bound = BoundOperator::<O>::new(CString::new(name)?, O::execution_provider_type().map(CString::new).transpose()?);
-		let bound = ErasedBoundOperator::new(bound);
-		ortsys![unsafe CustomOpDomain_Add(self.ptr.as_ptr(), bound.op_ptr())?];
+	pub fn add<O: Operator + 'static>(mut self, operator: O) -> Result<Self> {
+		// `Box`ing the operator here because we move it into `self` immediately after registering it. Without `Box`,
+		// the pointer we pass to `CustomOpDomain_Add` would become invalid.
+		let bound = Box::new(BoundOperator::new(operator)?);
+		ortsys![unsafe CustomOpDomain_Add(self.ptr.as_ptr(), (&*bound as *const BoundOperator) as *mut _)?];
 
 		self.operators.push(bound);
 

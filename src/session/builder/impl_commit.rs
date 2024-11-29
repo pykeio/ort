@@ -60,12 +60,13 @@ impl SessionBuilder {
 
 			match std::fs::rename(&temp_filepath, &model_filepath) {
 				Ok(()) => model_filepath,
-				Err(e) => match e.kind() {
-					std::io::ErrorKind::AlreadyExists => {
+				Err(e) => {
+					if model_filepath.exists() {
 						let _ = std::fs::remove_file(temp_filepath);
 						model_filepath
+					} else {
+						return Err(Error::new(format!("Failed to download model: {e}")));
 					}
-					_ => return Err(Error::new(format!("Failed to download model: {e}")))
 				}
 			}
 		};

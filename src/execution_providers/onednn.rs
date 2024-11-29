@@ -54,16 +54,21 @@ impl ExecutionProvider for OneDNNExecutionProvider {
 			let mut dnnl_options: *mut ort_sys::OrtDnnlProviderOptions = std::ptr::null_mut();
 			crate::ortsys![unsafe CreateDnnlProviderOptions(&mut dnnl_options)?];
 			let ffi_options = self.options.to_ffi();
-			if let Err(e) = crate::error::status_to_result(
-				crate::ortsys![unsafe UpdateDnnlProviderOptions(dnnl_options, ffi_options.key_ptrs(), ffi_options.value_ptrs(), ffi_options.len())]
-			) {
+			if let Err(e) = unsafe {
+				crate::error::status_to_result(crate::ortsys![UpdateDnnlProviderOptions(
+					dnnl_options,
+					ffi_options.key_ptrs(),
+					ffi_options.value_ptrs(),
+					ffi_options.len()
+				)])
+			} {
 				crate::ortsys![unsafe ReleaseDnnlProviderOptions(dnnl_options)];
 				return Err(e);
 			}
 
 			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_Dnnl(session_builder.ptr_mut(), dnnl_options)];
 			crate::ortsys![unsafe ReleaseDnnlProviderOptions(dnnl_options)];
-			return Ok(());
+			return unsafe { crate::error::status_to_result(status) };
 		}
 
 		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))

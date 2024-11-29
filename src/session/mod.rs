@@ -562,7 +562,7 @@ mod dangerous {
 	) -> Result<usize> {
 		let mut num_nodes = 0;
 		let status = unsafe { f(session_ptr.as_ptr(), &mut num_nodes) };
-		status_to_result(status)?;
+		unsafe { status_to_result(status) }?;
 		Ok(num_nodes)
 	}
 
@@ -597,7 +597,7 @@ mod dangerous {
 		let mut name_bytes: *mut c_char = std::ptr::null_mut();
 
 		let status = unsafe { f(session_ptr.as_ptr(), i, allocator.ptr().cast_mut(), &mut name_bytes) };
-		status_to_result(status)?;
+		unsafe { status_to_result(status) }?;
 		assert_non_null_pointer(name_bytes, "InputName")?;
 
 		raw_pointer_to_string(allocator, name_bytes)
@@ -625,7 +625,7 @@ mod dangerous {
 		let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
 
 		let status = unsafe { f(session_ptr.as_ptr(), i, &mut typeinfo_ptr) };
-		status_to_result(status)?;
+		unsafe { status_to_result(status) }?;
 		assert_non_null_pointer(typeinfo_ptr, "TypeInfo")?;
 
 		Ok(ValueType::from_type_info(typeinfo_ptr))

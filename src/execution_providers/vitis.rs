@@ -61,15 +61,15 @@ impl ExecutionProvider for VitisAIExecutionProvider {
 			use crate::AsPointer;
 
 			let ffi_options = self.options.to_ffi();
-			let status = crate::ortsys![
+			crate::ortsys![
 				unsafe SessionOptionsAppendExecutionProvider_VitisAI(
 					session_builder.ptr_mut(),
 					ffi_options.key_ptrs(),
 					ffi_options.value_ptrs(),
 					ffi_options.len()
-				)
+				)?
 			];
-			return crate::error::status_to_result(status);
+			return Ok(());
 		}
 
 		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))

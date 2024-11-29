@@ -113,7 +113,7 @@ impl ExecutionProvider for CoreMLExecutionProvider {
 			if self.use_cpu_and_gpu {
 				flags |= 0x020;
 			}
-			return crate::error::status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_CoreML(session_builder.ptr_mut(), flags) });
+			return unsafe { crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_CoreML(session_builder.ptr_mut(), flags)) };
 		}
 
 		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))

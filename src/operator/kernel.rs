@@ -118,7 +118,7 @@ impl GetKernelAttribute<'_> for f32 {
 		Self: Sized
 	{
 		let mut value = Self::default();
-		status_to_result(ortsys![unsafe KernelInfoGetAttribute_float(info, name, &mut value)]).ok()?;
+		unsafe { status_to_result(ortsys![KernelInfoGetAttribute_float(info, name, &mut value)]) }.ok()?;
 		Some(value)
 	}
 }
@@ -129,7 +129,7 @@ impl GetKernelAttribute<'_> for i64 {
 		Self: Sized
 	{
 		let mut value = Self::default();
-		status_to_result(ortsys![unsafe KernelInfoGetAttribute_int64(info, name, &mut value)]).ok()?;
+		unsafe { status_to_result(ortsys![KernelInfoGetAttribute_int64(info, name, &mut value)]) }.ok()?;
 		Some(value)
 	}
 }
@@ -140,9 +140,9 @@ impl GetKernelAttribute<'_> for String {
 		Self: Sized
 	{
 		let mut size = 0;
-		status_to_result(ortsys![unsafe KernelInfoGetAttribute_string(info, name, ptr::null_mut(), &mut size)]).ok()?;
+		unsafe { status_to_result(ortsys![KernelInfoGetAttribute_string(info, name, ptr::null_mut(), &mut size)]) }.ok()?;
 		let mut out = vec![0u8; size];
-		status_to_result(ortsys![unsafe KernelInfoGetAttribute_string(info, name, out.as_mut_ptr().cast::<c_char>(), &mut size)]).ok()?;
+		unsafe { status_to_result(ortsys![KernelInfoGetAttribute_string(info, name, out.as_mut_ptr().cast::<c_char>(), &mut size)]) }.ok()?;
 		CString::from_vec_with_nul(out).ok().and_then(|c| c.into_string().ok())
 	}
 }
@@ -153,9 +153,9 @@ impl GetKernelAttribute<'_> for Vec<f32> {
 		Self: Sized
 	{
 		let mut size = 0;
-		status_to_result(ortsys![unsafe KernelInfoGetAttributeArray_float(info, name, ptr::null_mut(), &mut size)]).ok()?;
+		unsafe { status_to_result(ortsys![KernelInfoGetAttributeArray_float(info, name, ptr::null_mut(), &mut size)]) }.ok()?;
 		let mut out = vec![0f32; size];
-		status_to_result(ortsys![unsafe KernelInfoGetAttributeArray_float(info, name, out.as_mut_ptr(), &mut size)]).ok()?;
+		unsafe { status_to_result(ortsys![KernelInfoGetAttributeArray_float(info, name, out.as_mut_ptr(), &mut size)]) }.ok()?;
 		Some(out)
 	}
 }
@@ -166,9 +166,9 @@ impl GetKernelAttribute<'_> for Vec<i64> {
 		Self: Sized
 	{
 		let mut size = 0;
-		status_to_result(ortsys![unsafe KernelInfoGetAttributeArray_int64(info, name, ptr::null_mut(), &mut size)]).ok()?;
+		unsafe { status_to_result(ortsys![KernelInfoGetAttributeArray_int64(info, name, ptr::null_mut(), &mut size)]) }.ok()?;
 		let mut out = vec![0i64; size];
-		status_to_result(ortsys![unsafe KernelInfoGetAttributeArray_int64(info, name, out.as_mut_ptr(), &mut size)]).ok()?;
+		unsafe { status_to_result(ortsys![KernelInfoGetAttributeArray_int64(info, name, out.as_mut_ptr(), &mut size)]) }.ok()?;
 		Some(out)
 	}
 }
@@ -183,7 +183,7 @@ impl<'s, T: DowncastableTarget> GetKernelAttribute<'s> for ValueRef<'s, T> {
 		let allocator = Allocator::default();
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
-		status_to_result(ortsys![unsafe KernelInfoGetAttribute_tensor(info, name, allocator.ptr().cast_mut(), &mut value_ptr)]).ok()?;
+		unsafe { status_to_result(ortsys![KernelInfoGetAttribute_tensor(info, name, allocator.ptr().cast_mut(), &mut value_ptr)]) }.ok()?;
 		unsafe { ValueRef::new(DynValue::from_ptr(NonNull::new(value_ptr)?, None)) }
 			.downcast()
 			.ok()
@@ -270,7 +270,7 @@ impl KernelContext {
 		F: Fn(usize) + Sync + Send
 	{
 		let executor = Box::new(f) as Box<dyn Fn(usize) + Sync + Send>;
-		ortsys![unsafe KernelContext_ParallelFor(self.ptr.as_ptr(), Some(parallel_for_cb), total, max_num_batches, &executor as *const _ as *mut c_void)?];
+		ortsys![unsafe KernelContext_ParallelFor(self.ptr.as_ptr(), parallel_for_cb, total, max_num_batches, &executor as *const _ as *mut c_void)?];
 		Ok(())
 	}
 

@@ -55,13 +55,14 @@ impl ExecutionProvider for XNNPACKExecutionProvider {
 
 			let ffi_options = self.options.to_ffi();
 			let ep_name = std::ffi::CString::new("XNNPACK").unwrap_or_else(|_| unreachable!());
-			return crate::error::status_to_result(crate::ortsys![unsafe SessionOptionsAppendExecutionProvider(
+			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider(
 				session_builder.ptr_mut(),
 				ep_name.as_ptr(),
 				ffi_options.key_ptrs(),
 				ffi_options.value_ptrs(),
 				ffi_options.len(),
-			)]);
+			)?];
+			return Ok(());
 		}
 
 		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))

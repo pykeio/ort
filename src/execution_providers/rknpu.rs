@@ -41,7 +41,7 @@ impl ExecutionProvider for RKNPUExecutionProvider {
 			use crate::AsPointer;
 
 			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_RKNPU(options: *mut ort_sys::OrtSessionOptions) -> ort_sys::OrtStatusPtr);
-			return crate::error::status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_RKNPU(session_builder.ptr_mut()) });
+			return unsafe { crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_RKNPU(session_builder.ptr_mut())) };
 		}
 
 		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))

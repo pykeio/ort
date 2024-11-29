@@ -206,7 +206,7 @@ impl Trainer {
 				.collect::<Result<Vec<_>>>()?
 		);
 
-		status_to_result(res)?;
+		unsafe { status_to_result(res) }?;
 
 		Ok(())
 	}

@@ -95,7 +95,7 @@ impl ExecutionProvider for NNAPIExecutionProvider {
 			if self.cpu_only {
 				flags |= 0x008;
 			}
-			return crate::error::status_to_result(unsafe { OrtSessionOptionsAppendExecutionProvider_Nnapi(session_builder.ptr_mut(), flags) });
+			return unsafe { crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_Nnapi(session_builder.ptr_mut(), flags)) };
 		}
 
 		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))

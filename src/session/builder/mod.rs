@@ -9,7 +9,7 @@ use std::{
 
 use crate::{
 	AsPointer,
-	error::{Result, assert_non_null_pointer, status_to_result},
+	error::{Result, assert_non_null_pointer},
 	memory::MemoryInfo,
 	operator::OperatorDomain,
 	ortsys,
@@ -54,7 +54,7 @@ pub struct SessionBuilder {
 impl Clone for SessionBuilder {
 	fn clone(&self) -> Self {
 		let mut session_options_ptr = ptr::null_mut();
-		status_to_result(ortsys![unsafe CloneSessionOptions(self.ptr(), ptr::addr_of_mut!(session_options_ptr))]).expect("error cloning session options");
+		ortsys![unsafe CloneSessionOptions(self.ptr(), ptr::addr_of_mut!(session_options_ptr)).expect("error cloning session options")];
 		assert_non_null_pointer(session_options_ptr, "OrtSessionOptions").expect("Cloned session option pointer is null");
 		Self {
 			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },

@@ -170,7 +170,8 @@ impl Default for Allocator {
 	/// transparent to the user).
 	fn default() -> Self {
 		let mut allocator_ptr: *mut ort_sys::OrtAllocator = std::ptr::null_mut();
-		status_to_result(ortsys![unsafe GetAllocatorWithDefaultOptions(&mut allocator_ptr); nonNull(allocator_ptr)]).expect("Failed to get default allocator");
+		unsafe { status_to_result(ortsys![GetAllocatorWithDefaultOptions(&mut allocator_ptr); nonNull(allocator_ptr)]) }
+			.expect("Failed to get default allocator");
 		Self {
 			ptr: unsafe { NonNull::new_unchecked(allocator_ptr) },
 			is_default: true,

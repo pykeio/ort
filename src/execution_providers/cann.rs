@@ -147,16 +147,16 @@ impl ExecutionProvider for CANNExecutionProvider {
 			let mut cann_options: *mut ort_sys::OrtCANNProviderOptions = std::ptr::null_mut();
 			crate::ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)?];
 			let ffi_options = self.options.to_ffi();
-			if let Err(e) = crate::error::status_to_result(
-				crate::ortsys![unsafe UpdateCANNProviderOptions(cann_options, ffi_options.key_ptrs(), ffi_options.value_ptrs(), ffi_options.len())]
-			) {
+			if let Err(e) = unsafe { crate::error::status_to_result(
+				crate::ortsys![UpdateCANNProviderOptions(cann_options, ffi_options.key_ptrs(), ffi_options.value_ptrs(), ffi_options.len())]
+			) } {
 				crate::ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
 				return Err(e);
 			}
 
 			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_CANN(session_builder.ptr_mut(), cann_options)];
 			crate::ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
-			return crate::error::status_to_result(status);
+			return unsafe { crate::error::status_to_result(status) };
 		}
 
 		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))

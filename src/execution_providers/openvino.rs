@@ -146,9 +146,8 @@ impl ExecutionProvider for OpenVINOExecutionProvider {
 				enable_dynamic_shapes: self.enable_dynamic_shapes.into(),
 				enable_npu_fast_compile: self.enable_npu_fast_compile.into()
 			};
-			return crate::error::status_to_result(
-				crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO(session_builder.ptr_mut(), std::ptr::addr_of!(openvino_options))]
-			);
+			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO(session_builder.ptr_mut(), std::ptr::addr_of!(openvino_options))?];
+			return Ok(());
 		}
 
 		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))

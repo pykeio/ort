@@ -109,29 +109,12 @@ pub fn info() -> &'static str {
 	unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(str.cast::<u8>(), len)) }
 }
 
-/// Returns a pointer to the global [`ort_sys::OrtApi`] object.
+/// Returns a reference to the global [`ort_sys::OrtApi`] object.
 ///
 /// # Panics
 /// May panic if:
 /// - Getting the `OrtApi` struct fails, due to `ort` loading an unsupported version of ONNX Runtime.
 /// - Loading the ONNX Runtime dynamic library fails if the `load-dynamic` feature is enabled.
-///
-/// # Examples
-/// The primary (public-facing) use case for this function is accessing APIs that do not have a corresponding safe
-/// implementation in `ort`. For example, [`GetBuildInfoString`](https://onnxruntime.ai/docs/api/c/struct_ort_api.html#a0a7dba37b0017c0ef3a0ab4e266a967d):
-///
-/// ```
-/// # use std::ffi::CStr;
-/// # fn main() -> ort::Result<()> {
-/// let api = ort::api();
-/// let build_info = unsafe { CStr::from_ptr(api.GetBuildInfoString.unwrap()()) };
-/// println!("{}", build_info.to_string_lossy());
-/// // ORT Build Info: git-branch=HEAD, git-commit-id=4573740, build type=Release, cmake cxx flags: /DWIN32 /D_WINDOWS /EHsc /EHsc /wd26812 -DEIGEN_HAS_C99_MATH -DCPUINFO_SUPPORTED
-/// # Ok(())
-/// # }
-/// ```
-///
-/// For the full list of ONNX Runtime APIs, consult the [`ort_sys::OrtApi`] struct and the [ONNX Runtime C API](https://onnxruntime.ai/docs/api/c/struct_ort_api.html).
 pub fn api() -> &'static ort_sys::OrtApi {
 	struct ApiPointer(NonNull<ort_sys::OrtApi>);
 	unsafe impl Send for ApiPointer {}
@@ -150,9 +133,7 @@ pub fn api() -> &'static ort_sys::OrtApi {
 				let base: *const ort_sys::OrtApiBase = base_getter();
 				assert_ne!(base, ptr::null());
 
-				let get_version_string: unsafe extern "system" fn() -> *const c_char =
-					(*base).GetVersionString.expect("`GetVersionString` must be present in `OrtApiBase`");
-				let version_string = get_version_string();
+				let version_string = ((*base).GetVersionString)();
 				let version_string = CStr::from_ptr(version_string).to_string_lossy();
 				tracing::info!("Loaded ONNX Runtime dylib with version '{version_string}'");
 
@@ -170,18 +151,14 @@ pub fn api() -> &'static ort_sys::OrtApi {
 					),
 					std::cmp::Ordering::Equal => {}
 				};
-				let get_api: unsafe extern "system" fn(u32) -> *const ort_sys::OrtApi =
-					(*base).GetApi.expect("`GetApi` must be present in `OrtApiBase`");
-				let api: *const ort_sys::OrtApi = get_api(ort_sys::ORT_API_VERSION);
+				let api: *const ort_sys::OrtApi = ((*base).GetApi)(ort_sys::ORT_API_VERSION);
 				ApiPointer(NonNull::new(api.cast_mut()).expect("Failed to initialize ORT API"))
 			}
 			#[cfg(not(feature = "load-dynamic"))]
 			unsafe {
 				let base: *const ort_sys::OrtApiBase = ort_sys::OrtGetApiBase();
 				assert_ne!(base, ptr::null());
-				let get_api: unsafe extern "system" fn(u32) -> *const ort_sys::OrtApi =
-					(*base).GetApi.expect("`GetApi` must be present in `OrtApiBase`");
-				let api: *const ort_sys::OrtApi = get_api(ort_sys::ORT_API_VERSION);
+				let api: *const ort_sys::OrtApi = ((*base).GetApi)(ort_sys::ORT_API_VERSION);
 				ApiPointer(NonNull::new(api.cast_mut()).expect("Failed to initialize ORT API"))
 			}
 		})
@@ -207,41 +184,42 @@ pub trait AsPointer {
 #[macro_export]
 macro_rules! ortsys {
 	($method:ident) => {
-		$crate::api().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))
+		($crate::api().$method)
 	};
 	($method:ident($($n:expr),+ $(,)?)) => {
-		$crate::api().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+)
+		($crate::api().$method)($($n),+)
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?)) => {
-		unsafe { $crate::api().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) }
+		unsafe { ($crate::api().$method)($($n),+) }
 	};
 	($method:ident($($n:expr),+ $(,)?).expect($e:expr)) => {
-		$crate::error::status_to_result($crate::api().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+)).expect($e)
+		$crate::error::status_to_result(($crate::api().$method)($($n),+)).expect($e)
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?).expect($e:expr)) => {
-		$crate::error::status_to_result(unsafe { $crate::api().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) }).expect($e)
+		unsafe { $crate::error::status_to_result(($crate::api().$method)($($n),+)) }.expect($e)
 	};
-	($method:ident($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {
-		$crate::api().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+);
-		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
-	};
+	($method:ident($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {{
+		let _x = ($crate::api().$method)($($n),+);
+		$($crate::error::assert_non_null_pointer($check, stringify!($method)).unwrap();)+
+		_x
+	}};
 	(unsafe $method:ident($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {{
-		let _x = unsafe { $crate::api().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) };
+		let _x = unsafe { ($crate::api().$method)($($n),+) };
 		$($crate::error::assert_non_null_pointer($check, stringify!($method)).unwrap();)+
 		_x
 	}};
 	($method:ident($($n:expr),+ $(,)?)?) => {
-		$crate::error::status_to_result($crate::api().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+))?;
+		$crate::error::status_to_result(($crate::api().$method)($($n),+))?;
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?)?) => {
-		$crate::error::status_to_result(unsafe { $crate::api().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) })?;
+		unsafe { $crate::error::status_to_result(($crate::api().$method)($($n),+)) }?;
 	};
 	($method:ident($($n:expr),+ $(,)?)?; nonNull($($check:expr),+ $(,)?)$(;)?) => {
-		$crate::error::status_to_result($crate::api().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+))?;
+		$crate::error::status_to_result(($crate::api().$method)($($n),+))?;
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?)?; nonNull($($check:expr),+ $(,)?)$(;)?) => {{
-		$crate::error::status_to_result(unsafe { $crate::api().$method.unwrap_or_else(|| unreachable!(concat!("Method `", stringify!($method), "` is null")))($($n),+) })?;
+		unsafe { $crate::error::status_to_result(($crate::api().$method)($($n),+)) }?;
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	}};
 }

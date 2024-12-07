@@ -62,6 +62,8 @@ download-binaries = [ "ort-sys/download-binaries" ]
 load-dynamic = [ "libloading", "ort-sys/load-dynamic" ]
 copy-dylibs = [ "ort-sys/copy-dylibs" ]
 
+alternative-backend = [ "ort-sys/disable-linking" ]
+
 cuda = [ "ort-sys/cuda" ]
 tensorrt = [ "ort-sys/tensorrt" ]
 openvino = [ "ort-sys/openvino" ]

@@ -563,7 +563,10 @@ fn real_main(link: bool) {
 }
 
 fn main() {
-	if env::var("DOCS_RS").is_ok() {
+	if env::var("DOCS_RS").is_ok() || cfg!(feature = "disable-linking") {
+		// On docs.rs, A) we don't need to link, and B) we don't have network, so we couldn't download anything if we wanted to.
+		// If `disable-linking` is specified, presumably the application will configure a custom backend, and the crate
+		// providing said backend will have its own linking logic, so no need to do anything.
 		return;
 	}
 

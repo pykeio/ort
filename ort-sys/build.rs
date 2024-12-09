@@ -99,10 +99,10 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 			let lib_path = lib_file.path();
 			let lib_name = lib_path.file_name().unwrap();
 			let out_path = out_dir.join(lib_name);
+			if out_path.is_symlink() {
+				fs::remove_file(&out_path).unwrap();
+			}
 			if !out_path.exists() {
-				if out_path.is_symlink() {
-					fs::remove_file(&out_path).unwrap();
-				}
 				#[cfg(windows)]
 				if std::os::windows::fs::symlink_file(&lib_path, &out_path).is_err() {
 					copy_fallback = true;

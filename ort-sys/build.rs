@@ -419,6 +419,10 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 	} else {
 		#[cfg(feature = "download-binaries")]
 		{
+			if env::var("CARGO_NET_OFFLINE").as_deref() == Ok("true") {
+				return (PathBuf::default(), true);
+			}
+
 			let target = env::var("TARGET").unwrap().to_string();
 
 			let mut feature_set = Vec::new();

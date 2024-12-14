@@ -1,6 +1,7 @@
 [workspace]
 members = [
 	'ort-sys',
+	'backends/candle',
 	'examples/async-gpt2-api',
 	'examples/custom-ops',
 	'examples/gpt2',

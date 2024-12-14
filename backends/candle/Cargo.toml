@@ -1,0 +1,23 @@
+[package]
+name = "ort-candle"
+description = "ort + candle = 🦀 - An alternative backend for ort, powered by candle."
+version = "0.1.0+0.8.1"
+edition = "2021"
+rust-version = "1.70"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/pykeio/ort"
+homepage = "https://ort.pyke.io/"
+keywords = [ "machine-learning", "ai", "ml" , "sys"]
+categories = [ "algorithms", "mathematics", "science" ]
+authors = [
+	"pyke.io <contact@pyke.io>"
+]
+
+[lib]
+name = "ort_candle"
+path = "lib.rs"
+
+[dependencies]
+ort-sys = { version = "2.0.0-rc.9", path = "../../ort-sys", default-features = false }
+candle-core = { version = "0.8.1", default-features = false }
+candle-onnx = { version = "0.8.1" }

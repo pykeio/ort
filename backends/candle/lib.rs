@@ -1,5 +1,6 @@
 mod api;
 pub(crate) mod error;
+mod memory;
 
 pub(crate) struct Environment {}
 

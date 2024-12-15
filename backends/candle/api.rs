@@ -1,6 +1,9 @@
 #![allow(non_snake_case, unused)]
 
-use std::{ffi::CString, ptr};
+use std::{
+	ffi::{CStr, CString},
+	ptr
+};
 
 use ort_sys::{
 	ExecutionMode, GraphOptimizationLevel, ONNXTensorElementDataType, ONNXType, OrtAllocator, OrtAllocatorType, OrtApi, OrtArenaCfg, OrtCANNProviderOptions,
@@ -12,7 +15,11 @@ use ort_sys::{
 	OrtTensorRTProviderOptionsV2, OrtTensorTypeAndShapeInfo, OrtThreadingOptions, OrtTrainingApi, OrtTypeInfo, OrtValue, RunAsyncCallbackFn, ortchar
 };
 
-use crate::{Environment, error::Error};
+use crate::{
+	Environment,
+	error::Error,
+	memory::{Allocator, MemoryInfo}
+};
 
 unsafe extern "system" fn CreateStatus(code: OrtErrorCode, msg: *const ::std::os::raw::c_char) -> *mut OrtStatus {
 	let msg = CString::from_raw(msg.cast_mut());
@@ -44,11 +51,11 @@ unsafe extern "system" fn CreateEnvWithCustomLogger(
 }
 
 unsafe extern "system" fn EnableTelemetryEvents(env: *const OrtEnv) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn DisableTelemetryEvents(env: *const OrtEnv) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn CreateSession(
@@ -365,47 +372,77 @@ unsafe extern "system" fn CreateMemoryInfo(
 	mem_type: OrtMemType,
 	out: *mut *mut OrtMemoryInfo
 ) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let device_name = unsafe { CStr::from_ptr(name) };
+	match MemoryInfo::new(device_name.to_string_lossy(), id as _, mem_type) {
+		Ok(inf) => {
+			unsafe { *out = (Box::leak(Box::new(inf)) as *mut MemoryInfo).cast() };
+			ptr::null_mut()
+		}
+		Err(e) => e.into_sys()
+	}
 }
 
 unsafe extern "system" fn CreateCpuMemoryInfo(type_: OrtAllocatorType, mem_type: OrtMemType, out: *mut *mut OrtMemoryInfo) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	match MemoryInfo::new("Cpu", 0, mem_type) {
+		Ok(inf) => {
+			unsafe { *out = (Box::leak(Box::new(inf)) as *mut MemoryInfo).cast() };
+			ptr::null_mut()
+		}
+		Err(e) => e.into_sys()
+	}
 }
 
 unsafe extern "system" fn CompareMemoryInfo(info1: *const OrtMemoryInfo, info2: *const OrtMemoryInfo, out: *mut ::std::os::raw::c_int) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let info1 = unsafe { &*info1.cast::<MemoryInfo>() };
+	let info2 = unsafe { &*info2.cast::<MemoryInfo>() };
+	*out = if info1 == info2 { 0 } else { -1 };
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn MemoryInfoGetName(ptr: *const OrtMemoryInfo, out: *mut *const ::std::os::raw::c_char) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let info = unsafe { &*ptr.cast::<MemoryInfo>() };
+	*out = info.device_name_sys().as_ptr().cast();
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn MemoryInfoGetId(ptr: *const OrtMemoryInfo, out: *mut ::std::os::raw::c_int) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let info = unsafe { &*ptr.cast::<MemoryInfo>() };
+	*out = info.device_id() as _;
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn MemoryInfoGetMemType(ptr: *const OrtMemoryInfo, out: *mut OrtMemType) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let info = unsafe { &*ptr.cast::<MemoryInfo>() };
+	*out = info.memory_type() as _;
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn MemoryInfoGetType(ptr: *const OrtMemoryInfo, out: *mut OrtAllocatorType) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	*out = OrtAllocatorType::OrtDeviceAllocator;
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn AllocatorAlloc(ort_allocator: *mut OrtAllocator, size: usize, out: *mut *mut ::std::os::raw::c_void) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	*out = unsafe { &*ort_allocator }.Alloc.unwrap()(ort_allocator, size);
+	if unsafe { *out }.is_null() {
+		Error::new_sys(OrtErrorCode::ORT_RUNTIME_EXCEPTION, "Allocation failed");
+	}
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn AllocatorFree(ort_allocator: *mut OrtAllocator, p: *mut ::std::os::raw::c_void) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	unsafe { &*ort_allocator }.Free.unwrap()(ort_allocator, p);
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn AllocatorGetInfo(ort_allocator: *const OrtAllocator, out: *mut *const OrtMemoryInfo) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	*out = unsafe { &*ort_allocator }.Info.unwrap()(ort_allocator);
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn GetAllocatorWithDefaultOptions(out: *mut *mut OrtAllocator) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	*out = (&crate::memory::DEFAULT_CPU_ALLOCATOR as *const Allocator).cast_mut().cast();
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn AddFreeDimensionOverride(
@@ -500,7 +537,9 @@ unsafe extern "system" fn ReleaseStatus(input: *mut OrtStatus) {
 	drop(Error::consume_sys(input));
 }
 
-unsafe extern "system" fn ReleaseMemoryInfo(input: *mut OrtMemoryInfo) {}
+unsafe extern "system" fn ReleaseMemoryInfo(input: *mut OrtMemoryInfo) {
+	drop(unsafe { Box::<MemoryInfo>::from_raw(input.cast()) });
+}
 
 unsafe extern "system" fn ReleaseSession(input: *mut OrtSession) {}
 
@@ -668,10 +707,14 @@ unsafe extern "system" fn AddSessionConfigEntry(
 }
 
 unsafe extern "system" fn CreateAllocator(session: *const OrtSession, mem_info: *const OrtMemoryInfo, out: *mut *mut OrtAllocator) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let mem_info = unsafe { &*mem_info.cast::<MemoryInfo>() };
+	*out = (Box::leak(Box::new(Allocator::new(mem_info))) as *mut Allocator).cast();
+	ptr::null_mut()
 }
 
-unsafe extern "system" fn ReleaseAllocator(input: *mut OrtAllocator) {}
+unsafe extern "system" fn ReleaseAllocator(input: *mut OrtAllocator) {
+	drop(Box::from_raw(input.cast::<Allocator>()));
+}
 
 unsafe extern "system" fn RunWithBinding(session: *mut OrtSession, run_options: *const OrtRunOptions, binding_ptr: *const OrtIoBinding) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -1257,7 +1300,10 @@ unsafe extern "system" fn GetCANNProviderOptionsAsString(
 
 unsafe extern "system" fn ReleaseCANNProviderOptions(input: *mut OrtCANNProviderOptions) {}
 
-unsafe extern "system" fn MemoryInfoGetDeviceType(ptr: *const OrtMemoryInfo, out: *mut OrtMemoryInfoDeviceType) {}
+unsafe extern "system" fn MemoryInfoGetDeviceType(ptr: *const OrtMemoryInfo, out: *mut OrtMemoryInfoDeviceType) {
+	let memory_info = unsafe { &*ptr.cast::<MemoryInfo>() };
+	*out = memory_info.device_type();
+}
 
 unsafe extern "system" fn UpdateEnvWithCustomLogLevel(ort_env: *mut OrtEnv, log_severity_level: OrtLoggingLevel) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")

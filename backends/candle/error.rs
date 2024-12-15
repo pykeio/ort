@@ -7,12 +7,19 @@ pub struct Error {
 }
 
 impl Error {
-	pub fn new_sys(code: ort_sys::OrtErrorCode, message: impl Into<String>) -> *mut ort_sys::OrtStatus {
-		(Box::leak(Box::new(Self {
+	pub fn new(code: ort_sys::OrtErrorCode, message: impl Into<String>) -> Self {
+		Self {
 			code,
 			message: CString::new(message.into()).unwrap()
-		})) as *mut Error)
-			.cast()
+		}
+	}
+
+	pub fn into_sys(self) -> *mut ort_sys::OrtStatus {
+		(Box::leak(Box::new(self)) as *mut Error).cast()
+	}
+
+	pub fn new_sys(code: ort_sys::OrtErrorCode, message: impl Into<String>) -> *mut ort_sys::OrtStatus {
+		Self::new(code, message).into_sys()
 	}
 
 	#[inline]

@@ -5,7 +5,8 @@ use ort_sys::{OrtAllocatorType, OrtErrorCode, OrtMemType, OrtMemoryInfoDeviceTyp
 
 use crate::error::Error;
 
-pub struct MemoryInfo(Device);
+#[repr(transparent)]
+pub struct MemoryInfo(pub Device);
 
 impl MemoryInfo {
 	pub fn new(device_name: impl AsRef<str>, device_id: usize, mem_type: OrtMemType) -> Result<Self, Error> {
@@ -22,6 +23,10 @@ impl MemoryInfo {
 				.map_err(|e| Error::new(OrtErrorCode::ORT_ENGINE_ERROR, e.to_string())),
 			device_name => Err(Error::new(OrtErrorCode::ORT_NOT_IMPLEMENTED, format!("ort-candle does not support the '{device_name}' device")))
 		}
+	}
+
+	pub fn device(&self) -> &Device {
+		&self.0
 	}
 
 	pub fn device_type(&self) -> OrtMemoryInfoDeviceType {

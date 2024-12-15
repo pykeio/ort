@@ -17,6 +17,8 @@ authors = [
 name = "ort_candle"
 path = "lib.rs"
 
+[features]
+
 [dependencies]
 ort-sys = { version = "=2.0.0-rc.9", path = "../../ort-sys", default-features = false }
 candle-core = { version = "0.8.1", default-features = false }
@@ -28,3 +30,6 @@ ort = { version = "=2.0.0-rc.9", path = "../../", default-features = false, feat
 [[test]]
 name = "memory"
 path = "tests/memory.rs"
+[[test]]
+name = "tensor"
+path = "tests/tensor.rs"

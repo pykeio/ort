@@ -5,6 +5,7 @@ use std::{
 	ptr
 };
 
+use candle_core::{CpuStorage, Device, Storage, Tensor};
 use ort_sys::{
 	ExecutionMode, GraphOptimizationLevel, ONNXTensorElementDataType, ONNXType, OrtAllocator, OrtAllocatorType, OrtApi, OrtArenaCfg, OrtCANNProviderOptions,
 	OrtCUDAProviderOptions, OrtCUDAProviderOptionsV2, OrtCustomCreateThreadFn, OrtCustomJoinThreadFn, OrtCustomOp, OrtCustomOpDomain, OrtDnnlProviderOptions,
@@ -16,7 +17,7 @@ use ort_sys::{
 };
 
 use crate::{
-	Environment,
+	Environment, convert_sys_to_dtype,
 	error::Error,
 	memory::{Allocator, MemoryInfo}
 };
@@ -268,7 +269,24 @@ unsafe extern "system" fn CreateTensorAsOrtValue(
 	type_: ONNXTensorElementDataType,
 	out: *mut *mut OrtValue
 ) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let allocator = unsafe { &*allocator.cast::<Allocator>() };
+	let mem_info = allocator.memory_info;
+	let shape: Vec<usize> = unsafe { std::slice::from_raw_parts(shape, shape_len) }
+		.iter()
+		.copied()
+		.map(|c| c as usize)
+		.collect();
+	let dtype = match convert_sys_to_dtype(type_) {
+		Ok(dtype) => dtype,
+		Err(e) => return e.into_sys()
+	};
+	match Tensor::zeros(shape, dtype, mem_info.device()) {
+		Ok(tensor) => {
+			*out = (Box::leak(Box::new(tensor)) as *mut Tensor).cast();
+			ptr::null_mut()
+		}
+		Err(e) => Error::new_sys(OrtErrorCode::ORT_EP_FAIL, format!("Failed to create tensor: {e}"))
+	}
 }
 
 unsafe extern "system" fn CreateTensorWithDataAsOrtValue(
@@ -280,15 +298,49 @@ unsafe extern "system" fn CreateTensorWithDataAsOrtValue(
 	type_: ONNXTensorElementDataType,
 	out: *mut *mut OrtValue
 ) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let mem_info = unsafe { &*info.cast::<MemoryInfo>() };
+	let data_slice = unsafe { std::slice::from_raw_parts(p_data.cast::<u8>(), p_data_len) };
+	let shape: Vec<usize> = unsafe { std::slice::from_raw_parts(shape, shape_len) }
+		.iter()
+		.copied()
+		.map(|c| c as usize)
+		.collect();
+	let dtype = match convert_sys_to_dtype(type_) {
+		Ok(dtype) => dtype,
+		Err(e) => return e.into_sys()
+	};
+	match Tensor::from_raw_buffer(data_slice, dtype, &shape, mem_info.device()) {
+		Ok(tensor) => {
+			*out = (Box::leak(Box::new(tensor)) as *mut Tensor).cast();
+			ptr::null_mut()
+		}
+		Err(e) => Error::new_sys(OrtErrorCode::ORT_EP_FAIL, format!("Failed to create tensor: {e}"))
+	}
 }
 
 unsafe extern "system" fn IsTensor(value: *const OrtValue, out: *mut ::std::os::raw::c_int) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	*out = 1;
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn GetTensorMutableData(value: *mut OrtValue, out: *mut *mut ::std::os::raw::c_void) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let tensor = unsafe { &*value.cast::<Tensor>() };
+	let (storage, _layout) = tensor.storage_and_layout();
+	match &*storage {
+		Storage::Cpu(storage) => {
+			*out = match storage {
+				CpuStorage::U8(v) => v.as_ptr() as *mut _,
+				CpuStorage::U32(v) => v.as_ptr() as *mut _,
+				CpuStorage::I64(v) => v.as_ptr() as *mut _,
+				CpuStorage::F64(v) => v.as_ptr() as *mut _,
+				CpuStorage::F32(v) => v.as_ptr() as *mut _,
+				CpuStorage::F16(v) => v.as_ptr() as *mut _,
+				CpuStorage::BF16(v) => v.as_ptr() as *mut _
+			};
+			ptr::null_mut()
+		}
+		_ => Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	}
 }
 
 unsafe extern "system" fn FillStringTensor(value: *mut OrtValue, s: *const *const ::std::os::raw::c_char, s_len: usize) -> OrtStatusPtr {
@@ -543,7 +595,9 @@ unsafe extern "system" fn ReleaseMemoryInfo(input: *mut OrtMemoryInfo) {
 
 unsafe extern "system" fn ReleaseSession(input: *mut OrtSession) {}
 
-unsafe extern "system" fn ReleaseValue(input: *mut OrtValue) {}
+unsafe extern "system" fn ReleaseValue(input: *mut OrtValue) {
+	drop(unsafe { Box::<Tensor>::from_raw(input.cast()) })
+}
 
 unsafe extern "system" fn ReleaseRunOptions(input: *mut OrtRunOptions) {}
 
@@ -1104,7 +1158,10 @@ unsafe extern "system" fn KernelContext_GetGPUComputeStream(context: *const OrtK
 }
 
 unsafe extern "system" fn GetTensorMemoryInfo(value: *const OrtValue, mem_info: *mut *const OrtMemoryInfo) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let tensor = unsafe { &*value.cast::<Tensor>() };
+	// `MemoryInfo` is #[repr(transparent)], so &MemoryInfo is &Device.
+	*mem_info = (tensor.device() as *const Device).cast();
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn GetExecutionProviderApi(

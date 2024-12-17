@@ -1,8 +1,9 @@
 #![allow(non_snake_case, unused)]
 
 use std::{
-	ffi::{CStr, CString},
-	ptr
+	collections::HashMap,
+	ffi::{CStr, CString, OsStr, OsString},
+	fs, mem, ptr
 };
 
 use candle_core::{CpuStorage, DType, Device, Shape, Storage, Tensor};
@@ -20,6 +21,7 @@ use crate::{
 	Environment, convert_dtype_to_sys, convert_sys_to_dtype,
 	error::Error,
 	memory::{Allocator, MemoryInfo},
+	session::{Session, SessionOptions},
 	tensor::TypeInfo
 };
 
@@ -66,7 +68,30 @@ unsafe extern "system" fn CreateSession(
 	options: *const OrtSessionOptions,
 	out: *mut *mut OrtSession
 ) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let options = unsafe { &*options.cast::<SessionOptions>() };
+
+	let len = (0..).take_while(|&i| *model_path.offset(i) != 0).count();
+	let path = std::slice::from_raw_parts(model_path, len);
+	#[cfg(target_os = "windows")]
+	let path = {
+		use std::os::windows::ffi::OsStringExt;
+		OsString::from_wide(path)
+	};
+	#[cfg(not(target_os = "windows"))]
+	let path = OsString::from_encoded_bytes_unchecked(path.to_vec());
+
+	let buf = match fs::read(path) {
+		Ok(buf) => buf,
+		Err(e) => return Error::new_sys(OrtErrorCode::ORT_NO_SUCHFILE, format!("Failed to read model file: {e}"))
+	};
+
+	match Session::from_buffer(options, &buf) {
+		Ok(session) => {
+			*out = (Box::leak(Box::new(session)) as *mut Session).cast();
+			ptr::null_mut()
+		}
+		Err(e) => Error::new_sys(OrtErrorCode::ORT_FAIL, format!("Failed to parse model: {e}"))
+	}
 }
 
 unsafe extern "system" fn CreateSessionFromArray(
@@ -76,7 +101,17 @@ unsafe extern "system" fn CreateSessionFromArray(
 	options: *const OrtSessionOptions,
 	out: *mut *mut OrtSession
 ) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let options = unsafe { &*options.cast::<SessionOptions>() };
+
+	let buf = std::slice::from_raw_parts(model_data.cast::<u8>(), model_data_length);
+
+	match Session::from_buffer(options, buf) {
+		Ok(session) => {
+			*out = (Box::leak(Box::new(session)) as *mut Session).cast();
+			ptr::null_mut()
+		}
+		Err(e) => Error::new_sys(OrtErrorCode::ORT_FAIL, format!("Failed to parse model: {e}"))
+	}
 }
 
 unsafe extern "system" fn Run(
@@ -87,13 +122,47 @@ unsafe extern "system" fn Run(
 	input_len: usize,
 	output_names: *const *const ::std::os::raw::c_char,
 	output_names_len: usize,
-	outputs: *mut *mut OrtValue
+	output_ptrs: *mut *mut OrtValue
 ) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let session = unsafe { &*session.cast::<Session>() };
+
+	let inputs: HashMap<String, Tensor> = std::slice::from_raw_parts(input_names, input_len)
+		.iter()
+		.zip(std::slice::from_raw_parts(inputs, input_len))
+		.map(|(&name, &input)| {
+			let name = unsafe { CStr::from_ptr(name) };
+			let input = unsafe { &*input.cast::<Tensor>() };
+			(name.to_string_lossy().to_string(), input.clone())
+		})
+		.collect();
+
+	match session.run(inputs) {
+		Ok(outputs) => {
+			let output_names: Vec<String> = std::slice::from_raw_parts(input_names, input_len)
+				.iter()
+				.map(|&name| unsafe { CStr::from_ptr(name) }.to_string_lossy().to_string())
+				.collect();
+			let output_view = std::slice::from_raw_parts_mut(output_ptrs, output_names_len);
+
+			for (name, tensor) in outputs {
+				if let Some(index) = output_names
+					.iter()
+					.zip(output_view.iter())
+					.find_map(|(o_name, output)| if name == *o_name { Some(*output) } else { None })
+				{
+					*index.cast::<Tensor>() = tensor;
+				}
+			}
+
+			ptr::null_mut()
+		}
+		Err(e) => Error::new_sys(OrtErrorCode::ORT_FAIL, format!("Failed to run session: {e}"))
+	}
 }
 
 unsafe extern "system" fn CreateSessionOptions(options: *mut *mut OrtSessionOptions) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	*options = (Box::leak(Box::new(SessionOptions)) as *mut SessionOptions).cast();
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn SetOptimizedModelFilePath(options: *mut OrtSessionOptions, optimized_model_filepath: *const ortchar) -> OrtStatusPtr {
@@ -101,7 +170,9 @@ unsafe extern "system" fn SetOptimizedModelFilePath(options: *mut OrtSessionOpti
 }
 
 unsafe extern "system" fn CloneSessionOptions(in_options: *const OrtSessionOptions, out_options: *mut *mut OrtSessionOptions) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let options = unsafe { &*in_options.cast::<SessionOptions>() };
+	*out_options = (Box::leak(Box::new(options.clone())) as *mut SessionOptions).cast();
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn SetSessionExecutionMode(options: *mut OrtSessionOptions, execution_mode: ExecutionMode) -> OrtStatusPtr {
@@ -177,23 +248,102 @@ unsafe extern "system" fn RegisterCustomOpsLibrary(
 }
 
 unsafe extern "system" fn SessionGetInputCount(session: *const OrtSession, out: *mut usize) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let session = unsafe { &*session.cast::<Session>() };
+	match session.model.graph.as_ref() {
+		Some(graph) => {
+			*out = graph.input.len();
+			ptr::null_mut()
+		}
+		None => Error::new_sys(OrtErrorCode::ORT_NO_MODEL, "Graph is missing")
+	}
 }
 
 unsafe extern "system" fn SessionGetOutputCount(session: *const OrtSession, out: *mut usize) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let session = unsafe { &*session.cast::<Session>() };
+	match session.model.graph.as_ref() {
+		Some(graph) => {
+			*out = graph.output.len();
+			ptr::null_mut()
+		}
+		None => Error::new_sys(OrtErrorCode::ORT_NO_MODEL, "Graph is missing")
+	}
 }
 
 unsafe extern "system" fn SessionGetOverridableInitializerCount(session: *const OrtSession, out: *mut usize) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	*out = 0;
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn SessionGetInputTypeInfo(session: *const OrtSession, index: usize, type_info: *mut *mut OrtTypeInfo) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let session = unsafe { &*session.cast::<Session>() };
+	match session.model.graph.as_ref() {
+		Some(graph) => {
+			let type_proto = graph.input[index].r#type.as_ref().unwrap().value.as_ref().unwrap();
+			match type_proto {
+				candle_onnx::onnx::type_proto::Value::TensorType(tensor_proto) => {
+					let dtype = mem::transmute::<i32, candle_onnx::onnx::tensor_proto::DataType>(tensor_proto.elem_type);
+					let dtype = match candle_onnx::dtype(dtype) {
+						Some(dtype) => dtype,
+						None => return Error::new_sys(OrtErrorCode::ORT_FAIL, format!("Unsupported data type {dtype:?} for input #{}", index + 1))
+					};
+
+					let mut shape_out = vec![];
+					if let Some(shape) = tensor_proto.shape.as_ref() {
+						for dim in &shape.dim {
+							shape_out.push(match &dim.value {
+								Some(v) => match v {
+									candle_onnx::onnx::tensor_shape_proto::dimension::Value::DimValue(v) => *v,
+									candle_onnx::onnx::tensor_shape_proto::dimension::Value::DimParam(_) => -1i64
+								},
+								None => -1i64
+							});
+						}
+					}
+
+					*type_info = TypeInfo::new_sys(dtype, shape_out);
+					ptr::null_mut()
+				}
+				_ => Error::new_sys(OrtErrorCode::ORT_FAIL, "Invalid type; only tensors are supported")
+			}
+		}
+		None => Error::new_sys(OrtErrorCode::ORT_NO_MODEL, "Graph is missing")
+	}
 }
 
 unsafe extern "system" fn SessionGetOutputTypeInfo(session: *const OrtSession, index: usize, type_info: *mut *mut OrtTypeInfo) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let session = unsafe { &*session.cast::<Session>() };
+	match session.model.graph.as_ref() {
+		Some(graph) => {
+			let type_proto = graph.output[index].r#type.as_ref().unwrap().value.as_ref().unwrap();
+			match type_proto {
+				candle_onnx::onnx::type_proto::Value::TensorType(tensor_proto) => {
+					let dtype = mem::transmute::<i32, candle_onnx::onnx::tensor_proto::DataType>(tensor_proto.elem_type);
+					let dtype = match candle_onnx::dtype(dtype) {
+						Some(dtype) => dtype,
+						None => return Error::new_sys(OrtErrorCode::ORT_FAIL, format!("Unsupported data type {dtype:?} for output #{}", index + 1))
+					};
+
+					let mut shape_out = vec![];
+					if let Some(shape) = tensor_proto.shape.as_ref() {
+						for dim in &shape.dim {
+							shape_out.push(match &dim.value {
+								Some(v) => match v {
+									candle_onnx::onnx::tensor_shape_proto::dimension::Value::DimValue(v) => *v,
+									candle_onnx::onnx::tensor_shape_proto::dimension::Value::DimParam(_) => -1i64
+								},
+								None => -1i64
+							});
+						}
+					}
+
+					*type_info = TypeInfo::new_sys(dtype, shape_out);
+					ptr::null_mut()
+				}
+				_ => Error::new_sys(OrtErrorCode::ORT_FAIL, "Invalid type; only tensors are supported")
+			}
+		}
+		None => Error::new_sys(OrtErrorCode::ORT_NO_MODEL, "Graph is missing")
+	}
 }
 
 unsafe extern "system" fn SessionGetOverridableInitializerTypeInfo(session: *const OrtSession, index: usize, type_info: *mut *mut OrtTypeInfo) -> OrtStatusPtr {
@@ -206,7 +356,15 @@ unsafe extern "system" fn SessionGetInputName(
 	allocator: *mut OrtAllocator,
 	value: *mut *mut ::std::os::raw::c_char
 ) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let session = unsafe { &*session.cast::<Session>() };
+	match session.model.graph.as_ref() {
+		Some(graph) => {
+			let name = CString::new(&*graph.input[index].name).unwrap();
+			*value = name.into_raw();
+			ptr::null_mut()
+		}
+		None => Error::new_sys(OrtErrorCode::ORT_NO_MODEL, "Graph is missing")
+	}
 }
 
 unsafe extern "system" fn SessionGetOutputName(
@@ -215,7 +373,15 @@ unsafe extern "system" fn SessionGetOutputName(
 	allocator: *mut OrtAllocator,
 	value: *mut *mut ::std::os::raw::c_char
 ) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let session = unsafe { &*session.cast::<Session>() };
+	match session.model.graph.as_ref() {
+		Some(graph) => {
+			let name = CString::new(&*graph.output[index].name).unwrap();
+			*value = name.into_raw();
+			ptr::null_mut()
+		}
+		None => Error::new_sys(OrtErrorCode::ORT_NO_MODEL, "Graph is missing")
+	}
 }
 
 unsafe extern "system" fn SessionGetOverridableInitializerName(
@@ -373,7 +539,7 @@ unsafe extern "system" fn GetOnnxTypeFromTypeInfo(type_info: *const OrtTypeInfo,
 }
 
 unsafe extern "system" fn CreateTensorTypeAndShapeInfo(out: *mut *mut OrtTensorTypeAndShapeInfo) -> OrtStatusPtr {
-	*out = TypeInfo::new_sys(DType::F32, Shape::from_dims(&[])).cast();
+	*out = TypeInfo::new_sys(DType::F32, Vec::new()).cast();
 	ptr::null_mut()
 }
 
@@ -390,7 +556,7 @@ unsafe extern "system" fn SetTensorElementType(info: *mut OrtTensorTypeAndShapeI
 
 unsafe extern "system" fn SetDimensions(info: *mut OrtTensorTypeAndShapeInfo, dim_values: *const i64, dim_count: usize) -> OrtStatusPtr {
 	let info = unsafe { &mut *info.cast::<TypeInfo>() };
-	info.shape = Shape::from_dims(unsafe { std::slice::from_raw_parts(dim_values.cast(), dim_count) });
+	info.shape = unsafe { std::slice::from_raw_parts(dim_values.cast(), dim_count) }.to_vec();
 	ptr::null_mut()
 }
 
@@ -402,13 +568,13 @@ unsafe extern "system" fn GetTensorElementType(info: *const OrtTensorTypeAndShap
 
 unsafe extern "system" fn GetDimensionsCount(info: *const OrtTensorTypeAndShapeInfo, out: *mut usize) -> OrtStatusPtr {
 	let info = unsafe { &*info.cast::<TypeInfo>() };
-	*out = info.shape.rank();
+	*out = info.shape.len();
 	ptr::null_mut()
 }
 
 unsafe extern "system" fn GetDimensions(info: *const OrtTensorTypeAndShapeInfo, dim_values: *mut i64, dim_values_length: usize) -> OrtStatusPtr {
 	let info = unsafe { &*info.cast::<TypeInfo>() };
-	for (i, dim) in info.shape.dims().iter().enumerate().take(dim_values_length) {
+	for (i, dim) in info.shape.iter().enumerate().take(dim_values_length) {
 		*dim_values.add(i) = *dim as _;
 	}
 	ptr::null_mut()
@@ -428,8 +594,8 @@ unsafe extern "system" fn GetSymbolicDimensions(
 unsafe extern "system" fn GetTensorShapeElementCount(info: *const OrtTensorTypeAndShapeInfo, out: *mut usize) -> OrtStatusPtr {
 	let info = unsafe { &*info.cast::<TypeInfo>() };
 	let mut size = 1usize;
-	for dim in info.shape.dims() {
-		size *= *dim;
+	for dim in &info.shape {
+		size *= *dim as usize;
 	}
 	*out = size;
 	ptr::null_mut()
@@ -437,13 +603,13 @@ unsafe extern "system" fn GetTensorShapeElementCount(info: *const OrtTensorTypeA
 
 unsafe extern "system" fn GetTensorTypeAndShape(value: *const OrtValue, out: *mut *mut OrtTensorTypeAndShapeInfo) -> OrtStatusPtr {
 	let tensor = unsafe { &*value.cast::<Tensor>() };
-	*out = TypeInfo::new_sys(tensor.dtype(), tensor.shape().clone()).cast();
+	*out = TypeInfo::new_sys(tensor.dtype(), tensor.shape().dims().iter().map(|c| *c as i64).collect()).cast();
 	ptr::null_mut()
 }
 
 unsafe extern "system" fn GetTypeInfo(value: *const OrtValue, out: *mut *mut OrtTypeInfo) -> OrtStatusPtr {
 	let tensor = unsafe { &*value.cast::<Tensor>() };
-	*out = TypeInfo::new_sys(tensor.dtype(), tensor.shape().clone());
+	*out = TypeInfo::new_sys(tensor.dtype(), tensor.shape().dims().iter().map(|c| *c as i64).collect());
 	ptr::null_mut()
 }
 
@@ -628,10 +794,12 @@ unsafe extern "system" fn ReleaseMemoryInfo(input: *mut OrtMemoryInfo) {
 	drop(unsafe { Box::<MemoryInfo>::from_raw(input.cast()) });
 }
 
-unsafe extern "system" fn ReleaseSession(input: *mut OrtSession) {}
+unsafe extern "system" fn ReleaseSession(input: *mut OrtSession) {
+	drop(unsafe { Box::<Session>::from_raw(input.cast()) });
+}
 
 unsafe extern "system" fn ReleaseValue(input: *mut OrtValue) {
-	drop(unsafe { Box::<Tensor>::from_raw(input.cast()) })
+	drop(unsafe { Box::<Tensor>::from_raw(input.cast()) });
 }
 
 unsafe extern "system" fn ReleaseRunOptions(input: *mut OrtRunOptions) {}
@@ -644,7 +812,9 @@ unsafe extern "system" fn ReleaseTensorTypeAndShapeInfo(input: *mut OrtTensorTyp
 	drop(TypeInfo::consume_sys(input.cast()));
 }
 
-unsafe extern "system" fn ReleaseSessionOptions(input: *mut OrtSessionOptions) {}
+unsafe extern "system" fn ReleaseSessionOptions(input: *mut OrtSessionOptions) {
+	drop(Box::from_raw(input.cast::<SessionOptions>()));
+}
 
 unsafe extern "system" fn ReleaseCustomOpDomain(input: *mut OrtCustomOpDomain) {}
 

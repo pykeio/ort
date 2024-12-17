@@ -4,6 +4,7 @@ use ort_sys::OrtErrorCode;
 mod api;
 pub(crate) mod error;
 mod memory;
+mod session;
 mod tensor;
 
 pub use self::api::api;

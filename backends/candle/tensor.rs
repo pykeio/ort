@@ -1,12 +1,12 @@
-use candle_core::{DType, Shape};
+use candle_core::DType;
 
 pub struct TypeInfo {
 	pub dtype: DType,
-	pub shape: Shape
+	pub shape: Vec<i64>
 }
 
 impl TypeInfo {
-	pub fn new_sys(dtype: DType, shape: Shape) -> *mut ort_sys::OrtTypeInfo {
+	pub fn new_sys(dtype: DType, shape: Vec<i64>) -> *mut ort_sys::OrtTypeInfo {
 		(Box::leak(Box::new(Self { dtype, shape })) as *mut TypeInfo).cast()
 	}
 

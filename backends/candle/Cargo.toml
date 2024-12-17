@@ -26,7 +26,7 @@ candle-onnx = { version = "0.8.1" }
 prost = { version = "0.12.1", default-features = false }
 
 [dev-dependencies]
-ort = { version = "=2.0.0-rc.9", path = "../../", default-features = false, features = [ "alternative-backend" ] }
+ort = { version = "=2.0.0-rc.9", path = "../../", default-features = false, features = [ "alternative-backend", "fetch-models" ] }
 
 [[test]]
 name = "memory"

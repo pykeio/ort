@@ -1,4 +1,4 @@
-use std::ptr;
+use std::{any::Any, ffi::CString, ptr};
 
 use candle_core::{Device, DeviceLocation, backend::BackendDevice};
 use ort_sys::{OrtAllocatorType, OrtErrorCode, OrtMemType, OrtMemoryInfoDeviceType};
@@ -95,7 +95,9 @@ unsafe extern "system" fn sys_allocator_alloc(_this: *mut ort_sys::OrtAllocator,
 	ptr::null_mut()
 }
 
-unsafe extern "system" fn sys_allocator_free(_this: *mut ort_sys::OrtAllocator, _p: *mut ::std::os::raw::c_void) {}
+unsafe extern "system" fn sys_allocator_free(_this: *mut ort_sys::OrtAllocator, p: *mut ::std::os::raw::c_void) {
+	drop(CString::from_raw(p.cast()));
+}
 
 unsafe extern "system" fn sys_allocator_info(this_: *const ort_sys::OrtAllocator) -> *const ort_sys::OrtMemoryInfo {
 	let _allocator = unsafe { &*this_.cast::<Allocator>() };

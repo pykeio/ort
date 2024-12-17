@@ -5,7 +5,7 @@ use std::{
 	ptr
 };
 
-use candle_core::{CpuStorage, Device, Storage, Tensor};
+use candle_core::{CpuStorage, DType, Device, Shape, Storage, Tensor};
 use ort_sys::{
 	ExecutionMode, GraphOptimizationLevel, ONNXTensorElementDataType, ONNXType, OrtAllocator, OrtAllocatorType, OrtApi, OrtArenaCfg, OrtCANNProviderOptions,
 	OrtCUDAProviderOptions, OrtCUDAProviderOptionsV2, OrtCustomCreateThreadFn, OrtCustomJoinThreadFn, OrtCustomOp, OrtCustomOpDomain, OrtDnnlProviderOptions,
@@ -17,9 +17,10 @@ use ort_sys::{
 };
 
 use crate::{
-	Environment, convert_sys_to_dtype,
+	Environment, convert_dtype_to_sys, convert_sys_to_dtype,
 	error::Error,
-	memory::{Allocator, MemoryInfo}
+	memory::{Allocator, MemoryInfo},
+	tensor::TypeInfo
 };
 
 unsafe extern "system" fn CreateStatus(code: OrtErrorCode, msg: *const ::std::os::raw::c_char) -> *mut OrtStatus {
@@ -362,35 +363,55 @@ unsafe extern "system" fn GetStringTensorContent(
 }
 
 unsafe extern "system" fn CastTypeInfoToTensorInfo(type_info: *const OrtTypeInfo, out: *mut *const OrtTensorTypeAndShapeInfo) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	*out = type_info.cast();
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn GetOnnxTypeFromTypeInfo(type_info: *const OrtTypeInfo, out: *mut ONNXType) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	*out = ONNXType::ONNX_TYPE_TENSOR;
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn CreateTensorTypeAndShapeInfo(out: *mut *mut OrtTensorTypeAndShapeInfo) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	*out = TypeInfo::new_sys(DType::F32, Shape::from_dims(&[])).cast();
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn SetTensorElementType(info: *mut OrtTensorTypeAndShapeInfo, type_: ONNXTensorElementDataType) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let info = unsafe { &mut *info.cast::<TypeInfo>() };
+	match convert_sys_to_dtype(type_) {
+		Ok(dtype) => {
+			info.dtype = dtype;
+			ptr::null_mut()
+		}
+		Err(e) => e.into_sys()
+	}
 }
 
 unsafe extern "system" fn SetDimensions(info: *mut OrtTensorTypeAndShapeInfo, dim_values: *const i64, dim_count: usize) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let info = unsafe { &mut *info.cast::<TypeInfo>() };
+	info.shape = Shape::from_dims(unsafe { std::slice::from_raw_parts(dim_values.cast(), dim_count) });
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn GetTensorElementType(info: *const OrtTensorTypeAndShapeInfo, out: *mut ONNXTensorElementDataType) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let info = unsafe { &*info.cast::<TypeInfo>() };
+	*out = convert_dtype_to_sys(info.dtype);
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn GetDimensionsCount(info: *const OrtTensorTypeAndShapeInfo, out: *mut usize) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let info = unsafe { &*info.cast::<TypeInfo>() };
+	*out = info.shape.rank();
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn GetDimensions(info: *const OrtTensorTypeAndShapeInfo, dim_values: *mut i64, dim_values_length: usize) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let info = unsafe { &*info.cast::<TypeInfo>() };
+	for (i, dim) in info.shape.dims().iter().enumerate().take(dim_values_length) {
+		*dim_values.add(i) = *dim as _;
+	}
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn GetSymbolicDimensions(
@@ -398,23 +419,37 @@ unsafe extern "system" fn GetSymbolicDimensions(
 	dim_params: *mut *const ::std::os::raw::c_char,
 	dim_params_length: usize
 ) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	for i in 0..dim_params_length {
+		*dim_params.add(i) = ptr::null();
+	}
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn GetTensorShapeElementCount(info: *const OrtTensorTypeAndShapeInfo, out: *mut usize) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let info = unsafe { &*info.cast::<TypeInfo>() };
+	let mut size = 1usize;
+	for dim in info.shape.dims() {
+		size *= *dim;
+	}
+	*out = size;
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn GetTensorTypeAndShape(value: *const OrtValue, out: *mut *mut OrtTensorTypeAndShapeInfo) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let tensor = unsafe { &*value.cast::<Tensor>() };
+	*out = TypeInfo::new_sys(tensor.dtype(), tensor.shape().clone()).cast();
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn GetTypeInfo(value: *const OrtValue, out: *mut *mut OrtTypeInfo) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	let tensor = unsafe { &*value.cast::<Tensor>() };
+	*out = TypeInfo::new_sys(tensor.dtype(), tensor.shape().clone());
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn GetValueType(value: *const OrtValue, out: *mut ONNXType) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	*out = ONNXType::ONNX_TYPE_TENSOR;
+	ptr::null_mut()
 }
 
 unsafe extern "system" fn CreateMemoryInfo(
@@ -477,7 +512,7 @@ unsafe extern "system" fn MemoryInfoGetType(ptr: *const OrtMemoryInfo, out: *mut
 unsafe extern "system" fn AllocatorAlloc(ort_allocator: *mut OrtAllocator, size: usize, out: *mut *mut ::std::os::raw::c_void) -> OrtStatusPtr {
 	*out = unsafe { &*ort_allocator }.Alloc.unwrap()(ort_allocator, size);
 	if unsafe { *out }.is_null() {
-		Error::new_sys(OrtErrorCode::ORT_RUNTIME_EXCEPTION, "Allocation failed");
+		return Error::new_sys(OrtErrorCode::ORT_RUNTIME_EXCEPTION, "Allocation failed");
 	}
 	ptr::null_mut()
 }
@@ -601,9 +636,13 @@ unsafe extern "system" fn ReleaseValue(input: *mut OrtValue) {
 
 unsafe extern "system" fn ReleaseRunOptions(input: *mut OrtRunOptions) {}
 
-unsafe extern "system" fn ReleaseTypeInfo(input: *mut OrtTypeInfo) {}
+unsafe extern "system" fn ReleaseTypeInfo(input: *mut OrtTypeInfo) {
+	drop(TypeInfo::consume_sys(input));
+}
 
-unsafe extern "system" fn ReleaseTensorTypeAndShapeInfo(input: *mut OrtTensorTypeAndShapeInfo) {}
+unsafe extern "system" fn ReleaseTensorTypeAndShapeInfo(input: *mut OrtTensorTypeAndShapeInfo) {
+	drop(TypeInfo::consume_sys(input.cast()));
+}
 
 unsafe extern "system" fn ReleaseSessionOptions(input: *mut OrtSessionOptions) {}
 

@@ -2,6 +2,7 @@
 members = [
 	'ort-sys',
 	'backends/candle',
+	'backends/tract',
 	'examples/async-gpt2-api',
 	'examples/custom-ops',
 	'examples/gpt2',

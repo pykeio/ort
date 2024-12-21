@@ -6,7 +6,6 @@ edition = "2021"
 
 [dependencies]
 ort = { path = "../../", features = [ "fetch-models" ] }
-ndarray = "0.16"
 tokenizers = { version = "0.19", default-features = false, features = [ "onig" ] }
 rand = "0.8"
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }

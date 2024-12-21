@@ -6,7 +6,6 @@ edition = "2021"
 
 [dependencies]
 ort = { path = "../../", features = [ "fetch-models" ] }
-ndarray = "0.16"
 
 [features]
 load-dynamic = [ "ort/load-dynamic" ]

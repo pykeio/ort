@@ -3,7 +3,6 @@ use std::{
 	path::Path
 };
 
-use ndarray::{Array1, ArrayViewD, Axis, array, concatenate, s};
 use ort::{
 	execution_providers::CUDAExecutionProvider,
 	inputs,
@@ -22,8 +21,6 @@ const TOP_K: usize = 5;
 /// GPT-2 Text Generation
 ///
 /// This Rust program demonstrates text generation using the GPT-2 language model with `ort`.
-/// The program initializes the model, tokenizes a prompt, and generates a sequence of tokens.
-/// It utilizes top-k sampling for diverse and contextually relevant text generation.
 fn main() -> ort::Result<()> {
 	// Initialize tracing to receive debug messages from `ort`
 	tracing_subscriber::fmt::init();
@@ -34,7 +31,7 @@ fn main() -> ort::Result<()> {
 		.with_execution_providers([CUDAExecutionProvider::default().build()])
 		.commit()?;
 
-	let mut stdout = io::stdout();
+	let mut stdout: io::Stdout = io::stdout();
 	let mut rng = rand::thread_rng();
 
 	// Load our model
@@ -46,34 +43,35 @@ fn main() -> ort::Result<()> {
 	// Load the tokenizer and encode the prompt into a sequence of tokens.
 	let tokenizer = Tokenizer::from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("tokenizer.json")).unwrap();
 	let tokens = tokenizer.encode(PROMPT, false).unwrap();
-	let tokens = tokens.get_ids().iter().map(|i| *i as i64).collect::<Vec<_>>();
-
-	let mut tokens = Array1::from_iter(tokens.iter().cloned());
+	let mut tokens = tokens.get_ids().iter().map(|i| *i as i64).collect::<Vec<_>>();
 
 	print!("{PROMPT}");
 	stdout.flush().unwrap();
 
 	for _ in 0..GEN_TOKENS {
-		let array = tokens.view().insert_axis(Axis(0)).insert_axis(Axis(1));
-		let outputs = session.run(inputs![TensorRef::from_array_view(array)?])?;
-		let generated_tokens: ArrayViewD<f32> = outputs["output1"].try_extract_tensor()?;
+		// Raw tensor construction takes a tuple of (dimensions, data).
+		// The model expects our input to have shape [B, _, S]
+		let input = TensorRef::from_array_view((vec![1, 1, tokens.len() as i64], tokens.as_slice()))?;
+		let outputs = session.run(inputs![input])?;
+		let (dim, mut probabilities) = outputs["output1"].try_extract_raw_tensor()?;
 
-		// Collect and sort logits
-		let probabilities = &mut generated_tokens
-			.slice(s![0, 0, -1, ..])
-			.insert_axis(Axis(0))
-			.to_owned()
-			.iter()
-			.cloned()
-			.enumerate()
-			.collect::<Vec<_>>();
+		// The output tensor will have shape [B, _, S, V]
+		// We want only the probabilities for the last token in this sequence, which will be the next most likely token
+		// according to the model
+		let (seq_len, vocab_size) = (dim[2] as usize, dim[3] as usize);
+		probabilities = &probabilities[(seq_len - 1) * vocab_size..];
+
+		// Sort each token by probability
+		let mut probabilities: Vec<(usize, f32)> = probabilities.iter().copied().enumerate().collect();
 		probabilities.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Less));
 
 		// Sample using top-k sampling
-		let token = probabilities[rng.gen_range(0..=TOP_K)].0;
-		tokens = concatenate![Axis(0), tokens, array![token.try_into().unwrap()]];
+		let token = probabilities[rng.gen_range(0..=TOP_K)].0 as i64;
 
-		let token_str = tokenizer.decode(&[token as _], true).unwrap();
+		// Add our generated token to the input sequence
+		tokens.push(token);
+
+		let token_str = tokenizer.decode(&[token as u32], true).unwrap();
 		print!("{}", token_str);
 		stdout.flush().unwrap();
 	}

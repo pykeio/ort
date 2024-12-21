@@ -7,17 +7,18 @@ use std::{
 	sync::Arc
 };
 
+use ndarray::ArrayViewMut;
 #[cfg(feature = "ndarray")]
 use ndarray::{ArcArray, Array, ArrayView, CowArray, Dimension};
 
-use super::{DynTensor, Tensor, TensorRefMut, calculate_tensor_size};
+use super::{Tensor, TensorRef, TensorRefMut, calculate_tensor_size};
 use crate::{
 	AsPointer,
 	error::{Error, ErrorCode, Result, assert_non_null_pointer},
 	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
 	ortsys,
 	tensor::{PrimitiveTensorElementType, TensorElementType, Utf8Data},
-	value::{DynValue, Value, ValueInner, ValueType}
+	value::{Value, ValueInner, ValueType}
 };
 
 impl Tensor<String> {
@@ -48,7 +49,7 @@ impl Tensor<String> {
 	/// ```
 	///
 	/// Note that string data will *always* be copied, no matter what form the data is provided in.
-	pub fn from_string_array<T: Utf8Data>(input: impl IntoValueTensor<Item = T>) -> Result<Tensor<String>> {
+	pub fn from_string_array<T: Utf8Data>(input: impl TensorArrayData<T>) -> Result<Tensor<String>> {
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 
 		let (shape, data) = input.ref_parts()?;
@@ -180,13 +181,13 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	///
 	/// Raw data provided as a `Arc<Box<[T]>>`, `Box<[T]>`, or `Vec<T>` will never be copied. Raw data is expected to be
 	/// in standard, contigous layout.
-	pub fn from_array(input: impl IntoValueTensor<Item = T>) -> Result<Tensor<T>> {
+	pub fn from_array(input: impl OwnedTensorArrayData<T>) -> Result<Tensor<T>> {
 		let memory_info = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Arena, MemoryType::CPUInput)?;
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 
 		// f16 and bf16 are repr(transparent) to u16, so memory layout should be identical to onnxruntime
-		let (shape, ptr, ptr_len, guard) = input.into_parts()?;
+		let TensorArrayDataParts { shape, ptr, num_elements, guard } = input.into_parts()?;
 		let shape_ptr: *const i64 = shape.as_ptr();
 		let shape_len = shape.len();
 
@@ -197,7 +198,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 			unsafe CreateTensorWithDataAsOrtValue(
 				memory_info.ptr(),
 				tensor_values_ptr,
-				ptr_len * std::mem::size_of::<T>(),
+				num_elements * std::mem::size_of::<T>(),
 				shape_ptr,
 				shape_len,
 				T::into_tensor_element_type().into(),
@@ -223,7 +224,99 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	}
 }
 
+impl<'a, T: PrimitiveTensorElementType + Debug> TensorRef<'a, T> {
+	pub fn from_array_view(input: impl TensorArrayData<T>) -> Result<TensorRef<'a, T>> {
+		let memory_info = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Arena, MemoryType::CPUInput)?;
+
+		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
+
+		// f16 and bf16 are repr(transparent) to u16, so memory layout should be identical to onnxruntime
+		let (shape, data) = input.ref_parts()?;
+		let num_elements = calculate_tensor_size(&shape);
+		let shape_ptr: *const i64 = shape.as_ptr();
+		let shape_len = shape.len();
+
+		let tensor_values_ptr: *mut std::ffi::c_void = data.as_ptr() as *mut _;
+		assert_non_null_pointer(tensor_values_ptr, "TensorValues")?;
+
+		ortsys![
+			unsafe CreateTensorWithDataAsOrtValue(
+				memory_info.ptr(),
+				tensor_values_ptr,
+				num_elements * std::mem::size_of::<T>(),
+				shape_ptr,
+				shape_len,
+				T::into_tensor_element_type().into(),
+				&mut value_ptr
+			)?;
+			nonNull(value_ptr)
+		];
+
+		let mut tensor = TensorRef::new(Tensor {
+			inner: Arc::new(ValueInner {
+				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
+				dtype: ValueType::Tensor {
+					ty: T::into_tensor_element_type(),
+					dimensions: shape,
+					dimension_symbols: vec![None; shape_len]
+				},
+				drop: true,
+				memory_info: Some(memory_info),
+				_backing: None
+			}),
+			_markers: PhantomData
+		});
+		tensor.upgradable = false;
+		Ok(tensor)
+	}
+}
+
 impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
+	pub fn from_array_view_mut(mut input: impl TensorArrayDataMut<T>) -> Result<TensorRefMut<'a, T>> {
+		let memory_info = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Arena, MemoryType::CPUInput)?;
+
+		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
+
+		// f16 and bf16 are repr(transparent) to u16, so memory layout should be identical to onnxruntime
+		let (shape, data) = input.ref_parts_mut()?;
+		let num_elements = calculate_tensor_size(&shape);
+		let shape_ptr: *const i64 = shape.as_ptr();
+		let shape_len = shape.len();
+
+		let tensor_values_ptr: *mut std::ffi::c_void = data.as_ptr() as *mut _;
+		assert_non_null_pointer(tensor_values_ptr, "TensorValues")?;
+
+		ortsys![
+			unsafe CreateTensorWithDataAsOrtValue(
+				memory_info.ptr(),
+				tensor_values_ptr,
+				num_elements * std::mem::size_of::<T>(),
+				shape_ptr,
+				shape_len,
+				T::into_tensor_element_type().into(),
+				&mut value_ptr
+			)?;
+			nonNull(value_ptr)
+		];
+
+		let mut tensor = TensorRefMut::new(Tensor {
+			inner: Arc::new(ValueInner {
+				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
+				dtype: ValueType::Tensor {
+					ty: T::into_tensor_element_type(),
+					dimensions: shape,
+					dimension_symbols: vec![None; shape_len]
+				},
+				drop: true,
+				memory_info: Some(memory_info),
+				_backing: None
+			}),
+			_markers: PhantomData
+		});
+		tensor.upgradable = false;
+		Ok(tensor)
+	}
+
 	/// Create a mutable tensor view from a raw pointer and shape.
 	///
 	/// The length of data is determined by `T` and the given shape, so the given buffer must be at least
@@ -269,7 +362,7 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 			nonNull(value_ptr)
 		];
 
-		Ok(TensorRefMut::new(Value {
+		let mut tensor = TensorRefMut::new(Value {
 			inner: Arc::new(ValueInner {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
 				dtype: ValueType::Tensor {
@@ -282,16 +375,29 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 				_backing: None
 			}),
 			_markers: PhantomData
-		}))
+		});
+		tensor.upgradable = false;
+		Ok(tensor)
 	}
 }
 
-pub trait IntoValueTensor {
-	type Item;
+pub trait TensorArrayData<I> {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[I])>;
+}
 
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])>;
-	#[allow(clippy::type_complexity)]
-	fn into_parts(self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)>;
+pub trait TensorArrayDataMut<I>: TensorArrayData<I> {
+	fn ref_parts_mut(&mut self) -> Result<(Vec<i64>, &mut [I])>;
+}
+
+pub trait OwnedTensorArrayData<I>: TensorArrayData<I> {
+	fn into_parts(self) -> Result<TensorArrayDataParts<I>>;
+}
+
+pub struct TensorArrayDataParts<I> {
+	pub shape: Vec<i64>,
+	pub ptr: *mut I,
+	pub num_elements: usize,
+	pub guard: Box<dyn Any>
 }
 
 pub trait ToDimensions {
@@ -355,302 +461,180 @@ impl_to_dimensions!(<N> for [usize; N], for [i32; N], for [i64; N]);
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'i, 'v, T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for &'i CowArray<'v, T, D>
-where
-	'v: 'i
-{
-	type Item = T;
-
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
+impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for &CowArray<'_, T, D> {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[T])> {
 		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
 		let data = self
 			.as_slice()
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
 		Ok((shape, data))
-	}
-
-	fn into_parts(self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
-		// This will result in a copy in either form of the CowArray
-		let mut contiguous_array = self.as_standard_layout().into_owned();
-		let shape: Vec<i64> = contiguous_array.shape().iter().map(|d| *d as i64).collect();
-		let ptr = contiguous_array.as_mut_ptr();
-		let ptr_len = contiguous_array.len();
-		let guard = Box::new(contiguous_array);
-		Ok((shape, ptr, ptr_len, guard))
 	}
 }
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for &mut ArcArray<T, D> {
-	type Item = T;
-
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
+impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for ArcArray<T, D> {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[T])> {
 		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
 		let data = self
 			.as_slice()
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
 		Ok((shape, data))
-	}
-
-	fn into_parts(self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
-		if self.is_standard_layout() {
-			// We can avoid the copy here and use the data as is
-			let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
-			let ptr = self.as_mut_ptr();
-			let ptr_len = self.len();
-			let guard = Box::new(self.clone());
-			Ok((shape, ptr, ptr_len, guard))
-		} else {
-			// Need to do a copy here to get data in to standard layout
-			let mut contiguous_array = self.as_standard_layout().into_owned();
-			let shape: Vec<i64> = contiguous_array.shape().iter().map(|d| *d as i64).collect();
-			let ptr = contiguous_array.as_mut_ptr();
-			let ptr_len: usize = contiguous_array.len();
-			let guard = Box::new(contiguous_array);
-			Ok((shape, ptr, ptr_len, guard))
-		}
 	}
 }
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for Array<T, D> {
-	type Item = T;
-
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
+impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for Array<T, D> {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[T])> {
 		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
 		let data = self
 			.as_slice()
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
 		Ok((shape, data))
 	}
+}
 
-	fn into_parts(self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for &Array<T, D> {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[T])> {
+		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
+		let data = self
+			.as_slice()
+			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
+		Ok((shape, data))
+	}
+}
+
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+impl<T: Clone + 'static, D: Dimension + 'static> OwnedTensorArrayData<T> for Array<T, D> {
+	fn into_parts(self) -> Result<TensorArrayDataParts<T>> {
 		if self.is_standard_layout() {
 			// We can avoid the copy here and use the data as is
 			let mut guard = Box::new(self);
 			let shape: Vec<i64> = guard.shape().iter().map(|d| *d as i64).collect();
 			let ptr = guard.as_mut_ptr();
-			let ptr_len = guard.len();
-			Ok((shape, ptr, ptr_len, guard))
+			let num_elements = guard.len();
+			Ok(TensorArrayDataParts { shape, ptr, num_elements, guard })
 		} else {
 			// Need to do a copy here to get data in to standard layout
 			let mut contiguous_array = self.as_standard_layout().into_owned();
 			let shape: Vec<i64> = contiguous_array.shape().iter().map(|d| *d as i64).collect();
 			let ptr = contiguous_array.as_mut_ptr();
-			let ptr_len: usize = contiguous_array.len();
+			let num_elements: usize = contiguous_array.len();
 			let guard = Box::new(contiguous_array);
-			Ok((shape, ptr, ptr_len, guard))
+			Ok(TensorArrayDataParts { shape, ptr, num_elements, guard })
 		}
 	}
 }
 
 #[cfg(feature = "ndarray")]
-impl<T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for ArrayView<'_, T, D> {
-	type Item = T;
-
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for ArrayView<'_, T, D> {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[T])> {
 		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
 		let data = self
 			.as_slice()
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
 		Ok((shape, data))
 	}
+}
 
-	fn into_parts(self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
-		// This will result in a copy in either form of the ArrayView
-		let mut contiguous_array = self.as_standard_layout().into_owned();
-		let shape: Vec<i64> = contiguous_array.shape().iter().map(|d| *d as i64).collect();
-		let ptr = contiguous_array.as_mut_ptr();
-		let ptr_len = contiguous_array.len();
-		let guard = Box::new(contiguous_array);
-		Ok((shape, ptr, ptr_len, guard))
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for ArrayViewMut<'_, T, D> {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[T])> {
+		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
+		let data = self
+			.as_slice()
+			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
+		Ok((shape, data))
 	}
 }
 
-impl<T: Clone + Debug + 'static, D: ToDimensions> IntoValueTensor for (D, &[T]) {
-	type Item = T;
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayDataMut<T> for ArrayViewMut<'_, T, D> {
+	fn ref_parts_mut(&mut self) -> Result<(Vec<i64>, &mut [T])> {
+		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
+		let data = self
+			.as_slice_mut()
+			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
+		Ok((shape, data))
+	}
+}
 
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
+impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, &[T]) {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[T])> {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		Ok((shape, self.1))
 	}
+}
 
-	fn into_parts(self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
+impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, &mut [T]) {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[T])> {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
-		let mut data = self.1.to_vec();
-		let ptr = data.as_mut_ptr();
-		let ptr_len: usize = data.len();
-		Ok((shape, ptr, ptr_len, Box::new(data)))
+		Ok((shape, self.1))
 	}
 }
 
-impl<T: Clone + Debug + 'static, D: ToDimensions> IntoValueTensor for (D, Vec<T>) {
-	type Item = T;
+impl<T: Clone + 'static, D: ToDimensions> TensorArrayDataMut<T> for (D, &mut [T]) {
+	fn ref_parts_mut(&mut self) -> Result<(Vec<i64>, &mut [T])> {
+		let shape = self.0.to_dimensions(Some(self.1.len()))?;
+		Ok((shape, self.1))
+	}
+}
 
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
+impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Vec<T>) {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[T])> {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		let data = &*self.1;
 		Ok((shape, data))
 	}
+}
 
-	fn into_parts(mut self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
+impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Vec<T>) {
+	fn into_parts(mut self) -> Result<TensorArrayDataParts<T>> {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		let ptr = self.1.as_mut_ptr();
-		let ptr_len: usize = self.1.len();
-		Ok((shape, ptr, ptr_len, Box::new(self.1)))
+		let num_elements: usize = self.1.len();
+		Ok(TensorArrayDataParts {
+			shape,
+			ptr,
+			num_elements,
+			guard: Box::new(self.1)
+		})
 	}
 }
 
-impl<T: Clone + Debug + 'static, D: ToDimensions> IntoValueTensor for (D, Box<[T]>) {
-	type Item = T;
-
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
+impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Box<[T]>) {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[T])> {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		let data = &*self.1;
 		Ok((shape, data))
 	}
+}
 
-	fn into_parts(mut self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
+impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Box<[T]>) {
+	fn into_parts(mut self) -> Result<TensorArrayDataParts<T>> {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		let ptr = self.1.as_mut_ptr();
-		let ptr_len: usize = self.1.len();
-		Ok((shape, ptr, ptr_len, Box::new(self.1)))
+		let num_elements: usize = self.1.len();
+		Ok(TensorArrayDataParts {
+			shape,
+			ptr,
+			num_elements,
+			guard: Box::new(self.1)
+		})
 	}
 }
 
-impl<T: Clone + Debug + 'static, D: ToDimensions> IntoValueTensor for (D, Arc<Box<[T]>>) {
-	type Item = T;
-
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[Self::Item])> {
+impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<Box<[T]>>) {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[T])> {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		let data = &*self.1;
 		Ok((shape, data))
 	}
-
-	fn into_parts(mut self) -> Result<(Vec<i64>, *mut Self::Item, usize, Box<dyn Any>)> {
-		let shape = self.0.to_dimensions(Some(self.1.len()))?;
-		let ptr = std::sync::Arc::<std::boxed::Box<[T]>>::make_mut(&mut self.1).as_mut_ptr();
-		let ptr_len: usize = self.1.len();
-		let guard = Box::new(Arc::clone(&self.1));
-		Ok((shape, ptr, ptr_len, guard))
-	}
 }
-
-#[cfg(feature = "ndarray")]
-#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'i, 'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for Tensor<T>
-where
-	'v: 'i
-{
-	type Error = Error;
-	fn try_from(arr: &'i CowArray<'v, T, D>) -> Result<Self, Self::Error> {
-		Tensor::from_array(arr)
-	}
-}
-
-#[cfg(feature = "ndarray")]
-#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for Tensor<T> {
-	type Error = Error;
-	fn try_from(arr: ArrayView<'v, T, D>) -> Result<Self, Self::Error> {
-		Tensor::from_array(arr)
-	}
-}
-
-#[cfg(feature = "ndarray")]
-#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'i, 'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for DynTensor
-where
-	'v: 'i
-{
-	type Error = Error;
-	fn try_from(arr: &'i CowArray<'v, T, D>) -> Result<Self, Self::Error> {
-		Tensor::from_array(arr).map(|c| c.upcast())
-	}
-}
-
-#[cfg(feature = "ndarray")]
-#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for DynTensor {
-	type Error = Error;
-	fn try_from(arr: ArrayView<'v, T, D>) -> Result<Self, Self::Error> {
-		Tensor::from_array(arr).map(|c| c.upcast())
-	}
-}
-
-#[cfg(feature = "ndarray")]
-#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'i, 'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for DynValue
-where
-	'v: 'i
-{
-	type Error = Error;
-	fn try_from(arr: &'i CowArray<'v, T, D>) -> Result<Self, Self::Error> {
-		Tensor::from_array(arr).map(|c| c.into_dyn())
-	}
-}
-
-#[cfg(feature = "ndarray")]
-#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-impl<'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<ArrayView<'v, T, D>> for DynValue {
-	type Error = Error;
-	fn try_from(arr: ArrayView<'v, T, D>) -> Result<Self, Self::Error> {
-		Tensor::from_array(arr).map(|c| c.into_dyn())
-	}
-}
-
-macro_rules! impl_try_from {
-	(@T,I $($t:ty),+) => {
-		$(
-			impl<T: PrimitiveTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for Tensor<T> {
-				type Error = Error;
-				fn try_from(value: $t) -> Result<Self, Self::Error> {
-					Tensor::from_array(value)
-				}
-			}
-			impl<T: PrimitiveTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for DynTensor {
-				type Error = Error;
-				fn try_from(value: $t) -> Result<Self, Self::Error> {
-					Tensor::from_array(value).map(|c| c.upcast())
-				}
-			}
-			impl<T: PrimitiveTensorElementType + Debug + Clone + 'static, I: ToDimensions> TryFrom<$t> for crate::value::DynValue {
-				type Error = Error;
-				fn try_from(value: $t) -> Result<Self, Self::Error> {
-					Tensor::from_array(value).map(|c| c.into_dyn())
-				}
-			}
-		)+
-	};
-	(@T,D $($t:ty),+) => {
-		$(
-			#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-			impl<T: PrimitiveTensorElementType + Debug + Clone + 'static, D: ndarray::Dimension + 'static> TryFrom<$t> for Tensor<T> {
-				type Error = Error;
-				fn try_from(value: $t) -> Result<Self, Self::Error> {
-					Tensor::from_array(value)
-				}
-			}
-			#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-			impl<T: PrimitiveTensorElementType + Debug + Clone + 'static, D: ndarray::Dimension + 'static> TryFrom<$t> for DynTensor {
-				type Error = Error;
-				fn try_from(value: $t) -> Result<Self, Self::Error> {
-					Tensor::from_array(value).map(|c| c.upcast())
-				}
-			}
-			#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
-			impl<T: PrimitiveTensorElementType + Debug + Clone + 'static, D: ndarray::Dimension + 'static> TryFrom<$t> for crate::value::DynValue {
-				type Error = Error;
-				fn try_from(value: $t) -> Result<Self, Self::Error> {
-					Tensor::from_array(value).map(|c| c.into_dyn())
-				}
-			}
-		)+
-	};
-}
-
-#[cfg(feature = "ndarray")]
-impl_try_from!(@T,D &mut ArcArray<T, D>, Array<T, D>);
-impl_try_from!(@T,I (I, Arc<Box<[T]>>), (I, Vec<T>), (I, Box<[T]>), (I, &[T]));

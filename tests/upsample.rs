@@ -4,7 +4,8 @@ use image::RgbImage;
 use ndarray::{Array, ArrayViewD, CowArray, Ix4};
 use ort::{
 	inputs,
-	session::{Session, builder::GraphOptimizationLevel}
+	session::{Session, builder::GraphOptimizationLevel},
+	value::TensorRef
 };
 use test_log::test;
 
@@ -69,7 +70,7 @@ fn upsample() -> ort::Result<()> {
 	let array = convert_image_to_cow_array(&image_buffer);
 
 	// Perform the inference
-	let outputs = session.run(inputs![&array]?)?;
+	let outputs = session.run(inputs![TensorRef::from_array_view(&array)?])?;
 
 	assert_eq!(outputs.len(), 1);
 	let output: ArrayViewD<f32> = outputs[0].try_extract_tensor()?;
@@ -106,7 +107,7 @@ fn upsample_with_ort_model() -> ort::Result<()> {
 	let array = convert_image_to_cow_array(&image_buffer);
 
 	// Perform the inference
-	let outputs = session.run(inputs![&array]?)?;
+	let outputs = session.run(inputs![TensorRef::from_array_view(&array)?])?;
 
 	assert_eq!(outputs.len(), 1);
 	let output: ArrayViewD<f32> = outputs[0].try_extract_tensor()?;

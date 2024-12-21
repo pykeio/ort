@@ -7,7 +7,8 @@ use ndarray::{Array1, ArrayViewD, Axis, array, concatenate, s};
 use ort::{
 	execution_providers::CUDAExecutionProvider,
 	inputs,
-	session::{Session, builder::GraphOptimizationLevel}
+	session::{Session, builder::GraphOptimizationLevel},
+	value::TensorRef
 };
 use rand::Rng;
 use tokenizers::Tokenizer;
@@ -54,7 +55,7 @@ fn main() -> ort::Result<()> {
 
 	for _ in 0..GEN_TOKENS {
 		let array = tokens.view().insert_axis(Axis(0)).insert_axis(Axis(1));
-		let outputs = session.run(inputs![array]?)?;
+		let outputs = session.run(inputs![TensorRef::from_array_view(array)?])?;
 		let generated_tokens: ArrayViewD<f32> = outputs["output1"].try_extract_tensor()?;
 
 		// Collect and sort logits

@@ -271,7 +271,11 @@ mod tests {
 	use ndarray::{ArcArray1, Array1, CowArray};
 
 	use super::Tensor;
-	use crate::{memory::Allocator, tensor::TensorElementType, value::ValueType};
+	use crate::{
+		memory::Allocator,
+		tensor::TensorElementType,
+		value::{TensorRef, ValueType}
+	};
 
 	#[test]
 	#[cfg(feature = "ndarray")]
@@ -298,18 +302,18 @@ mod tests {
 		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
 
 		let arc1 = ArcArray1::from_vec(v.clone());
-		let mut arc2 = ArcArray1::clone(&arc1);
-		let value = Tensor::from_array(&mut arc2)?;
+		let arc2 = ArcArray1::clone(&arc1);
+		let value = TensorRef::from_array_view(arc2.clone())?;
 		drop((arc1, arc2));
 
 		assert_eq!(value.extract_raw_tensor().1, &v);
 
 		let cow = CowArray::from(Array1::from_vec(v.clone()));
-		let value = Tensor::from_array(&cow)?;
+		let value = TensorRef::from_array_view(&cow)?;
 		assert_eq!(value.extract_raw_tensor().1, &v);
 
 		let owned = Array1::from_vec(v.clone());
-		let value = Tensor::from_array(owned.view())?;
+		let value = TensorRef::from_array_view(owned.view())?;
 		drop(owned);
 		assert_eq!(value.extract_raw_tensor().1, &v);
 
@@ -322,7 +326,7 @@ mod tests {
 
 		let arc = Arc::new(v.clone().into_boxed_slice());
 		let shape = vec![v.len() as i64];
-		let value = Tensor::from_array((shape, Arc::clone(&arc)))?;
+		let value = TensorRef::from_array_view((shape, Arc::clone(&arc)))?;
 		drop(arc);
 		assert_eq!(value.try_extract_raw_tensor::<f32>()?.1, &v);
 
@@ -358,10 +362,10 @@ mod tests {
 		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
 
 		let shape = [v.len()];
-		let value_arc_box = Tensor::from_array((shape, Arc::new(v.clone().into_boxed_slice())))?;
+		let value_arc_box = TensorRef::from_array_view((shape, Arc::new(v.clone().into_boxed_slice())))?;
 		let value_box = Tensor::from_array((shape, v.clone().into_boxed_slice()))?;
 		let value_vec = Tensor::from_array((shape, v.clone()))?;
-		let value_slice = Tensor::from_array((shape, &v[..]))?;
+		let value_slice = TensorRef::from_array_view((shape, &v[..]))?;
 
 		assert_eq!(value_arc_box.extract_raw_tensor().1, &v);
 		assert_eq!(value_box.extract_raw_tensor().1, &v);

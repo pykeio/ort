@@ -1,13 +1,13 @@
 use std::{
 	io::{self, Write},
-	path::Path,
-	sync::Arc
+	path::Path
 };
 
 use ort::{
 	execution_providers::CUDAExecutionProvider,
 	inputs,
-	session::{Session, builder::GraphOptimizationLevel}
+	session::{Session, builder::GraphOptimizationLevel},
+	value::TensorRef
 };
 use rand::Rng;
 use tokenizers::Tokenizer;
@@ -33,7 +33,7 @@ fn main() -> ort::Result<()> {
 		.with_execution_providers([CUDAExecutionProvider::default().build()])
 		.commit()?;
 
-	let mut stdout = io::stdout();
+	let mut stdout: io::Stdout = io::stdout();
 	let mut rng = rand::thread_rng();
 
 	// Load our model
@@ -45,7 +45,7 @@ fn main() -> ort::Result<()> {
 	// Load the tokenizer and encode the prompt into a sequence of tokens.
 	let tokenizer = Tokenizer::from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("tokenizer.json")).unwrap();
 	let tokens = tokenizer.encode(PROMPT, false).unwrap();
-	let mut tokens = Arc::new(tokens.get_ids().iter().map(|i| *i as i64).collect::<Vec<_>>().into_boxed_slice());
+	let mut tokens = tokens.get_ids().iter().map(|i| *i as i64).collect::<Vec<_>>();
 
 	print!("{PROMPT}");
 	stdout.flush().unwrap();
@@ -53,8 +53,8 @@ fn main() -> ort::Result<()> {
 	for _ in 0..GEN_TOKENS {
 		// Raw tensor construction takes a tuple of (dimensions, data).
 		// The model expects our input to have shape [B, _, S]
-		let input = (vec![1, 1, tokens.len() as i64], Arc::clone(&tokens));
-		let outputs = session.run(inputs![input]?)?;
+		let input = TensorRef::from_array_view((vec![1, 1, tokens.len() as i64], tokens.as_slice()))?;
+		let outputs = session.run(inputs![input])?;
 		let (dim, mut probabilities) = outputs["output1"].try_extract_raw_tensor()?;
 
 		// The output tensor will have shape [B, _, S + 1, V]
@@ -70,9 +70,7 @@ fn main() -> ort::Result<()> {
 		let token = probabilities[rng.gen_range(0..=TOP_K)].0 as i64;
 
 		// Add our generated token to the input sequence
-		let mut vec = tokens.to_vec();
-		vec.push(token);
-		*Arc::make_mut(&mut tokens) = vec.into_boxed_slice();
+		tokens.push(token);
 
 		let token_str = tokenizer.decode(&[token as u32], true).unwrap();
 		print!("{}", token_str);

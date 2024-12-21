@@ -4,7 +4,8 @@ use image::{ImageBuffer, Luma, Pixel, imageops::FilterType};
 use ort::{
 	inputs,
 	session::{Session, builder::GraphOptimizationLevel},
-	tensor::ArrayExtensions
+	tensor::ArrayExtensions,
+	value::TensorRef
 };
 use test_log::test;
 
@@ -45,7 +46,7 @@ fn mnist_5() -> ort::Result<()> {
 	});
 
 	// Perform the inference
-	let outputs = session.run(inputs![array]?)?;
+	let outputs = session.run(inputs![TensorRef::from_array_view(&array)?])?;
 
 	let mut probabilities: Vec<(usize, f32)> = outputs[0]
 		.try_extract_tensor()?

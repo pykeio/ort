@@ -10,7 +10,8 @@ use ndarray::s;
 use ort::{
 	Error, inputs,
 	session::{Session, builder::GraphOptimizationLevel},
-	tensor::ArrayExtensions
+	tensor::ArrayExtensions,
+	value::TensorRef
 };
 use test_log::test;
 
@@ -70,7 +71,7 @@ fn squeezenet_mushroom() -> ort::Result<()> {
 	}
 
 	// Perform the inference
-	let outputs = session.run(inputs![array]?)?;
+	let outputs = session.run(inputs![TensorRef::from_array_view(&array)?])?;
 
 	// Downloaded model does not have a softmax as final layer; call softmax on second axis
 	// and iterate on resulting probabilities, creating an index to later access labels.

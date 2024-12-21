@@ -45,7 +45,7 @@ fn main() -> anyhow::Result<()> {
 		)
 		.unwrap()
 	};
-	let outputs = model.run([tensor.into()])?;
+	let outputs = model.run(ort::inputs![tensor])?;
 
 	let output = outputs["output"].try_extract_tensor::<f32>()?;
 

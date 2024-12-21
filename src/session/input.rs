@@ -35,6 +35,11 @@ impl<T: ValueTypeMarker + ?Sized> From<Value<T>> for SessionInputValue<'_> {
 		SessionInputValue::Owned(value.into_dyn())
 	}
 }
+impl<'v, T: ValueTypeMarker + ?Sized> From<&'v Value<T>> for SessionInputValue<'v> {
+	fn from(value: &'v Value<T>) -> Self {
+		SessionInputValue::View(value.view().into_dyn())
+	}
+}
 
 /// The inputs to a [`Session::run`] call.
 ///
@@ -123,35 +128,27 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 #[macro_export]
 macro_rules! inputs {
 	($($v:expr),+ $(,)?) => (
-		(|| -> $crate::Result<_> {
-			Ok([$(::std::convert::Into::<$crate::session::SessionInputValue<'_>>::into(::std::convert::TryInto::<$crate::value::DynValue>::try_into($v).map_err($crate::Error::from)?)),+])
-		})()
+		[$(::std::convert::Into::<$crate::session::SessionInputValue<'_>>::into($v)),+]
 	);
 	($($n:expr => $v:expr),+ $(,)?) => (
-		(|| -> $crate::Result<_> {
-			Ok(vec![$(
-				::std::convert::TryInto::<$crate::value::DynValue>::try_into($v)
-					.map_err($crate::Error::from)
-					.map(|v| (::std::borrow::Cow::<str>::from($n), $crate::session::SessionInputValue::from(v)))?,)+])
-		})()
+		vec![$((::std::borrow::Cow::<str>::from($n), $crate::session::SessionInputValue::<'_>::from($v)),)+]
 	);
 }
 
 #[cfg(test)]
 mod tests {
-	use std::{collections::HashMap, sync::Arc};
+	use std::collections::HashMap;
 
 	use super::SessionInputs;
-	use crate::value::DynTensor;
+	use crate::value::{DynTensor, Tensor};
 
 	#[test]
 	fn test_hashmap_static_keys() -> crate::Result<()> {
 		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
-		let arc = Arc::new(v.clone().into_boxed_slice());
 		let shape = vec![v.len() as i64];
 
 		let mut inputs: HashMap<&str, DynTensor> = HashMap::new();
-		inputs.insert("test", (shape, arc).try_into()?);
+		inputs.insert("test", Tensor::from_array((shape, v))?.upcast());
 		let _ = SessionInputs::from(inputs);
 
 		Ok(())
@@ -160,11 +157,10 @@ mod tests {
 	#[test]
 	fn test_hashmap_string_keys() -> crate::Result<()> {
 		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
-		let arc = Arc::new(v.clone().into_boxed_slice());
 		let shape = vec![v.len() as i64];
 
 		let mut inputs: HashMap<String, DynTensor> = HashMap::new();
-		inputs.insert("test".to_string(), (shape, arc).try_into()?);
+		inputs.insert("test".to_string(), Tensor::from_array((shape, v))?.upcast());
 		let _ = SessionInputs::from(inputs);
 
 		Ok(())

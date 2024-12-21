@@ -78,12 +78,19 @@ impl Drop for ValueInner {
 #[derive(Debug)]
 pub struct ValueRef<'v, Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
 	inner: Value<Type>,
+	pub(crate) upgradable: bool,
 	lifetime: PhantomData<&'v ()>
 }
 
 impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 	pub(crate) fn new(inner: Value<Type>) -> Self {
-		ValueRef { inner, lifetime: PhantomData }
+		ValueRef {
+			// We cannot upgade a value which we cannot drop, i.e. `ValueRef`s used in operator kernels. Those only last for the
+			// duration of the kernel, allowing an upgrade would allow a UAF.
+			upgradable: inner.inner.drop,
+			inner,
+			lifetime: PhantomData
+		}
 	}
 
 	/// Attempts to downcast a temporary dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed
@@ -100,9 +107,7 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 
 	/// Attempts to upgrade this `ValueRef` to an owned [`Value`] holding the same data.
 	pub fn try_upgrade(self) -> Result<Value<Type>, Self> {
-		// We cannot upgade a value which we cannot drop, i.e. `ValueRef`s used in operator kernels. Those only last for the
-		// duration of the kernel, allowing an upgrade would allow a UAF.
-		if !self.inner.inner.drop {
+		if !self.upgradable {
 			return Err(self);
 		}
 
@@ -126,12 +131,19 @@ impl<Type: ValueTypeMarker + ?Sized> Deref for ValueRef<'_, Type> {
 #[derive(Debug)]
 pub struct ValueRefMut<'v, Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
 	inner: Value<Type>,
+	pub(crate) upgradable: bool,
 	lifetime: PhantomData<&'v ()>
 }
 
 impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 	pub(crate) fn new(inner: Value<Type>) -> Self {
-		ValueRefMut { inner, lifetime: PhantomData }
+		ValueRefMut {
+			// We cannot upgade a value which we cannot drop, i.e. `ValueRef`s used in operator kernels. Those only last for the
+			// duration of the kernel, allowing an upgrade would allow a UAF.
+			upgradable: inner.inner.drop,
+			inner,
+			lifetime: PhantomData
+		}
 	}
 
 	/// Attempts to downcast a temporary mutable dynamic value (like [`DynValue`] or [`DynTensor`]) to a more
@@ -148,9 +160,7 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 
 	/// Attempts to upgrade this `ValueRefMut` to an owned [`Value`] holding the same data.
 	pub fn try_upgrade(self) -> Result<Value<Type>, Self> {
-		// We cannot upgade a value which we cannot drop, i.e. `ValueRef`s used in operator kernels. Those only last for the
-		// duration of the kernel, allowing an upgrade would allow a UAF.
-		if !self.inner.inner.drop {
+		if !self.upgradable {
 			return Err(self);
 		}
 

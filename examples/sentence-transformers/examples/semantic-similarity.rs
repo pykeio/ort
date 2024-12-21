@@ -1,10 +1,11 @@
 use std::path::Path;
 
-use ndarray::{Array2, Axis, Ix2};
+use ndarray::{Axis, Ix2};
 use ort::{
 	Error,
 	execution_providers::CUDAExecutionProvider,
-	session::{Session, builder::GraphOptimizationLevel}
+	session::{Session, builder::GraphOptimizationLevel},
+	value::TensorRef
 };
 use tokenizers::Tokenizer;
 
@@ -45,11 +46,11 @@ fn main() -> ort::Result<()> {
 	let mask: Vec<i64> = encodings.iter().flat_map(|e| e.get_attention_mask().iter().map(|i| *i as i64)).collect();
 
 	// Convert our flattened arrays into 2-dimensional tensors of shape [N, L].
-	let a_ids = Array2::from_shape_vec([inputs.len(), padded_token_length], ids).unwrap();
-	let a_mask = Array2::from_shape_vec([inputs.len(), padded_token_length], mask).unwrap();
+	let a_ids = TensorRef::from_array_view(([inputs.len(), padded_token_length], &*ids))?;
+	let a_mask = TensorRef::from_array_view(([inputs.len(), padded_token_length], &*mask))?;
 
 	// Run the model.
-	let outputs = session.run(ort::inputs![a_ids, a_mask]?)?;
+	let outputs = session.run(ort::inputs![a_ids, a_mask])?;
 
 	// Extract our embeddings tensor and convert it to a strongly-typed 2-dimensional array.
 	let embeddings = outputs[1].try_extract_tensor::<f32>()?.into_dimensionality::<Ix2>().unwrap();

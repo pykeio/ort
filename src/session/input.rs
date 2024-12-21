@@ -83,28 +83,15 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 ///
 /// # Example
 ///
-/// ## Array of tensors
+/// ## Array of values
 ///
 /// ```no_run
 /// # use std::{error::Error, sync::Arc};
 /// # use ndarray::Array1;
-/// # use ort::session::{builder::GraphOptimizationLevel, Session};
+/// # use ort::{value::Tensor, session::{builder::GraphOptimizationLevel, Session}};
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// # 	let mut session = Session::builder()?.commit_from_file("model.onnx")?;
-/// let _ = session.run(ort::inputs![Array1::from_vec(vec![1, 2, 3, 4, 5])]?);
-/// # 	Ok(())
-/// # }
-/// ```
-///
-/// Note that string tensors must be created manually with [`Tensor::from_string_array`].
-///
-/// ```no_run
-/// # use std::{error::Error, sync::Arc};
-/// # use ndarray::Array1;
-/// # use ort::{session::{builder::GraphOptimizationLevel, Session}, value::Tensor};
-/// # fn main() -> Result<(), Box<dyn Error>> {
-/// # 	let mut session = Session::builder()?.commit_from_file("model.onnx")?;
-/// let _ = session.run(ort::inputs![Tensor::from_string_array(Array1::from_vec(vec!["hello", "world"]))?]?);
+/// let _ = session.run(ort::inputs![Tensor::from_array(([5], vec![1, 2, 3, 4, 5]))?])?;
 /// # 	Ok(())
 /// # }
 /// ```
@@ -114,12 +101,12 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 /// ```no_run
 /// # use std::{error::Error, sync::Arc};
 /// # use ndarray::Array1;
-/// # use ort::session::{builder::GraphOptimizationLevel, Session};
+/// # use ort::{value::Tensor, session::{builder::GraphOptimizationLevel, Session}};
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// # 	let mut session = Session::builder()?.commit_from_file("model.onnx")?;
 /// let _ = session.run(ort::inputs! {
-/// 	"tokens" => Array1::from_vec(vec![1, 2, 3, 4, 5])
-/// }?);
+/// 	"tokens" => Tensor::from_array(([5], vec![1, 2, 3, 4, 5]))?
+/// })?;
 /// # 	Ok(())
 /// # }
 /// ```

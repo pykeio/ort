@@ -35,7 +35,7 @@ use crate::{
 /// );
 ///
 /// // `outputs[0]` will be the tensor we just pre-allocated.
-/// let outputs = session.run_with_options(ort::inputs![input]?, &options)?;
+/// let outputs = session.run_with_options(ort::inputs![input], &options)?;
 /// # 	Ok(())
 /// # }
 /// ```
@@ -108,7 +108,7 @@ impl OutputSelector {
 	/// 	OutputSelector::default().preallocate(output0, Tensor::<f32>::new(&Allocator::default(), [1, 128, 128, 3])?)
 	/// );
 	///
-	/// let outputs = session.run_with_options(ort::inputs![input]?, &options)?;
+	/// let outputs = session.run_with_options(ort::inputs![input], &options)?;
 	/// # 	Ok(())
 	/// # }
 	/// ```
@@ -212,7 +212,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// );
 	///
 	/// // `outputs[0]` will be the tensor we just pre-allocated.
-	/// let outputs = session.run_with_options(ort::inputs![input]?, &options)?;
+	/// let outputs = session.run_with_options(ort::inputs![input], &options)?;
 	/// # 	Ok(())
 	/// # }
 	/// ```
@@ -262,7 +262,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// 	let _ = run_options_.terminate();
 	/// });
 	///
-	/// let res = session.run_with_options(ort::inputs![input]?, &*run_options);
+	/// let res = session.run_with_options(ort::inputs![input], &*run_options);
 	/// // upon termination, the session will return an `Error::SessionRun` error.`
 	/// assert_eq!(
 	/// 	&res.unwrap_err().to_string(),
@@ -293,7 +293,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// 	let _ = run_options_.unterminate();
 	/// });
 	///
-	/// let res = session.run_with_options(ort::inputs![input]?, &*run_options);
+	/// let res = session.run_with_options(ort::inputs![input], &*run_options);
 	/// assert!(res.is_ok());
 	/// # 	Ok(())
 	/// # }

@@ -6,7 +6,6 @@ edition = "2021"
 
 [dependencies]
 ort = { path = "../../", features = [ "training" ] }
-ndarray = "0.16"
 tokenizers = { version = ">=0.13.4", default-features = false, features = [ "onig" ] }
 rand = "0.8"
 simd-json = "0.13"

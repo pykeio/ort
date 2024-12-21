@@ -66,14 +66,17 @@ struct AppState {
 fn generate_stream(tokenizer: Arc<Tokenizer>, session: Arc<Session>, mut tokens: Vec<i64>, gen_tokens: usize) -> impl Stream<Item = ort::Result<Event>> + Send {
 	async_stream_lite::try_async_stream(|yielder| async move {
 		for _ in 0..gen_tokens {
-			let input = TensorRef::from_array_view((vec![1, 1, tokens.len() as i64], tokens.as_slice()))?;
-			let outputs = session.run_async(ort::inputs![input])?.await?;
-			let (dim, probabilities) = outputs["output1"].try_extract_raw_tensor()?;
+			let probabilities = {
+				let input = TensorRef::from_array_view((vec![1, 1, tokens.len() as i64], tokens.as_slice()))?;
+				let outputs = session.run_async(ort::inputs![input])?.await?;
+				let (dim, probabilities) = outputs["output1"].try_extract_raw_tensor()?;
 
-			// Collect and sort logits
-			let (seq_len, vocab_size) = (dim[2] as usize, dim[3] as usize);
-			let mut probabilities: Vec<(usize, f32)> = probabilities[(seq_len - 1) * vocab_size..].iter().copied().enumerate().collect();
-			probabilities.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Less));
+				// Collect and sort logits
+				let (seq_len, vocab_size) = (dim[2] as usize, dim[3] as usize);
+				let mut probabilities: Vec<(usize, f32)> = probabilities[(seq_len - 1) * vocab_size..].iter().copied().enumerate().collect();
+				probabilities.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Less));
+				probabilities
+			};
 
 			// Sample using top-k sampling
 			let token = {

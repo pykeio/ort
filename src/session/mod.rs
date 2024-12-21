@@ -355,8 +355,8 @@ impl Session {
 	/// ```
 	pub fn run_async<'s, 'i, 'v: 'i + 's, const N: usize>(
 		&'s self,
-		input_values: impl Into<SessionInputs<'i, 'v, N>> + 'static
-	) -> Result<InferenceFut<'s, 's, NoSelectedOutputs>> {
+		input_values: impl Into<SessionInputs<'i, 'v, N>>
+	) -> Result<InferenceFut<'s, 's, 'v, NoSelectedOutputs>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(_) => unimplemented!("slices cannot be used in `run_async`"),
 			SessionInputs::ValueArray(input_values) => {
@@ -372,9 +372,9 @@ impl Session {
 	/// See [`Session::run_with_options`] and [`Session::run_async`] for more details.
 	pub fn run_async_with_options<'s, 'i, 'v: 'i + 's, 'r, O: SelectedOutputMarker, const N: usize>(
 		&'s self,
-		input_values: impl Into<SessionInputs<'i, 'v, N>> + 'static,
+		input_values: impl Into<SessionInputs<'i, 'v, N>>,
 		run_options: &'r RunOptions<O>
-	) -> Result<InferenceFut<'s, 'r, O>> {
+	) -> Result<InferenceFut<'s, 'r, 'v, O>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(_) => unimplemented!("slices cannot be used in `run_async`"),
 			SessionInputs::ValueArray(input_values) => {
@@ -393,7 +393,7 @@ impl Session {
 		input_names: &[String],
 		input_values: impl Iterator<Item = SessionInputValue<'v>>,
 		run_options: Option<&'r RunOptions<O>>
-	) -> Result<InferenceFut<'s, 'r, O>> {
+	) -> Result<InferenceFut<'s, 'r, 'v, O>> {
 		let run_options = match run_options {
 			Some(r) => RunOptionsRef::Ref(r),
 			// create a `RunOptions` to pass to the future so that when it drops, it terminates inference - crucial

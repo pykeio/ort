@@ -44,7 +44,7 @@ impl Drop for AdapterInner {
 /// run_options.add_adapter(&lora)?;
 ///
 /// let outputs =
-/// 	model.run_with_options(ort::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?]?, &run_options)?;
+/// 	model.run_with_options(ort::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?], &run_options)?;
 /// # Ok(())
 /// # }
 /// ```
@@ -84,7 +84,7 @@ impl Adapter {
 	/// run_options.add_adapter(&lora)?;
 	///
 	/// let outputs =
-	/// 	model.run_with_options(ort::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?]?, &run_options)?;
+	/// 	model.run_with_options(ort::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?], &run_options)?;
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -130,7 +130,7 @@ impl Adapter {
 	/// run_options.add_adapter(&lora)?;
 	///
 	/// let outputs =
-	/// 	model.run_with_options(ort::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?]?, &run_options)?;
+	/// 	model.run_with_options(ort::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?], &run_options)?;
 	/// # Ok(())
 	/// # }
 	/// ```

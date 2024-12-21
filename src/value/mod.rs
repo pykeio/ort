@@ -204,7 +204,7 @@ impl<Type: ValueTypeMarker + ?Sized> DerefMut for ValueRefMut<'_, Type> {
 /// let value = Tensor::from_array(ndarray::Array4::<f32>::zeros((1, 16, 16, 3)))?;
 ///
 /// // Get a DynValue from a session's output
-/// let value = &upsample.run(ort::inputs![value]?)?[0];
+/// let value = &upsample.run(ort::inputs![value])?[0];
 /// # 	Ok(())
 /// # }
 /// ```

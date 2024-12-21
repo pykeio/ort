@@ -38,11 +38,11 @@ impl Tensor<String> {
 	/// # fn main() -> ort::Result<()> {
 	/// // Create a string tensor from a raw data vector
 	/// let data = vec!["hello", "world"];
-	/// let value = Tensor::from_string_array(([data.len()], data.into_boxed_slice()))?;
+	/// let value = Tensor::from_string_array(([data.len()], &*data))?;
 	///
 	/// // Create a string tensor from an `ndarray::Array`
 	/// #[cfg(feature = "ndarray")]
-	/// let value = Tensor::from_string_array(ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap())?;
+	/// let value = Tensor::from_string_array(&ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap())?;
 	/// # 	Ok(())
 	/// # }
 	/// ```

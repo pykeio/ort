@@ -24,13 +24,13 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::value::Tensor;
+	/// # use ort::value::TensorRef;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
-	/// let value = Tensor::from_array(array.view())?.into_dyn();
+	/// let value = TensorRef::from_array_view(array.view())?.into_dyn();
 	///
 	/// let extracted = value.try_extract_tensor::<f32>()?;
-	/// assert_eq!(array.into_dyn(), extracted);
+	/// assert_eq!(array.view().into_dyn(), extracted);
 	/// # 	Ok(())
 	/// # }
 	/// ```
@@ -130,18 +130,16 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::value::Tensor;
+	/// # use ort::value::TensorRefMut;
 	/// # fn main() -> ort::Result<()> {
-	/// let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
-	/// let mut value = Tensor::from_array(array.view())?.into_dyn();
+	/// let mut array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
+	/// {
+	/// 	let mut value = TensorRefMut::from_array_view_mut(array.view_mut())?.into_dyn();
+	/// 	let mut extracted = value.try_extract_tensor_mut::<f32>()?;
+	/// 	extracted[[0, 0, 0, 1]] = 0.0;
+	/// }
 	///
-	/// let mut extracted = value.try_extract_tensor_mut::<f32>()?;
-	/// extracted[[0, 0, 0, 1]] = 0.0;
-	///
-	/// let mut array = array.into_dyn();
-	/// assert_ne!(array, extracted);
-	/// array[[0, 0, 0, 1]] = 0.0;
-	/// assert_eq!(array, extracted);
+	/// assert_eq!(array[[0, 0, 0, 1]], 0.0);
 	/// # 	Ok(())
 	/// # }
 	/// ```
@@ -290,7 +288,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = ndarray::Array1::from_vec(vec!["hello", "world"]);
-	/// let tensor = Tensor::from_string_array(array.clone())?.into_dyn();
+	/// let tensor = Tensor::from_string_array(&array)?.into_dyn();
 	///
 	/// let extracted = tensor.try_extract_string_tensor()?;
 	/// assert_eq!(array.into_dyn(), extracted);
@@ -450,13 +448,13 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::value::Tensor;
+	/// # use ort::value::TensorRef;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
-	/// let tensor = Tensor::from_array(array.view())?;
+	/// let tensor = TensorRef::from_array_view(&array)?;
 	///
 	/// let extracted = tensor.extract_tensor();
-	/// assert_eq!(array.into_dyn(), extracted);
+	/// assert_eq!(array.view().into_dyn(), extracted);
 	/// # 	Ok(())
 	/// # }
 	/// ```
@@ -470,18 +468,16 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::value::Tensor;
+	/// # use ort::value::TensorRefMut;
 	/// # fn main() -> ort::Result<()> {
-	/// let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
-	/// let mut tensor = Tensor::from_array(array.view())?;
+	/// let mut array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
+	/// {
+	/// 	let mut tensor = TensorRefMut::from_array_view_mut(array.view_mut())?;
+	/// 	let mut extracted = tensor.extract_tensor_mut();
+	/// 	extracted[[0, 0, 0, 1]] = 0.0;
+	/// }
 	///
-	/// let mut extracted = tensor.extract_tensor_mut();
-	/// extracted[[0, 0, 0, 1]] = 0.0;
-	///
-	/// let mut array = array.into_dyn();
-	/// assert_ne!(array, extracted);
-	/// array[[0, 0, 0, 1]] = 0.0;
-	/// assert_eq!(array, extracted);
+	/// assert_eq!(array[[0, 0, 0, 1]], 0.0);
 	/// # 	Ok(())
 	/// # }
 	/// ```
@@ -495,10 +491,10 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// view into its data.
 	///
 	/// ```
-	/// # use ort::value::Tensor;
+	/// # use ort::value::TensorRef;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = vec![1_i64, 2, 3, 4, 5];
-	/// let tensor = Tensor::from_array(([array.len()], array.clone().into_boxed_slice()))?;
+	/// let tensor = TensorRef::from_array_view(([array.len()], &*array))?;
 	///
 	/// let (extracted_shape, extracted_data) = tensor.extract_raw_tensor();
 	/// assert_eq!(extracted_data, &array);
@@ -514,14 +510,15 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// into its data.
 	///
 	/// ```
-	/// # use ort::value::Tensor;
+	/// # use ort::value::TensorRefMut;
 	/// # fn main() -> ort::Result<()> {
-	/// let array = vec![1_i64, 2, 3, 4, 5];
-	/// let tensor = Tensor::from_array(([array.len()], array.clone().into_boxed_slice()))?;
-	///
-	/// let (extracted_shape, extracted_data) = tensor.extract_raw_tensor();
-	/// assert_eq!(extracted_data, &array);
-	/// assert_eq!(extracted_shape, [5]);
+	/// let mut original_array = vec![1_i64, 2, 3, 4, 5];
+	/// {
+	/// 	let mut tensor = TensorRefMut::from_array_view_mut(([original_array.len()], &mut *original_array))?;
+	/// 	let (extracted_shape, extracted_data) = tensor.extract_raw_tensor_mut();
+	/// 	extracted_data[2] = 42;
+	/// }
+	/// assert_eq!(original_array, [1, 2, 42, 4, 5]);
 	/// # 	Ok(())
 	/// # }
 	/// ```

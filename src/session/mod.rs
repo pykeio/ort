@@ -1,11 +1,11 @@
 //! Contains [`Session`], the main interface used to inference ONNX models.
 //!
 //! ```
-//! # use ort::session::Session;
+//! # use ort::{session::Session, value::TensorRef};
 //! # fn main() -> ort::Result<()> {
 //! let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 //! let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
-//! let outputs = session.run(ort::inputs![input]?)?;
+//! let outputs = session.run(ort::inputs![TensorRef::from_array_view(&input)?])?;
 //! # 	Ok(())
 //! # }
 //! ```
@@ -82,11 +82,11 @@ impl Drop for SharedSessionInner {
 /// An ONNX Runtime graph to be used for inference.
 ///
 /// ```
-/// # use ort::session::Session;
+/// # use ort::{session::Session, value::TensorRef};
 /// # fn main() -> ort::Result<()> {
 /// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
-/// let outputs = session.run(ort::inputs![input]?)?;
+/// let outputs = session.run(ort::inputs![TensorRef::from_array_view(&input)?])?;
 /// # 	Ok(())
 /// # }
 /// ```
@@ -187,11 +187,11 @@ impl Session {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{run_options::RunOptions, Session}, tensor::TensorElementType, value::{Value, ValueType}};
+	/// # use ort::{session::{run_options::RunOptions, Session}, tensor::TensorElementType, value::{Value, ValueType, TensorRef}};
 	/// # fn main() -> ort::Result<()> {
 	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
-	/// let outputs = session.run(ort::inputs![input]?)?;
+	/// let outputs = session.run(ort::inputs![TensorRef::from_array_view(&input)?])?;
 	/// # 	Ok(())
 	/// # }
 	/// ```
@@ -217,7 +217,7 @@ impl Session {
 	/// ```no_run
 	/// # // no_run because upsample.onnx is too simple of a model for the termination signal to be reliable enough
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType}, tensor::TensorElementType};
+	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef}, tensor::TensorElementType};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
@@ -228,7 +228,7 @@ impl Session {
 	/// 	let _ = run_options_.terminate();
 	/// });
 	///
-	/// let res = session.run_with_options(ort::inputs![input]?, &*run_options);
+	/// let res = session.run_with_options(ort::inputs![&input], &*run_options);
 	/// // upon termination, the session will return an `Error::SessionRun` error.`
 	/// assert_eq!(
 	/// 	&res.unwrap_err().to_string(),
@@ -345,11 +345,11 @@ impl Session {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType}, tensor::TensorElementType};
+	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef}, tensor::TensorElementType};
 	/// # fn main() -> ort::Result<()> { tokio_test::block_on(async {
 	/// let session = Session::builder()?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
-	/// let outputs = session.run_async(ort::inputs![input]?)?.await?;
+	/// let outputs = session.run_async(ort::inputs![TensorRef::from_array_view(&input)?])?.await?;
 	/// # 	Ok(())
 	/// # }) }
 	/// ```
@@ -477,13 +477,13 @@ impl Session {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{run_options::RunOptions, Session, WorkloadType}, tensor::TensorElementType, value::{Value, ValueType}};
+	/// # use ort::{session::{run_options::RunOptions, Session, WorkloadType}, tensor::TensorElementType, value::{Value, ValueType, TensorRef}};
 	/// # fn main() -> ort::Result<()> {
 	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// session.set_workload_type(WorkloadType::Efficient)?;
 	///
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
-	/// let outputs = session.run(ort::inputs![input]?)?;
+	/// let outputs = session.run(ort::inputs![TensorRef::from_array_view(&input)?])?;
 	/// # 	Ok(())
 	/// # }
 	/// ```

@@ -222,7 +222,7 @@ impl<V: PrimitiveTensorElementType + Debug + Clone + 'static> Value<MapValueType
 	/// ```
 	pub fn new(data: impl IntoIterator<Item = (String, V)>) -> Result<Self> {
 		let (keys, values): (Vec<String>, Vec<V>) = data.into_iter().unzip();
-		Self::new_kv(Tensor::from_string_array((vec![keys.len()], keys))?, Tensor::from_array((vec![values.len()], values))?)
+		Self::new_kv(Tensor::from_string_array((vec![keys.len()], keys.as_slice()))?, Tensor::from_array((vec![values.len()], values))?)
 	}
 }
 

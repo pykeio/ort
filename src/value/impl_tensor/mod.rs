@@ -312,11 +312,6 @@ mod tests {
 		let value = TensorRef::from_array_view(&cow)?;
 		assert_eq!(value.extract_raw_tensor().1, &v);
 
-		let owned = Array1::from_vec(v.clone());
-		let value = TensorRef::from_array_view(owned.view())?;
-		drop(owned);
-		assert_eq!(value.extract_raw_tensor().1, &v);
-
 		Ok(())
 	}
 

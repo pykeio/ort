@@ -1,4 +1,3 @@
-use ndarray::Array2;
 use ort::{
 	operator::{
 		Operator, OperatorDomain,
@@ -6,7 +5,8 @@ use ort::{
 		kernel::{Kernel, KernelAttributes, KernelContext}
 	},
 	session::Session,
-	tensor::TensorElementType
+	tensor::TensorElementType,
+	value::Tensor
 };
 
 struct CustomOpOne;
@@ -78,7 +78,16 @@ fn main() -> ort::Result<()> {
 		.with_operators(OperatorDomain::new("test.customop")?.add(CustomOpOne)?.add(CustomOpTwo)?)?
 		.commit_from_file("tests/data/custom_op_test.onnx")?;
 
-	let values = session.run(ort::inputs![Array2::<f32>::zeros((3, 5)), Array2::<f32>::ones((3, 5))]?)?;
+	let allocator = session.allocator();
+	let value1 = Tensor::<f32>::new(allocator, [3, 5])?;
+	let mut value2 = Tensor::<f32>::new(allocator, [3, 5])?;
+	{
+		let (_, data) = value2.extract_raw_tensor_mut();
+		for datum in data {
+			*datum = 1.;
+		}
+	}
+	let values = session.run(ort::inputs![&value1, &value2])?;
 	println!("{:?}", values[0].try_extract_tensor::<i32>()?);
 
 	Ok(())

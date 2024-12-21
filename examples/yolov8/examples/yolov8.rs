@@ -7,7 +7,8 @@ use ndarray::{Array, Axis, s};
 use ort::{
 	execution_providers::CUDAExecutionProvider,
 	inputs,
-	session::{Session, SessionOutputs}
+	session::{Session, SessionOutputs},
+	value::TensorRef
 };
 use raqote::{DrawOptions, DrawTarget, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle};
 use show_image::{AsImageView, WindowOptions, event};
@@ -66,7 +67,7 @@ fn main() -> ort::Result<()> {
 	let model = Session::builder()?.commit_from_url(YOLOV8M_URL)?;
 
 	// Run YOLOv8 inference
-	let outputs: SessionOutputs = model.run(inputs!["images" => input.view()]?)?;
+	let outputs: SessionOutputs = model.run(inputs!["images" => TensorRef::from_array_view(&input)?])?;
 	let output = outputs["output0"].try_extract_tensor::<f32>()?.t().into_owned();
 
 	let mut boxes = Vec::new();

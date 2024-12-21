@@ -4,7 +4,7 @@ use std::{ops::Mul, path::Path};
 
 use image::{GenericImageView, ImageBuffer, Rgba, imageops::FilterType};
 use ndarray::Array;
-use ort::{execution_providers::CUDAExecutionProvider, inputs, session::Session};
+use ort::{execution_providers::CUDAExecutionProvider, inputs, session::Session, value::TensorRef};
 use show_image::{AsImageView, WindowOptions, event};
 
 #[show_image::main]
@@ -31,7 +31,7 @@ fn main() -> ort::Result<()> {
 		input[[0, 2, y, x]] = (b as f32 - 127.5) / 127.5;
 	}
 
-	let outputs = model.run(inputs!["input" => input.view()]?)?;
+	let outputs = model.run(inputs!["input" => TensorRef::from_array_view(input.view())?])?;
 
 	let output = outputs["output"].try_extract_tensor::<f32>()?;
 

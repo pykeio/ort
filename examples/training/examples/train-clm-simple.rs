@@ -5,12 +5,12 @@ use std::{
 };
 
 use kdam::BarExt;
-use ndarray::{Array1, Array2, ArrayViewD, Axis, concatenate, s};
 use ort::{
 	execution_providers::CUDAExecutionProvider,
 	memory::Allocator,
 	session::{Session, builder::SessionBuilder},
-	training::{CheckpointStrategy, Trainer, TrainerCallbacks, TrainerControl, TrainerState, TrainingArguments}
+	training::{CheckpointStrategy, Trainer, TrainerCallbacks, TrainerControl, TrainerState, TrainingArguments},
+	value::{Tensor, TensorRef}
 };
 use rand::RngCore;
 use tokenizers::Tokenizer;
@@ -94,10 +94,10 @@ fn main() -> ort::Result<()> {
 				.unwrap();
 		}
 
-		Ok((
-			ort::inputs![Array2::<i64>::from_shape_vec([BATCH_SIZE, SEQUENCE_LENGTH], input_buffer.iter().map(|c| *c as i64).collect()).unwrap()]?,
-			ort::inputs![Array1::<i64>::from_shape_vec([BATCH_SIZE * SEQUENCE_LENGTH], label_buffer.iter().map(|c| *c as i64).collect()).unwrap()]?
-		))
+		let inputs = Tensor::from_array(([BATCH_SIZE, SEQUENCE_LENGTH], input_buffer.iter().map(|c| *c as i64).collect::<Vec<i64>>()))?;
+		let labels = Tensor::from_array(([BATCH_SIZE * SEQUENCE_LENGTH], label_buffer.iter().map(|c| *c as i64).collect::<Vec<i64>>()))?;
+
+		Ok((ort::inputs![inputs], ort::inputs![labels]))
 	};
 
 	trainer.train(
@@ -115,26 +115,19 @@ fn main() -> ort::Result<()> {
 	let mut stdout = std::io::stdout();
 
 	let tokens = tokenizer.encode("<|endoftext|>", false).unwrap();
-	let tokens = tokens.get_ids().iter().map(|i| *i as i64).collect::<Vec<_>>();
-
-	let mut tokens = Array1::from_iter(tokens.iter().cloned());
+	let mut tokens = tokens.get_ids().iter().map(|i| *i as i64).collect::<Vec<_>>();
 
 	for _ in 0..50 {
-		let array = tokens.view().insert_axis(Axis(0));
-		let outputs = session.run(ort::inputs![array]?)?;
-		let generated_tokens: ArrayViewD<f32> = outputs["probs"].try_extract_tensor()?;
+		let input = TensorRef::from_array_view((vec![1, 1, tokens.len() as i64], tokens.as_slice()))?;
+		let outputs = session.run(ort::inputs![input])?;
+		let (dim, probabilities) = outputs["probs"].try_extract_raw_tensor()?;
 
-		let probabilities = &mut generated_tokens
-			.slice(s![-1, ..])
-			.to_owned()
-			.iter()
-			.cloned()
-			.enumerate()
-			.collect::<Vec<_>>();
+		let (seq_len, vocab_size) = (dim[2] as usize, dim[3] as usize);
+		let mut probabilities: Vec<(usize, f32)> = probabilities[(seq_len - 1) * vocab_size..].iter().copied().enumerate().collect();
 		probabilities.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Less));
 
-		let token = probabilities[0].0;
-		tokens = concatenate![Axis(0), tokens, ndarray::array![token.try_into().unwrap()]];
+		let token = probabilities[0].0 as i64;
+		tokens.push(token);
 
 		let token_str = tokenizer.decode(&[token as _], false).unwrap();
 		print!("{}", token_str);

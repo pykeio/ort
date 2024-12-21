@@ -173,7 +173,7 @@ mod tests {
 		run_options.add_adapter(&lora)?;
 
 		let output: Tensor<f32> = model
-			.run_with_options(crate::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?]?, &run_options)?
+			.run_with_options(crate::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?], &run_options)?
 			.remove("output")
 			.expect("")
 			.downcast()?;
@@ -198,7 +198,7 @@ mod tests {
 		run_options.add_adapter(&lora)?;
 
 		let output: Tensor<f32> = model
-			.run_with_options(crate::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?]?, &run_options)?
+			.run_with_options(crate::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?], &run_options)?
 			.remove("output")
 			.expect("")
 			.downcast()?;

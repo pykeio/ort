@@ -10,11 +10,10 @@ use axum::{
 	routing::post
 };
 use futures::Stream;
-use ndarray::{Array1, ArrayViewD, Axis, array, concatenate, s};
 use ort::{
 	execution_providers::CUDAExecutionProvider,
-	inputs,
-	session::{Session, builder::GraphOptimizationLevel}
+	session::{Session, builder::GraphOptimizationLevel},
+	value::TensorRef
 };
 use rand::Rng;
 use tokenizers::Tokenizer;
@@ -64,37 +63,31 @@ struct AppState {
 	tokenizer: Arc<Tokenizer>
 }
 
-fn generate_stream(tokenizer: Arc<Tokenizer>, session: Arc<Session>, tokens: Vec<i64>, gen_tokens: usize) -> impl Stream<Item = ort::Result<Event>> + Send {
-	async_stream::try_stream! {
-		let mut tokens = Array1::from_iter(tokens.iter().cloned());
-
+fn generate_stream(tokenizer: Arc<Tokenizer>, session: Arc<Session>, mut tokens: Vec<i64>, gen_tokens: usize) -> impl Stream<Item = ort::Result<Event>> + Send {
+	async_stream_lite::try_async_stream(|yielder| async move {
 		for _ in 0..gen_tokens {
-			let array = tokens.view().insert_axis(Axis(0)).insert_axis(Axis(1));
-			let outputs = session.run_async(inputs![array]?)?.await?;
-			let generated_tokens: ArrayViewD<f32> = outputs["output1"].try_extract_tensor()?;
+			let input = TensorRef::from_array_view((vec![1, 1, tokens.len() as i64], tokens.as_slice()))?;
+			let outputs = session.run_async(ort::inputs![input])?.await?;
+			let (dim, probabilities) = outputs["output1"].try_extract_raw_tensor()?;
 
 			// Collect and sort logits
-			let probabilities = &mut generated_tokens
-				.slice(s![0, 0, -1, ..])
-				.insert_axis(Axis(0))
-				.to_owned()
-				.iter()
-				.cloned()
-				.enumerate()
-				.collect::<Vec<_>>();
+			let (seq_len, vocab_size) = (dim[2] as usize, dim[3] as usize);
+			let mut probabilities: Vec<(usize, f32)> = probabilities[(seq_len - 1) * vocab_size..].iter().copied().enumerate().collect();
 			probabilities.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Less));
 
 			// Sample using top-k sampling
 			let token = {
 				let mut rng = rand::thread_rng();
-				probabilities[rng.gen_range(0..=5)].0
+				probabilities[rng.gen_range(0..=5)].0 as i64
 			};
-			tokens = concatenate![Axis(0), tokens, array![token.try_into().unwrap()]];
+			tokens.push(token);
 
 			let token_str = tokenizer.decode(&[token as _], true).unwrap();
-			yield Event::default().data(token_str);
+			yielder.r#yield(Event::default().data(token_str)).await;
 		}
-	}
+
+		Ok(())
+	})
 }
 
 impl FromRef<AppState> for Arc<Session> {

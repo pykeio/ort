@@ -1,5 +1,3 @@
-use ndarray::{Array2, arr2};
-
 use crate::{
 	Result,
 	operator::{
@@ -8,7 +6,8 @@ use crate::{
 		kernel::{Kernel, KernelAttributes, KernelContext}
 	},
 	session::Session,
-	tensor::TensorElementType
+	tensor::TensorElementType,
+	value::Tensor
 };
 
 struct CustomOpOne;
@@ -82,8 +81,17 @@ fn test_custom_ops() -> crate::Result<()> {
 		.with_operators(OperatorDomain::new("test.customop")?.add(CustomOpOne)?.add(CustomOpTwo)?)?
 		.commit_from_file("tests/data/custom_op_test.onnx")?;
 
-	let values = session.run(crate::inputs![Array2::<f32>::zeros((3, 5)), Array2::<f32>::ones((3, 5))]?)?;
-	assert_eq!(values[0].try_extract_tensor::<i32>()?, arr2(&[[0, 1, 0, 3, 0], [5, 0, 7, 0, 9], [0, 11, 0, 13, 0]]).view().into_dyn());
+	let allocator = session.allocator();
+	let value1 = Tensor::<f32>::new(allocator, [3, 5])?;
+	let mut value2 = Tensor::<f32>::new(allocator, [3, 5])?;
+	{
+		let (_, data) = value2.extract_raw_tensor_mut();
+		for datum in data {
+			*datum = 1.;
+		}
+	}
+	let values = session.run(crate::inputs![&value1, &value2])?;
+	assert_eq!(values[0].try_extract_raw_tensor::<i32>()?.1, [0, 1, 0, 3, 0, 5, 0, 7, 0, 9, 0, 11, 0, 13, 0]);
 
 	Ok(())
 }

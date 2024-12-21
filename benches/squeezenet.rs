@@ -3,7 +3,10 @@ use std::{path::Path, sync::Arc};
 use glassbench::{Bench, pretend_used};
 use image::{ImageBuffer, Pixel, Rgb, imageops::FilterType};
 use ndarray::{Array4, s};
-use ort::session::{Session, builder::GraphOptimizationLevel};
+use ort::{
+	session::{Session, builder::GraphOptimizationLevel},
+	value::TensorRef
+};
 
 fn load_squeezenet_data() -> ort::Result<(Session, Array4<f32>)> {
 	const IMAGE_TO_LOAD: &str = "mushroom.png";
@@ -44,7 +47,7 @@ fn bench_squeezenet(bench: &mut Bench) {
 	let (session, data) = load_squeezenet_data().unwrap();
 	bench.task("ArrayView", |task| {
 		task.iter(|| {
-			pretend_used(session.run(ort::inputs![data.view()].unwrap()).unwrap());
+			pretend_used(session.run(ort::inputs![TensorRef::from_array_view(&data).unwrap()]).unwrap());
 		})
 	});
 
@@ -52,7 +55,11 @@ fn bench_squeezenet(bench: &mut Bench) {
 	let shape: Vec<i64> = data.shape().iter().map(|c| *c as _).collect();
 	bench.task("Raw data", |task| {
 		task.iter(|| {
-			pretend_used(session.run(ort::inputs![(shape.clone(), Arc::clone(&raw))].unwrap()).unwrap());
+			pretend_used(
+				session
+					.run(ort::inputs![TensorRef::from_array_view((shape.clone(), Arc::clone(&raw))).unwrap()])
+					.unwrap()
+			);
 		})
 	});
 }

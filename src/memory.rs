@@ -253,7 +253,7 @@ impl AllocationDevice {
 	pub const CUDA_PINNED: AllocationDevice = AllocationDevice("CudaPinned");
 	pub const CANN: AllocationDevice = AllocationDevice("Cann");
 	pub const CANN_PINNED: AllocationDevice = AllocationDevice("CannPinned");
-	pub const DIRECTML: AllocationDevice = AllocationDevice("Dml");
+	pub const DIRECTML: AllocationDevice = AllocationDevice("DML");
 	pub const DIRECTML_CPU: AllocationDevice = AllocationDevice("DML CPU");
 	pub const HIP: AllocationDevice = AllocationDevice("Hip");
 	pub const HIP_PINNED: AllocationDevice = AllocationDevice("HipPinned");

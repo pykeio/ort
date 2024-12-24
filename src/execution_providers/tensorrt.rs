@@ -171,13 +171,13 @@ impl TensorRTExecutionProvider {
 
 	#[must_use]
 	pub fn with_build_heuristics(mut self, enable: bool) -> Self {
-		self.options.set("trt_enable_build_heuristics", if enable { "1" } else { "0" });
+		self.options.set("trt_build_heuristics_enable", if enable { "1" } else { "0" });
 		self
 	}
 
 	#[must_use]
 	pub fn with_sparsity(mut self, enable: bool) -> Self {
-		self.options.set("trt_enable_sparsity", if enable { "1" } else { "0" });
+		self.options.set("trt_sparsity_enable", if enable { "1" } else { "0" });
 		self
 	}
 

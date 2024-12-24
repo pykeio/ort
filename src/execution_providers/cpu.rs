@@ -13,8 +13,8 @@ pub struct CPUExecutionProvider {
 
 impl CPUExecutionProvider {
 	#[must_use]
-	pub fn with_arena_allocator(mut self) -> Self {
-		self.use_arena = true;
+	pub fn with_arena_allocator(mut self, enable: bool) -> Self {
+		self.use_arena = enable;
 		self
 	}
 

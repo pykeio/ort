@@ -67,8 +67,8 @@ impl CANNExecutionProvider {
 
 	/// Configure whether to dump the subgraph into ONNX format for analysis of subgraph segmentation.
 	#[must_use]
-	pub fn with_dump_graphs(mut self) -> Self {
-		self.options.set("dump_graphs", "1");
+	pub fn with_dump_graphs(mut self, enable: bool) -> Self {
+		self.options.set("dump_graphs", if enable { "1" } else { "0" });
 		self
 	}
 

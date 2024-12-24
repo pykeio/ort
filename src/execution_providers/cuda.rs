@@ -184,16 +184,16 @@ impl CUDAExecutionProvider {
 	/// > graph runs. Due to this, the latency associated with the first `run()` is bound to be high. Subsequent
 	/// > `run()`s only perform graph replays of the graph captured and cached in the first `run()`.
 	#[must_use]
-	pub fn with_cuda_graph(mut self) -> Self {
-		self.options.set("enable_cuda_graph", "1");
+	pub fn with_cuda_graph(mut self, enable: bool) -> Self {
+		self.options.set("enable_cuda_graph", if enable { "1" } else { "0" });
 		self
 	}
 
 	/// Whether to use strict mode in the `SkipLayerNormalization` implementation. The default and recommanded setting
 	/// is `false`. If enabled, accuracy may improve slightly, but performance may decrease.
 	#[must_use]
-	pub fn with_skip_layer_norm_strict_mode(mut self) -> Self {
-		self.options.set("enable_skip_layer_norm_strict_mode", "1");
+	pub fn with_skip_layer_norm_strict_mode(mut self, enable: bool) -> Self {
+		self.options.set("enable_skip_layer_norm_strict_mode", if enable { "1" } else { "0" });
 		self
 	}
 
@@ -207,8 +207,8 @@ impl CUDAExecutionProvider {
 	}
 
 	#[must_use]
-	pub fn with_prefer_nhwc(mut self) -> Self {
-		self.options.set("prefer_nhwc", "1");
+	pub fn with_prefer_nhwc(mut self, enable: bool) -> Self {
+		self.options.set("prefer_nhwc", if enable { "1" } else { "0" });
 		self
 	}
 

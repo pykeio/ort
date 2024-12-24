@@ -4,7 +4,7 @@ use std::{
 	fmt::Debug,
 	marker::PhantomData,
 	ptr::{self, NonNull},
-	sync::Arc
+	sync::Arc,
 };
 
 #[cfg(feature = "ndarray")]
@@ -17,7 +17,7 @@ use crate::{
 	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
 	ortsys,
 	tensor::{PrimitiveTensorElementType, TensorElementType, Utf8Data},
-	value::{DynValue, Value, ValueInner, ValueType}
+	value::{DynValue, Value, ValueInner, ValueType},
 };
 
 impl Tensor<String> {
@@ -81,13 +81,13 @@ impl Tensor<String> {
 				dtype: ValueType::Tensor {
 					ty: TensorElementType::String,
 					dimensions: shape,
-					dimension_symbols: vec![None; shape_len]
+					dimension_symbols: vec![None; shape_len],
 				},
 				memory_info: MemoryInfo::from_value(value_ptr),
 				drop: true,
-				_backing: None
+				_backing: None,
 			}),
-			_markers: PhantomData
+			_markers: PhantomData,
 		})
 	}
 }
@@ -135,13 +135,13 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 				dtype: ValueType::Tensor {
 					ty: T::into_tensor_element_type(),
 					dimensions: shape,
-					dimension_symbols: vec![None; shape_len]
+					dimension_symbols: vec![None; shape_len],
 				},
 				drop: true,
 				memory_info: MemoryInfo::from_value(value_ptr),
-				_backing: None
+				_backing: None,
 			}),
-			_markers: PhantomData
+			_markers: PhantomData,
 		})
 	}
 
@@ -212,13 +212,13 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 				dtype: ValueType::Tensor {
 					ty: T::into_tensor_element_type(),
 					dimensions: shape,
-					dimension_symbols: vec![None; shape_len]
+					dimension_symbols: vec![None; shape_len],
 				},
 				drop: true,
 				memory_info: Some(memory_info),
-				_backing: Some(guard)
+				_backing: Some(guard),
 			}),
-			_markers: PhantomData
+			_markers: PhantomData,
 		})
 	}
 }
@@ -275,13 +275,13 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 				dtype: ValueType::Tensor {
 					ty: T::into_tensor_element_type(),
 					dimensions: shape,
-					dimension_symbols: vec![None; shape_len]
+					dimension_symbols: vec![None; shape_len],
 				},
 				drop: true,
 				memory_info: Some(info),
-				_backing: None
+				_backing: None,
 			}),
-			_markers: PhantomData
+			_markers: PhantomData,
 		}))
 	}
 }
@@ -346,7 +346,7 @@ impl ToDimensions for () {
 	fn to_dimensions(&self, expected_size: Option<usize>) -> Result<Vec<i64>> {
 		match expected_size {
 			Some(1) | None => Ok(vec![]),
-			Some(_) => Err(Error::new_with_code(ErrorCode::InvalidArgument, "Expected data to have a length of exactly 1 for scalar shape"))
+			Some(_) => Err(Error::new_with_code(ErrorCode::InvalidArgument, "Expected data to have a length of exactly 1 for scalar shape")),
 		}
 	}
 }
@@ -357,7 +357,7 @@ impl_to_dimensions!(<N> for [usize; N], for [i32; N], for [i64; N]);
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<'i, 'v, T: Clone + 'static, D: Dimension + 'static> IntoValueTensor for &'i CowArray<'v, T, D>
 where
-	'v: 'i
+	'v: 'i,
 {
 	type Item = T;
 
@@ -542,7 +542,7 @@ impl<T: Clone + Debug + 'static, D: ToDimensions> IntoValueTensor for (D, Arc<Bo
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<'i, 'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for Tensor<T>
 where
-	'v: 'i
+	'v: 'i,
 {
 	type Error = Error;
 	fn try_from(arr: &'i CowArray<'v, T, D>) -> Result<Self, Self::Error> {
@@ -563,7 +563,7 @@ impl<'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension +
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<'i, 'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for DynTensor
 where
-	'v: 'i
+	'v: 'i,
 {
 	type Error = Error;
 	fn try_from(arr: &'i CowArray<'v, T, D>) -> Result<Self, Self::Error> {
@@ -584,7 +584,7 @@ impl<'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension +
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<'i, 'v, T: PrimitiveTensorElementType + Debug + Clone + 'static, D: Dimension + 'static> TryFrom<&'i CowArray<'v, T, D>> for DynValue
 where
-	'v: 'i
+	'v: 'i,
 {
 	type Error = Error;
 	fn try_from(arr: &'i CowArray<'v, T, D>) -> Result<Self, Self::Error> {

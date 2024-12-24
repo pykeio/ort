@@ -26,14 +26,14 @@ impl MIGraphXExecutionProvider {
 	}
 
 	#[must_use]
-	pub fn with_fp16(mut self) -> Self {
-		self.enable_fp16 = true;
+	pub fn with_fp16(mut self, enable: bool) -> Self {
+		self.enable_fp16 = enable;
 		self
 	}
 
 	#[must_use]
-	pub fn with_int8(mut self) -> Self {
-		self.enable_int8 = true;
+	pub fn with_int8(mut self, enable: bool) -> Self {
+		self.enable_int8 = enable;
 		self
 	}
 

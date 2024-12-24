@@ -78,8 +78,8 @@ impl OpenVINOExecutionProvider {
 
 	/// This option enables OpenCL queue throttling for GPU devices (reduces CPU utilization when using GPU).
 	#[must_use]
-	pub fn with_opencl_throttling(mut self) -> Self {
-		self.enable_opencl_throttling = true;
+	pub fn with_opencl_throttling(mut self, enable: bool) -> Self {
+		self.enable_opencl_throttling = enable;
 		self
 	}
 
@@ -87,14 +87,14 @@ impl OpenVINOExecutionProvider {
 	/// input image/data shape at run time in CPU. This gives best result for running multiple inferences with varied
 	/// shaped images/data.
 	#[must_use]
-	pub fn with_dynamic_shapes(mut self) -> Self {
-		self.enable_dynamic_shapes = true;
+	pub fn with_dynamic_shapes(mut self, enable: bool) -> Self {
+		self.enable_dynamic_shapes = enable;
 		self
 	}
 
 	#[must_use]
-	pub fn with_npu_fast_compile(mut self) -> Self {
-		self.enable_npu_fast_compile = true;
+	pub fn with_npu_fast_compile(mut self, enable: bool) -> Self {
+		self.enable_npu_fast_compile = enable;
 		self
 	}
 

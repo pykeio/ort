@@ -50,8 +50,8 @@ impl ROCmExecutionProvider {
 	}
 
 	#[must_use]
-	pub fn with_exhaustive_conv_search(mut self) -> Self {
-		self.miopen_conv_exhaustive_search = true;
+	pub fn with_exhaustive_conv_search(mut self, enable: bool) -> Self {
+		self.miopen_conv_exhaustive_search = enable;
 		self
 	}
 

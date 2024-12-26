@@ -148,7 +148,7 @@ pub(crate) fn assert_non_null_pointer<T>(ptr: *const T, name: &'static str) -> R
 /// Converts an [`ort_sys::OrtStatus`] to a [`Result`].
 ///
 /// Note that this frees `status`!
-pub unsafe fn status_to_result(status: *mut ort_sys::OrtStatus) -> Result<(), Error> {
+pub(crate) unsafe fn status_to_result(status: *mut ort_sys::OrtStatus) -> Result<(), Error> {
 	if status.is_null() {
 		Ok(())
 	} else {

@@ -628,16 +628,6 @@ impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Vec<T>
 	crate::private_impl!();
 }
 
-impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Box<[T]>) {
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[T], Option<Box<dyn Any>>)> {
-		let shape = self.0.to_dimensions(Some(self.1.len()))?;
-		let data = &*self.1;
-		Ok((shape, data, None))
-	}
-
-	crate::private_impl!();
-}
-
 impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Box<[T]>) {
 	fn into_parts(mut self) -> Result<TensorArrayDataParts<T>> {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;

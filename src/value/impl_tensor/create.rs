@@ -93,8 +93,8 @@ impl Tensor<String> {
 }
 
 impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
-	/// Construct a tensor in a given allocator with a given shape and datatype. The data contained in the
-	/// value will be zero-allocated on the allocation device.
+	/// Construct a tensor via a given allocator with a given shape and datatype. The data in the tensor will be
+	/// **uninitialized**.
 	///
 	/// This can be used to create a tensor with data on a certain device. For example, to create a tensor with pinned
 	/// (CPU) memory for use with CUDA:
@@ -128,6 +128,16 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 			)?;
 			nonNull(value_ptr)
 		];
+
+		// `CreateTensorAsOrtValue` actually does not guarantee that the data allocated is zero'd out, so if we can, we should
+		// do it manually.
+		let memory_info = MemoryInfo::from_value(value_ptr).expect("CreateTensorAsOrtValue returned non-tensor");
+		if memory_info.is_cpu_accessible() {
+			let mut buffer_ptr: *mut ort_sys::c_void = std::ptr::null_mut();
+			ortsys![unsafe GetTensorMutableData(value_ptr, &mut buffer_ptr)?; nonNull(buffer_ptr)];
+
+			unsafe { buffer_ptr.write_bytes(0, calculate_tensor_size(&shape) * size_of::<T>()) };
+		}
 
 		Ok(Value {
 			inner: Arc::new(ValueInner {

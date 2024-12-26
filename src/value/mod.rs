@@ -36,7 +36,10 @@ pub use self::{
 	impl_sequence::{
 		DynSequence, DynSequenceRef, DynSequenceRefMut, DynSequenceValueType, Sequence, SequenceRef, SequenceRefMut, SequenceValueType, SequenceValueTypeMarker
 	},
-	impl_tensor::{DynTensor, DynTensorRef, DynTensorRefMut, DynTensorValueType, Tensor, TensorRef, TensorRefMut, TensorValueType, TensorValueTypeMarker},
+	impl_tensor::{
+		DynTensor, DynTensorRef, DynTensorRefMut, DynTensorValueType, OwnedTensorArrayData, Tensor, TensorArrayData, TensorArrayDataMut, TensorArrayDataParts,
+		TensorRef, TensorRefMut, TensorValueType, TensorValueTypeMarker
+	},
 	r#type::ValueType
 };
 use crate::{

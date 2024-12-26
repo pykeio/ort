@@ -391,15 +391,23 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 }
 
 pub trait TensorArrayData<I> {
+	#[allow(clippy::type_complexity)]
 	fn ref_parts(&self) -> Result<(Vec<i64>, &[I], Option<Box<dyn Any>>)>;
+
+	crate::private_trait!();
 }
 
 pub trait TensorArrayDataMut<I>: TensorArrayData<I> {
+	#[allow(clippy::type_complexity)]
 	fn ref_parts_mut(&mut self) -> Result<(Vec<i64>, &mut [I], Option<Box<dyn Any>>)>;
+
+	crate::private_trait!();
 }
 
 pub trait OwnedTensorArrayData<I> {
 	fn into_parts(self) -> Result<TensorArrayDataParts<I>>;
+
+	crate::private_trait!();
 }
 
 pub struct TensorArrayDataParts<I> {
@@ -478,6 +486,8 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for &CowArra
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
 		Ok((shape, data, None))
 	}
+
+	crate::private_impl!();
 }
 
 #[cfg(feature = "ndarray")]
@@ -490,6 +500,8 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for ArcArray
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
 		Ok((shape, data, Some(Box::new(self.clone()))))
 	}
+
+	crate::private_impl!();
 }
 
 #[cfg(feature = "ndarray")]
@@ -502,6 +514,8 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for &Array<T
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
 		Ok((shape, data, None))
 	}
+
+	crate::private_impl!();
 }
 
 #[cfg(feature = "ndarray")]
@@ -525,6 +539,8 @@ impl<T: Clone + 'static, D: Dimension + 'static> OwnedTensorArrayData<T> for Arr
 			Ok(TensorArrayDataParts { shape, ptr, num_elements, guard })
 		}
 	}
+
+	crate::private_impl!();
 }
 
 #[cfg(feature = "ndarray")]
@@ -537,6 +553,8 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for ArrayVie
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
 		Ok((shape, data, None))
 	}
+
+	crate::private_impl!();
 }
 
 #[cfg(feature = "ndarray")]
@@ -549,6 +567,8 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for ArrayVie
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
 		Ok((shape, data, None))
 	}
+
+	crate::private_impl!();
 }
 
 #[cfg(feature = "ndarray")]
@@ -561,6 +581,8 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayDataMut<T> for Array
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
 		Ok((shape, data, None))
 	}
+
+	crate::private_impl!();
 }
 
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, &[T]) {
@@ -568,6 +590,8 @@ impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, &[T]) {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		Ok((shape, self.1, None))
 	}
+
+	crate::private_impl!();
 }
 
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, &mut [T]) {
@@ -575,6 +599,8 @@ impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, &mut [T]) {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		Ok((shape, self.1, None))
 	}
+
+	crate::private_impl!();
 }
 
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayDataMut<T> for (D, &mut [T]) {
@@ -582,6 +608,8 @@ impl<T: Clone + 'static, D: ToDimensions> TensorArrayDataMut<T> for (D, &mut [T]
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		Ok((shape, self.1, None))
 	}
+
+	crate::private_impl!();
 }
 
 impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Vec<T>) {
@@ -596,6 +624,8 @@ impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Vec<T>
 			guard: Box::new(self.1)
 		})
 	}
+
+	crate::private_impl!();
 }
 
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Box<[T]>) {
@@ -604,6 +634,8 @@ impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Box<[T]>) {
 		let data = &*self.1;
 		Ok((shape, data, None))
 	}
+
+	crate::private_impl!();
 }
 
 impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Box<[T]>) {
@@ -618,6 +650,8 @@ impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Box<[T
 			guard: Box::new(self.1)
 		})
 	}
+
+	crate::private_impl!();
 }
 
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<[T]>) {
@@ -626,6 +660,8 @@ impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<[T]>) {
 		let data = &*self.1;
 		Ok((shape, data, Some(Box::new(self.1.clone()))))
 	}
+
+	crate::private_impl!();
 }
 
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<Box<[T]>>) {
@@ -634,4 +670,6 @@ impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<Box<[T]
 		let data = &*self.1;
 		Ok((shape, data, Some(Box::new(self.1.clone()))))
 	}
+
+	crate::private_impl!();
 }

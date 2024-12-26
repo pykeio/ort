@@ -345,7 +345,7 @@ mod tests {
 	fn test_string_tensor_raw() -> crate::Result<()> {
 		let v = vec!["hello world".to_string(), "こんにちは世界".to_string()];
 
-		let value = Tensor::from_string_array((vec![v.len() as i64], v.clone().into_boxed_slice()))?;
+		let value = Tensor::from_string_array((vec![v.len() as i64], &*v))?;
 		let (extracted_shape, extracted_view) = value.try_extract_raw_string_tensor()?;
 		assert_eq!(extracted_shape, [v.len() as i64]);
 		assert_eq!(extracted_view, v);

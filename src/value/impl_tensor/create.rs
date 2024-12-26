@@ -620,6 +620,14 @@ impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Box<[T
 	}
 }
 
+impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<[T]>) {
+	fn ref_parts(&self) -> Result<(Vec<i64>, &[T], Option<Box<dyn Any>>)> {
+		let shape = self.0.to_dimensions(Some(self.1.len()))?;
+		let data = &*self.1;
+		Ok((shape, data, Some(Box::new(self.1.clone()))))
+	}
+}
+
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<Box<[T]>>) {
 	fn ref_parts(&self) -> Result<(Vec<i64>, &[T], Option<Box<dyn Any>>)> {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;

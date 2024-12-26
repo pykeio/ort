@@ -356,7 +356,7 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 		let shape_ptr: *const i64 = shape.as_ptr();
 		let shape_len = shape.len();
 
-		let data_len = shape.iter().product::<i64>() as usize * std::mem::size_of::<T>();
+		let data_len = calculate_tensor_size(&shape) * std::mem::size_of::<T>();
 
 		ortsys![
 			unsafe CreateTensorWithDataAsOrtValue(

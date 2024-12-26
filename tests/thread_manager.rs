@@ -1,5 +1,4 @@
 use std::{
-	path::Path,
 	sync::{
 		Arc,
 		atomic::{AtomicUsize, Ordering}
@@ -7,12 +6,7 @@ use std::{
 	thread::{self, JoinHandle}
 };
 
-use image::{ImageBuffer, Luma, Pixel, imageops::FilterType};
-use ort::{
-	environment::{GlobalThreadPoolOptions, ThreadManager, ThreadWorker},
-	inputs,
-	session::{Session, builder::GraphOptimizationLevel}
-};
+use ort::environment::{GlobalThreadPoolOptions, ThreadManager, ThreadWorker};
 use test_log::test;
 
 struct ThreadStats {

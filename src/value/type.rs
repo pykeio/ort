@@ -5,7 +5,7 @@ use std::{
 
 use crate::{ortsys, tensor::TensorElementType};
 
-/// The type of a [`Value`], or a session input/output.
+/// The type of a [`Value`][super::Value], or a session input/output.
 ///
 /// ```
 /// # use std::sync::Arc;
@@ -73,7 +73,7 @@ pub enum ValueType {
 		/// The map value type.
 		value: TensorElementType
 	},
-	/// An optional value, which may or may not contain a [`Value`].
+	/// An optional value, which may or may not contain a [`Value`][super::Value].
 	Optional(Box<ValueType>)
 }
 

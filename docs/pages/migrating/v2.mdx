@@ -97,25 +97,8 @@ The final `SessionBuilder` methods have been renamed for clarity.
 
 ## Session inputs
 
-### `CowArray`/`IxDyn`/`ndarray` no longer required
-One of the biggest usability changes is that the usual pattern of `CowArray::from(array.into_dyn())` is no longer required to create tensors. Now, tensors can be created from:
-- Owned `Array`s of any dimensionality
-- `ArrayView`s of any dimensionality
-- Shared references to `CowArray`s of any dimensionality (i.e. `&CowArray<'_, f32, Ix3>`)
-- Mutable references to `ArcArray`s of any dimensionality (i.e. `&mut ArcArray<f32, Ix3>`)
-- A raw shape definition & data array, of type `(Vec<i64>, Arc<Box<[T]>>)`
-
-```diff
--// v1.x
--let mut tokens = CowArray::from(Array1::from_iter(tokens.iter().cloned()).into_dyn());
-+// v2
-+let mut tokens = Array1::from_iter(tokens.iter().cloned());
-```
-
-It should be noted that there are some cases in which an array is cloned when converting into a tensor which may lead to a surprising performance hit. ONNX Runtime does not expose an API to specify the strides of a tensor, so if an array is reshaped before being converted into a tensor, it must be cloned in order to make the data contiguous. Specifically:
-- `&CowArray`, `ArrayView` will **always be cloned** (due to the fact that we cannot guarantee the lifetime of the array).
-- `Array`, `&mut ArcArray` will only be cloned **if the memory layout is not contiguous**, i.e. if it has been reshaped.
-- Raw data will never be cloned as it is assumed to already have a contiguous memory layout.
+### Tensor creation
+You can now create input tensors from `Array`s and `ArrayView`s. See the [tensor value documentation](/fundamentals/value#creating-values) for more information.
 
 ### `ort::inputs!` macro
 
@@ -127,18 +110,16 @@ The `ort::inputs!` macro will painlessly convert compatible data types (see abov
 -// v1.x
 -let chunk_embeddings = text_encoder.run(&[CowArray::from(text_input_chunk.into_dyn())])?;
 +// v2
-+let chunk_embeddings = text_encoder.run(ort::inputs![text_input_chunk]?)?;
++let chunk_embeddings = text_encoder.run(ort::inputs![text_input_chunk])?;
 ```
-
-Note the `?` after the macro call - `ort::inputs!` returns an `ort::Result<SessionInputs>`, so you'll need to handle any errors accordingly.
 
 As mentioned, you can now also specify inputs by name using a map-like syntax. This is especially useful for graphs with optional inputs.
 ```rust
 let noise_pred = unet.run(ort::inputs![
-    "latents" => latents,
-    "timestep" => Array1::from_iter([t]),
+    "latents" => &latents,
+    "timestep" => Tensor::from_array(([1], vec![t]))?,
     "encoder_hidden_states" => text_embeddings.view()
-]?)?;
+])?;
 ```
 
 ### Tensor creation no longer requires the session's allocator
@@ -148,19 +129,19 @@ In previous versions, `Value::from_array` took an allocator parameter. The alloc
 -// v1.x
 -let val = Value::from_array(session.allocator(), &array)?;
 +// v2
-+let val = Tensor::from_array(&array)?;
++let val = Tensor::from_array(array)?;
 ```
 
 ### Separate string tensor creation
 As previously mentioned, the logic for creating string tensors has been moved from `Value::from_array` to `DynTensor::from_string_array`.
 
-To use string tensors with `ort::inputs!`, you must create a `DynTensor` using `DynTensor::from_string_array`.
+To use string tensors with `ort::inputs!`, you must create a `Tensor` using `Tensor::from_string_array`.
 
 ```rust
 let array = ndarray::Array::from_shape_vec((1,), vec![document]).unwrap();
 let outputs = session.run(ort::inputs![
-    "input" => DynTensor::from_string_array(session.allocator(), array)?
-]?)?;
+    "input" => Tensor::from_string_array(session.allocator(), array)?
+])?;
 ```
 
 ## Session outputs
@@ -173,7 +154,7 @@ let l = outputs["latents"].try_extract_tensor::<f32>()?;
 ```
 
 ## Execution providers
-Execution provider structs with public fields have been replaced with builder pattern structs. See the [API reference](https://docs.rs/ort/2.0.0-rc.8/ort/index.html?search=ExecutionProvider) and the [execution providers reference](/perf/execution-providers) for more information.
+Execution provider structs with public fields have been replaced with builder pattern structs. See the [API reference](https://docs.rs/ort/2.0.0-rc.9/ort/execution_providers/index.html#reexports) and the [execution providers reference](/perf/execution-providers) for more information.
 
 ```diff
 -// v1.x
@@ -190,8 +171,11 @@ Execution provider structs with public fields have been replaced with builder pa
 
 ## Updated dependencies & features
 
+### `ndarray` 0.16
+The `ndarray` dependency has been upgraded to 0.16. In order to convert tensors from `ndarray`, your application must update to `ndarray` 0.16 as well.
+
 ### `ndarray` is now optional
-The dependency on `ndarray` is now declared optional. If you use `ort` with `default-features = false`, you'll need to add the `ndarray` feature.
+The dependency on `ndarray` is now optional. If you previously used `ort` with `default-features = false`, you'll need to add the `ndarray` feature to keep using `ndarray` integration.
 
 ## Model Zoo structs have been removed
 ONNX pushed a new Model Zoo structure that adds hundreds of different models. This is impractical to maintain, so the built-in structs have been removed.

@@ -355,7 +355,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = vec!["hello", "world"];
-	/// let tensor = Tensor::from_string_array(([array.len()], array.clone().into_boxed_slice()))?.into_dyn();
+	/// let tensor = Tensor::from_string_array(([array.len()], &*array))?.into_dyn();
 	///
 	/// let (extracted_shape, extracted_data) = tensor.try_extract_raw_string_tensor()?;
 	/// assert_eq!(extracted_data, array);

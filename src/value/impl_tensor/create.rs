@@ -23,15 +23,13 @@ use crate::{
 impl Tensor<String> {
 	/// Construct a [`Tensor`] from an array of strings.
 	///
-	/// Just like numeric tensors, string tensors can be created from:
-	/// - (with feature `ndarray`) a shared reference to a [`ndarray::CowArray`] (`&CowArray<'_, T, D>`);
-	/// - (with feature `ndarray`) a mutable/exclusive reference to an [`ndarray::ArcArray`] (`&mut ArcArray<T, D>`);
-	/// - (with feature `ndarray`) an owned [`ndarray::Array`];
-	/// - (with feature `ndarray`) a borrowed view of another array, as an [`ndarray::ArrayView`] (`ArrayView<'_, T,
-	///   D>`);
-	/// - a tuple of `(dimensions, data)` where:
-	///   * `dimensions` is one of `Vec<I>`, `[I]` or `&[I]`, where `I` is `i64` or `usize`;
-	///   * and `data` is one of `Vec<T>`, `Box<[T]>`, `Arc<Box<[T]>>`, or `&[T]`.
+	/// String tensors can be created from:
+	/// - (with feature `ndarray`) a shared reference to a [`ndarray::CowArray`] (`&CowArray<'_, T, D>`) or
+	///   [`ndarray::Array`] (`&Array<T, D>`);
+	/// - (with feature `ndarray`) an [`ndarray::ArcArray`] or [`ndarray::ArrayView`];
+	/// - a tuple of `(shape, data)` where:
+	///   * `shape` is one of `Vec<I>`, `[I; N]` or `&[I]`, where `I` is `i64` or `usize`, and
+	///   * `data` is one of `&[T]`, `Arc<[T]>`, or `Arc<Box<[T]>>`.
 	///
 	/// ```
 	/// # use ort::{session::Session, value::Tensor};
@@ -46,8 +44,6 @@ impl Tensor<String> {
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	///
-	/// Note that string data will *always* be copied, no matter what form the data is provided in.
 	pub fn from_string_array<T: Utf8Data>(input: impl TensorArrayData<T>) -> Result<Tensor<String>> {
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 
@@ -155,17 +151,13 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 		})
 	}
 
-	/// Construct a tensor from an array of data.
+	/// Construct an owned tensor from an array of data.
 	///
-	/// Tensors can be created from:
-	/// - (with feature `ndarray`) a shared reference to a [`ndarray::CowArray`] (`&CowArray<'_, T, D>`);
-	/// - (with feature `ndarray`) a mutable/exclusive reference to an [`ndarray::ArcArray`] (`&mut ArcArray<T, D>`);
-	/// - (with feature `ndarray`) an owned [`ndarray::Array`];
-	/// - (with feature `ndarray`) a borrowed view of another array, as an [`ndarray::ArrayView`] (`ArrayView<'_, T,
-	///   D>`);
-	/// - a tuple of `(dimensions, data)` where:
-	///   * `dimensions` is one of `Vec<I>`, `[I]` or `&[I]`, where `I` is `i64` or `usize`;
-	///   * and `data` is one of `Vec<T>`, `Box<[T]>`, `Arc<Box<[T]>>`, or `&[T]`.
+	/// Owned tensors can be created from:
+	/// - (with feature `ndarray`) an owned [`ndarray::Array`], or
+	/// - a tuple of `(shape, data)` where:
+	///   * `shape` is one of `Vec<I>`, `[I]` or `&[I]`, where `I` is `i64` or `usize`, and
+	///   * `data` is one of `Vec<T>` or `Box<[T]>`.
 	///
 	/// ```
 	/// # use ort::value::Tensor;
@@ -180,16 +172,11 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// # }
 	/// ```
 	///
-	/// Creating string tensors requires a separate method; see [`DynTensor::from_string_array`].
+	/// When passing an [`ndarray::Array`], the array may be copied in order to convert it to a contiguous layout if it
+	/// is not already. When creating a tensor from a `Vec` or boxed slice, the data is assumed to already be in
+	/// contiguous layout.
 	///
-	/// Note that data provided in an `ndarray` may be copied in some circumstances:
-	/// - `&CowArray<'_, T, D>` will always be copied regardless of whether it is uniquely owned or borrowed.
-	/// - `&mut ArcArray<T, D>` and `Array<T, D>` will be copied only if the data is not in a contiguous layout (which
-	///   is the case after most reshape operations)
-	/// - `ArrayView<'_, T, D>` will always be copied.
-	///
-	/// Raw data provided as a `Arc<Box<[T]>>`, `Box<[T]>`, or `Vec<T>` will never be copied. Raw data is expected to be
-	/// in standard, contigous layout.
+	/// Creating string tensors requires a separate method; see [`Tensor::from_string_array`].
 	pub fn from_array(input: impl OwnedTensorArrayData<T>) -> Result<Tensor<T>> {
 		let memory_info = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Arena, MemoryType::CPUInput)?;
 
@@ -234,6 +221,35 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 }
 
 impl<'a, T: PrimitiveTensorElementType + Debug> TensorRef<'a, T> {
+	/// Construct a tensor from borrowed data.
+	///
+	/// Borrowed tensors can be created from:
+	/// - (with feature `ndarray`) a shared reference to a [`ndarray::CowArray`] (`&CowArray<'_, T, D>`) or
+	///   [`ndarray::Array`] (`&Array<T, D>`);
+	/// - (with feature `ndarray`) an [`ndarray::ArcArray`] or [`ndarray::ArrayView`];
+	/// - a tuple of `(shape, data)` where:
+	///   * `shape` is one of `Vec<I>`, `[I; N]` or `&[I]`, where `I` is `i64` or `usize`, and
+	///   * `data` is one of `&[T]`, `Arc<[T]>`, or `Arc<Box<[T]>>`.
+	///
+	/// ```
+	/// # use ort::value::TensorRef;
+	/// # fn main() -> ort::Result<()> {
+	/// // Create a tensor from a raw data vector
+	/// let data = vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0];
+	/// let tensor = TensorRef::from_array_view(([1usize, 2, 3], &*data))?;
+	///
+	/// // Create a tensor from an `ndarray::Array`
+	/// # #[cfg(feature = "ndarray")]
+	/// # {
+	/// let array = ndarray::Array4::<f32>::zeros((1, 16, 16, 3));
+	/// let tensor = TensorRef::from_array_view(array.view())?;
+	/// # }
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	///
+	/// When passing an [`ndarray`] type, the data **must** have a contiguous memory layout, or else an error will be
+	/// returned. See [`ndarray::ArrayBase::as_standard_layout`] to convert an array to a contiguous layout.
 	pub fn from_array_view(input: impl TensorArrayData<T> + 'a) -> Result<TensorRef<'a, T>> {
 		let memory_info = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Arena, MemoryType::CPUInput)?;
 
@@ -281,6 +297,34 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRef<'a, T> {
 }
 
 impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
+	/// Construct a tensor from mutably borrowed data. Modifying data with [`Value::extract_tensor_mut`] will modify the
+	/// underlying buffer as well.
+	///
+	/// Mutably borrowed tensors can be created from:
+	/// - (with feature `ndarray`) an exclusive reference to an [`ndarray::Array`] (`&Array<T, D>`);
+	/// - (with feature `ndarray`) an [`ndarray::ArrayViewMut`];
+	/// - a tuple of `(shape, &mut [T])`, where `shape` is one of `Vec<I>`, `[I; N]` or `&[I]`, where `I` is `i64` or
+	///   `usize`.
+	///
+	/// ```
+	/// # use ort::value::TensorRefMut;
+	/// # fn main() -> ort::Result<()> {
+	/// // Create a tensor from a raw data vector
+	/// let mut data = vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0];
+	/// let tensor = TensorRefMut::from_array_view_mut(([1usize, 2, 3], &mut *data))?;
+	///
+	/// // Create a tensor from an `ndarray::Array`
+	/// # #[cfg(feature = "ndarray")]
+	/// # {
+	/// let mut array = ndarray::Array4::<f32>::zeros((1, 16, 16, 3));
+	/// let tensor = TensorRefMut::from_array_view_mut(array.view_mut())?;
+	/// # }
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	///
+	/// When passing an [`ndarray`] type, the data **must** have a contiguous memory layout, or else an error will be
+	/// returned. See [`ndarray::ArrayBase::as_standard_layout`] to convert an array to a contiguous layout.
 	pub fn from_array_view_mut(mut input: impl TensorArrayDataMut<T>) -> Result<TensorRefMut<'a, T>> {
 		let memory_info = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Arena, MemoryType::CPUInput)?;
 

@@ -76,11 +76,6 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 
 /// Construct the inputs to a session from an array or named map of values.
 ///
-/// See [`Value::from_array`] for details on what types a tensor can be created from.
-///
-/// Note that the output of this macro is a `Result<SessionInputs, OrtError>`, so make sure to handle any potential
-/// errors.
-///
 /// # Example
 ///
 /// ## Array of values
@@ -110,8 +105,6 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 /// # 	Ok(())
 /// # }
 /// ```
-///
-/// [`Tensor::from_string_array`]: crate::value::Tensor::from_string_array
 #[macro_export]
 macro_rules! inputs {
 	($($v:expr),+ $(,)?) => (

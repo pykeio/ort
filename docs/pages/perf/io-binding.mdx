@@ -12,7 +12,7 @@ In some cases, this I/O overhead is unavoidable -- a causal language model, for 
 For these cases, ONNX Runtime provides **I/O binding**, an interface that allows you to manually specify which inputs/outputs reside on which device, and control when they are synchronized.
 
 ## Creating
-I/O binding is used via the [`IoBinding`](https://docs.rs/ort/2.0.0-rc.8/ort/struct.IoBinding.html) struct. `IoBinding` is created using the [`Session::create_binding`](https://docs.rs/ort/2.0.0-rc.8/ort/struct.Session.html#method.create_binding) method:
+I/O binding is used via the [`IoBinding`](https://docs.rs/ort/2.0.0-rc.9/ort/io_binding/struct.IoBinding.html) struct. `IoBinding` is created using the [`Session::create_binding`](https://docs.rs/ort/2.0.0-rc.9/ort/session/struct.Session.html#method.create_binding) method:
 
 ```rs
 let mut binding = session.create_binding()?;
@@ -57,7 +57,7 @@ binding.bind_output_to_device("action", &allocator.memory_info())?;
     This means that subsequent runs will *override* the data in `action`. If you need to access a bound output's data *across* runs (i.e. in a multithreading setting), the data needs to be copied to another buffer to avoid undefined behavior.
 </Callout>
 
-Outputs can be bound to any device -- they can even stay on the EP device if you bind it to a tensor created with the session's allocator (`Tensor::new(session.allocator(), ...)`). You can then access the pointer to device memory using [`Tensor::data_ptr`](https://docs.rs/ort/2.0.0-rc.8/ort/type.Tensor.html#method.data_ptr).
+Outputs can be bound to any device -- they can even stay on the EP device if you bind it to a tensor created with the session's allocator (`Tensor::new(session.allocator(), ...)`). You can then access the pointer to device memory using [`Tensor::data_ptr`](https://docs.rs/ort/2.0.0-rc.9/ort/value/type.Tensor.html#method.data_ptr).
 
 If you do bind an output to the session's device, it is not guaranteed to be synchronized after `run`, just like `bind_input`. You can force outputs to synchronize immediately using `IoBinding::synchronize_outputs`.
 

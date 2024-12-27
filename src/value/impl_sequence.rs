@@ -74,7 +74,7 @@ impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
 	pub fn try_extract_sequence<OtherType: ValueTypeMarker + DowncastableTarget + Debug + Sized>(
 		&self,
 		allocator: &Allocator
-	) -> Result<Vec<Value<OtherType>>> {
+	) -> Result<Vec<ValueRef<'_, OtherType>>> {
 		match self.dtype() {
 			ValueType::Sequence(_) => {
 				let mut len = 0;
@@ -85,7 +85,9 @@ impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
 					let mut value_ptr = ptr::null_mut();
 					ortsys![unsafe GetValue(self.ptr(), i as _, allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
 
-					let value = unsafe { Value::from_ptr(NonNull::new_unchecked(value_ptr), None) };
+					let mut value = ValueRef::new(unsafe { Value::from_ptr(NonNull::new_unchecked(value_ptr), None) });
+					value.upgradable = false;
+
 					let value_type = value.dtype();
 					if !OtherType::can_downcast(value.dtype()) {
 						return Err(Error::new_with_code(
@@ -149,7 +151,7 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized + 'static> Value<Se
 }
 
 impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized> Value<SequenceValueType<T>> {
-	pub fn extract_sequence(&self, allocator: &Allocator) -> Vec<Value<T>> {
+	pub fn extract_sequence(&self, allocator: &Allocator) -> Vec<ValueRef<'_, T>> {
 		self.try_extract_sequence(allocator).expect("Failed to extract sequence")
 	}
 

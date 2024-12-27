@@ -46,7 +46,7 @@ let values = Tensor::<f32>::from_array(([4], vec![1., 2., 3., 4.]))?;
 let map = Map::new_kv(keys, values)?;
 ```
 
-`Sequence`s can be [created] from any iterator yielding a `Value` subtype:
+`Sequence`s can be [created](https://docs.rs/ort/2.0.0-rc.9/ort/value/type.Sequence.html#method.new) from any iterator yielding a `Value` subtype:
 ```rs
 let tensor1 = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
 let tensor2 = Tensor::<f32>::new(&allocator, [1, 224, 224, 3])?;

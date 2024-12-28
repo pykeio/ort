@@ -230,7 +230,7 @@ impl AsPointer for Trainer {
 
 impl Drop for Trainer {
 	fn drop(&mut self) {
-		tracing::trace!("dropping trainer");
+		crate::trace!("dropping trainer");
 		trainsys![unsafe ReleaseTrainingSession(self.ptr.as_ptr())];
 	}
 }

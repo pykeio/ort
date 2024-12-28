@@ -74,7 +74,7 @@ impl AsPointer for SharedSessionInner {
 
 impl Drop for SharedSessionInner {
 	fn drop(&mut self) {
-		tracing::debug!(ptr = ?self.session_ptr.as_ptr(), "dropping SharedSessionInner");
+		crate::debug!(ptr = ?self.session_ptr.as_ptr(), "dropping SharedSessionInner");
 		ortsys![unsafe ReleaseSession(self.session_ptr.as_ptr())];
 	}
 }

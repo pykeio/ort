@@ -13,14 +13,11 @@
 
 use std::{
 	any::Any,
-	ffi::{self, CStr, CString},
+	ffi::CString,
 	os::raw::c_void,
 	ptr::{self, NonNull},
 	sync::{Arc, RwLock}
 };
-
-use ort_sys::c_char;
-use tracing::{Level, debug};
 
 #[cfg(feature = "load-dynamic")]
 use crate::G_ORT_DYLIB_PATH;
@@ -66,7 +63,7 @@ impl AsPointer for Environment {
 
 impl Drop for Environment {
 	fn drop(&mut self) {
-		debug!(ptr = ?self.ptr(), "Releasing environment");
+		crate::debug!(ptr = ?self.ptr(), "Releasing environment");
 		ortsys![unsafe ReleaseEnv(self.ptr_mut())];
 	}
 }
@@ -81,7 +78,7 @@ pub fn get_environment() -> Result<Arc<Environment>> {
 		// drop our read lock so we dont deadlock when `commit` takes a write lock
 		drop(env);
 
-		debug!("Environment not yet initialized, creating a new one");
+		crate::debug!("Environment not yet initialized, creating a new one");
 		Ok(EnvironmentBuilder::new().commit()?)
 	}
 }
@@ -191,11 +188,13 @@ pub(crate) unsafe extern "system" fn thread_create<T: ThreadManager + Any>(
 			.cast_const()
 			.cast::<ort_sys::OrtCustomHandleType>(),
 		Ok(Err(e)) => {
-			tracing::error!("Failed to create thread using manager: {e}");
+			crate::error!("Failed to create thread using manager: {e}");
+			let _ = e;
 			ptr::null()
 		}
 		Err(e) => {
-			tracing::error!("Thread manager panicked: {e:?}");
+			crate::error!("Thread manager panicked: {e:?}");
+			let _ = e;
 			ptr::null()
 		}
 	}
@@ -204,7 +203,8 @@ pub(crate) unsafe extern "system" fn thread_create<T: ThreadManager + Any>(
 pub(crate) unsafe extern "system" fn thread_join<T: ThreadManager + Any>(ort_custom_thread_handle: ort_sys::OrtCustomThreadHandle) {
 	let handle = Box::from_raw(ort_custom_thread_handle.cast_mut().cast::<<T as ThreadManager>::Thread>());
 	if let Err(e) = <T as ThreadManager>::join(*handle) {
-		tracing::error!("Failed to join thread using manager: {e}");
+		crate::error!("Failed to join thread using manager: {e}");
+		let _ = e;
 	}
 }
 
@@ -279,15 +279,24 @@ impl EnvironmentBuilder {
 	pub fn commit(self) -> Result<Arc<Environment>> {
 		let (env_ptr, thread_manager, has_global_threadpool) = if let Some(mut thread_pool_options) = self.global_thread_pool_options {
 			let mut env_ptr: *mut ort_sys::OrtEnv = std::ptr::null_mut();
-			let logging_function: ort_sys::OrtLoggingFunction = Some(custom_logger);
-			let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
 			let cname = CString::new(self.name.clone()).unwrap_or_else(|_| unreachable!());
 
+			#[cfg(feature = "tracing")]
 			ortsys![
 				unsafe CreateEnvWithCustomLoggerAndGlobalThreadPools(
-					logging_function,
-					logger_param,
+					Some(crate::logging::custom_logger),
+					ptr::null_mut(),
 					ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
+					cname.as_ptr(),
+					thread_pool_options.ptr(),
+					&mut env_ptr
+				)?;
+				nonNull(env_ptr)
+			];
+			#[cfg(not(feature = "tracing"))]
+			ortsys![
+				unsafe CreateEnvWithGlobalThreadPools(
+					crate::logging::default_log_level(),
 					cname.as_ptr(),
 					thread_pool_options.ptr(),
 					&mut env_ptr
@@ -299,23 +308,32 @@ impl EnvironmentBuilder {
 			(env_ptr, thread_manager, true)
 		} else {
 			let mut env_ptr: *mut ort_sys::OrtEnv = std::ptr::null_mut();
-			let logging_function: ort_sys::OrtLoggingFunction = Some(custom_logger);
-			// FIXME: What should go here?
-			let logger_param: *mut std::ffi::c_void = std::ptr::null_mut();
 			let cname = CString::new(self.name.clone()).unwrap_or_else(|_| unreachable!());
+
+			#[cfg(feature = "tracing")]
 			ortsys![
 				unsafe CreateEnvWithCustomLogger(
-					logging_function,
-					logger_param,
+					Some(crate::logging::custom_logger),
+					ptr::null_mut(),
 					ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
 					cname.as_ptr(),
 					&mut env_ptr
 				)?;
 				nonNull(env_ptr)
 			];
+			#[cfg(not(feature = "tracing"))]
+			ortsys![
+				unsafe CreateEnv(
+					crate::logging::default_log_level(),
+					cname.as_ptr(),
+					&mut env_ptr
+				)?;
+				nonNull(env_ptr)
+			];
+
 			(env_ptr, None, false)
 		};
-		debug!(env_ptr = format!("{env_ptr:?}").as_str(), "Environment created");
+		crate::debug!(env_ptr = format!("{env_ptr:?}").as_str(), "Environment created");
 
 		if self.telemetry {
 			ortsys![unsafe EnableTelemetryEvents(env_ptr)?];
@@ -393,31 +411,4 @@ pub fn init() -> EnvironmentBuilder {
 pub fn init_from(path: impl ToString) -> EnvironmentBuilder {
 	let _ = G_ORT_DYLIB_PATH.set(Arc::new(path.to_string()));
 	EnvironmentBuilder::new()
-}
-
-/// Callback from C that will handle ONNX logging, forwarding ONNX's logs to the `tracing` crate.
-pub(crate) extern "system" fn custom_logger(
-	_params: *mut ffi::c_void,
-	severity: ort_sys::OrtLoggingLevel,
-	_: *const c_char,
-	id: *const c_char,
-	code_location: *const c_char,
-	message: *const c_char
-) {
-	assert_ne!(code_location, ptr::null());
-	let code_location = unsafe { CStr::from_ptr(code_location) }.to_str().unwrap_or("<decode error>");
-	assert_ne!(message, ptr::null());
-	let message = unsafe { CStr::from_ptr(message) }.to_str().unwrap_or("<decode error>");
-	assert_ne!(id, ptr::null());
-	let id = unsafe { CStr::from_ptr(id) }.to_str().unwrap_or("<decode error>");
-
-	let span = tracing::span!(Level::TRACE, "ort", id = id, location = code_location);
-
-	match severity {
-		ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE => tracing::event!(parent: &span, Level::TRACE, "{message}"),
-		ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_INFO => tracing::event!(parent: &span, Level::INFO, "{message}"),
-		ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING => tracing::event!(parent: &span, Level::WARN, "{message}"),
-		ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_ERROR => tracing::event!(parent: &span, Level::ERROR, "{message}"),
-		ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_FATAL => tracing::event!(parent: &span, Level::ERROR, "(FATAL): {message}")
-	}
 }

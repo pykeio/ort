@@ -20,6 +20,7 @@ pub mod environment;
 pub mod error;
 pub mod execution_providers;
 pub mod io_binding;
+pub(crate) mod logging;
 pub mod memory;
 pub mod metadata;
 pub mod operator;
@@ -39,6 +40,7 @@ pub use ort_sys as sys;
 
 #[cfg(feature = "load-dynamic")]
 pub use self::environment::init_from;
+pub(crate) use self::logging::{debug, error, info, trace, warning as warn};
 pub use self::{
 	environment::init,
 	error::{Error, ErrorCode, Result}
@@ -138,7 +140,7 @@ pub fn api() -> &'static ort_sys::OrtApi {
 
 				let version_string = ((*base).GetVersionString)();
 				let version_string = CStr::from_ptr(version_string).to_string_lossy();
-				tracing::info!("Loaded ONNX Runtime dylib with version '{version_string}'");
+				crate::info!("Loaded ONNX Runtime dylib with version '{version_string}'");
 
 				let lib_minor_version = version_string.split('.').nth(1).map_or(0, |x| x.parse::<u32>().unwrap_or(0));
 				match lib_minor_version.cmp(&MINOR_VERSION) {
@@ -147,7 +149,7 @@ pub fn api() -> &'static ort_sys::OrtApi {
 						env!("CARGO_PKG_VERSION"),
 						dylib_path()
 					),
-					std::cmp::Ordering::Greater => tracing::warn!(
+					std::cmp::Ordering::Greater => crate::warn!(
 						"ort {} may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
 						env!("CARGO_PKG_VERSION"),
 						dylib_path()

@@ -263,20 +263,20 @@ pub(crate) fn apply_execution_providers(
 				.ends_with("was not registered because its corresponding Cargo feature is not enabled.")
 			{
 				if ex.inner.supported_by_platform() {
-					tracing::warn!("{e}");
+					crate::warn!("{e}");
 				} else {
-					tracing::debug!("{e} (note: additionally, `{}` is not supported on this platform)", ex.inner.as_str());
+					crate::debug!("{e} (note: additionally, `{}` is not supported on this platform)", ex.inner.as_str());
 				}
 			} else {
-				tracing::error!("An error occurred when attempting to register `{}`: {e}", ex.inner.as_str());
+				crate::error!("An error occurred when attempting to register `{}`: {e}", ex.inner.as_str());
 			}
 		} else {
-			tracing::info!("Successfully registered `{}`", ex.inner.as_str());
+			crate::info!("Successfully registered `{}`", ex.inner.as_str());
 			fallback_to_cpu = false;
 		}
 	}
 	if fallback_to_cpu {
-		tracing::warn!("No execution providers registered successfully. Falling back to CPU.");
+		crate::warn!("No execution providers registered successfully. Falling back to CPU.");
 	}
 	Ok(())
 }

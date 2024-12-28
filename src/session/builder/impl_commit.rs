@@ -32,10 +32,10 @@ impl SessionBuilder {
 		});
 		let model_filepath = download_dir.join(&model_filename);
 		let downloaded_path = if model_filepath.exists() {
-			tracing::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), "Model already exists, skipping download");
+			crate::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), "Model already exists, skipping download");
 			model_filepath
 		} else {
-			tracing::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), url = format!("{url:?}").as_str(), "Downloading model");
+			crate::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), url = format!("{url:?}").as_str(), "Downloading model");
 
 			let resp = ureq::get(url).call().map_err(|e| Error::new(format!("Error downloading to file: {e}")))?;
 
@@ -43,7 +43,7 @@ impl SessionBuilder {
 				.header("Content-Length")
 				.and_then(|s| s.parse::<usize>().ok())
 				.expect("Missing Content-Length header");
-			tracing::info!(len, "Downloading {} bytes", len);
+			crate::info!(len, "Downloading {} bytes", len);
 
 			let mut reader = resp.into_reader();
 			let temp_filepath = download_dir.join(format!("tmp_{}.{model_filename}", ort_sys::internal::random_identifier()));

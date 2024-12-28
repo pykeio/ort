@@ -119,7 +119,7 @@ impl AsPointer for Checkpoint {
 
 impl Drop for Checkpoint {
 	fn drop(&mut self) {
-		tracing::trace!("dropping checkpoint");
+		crate::trace!("dropping checkpoint");
 		trainsys![unsafe ReleaseCheckpointState(self.ptr.as_ptr())];
 	}
 }

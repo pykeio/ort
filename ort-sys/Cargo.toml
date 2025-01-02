@@ -4,10 +4,11 @@ description = "Unsafe Rust bindings for ONNX Runtime 1.20 - Optimize and Acceler
 version = "2.0.0-rc.9"
 edition = "2021"
 rust-version = "1.70"
+links = "onnxruntime"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/pykeio/ort"
 homepage = "https://ort.pyke.io/"
-keywords = [ "machine-learning", "ai", "ml" , "sys"]
+keywords = [ "machine-learning", "ai", "ml", "onnxruntime", "sys"]
 categories = [ "algorithms", "mathematics", "science" ]
 authors = [
 	"pyke.io <contact@pyke.io>"

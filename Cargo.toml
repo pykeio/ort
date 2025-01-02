@@ -39,7 +39,7 @@ authors = [
 	"pyke.io <contact@pyke.io>",
 	"Nicolas Bigaouette <nbigaouette@gmail.com>"
 ]
-include = [ "src/", "benches/", "LICENSE-APACHE", "LICENSE-MIT", "README.md" ]
+include = [ "src/", "LICENSE-APACHE", "LICENSE-MIT", "README.md" ]
 
 [profile.release]
 opt-level = 3
@@ -101,7 +101,3 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [ "
 glassbench = "0.4"
 tokio = { version = "1.36", features = [ "test-util" ] }
 tokio-test = "0.4.3"
-
-[[bench]]
-name = "squeezenet"
-harness = false

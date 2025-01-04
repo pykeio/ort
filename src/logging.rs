@@ -5,34 +5,34 @@ use std::{
 };
 
 macro_rules! trace {
-	($($arg:tt)+) => {
+	($($arg:tt)+) => {{
 		#[cfg(feature = "tracing")]
 		tracing::trace!($($arg)+);
-	}
+	}}
 }
 macro_rules! debug {
-	($($arg:tt)+) => {
+	($($arg:tt)+) => {{
 		#[cfg(feature = "tracing")]
 		tracing::debug!($($arg)+);
-	}
+	}}
 }
 macro_rules! info {
-	($($arg:tt)+) => {
+	($($arg:tt)+) => {{
 		#[cfg(feature = "tracing")]
 		tracing::info!($($arg)+);
-	}
+	}}
 }
 macro_rules! warning {
-	($($arg:tt)+) => {
+	($($arg:tt)+) => {{
 		#[cfg(feature = "tracing")]
 		tracing::warn!($($arg)+);
-	}
+	}}
 }
 macro_rules! error {
-	($($arg:tt)+) => {
+	($($arg:tt)+) => {{
 		#[cfg(feature = "tracing")]
 		tracing::error!($($arg)+);
-	}
+	}}
 }
 pub(crate) use debug;
 pub(crate) use error;

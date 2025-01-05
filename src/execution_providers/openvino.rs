@@ -127,6 +127,9 @@ impl ExecutionProvider for OpenVINOExecutionProvider {
 
 			use crate::AsPointer;
 
+			// Like TensorRT, the OpenVINO EP is also pretty picky about needing an environment by this point.
+			let _ = crate::environment::get_environment();
+
 			let device_type = self.device_type.as_deref().map(CString::new).transpose()?;
 			let device_id = self.device_id.as_deref().map(CString::new).transpose()?;
 			let cache_dir = self.cache_dir.as_deref().map(CString::new).transpose()?;

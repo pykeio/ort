@@ -21,7 +21,11 @@ default-members = [
 	'examples/modnet',
 	'examples/sentence-transformers'
 ]
-exclude = [ 'examples/cudarc' ]
+exclude = [
+	'backends/candle',
+	'backends/tract',
+	'examples/cudarc'
+]
 
 [package]
 name = "ort"

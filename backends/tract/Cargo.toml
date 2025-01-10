@@ -25,7 +25,10 @@ tract-onnx = "0.21"
 parking_lot = "0.12"
 
 [dev-dependencies]
-ort = { version = "=2.0.0-rc.9", path = "../../", default-features = false, features = [ "alternative-backend", "fetch-models" ] }
+ort = { version = "=2.0.0-rc.9", path = "../../", default-features = false, features = [ "alternative-backend", "fetch-models", "ndarray" ] }
+ureq = "2.1"
+image = "0.25"
+ndarray = "0.16"
 
 [[test]]
 name = "memory"
@@ -33,3 +36,6 @@ path = "tests/memory.rs"
 [[test]]
 name = "tensor"
 path = "tests/tensor.rs"
+[[test]]
+name = "session"
+path = "tests/session.rs"

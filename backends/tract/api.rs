@@ -128,7 +128,7 @@ unsafe extern "system" fn Run(
 ) -> OrtStatusPtr {
 	let session = unsafe { &*session.cast::<Session>() };
 
-	let inputs: HashMap<String, Tensor> = std::slice::from_raw_parts(input_names, input_len)
+	let inputs: Vec<(String, Tensor)> = std::slice::from_raw_parts(input_names, input_len)
 		.iter()
 		.zip(std::slice::from_raw_parts(inputs, input_len))
 		.map(|(&name, &input)| {
@@ -140,19 +140,19 @@ unsafe extern "system" fn Run(
 
 	match session.run(inputs) {
 		Ok(outputs) => {
-			let output_names: Vec<String> = std::slice::from_raw_parts(input_names, input_len)
+			let output_names: Vec<String> = std::slice::from_raw_parts(output_names, output_names_len)
 				.iter()
 				.map(|&name| unsafe { CStr::from_ptr(name) }.to_string_lossy().to_string())
 				.collect();
-			let output_view = std::slice::from_raw_parts_mut(output_ptrs, output_names_len);
+			let output_view = std::slice::from_raw_parts_mut(output_ptrs.cast::<*mut Tensor>(), output_names_len);
 
 			for (name, tensor) in outputs {
 				if let Some(index) = output_names
 					.iter()
-					.zip(output_view.iter())
-					.find_map(|(o_name, output)| if name == *o_name { Some(*output) } else { None })
+					.zip(output_view.iter_mut())
+					.find_map(|(o_name, output)| if name == *o_name { Some(output) } else { None })
 				{
-					*index.cast::<Tensor>() = tensor;
+					*index = Box::leak(Box::new(tensor));
 				}
 			}
 
@@ -219,11 +219,7 @@ unsafe extern "system" fn SetSessionLogSeverityLevel(options: *mut OrtSessionOpt
 
 unsafe extern "system" fn SetSessionGraphOptimizationLevel(options: *mut OrtSessionOptions, graph_optimization_level: GraphOptimizationLevel) -> OrtStatusPtr {
 	let options = unsafe { &mut *options.cast::<SessionOptions>() };
-	if graph_optimization_level != GraphOptimizationLevel::ORT_DISABLE_ALL {
-		options.perform_optimizations = true;
-	} else {
-		options.perform_optimizations = false;
-	}
+	options.perform_optimizations = graph_optimization_level != GraphOptimizationLevel::ORT_DISABLE_ALL;
 	ptr::null_mut()
 }
 
@@ -257,13 +253,13 @@ unsafe extern "system" fn RegisterCustomOpsLibrary(
 
 unsafe extern "system" fn SessionGetInputCount(session: *const OrtSession, out: *mut usize) -> OrtStatusPtr {
 	let session = unsafe { &*session.cast::<Session>() };
-	*out = session.original_graph.inputs.len();
+	*out = session.inputs.len();
 	ptr::null_mut()
 }
 
 unsafe extern "system" fn SessionGetOutputCount(session: *const OrtSession, out: *mut usize) -> OrtStatusPtr {
 	let session = unsafe { &*session.cast::<Session>() };
-	*out = session.original_graph.outputs.len();
+	*out = session.outputs.len();
 	ptr::null_mut()
 }
 
@@ -274,8 +270,8 @@ unsafe extern "system" fn SessionGetOverridableInitializerCount(session: *const 
 
 unsafe extern "system" fn SessionGetInputTypeInfo(session: *const OrtSession, index: usize, type_info: *mut *mut OrtTypeInfo) -> OrtStatusPtr {
 	let session = unsafe { &*session.cast::<Session>() };
-	let (fact, label) = match session.original_graph.input_fact(index) {
-		Ok(fact) => (fact, session.outlet_labels.get(&session.original_graph.inputs[index]).unwrap()),
+	let fact = match session.original_graph.input_fact(index) {
+		Ok(fact) => fact,
 		Err(e) => return Error::new_sys(OrtErrorCode::ORT_FAIL, e.to_string())
 	};
 	*type_info = TypeInfo::new_sys(
@@ -294,8 +290,8 @@ unsafe extern "system" fn SessionGetInputTypeInfo(session: *const OrtSession, in
 
 unsafe extern "system" fn SessionGetOutputTypeInfo(session: *const OrtSession, index: usize, type_info: *mut *mut OrtTypeInfo) -> OrtStatusPtr {
 	let session = unsafe { &*session.cast::<Session>() };
-	let (fact, label) = match session.original_graph.output_fact(index) {
-		Ok(fact) => (fact, session.outlet_labels.get(&session.original_graph.outputs[index]).unwrap()),
+	let fact = match session.original_graph.output_fact(index) {
+		Ok(fact) => fact,
 		Err(e) => return Error::new_sys(OrtErrorCode::ORT_FAIL, e.to_string())
 	};
 	*type_info = TypeInfo::new_sys(
@@ -323,8 +319,8 @@ unsafe extern "system" fn SessionGetInputName(
 	value: *mut *mut ::std::os::raw::c_char
 ) -> OrtStatusPtr {
 	let session = unsafe { &*session.cast::<Session>() };
-	let name = match session.outlet_labels.get(&session.original_graph.inputs[index]) {
-		Some(name) => CString::new(name.to_owned()).unwrap(),
+	let name = match session.inputs.get(index) {
+		Some(value) => CString::new(value.name.as_str()).unwrap(),
 		None => return Error::new_sys(OrtErrorCode::ORT_FAIL, format!("Invalid input #{}", index + 1))
 	};
 	*value = name.into_raw();
@@ -338,8 +334,8 @@ unsafe extern "system" fn SessionGetOutputName(
 	value: *mut *mut ::std::os::raw::c_char
 ) -> OrtStatusPtr {
 	let session = unsafe { &*session.cast::<Session>() };
-	let name = match session.outlet_labels.get(&session.original_graph.outputs[index]) {
-		Some(name) => CString::new(name.to_owned()).unwrap(),
+	let name = match session.outputs.get(index) {
+		Some(value) => CString::new(value.name.as_str()).unwrap(),
 		None => return Error::new_sys(OrtErrorCode::ORT_FAIL, format!("Invalid output #{}", index + 1))
 	};
 	*value = name.into_raw();

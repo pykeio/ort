@@ -23,11 +23,6 @@ impl Error {
 	}
 
 	#[inline]
-	pub fn message(&self) -> &str {
-		self.message.as_c_str().to_str().unwrap()
-	}
-
-	#[inline]
 	pub fn message_ptr(&self) -> *const c_char {
 		self.message.as_ptr()
 	}

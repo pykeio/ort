@@ -19,10 +19,6 @@ impl Environment {
 		(Box::leak(Box::new(Self { onnx: tract_onnx::onnx() })) as *mut Environment).cast()
 	}
 
-	pub unsafe fn cast_from_sys<'e>(ptr: *const ort_sys::OrtEnv) -> &'e Environment {
-		unsafe { &*ptr.cast::<Environment>() }
-	}
-
 	pub unsafe fn consume_sys(ptr: *mut ort_sys::OrtEnv) -> Box<Environment> {
 		Box::from_raw(ptr.cast::<Environment>())
 	}

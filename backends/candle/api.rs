@@ -138,19 +138,19 @@ unsafe extern "system" fn Run(
 
 	match session.run(inputs) {
 		Ok(outputs) => {
-			let output_names: Vec<String> = std::slice::from_raw_parts(input_names, input_len)
+			let output_names: Vec<String> = std::slice::from_raw_parts(output_names, output_names_len)
 				.iter()
 				.map(|&name| unsafe { CStr::from_ptr(name) }.to_string_lossy().to_string())
 				.collect();
-			let output_view = std::slice::from_raw_parts_mut(output_ptrs, output_names_len);
+			let output_view = std::slice::from_raw_parts_mut(output_ptrs.cast::<*mut Tensor>(), output_names_len);
 
 			for (name, tensor) in outputs {
 				if let Some(index) = output_names
 					.iter()
-					.zip(output_view.iter())
-					.find_map(|(o_name, output)| if name == *o_name { Some(*output) } else { None })
+					.zip(output_view.iter_mut())
+					.find_map(|(o_name, output)| if name == *o_name { Some(output) } else { None })
 				{
-					*index.cast::<Tensor>() = tensor;
+					*index = Box::leak(Box::new(tensor));
 				}
 			}
 

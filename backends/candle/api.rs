@@ -78,7 +78,7 @@ unsafe extern "system" fn CreateSession(
 		OsString::from_wide(path)
 	};
 	#[cfg(not(target_os = "windows"))]
-	let path = OsString::from_encoded_bytes_unchecked(path.to_vec());
+	let path = OsString::from_encoded_bytes_unchecked(path.iter().map(|c| *c as u8).collect::<Vec<_>>());
 
 	let buf = match fs::read(path) {
 		Ok(buf) => buf,

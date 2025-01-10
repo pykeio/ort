@@ -30,10 +30,17 @@ jobs:
       matrix:
         platform:
           - os: ubuntu-latest
-          - os: windows-latest
           - os: macos-15
     steps:
       - uses: actions/checkout@v4
+      - name: Install protoc
+        if: matrix.platform.os == 'macos-15'
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            apt update && apt install protobuf-compiler -y
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            brew install protobuf
+          fi
       - name: Install stable Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:

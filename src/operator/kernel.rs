@@ -35,7 +35,7 @@ impl KernelAttributes {
 
 	pub fn get<'s, T: GetKernelAttribute<'s>>(&'s self, name: impl AsRef<str>) -> Option<T> {
 		let name = CString::new(name.as_ref()).ok()?;
-		T::get_from(self.0.as_ptr(), name.as_ptr())
+		unsafe { T::get_from(self.0.as_ptr(), name.as_ptr()) }
 	}
 
 	pub fn inputs(&self) -> Result<Vec<Input>> {
@@ -106,13 +106,13 @@ impl AsPointer for KernelAttributes {
 }
 
 pub trait GetKernelAttribute<'s> {
-	fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
+	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
 	where
 		Self: Sized;
 }
 
 impl GetKernelAttribute<'_> for f32 {
-	fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
+	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
 	where
 		Self: Sized
 	{
@@ -123,7 +123,7 @@ impl GetKernelAttribute<'_> for f32 {
 }
 
 impl GetKernelAttribute<'_> for i64 {
-	fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
+	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
 	where
 		Self: Sized
 	{
@@ -134,7 +134,7 @@ impl GetKernelAttribute<'_> for i64 {
 }
 
 impl GetKernelAttribute<'_> for String {
-	fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
+	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
 	where
 		Self: Sized
 	{
@@ -147,7 +147,7 @@ impl GetKernelAttribute<'_> for String {
 }
 
 impl GetKernelAttribute<'_> for Vec<f32> {
-	fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
+	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
 	where
 		Self: Sized
 	{
@@ -160,7 +160,7 @@ impl GetKernelAttribute<'_> for Vec<f32> {
 }
 
 impl GetKernelAttribute<'_> for Vec<i64> {
-	fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
+	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
 	where
 		Self: Sized
 	{
@@ -173,7 +173,7 @@ impl GetKernelAttribute<'_> for Vec<i64> {
 }
 
 impl<'s, T: DowncastableTarget> GetKernelAttribute<'s> for ValueRef<'s, T> {
-	fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
+	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
 	where
 		Self: Sized
 	{

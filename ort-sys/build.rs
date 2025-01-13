@@ -91,8 +91,8 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 
 		let lib_files = std::fs::read_dir(lib_dir).unwrap_or_else(|_| panic!("Failed to read contents of `{}` (does it exist?)", lib_dir.display()));
 		for lib_file in lib_files.filter(|e| {
-			e.as_ref().ok().map_or(false, |e| {
-				e.file_type().map_or(false, |e| !e.is_dir()) && [".dll", ".so", ".dylib"].into_iter().any(|v| e.path().to_string_lossy().contains(v))
+			e.as_ref().ok().is_some_and(|e| {
+				e.file_type().is_ok_and(|e| !e.is_dir()) && [".dll", ".so", ".dylib"].into_iter().any(|v| e.path().to_string_lossy().contains(v))
 			})
 		}) {
 			let lib_file = lib_file.unwrap();

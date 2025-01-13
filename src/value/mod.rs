@@ -248,14 +248,14 @@ pub trait ValueTypeMarker {
 	#[doc(hidden)]
 	fn format() -> String;
 
-	crate::private_trait!();
+	private_trait!();
 }
 
 /// Represents a type that a [`DynValue`] can be downcast to.
 pub trait DowncastableTarget: ValueTypeMarker {
 	fn can_downcast(dtype: &ValueType) -> bool;
 
-	crate::private_trait!();
+	private_trait!();
 }
 
 // this implementation is used in case we want to extract `DynValue`s from a [`Sequence`]; see `try_extract_sequence`
@@ -264,7 +264,7 @@ impl DowncastableTarget for DynValueTypeMarker {
 		true
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 /// The dynamic type marker, used for values which can be of any type.
@@ -275,16 +275,16 @@ impl ValueTypeMarker for DynValueTypeMarker {
 		"DynValue".to_string()
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 impl MapValueTypeMarker for DynValueTypeMarker {
-	crate::private_impl!();
+	private_impl!();
 }
 impl SequenceValueTypeMarker for DynValueTypeMarker {
-	crate::private_impl!();
+	private_impl!();
 }
 impl TensorValueTypeMarker for DynValueTypeMarker {
-	crate::private_impl!();
+	private_impl!();
 }
 
 unsafe impl<Type: ValueTypeMarker + ?Sized> Send for Value<Type> {}

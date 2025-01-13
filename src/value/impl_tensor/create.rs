@@ -3,6 +3,7 @@ use std::{
 	ffi,
 	fmt::Debug,
 	marker::PhantomData,
+	mem::size_of,
 	ptr::{self, NonNull},
 	sync::Arc
 };
@@ -438,20 +439,20 @@ pub trait TensorArrayData<I> {
 	#[allow(clippy::type_complexity)]
 	fn ref_parts(&self) -> Result<(Vec<i64>, &[I], Option<Box<dyn Any>>)>;
 
-	crate::private_trait!();
+	private_trait!();
 }
 
 pub trait TensorArrayDataMut<I>: TensorArrayData<I> {
 	#[allow(clippy::type_complexity)]
 	fn ref_parts_mut(&mut self) -> Result<(Vec<i64>, &mut [I], Option<Box<dyn Any>>)>;
 
-	crate::private_trait!();
+	private_trait!();
 }
 
 pub trait OwnedTensorArrayData<I> {
 	fn into_parts(self) -> Result<TensorArrayDataParts<I>>;
 
-	crate::private_trait!();
+	private_trait!();
 }
 
 pub struct TensorArrayDataParts<I> {
@@ -531,7 +532,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for &CowArra
 		Ok((shape, data, None))
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 #[cfg(feature = "ndarray")]
@@ -545,7 +546,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for ArcArray
 		Ok((shape, data, Some(Box::new(self.clone()))))
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 #[cfg(feature = "ndarray")]
@@ -559,7 +560,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for &Array<T
 		Ok((shape, data, None))
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 #[cfg(feature = "ndarray")]
@@ -573,7 +574,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for &mut Arr
 		Ok((shape, data, None))
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 #[cfg(feature = "ndarray")]
@@ -598,7 +599,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> OwnedTensorArrayData<T> for Arr
 		}
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 #[cfg(feature = "ndarray")]
@@ -612,7 +613,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for ArrayVie
 		Ok((shape, data, None))
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 #[cfg(feature = "ndarray")]
@@ -626,7 +627,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for ArrayVie
 		Ok((shape, data, None))
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 #[cfg(feature = "ndarray")]
@@ -640,7 +641,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayDataMut<T> for Array
 		Ok((shape, data, None))
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 #[cfg(feature = "ndarray")]
@@ -654,7 +655,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayDataMut<T> for &mut 
 		Ok((shape, data, None))
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, &[T]) {
@@ -663,7 +664,7 @@ impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, &[T]) {
 		Ok((shape, self.1, None))
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, &mut [T]) {
@@ -672,7 +673,7 @@ impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, &mut [T]) {
 		Ok((shape, self.1, None))
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayDataMut<T> for (D, &mut [T]) {
@@ -681,7 +682,7 @@ impl<T: Clone + 'static, D: ToDimensions> TensorArrayDataMut<T> for (D, &mut [T]
 		Ok((shape, self.1, None))
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Vec<T>) {
@@ -697,7 +698,7 @@ impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Vec<T>
 		})
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Box<[T]>) {
@@ -713,7 +714,7 @@ impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Box<[T
 		})
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<[T]>) {
@@ -723,7 +724,7 @@ impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<[T]>) {
 		Ok((shape, data, Some(Box::new(self.1.clone()))))
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<Box<[T]>>) {
@@ -733,5 +734,5 @@ impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<Box<[T]
 		Ok((shape, data, Some(Box::new(self.1.clone()))))
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }

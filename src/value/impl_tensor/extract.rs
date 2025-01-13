@@ -46,8 +46,6 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_tensor<T: PrimitiveTensorElementType>(&self) -> Result<ndarray::ArrayViewD<'_, T>> {
-		use crate::AsPointer;
-
 		match self.dtype() {
 			ValueType::Tensor { ty, dimensions, .. } => {
 				let mem = self.memory_info();

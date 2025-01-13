@@ -14,7 +14,7 @@ use crate::{
 };
 
 pub trait SequenceValueTypeMarker: ValueTypeMarker {
-	crate::private_trait!();
+	private_trait!();
 }
 
 #[derive(Debug)]
@@ -24,10 +24,10 @@ impl ValueTypeMarker for DynSequenceValueType {
 		"DynSequence".to_string()
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 impl SequenceValueTypeMarker for DynSequenceValueType {
-	crate::private_impl!();
+	private_impl!();
 }
 
 impl DowncastableTarget for DynSequenceValueType {
@@ -35,7 +35,7 @@ impl DowncastableTarget for DynSequenceValueType {
 		matches!(dtype, ValueType::Sequence { .. })
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 #[derive(Debug)]
@@ -45,10 +45,10 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + ?Sized> ValueTypeMarker f
 		format!("Sequence<{}>", T::format())
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 impl<T: ValueTypeMarker + DowncastableTarget + Debug + ?Sized> SequenceValueTypeMarker for SequenceValueType<T> {
-	crate::private_impl!();
+	private_impl!();
 }
 
 impl<T: ValueTypeMarker + DowncastableTarget + Debug + ?Sized> DowncastableTarget for SequenceValueType<T> {
@@ -59,7 +59,7 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + ?Sized> DowncastableTarge
 		}
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 pub type DynSequence = Value<DynSequenceValueType>;

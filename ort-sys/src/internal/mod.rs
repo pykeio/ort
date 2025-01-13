@@ -1,4 +1,7 @@
-use std::hash::{BuildHasher, Hasher, RandomState};
+use std::{
+	collections::hash_map::RandomState,
+	hash::{BuildHasher, Hasher}
+};
 
 pub mod dirs;
 

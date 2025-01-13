@@ -33,7 +33,6 @@ impl KernelAttributes {
 		Self(NonNull::from(unsafe { &*info }))
 	}
 
-	#[allow(private_bounds)]
 	pub fn get<'s, T: GetKernelAttribute<'s>>(&'s self, name: impl AsRef<str>) -> Option<T> {
 		let name = CString::new(name.as_ref()).ok()?;
 		T::get_from(self.0.as_ptr(), name.as_ptr())
@@ -106,7 +105,7 @@ impl AsPointer for KernelAttributes {
 	}
 }
 
-pub(crate) trait GetKernelAttribute<'s> {
+pub trait GetKernelAttribute<'s> {
 	fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
 	where
 		Self: Sized;

@@ -116,13 +116,13 @@ pub trait IntoTensorElementType {
 	/// Returns the ONNX tensor element data type corresponding to the given Rust type.
 	fn into_tensor_element_type() -> TensorElementType;
 
-	crate::private_trait!();
+	private_trait!();
 }
 
 /// A superset of [`IntoTensorElementType`] that represents traits whose underlying memory is identical between Rust and
 /// C++ (i.e., every type except `String`).
 pub trait PrimitiveTensorElementType: IntoTensorElementType {
-	crate::private_trait!();
+	private_trait!();
 }
 
 macro_rules! impl_type_trait {
@@ -132,11 +132,11 @@ macro_rules! impl_type_trait {
 				TensorElementType::$variant
 			}
 
-			crate::private_impl!();
+			private_impl!();
 		}
 
 		impl PrimitiveTensorElementType for $type_ {
-			crate::private_impl!();
+			private_impl!();
 		}
 	};
 }
@@ -164,7 +164,7 @@ impl IntoTensorElementType for String {
 		TensorElementType::String
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 /// Adapter for common Rust string types to ONNX strings.

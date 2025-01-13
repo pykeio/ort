@@ -24,6 +24,8 @@ pub(crate) mod logging;
 pub mod memory;
 pub mod metadata;
 pub mod operator;
+#[macro_use]
+pub(crate) mod private;
 pub mod session;
 pub mod tensor;
 #[cfg(feature = "training")]
@@ -246,26 +248,6 @@ pub(crate) fn char_p_to_string(raw: *const c_char) -> Result<String> {
 	let c_string = unsafe { CStr::from_ptr(raw.cast_mut()).to_owned() };
 	Ok(c_string.to_string_lossy().to_string())
 }
-
-pub(crate) struct PrivateTraitMarker;
-
-macro_rules! private_trait {
-	() => {
-		#[doc(hidden)]
-		#[allow(private_interfaces)]
-		fn _private() -> crate::PrivateTraitMarker;
-	};
-}
-macro_rules! private_impl {
-	() => {
-		#[allow(private_interfaces)]
-		fn _private() -> crate::PrivateTraitMarker {
-			crate::PrivateTraitMarker
-		}
-	};
-}
-pub(crate) use private_impl;
-pub(crate) use private_trait;
 
 #[cfg(test)]
 mod test {

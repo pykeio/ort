@@ -13,7 +13,7 @@ use super::{DowncastableTarget, DynValue, Value, ValueRef, ValueRefMut, ValueTyp
 use crate::{AsPointer, error::Result, memory::MemoryInfo, ortsys, tensor::IntoTensorElementType};
 
 pub trait TensorValueTypeMarker: ValueTypeMarker {
-	crate::private_trait!();
+	private_trait!();
 }
 
 #[derive(Debug)]
@@ -23,10 +23,10 @@ impl ValueTypeMarker for DynTensorValueType {
 		"DynTensor".to_string()
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 impl TensorValueTypeMarker for DynTensorValueType {
-	crate::private_impl!();
+	private_impl!();
 }
 
 #[derive(Debug)]
@@ -36,10 +36,10 @@ impl<T: IntoTensorElementType + Debug> ValueTypeMarker for TensorValueType<T> {
 		format!("Tensor<{}>", T::into_tensor_element_type())
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 impl<T: IntoTensorElementType + Debug> TensorValueTypeMarker for TensorValueType<T> {
-	crate::private_impl!();
+	private_impl!();
 }
 
 /// A tensor [`Value`] whose data type is unknown.
@@ -61,7 +61,7 @@ impl DowncastableTarget for DynTensorValueType {
 		matches!(dtype, ValueType::Tensor { .. })
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
@@ -215,7 +215,7 @@ impl<T: IntoTensorElementType + Debug> DowncastableTarget for TensorValueType<T>
 		}
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 impl<T: IntoTensorElementType + Debug> From<Value<TensorValueType<T>>> for DynValue {

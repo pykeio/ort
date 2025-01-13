@@ -20,7 +20,7 @@ use crate::{
 };
 
 pub trait MapValueTypeMarker: ValueTypeMarker {
-	crate::private_trait!();
+	private_trait!();
 }
 
 #[derive(Debug)]
@@ -30,10 +30,10 @@ impl ValueTypeMarker for DynMapValueType {
 		"DynMap".to_string()
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 impl MapValueTypeMarker for DynMapValueType {
-	crate::private_impl!();
+	private_impl!();
 }
 
 impl DowncastableTarget for DynMapValueType {
@@ -41,7 +41,7 @@ impl DowncastableTarget for DynMapValueType {
 		matches!(dtype, ValueType::Map { .. })
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 #[derive(Debug)]
@@ -51,10 +51,10 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementT
 		format!("Map<{}, {}>", K::into_tensor_element_type(), V::into_tensor_element_type())
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug> MapValueTypeMarker for MapValueType<K, V> {
-	crate::private_impl!();
+	private_impl!();
 }
 
 impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug> DowncastableTarget for MapValueType<K, V> {
@@ -65,7 +65,7 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementT
 		}
 	}
 
-	crate::private_impl!();
+	private_impl!();
 }
 
 pub type DynMap = Value<DynMapValueType>;

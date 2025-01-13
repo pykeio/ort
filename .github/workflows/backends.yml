@@ -1,0 +1,70 @@
+name: 🧩 Backends
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - '.github/workflows/backends.yml'
+      - 'src/**/*.rs'
+      - 'backends/**/*.rs'
+      - 'ort-sys/src/lib.rs'
+      - 'Cargo.toml'
+  pull_request:
+    paths:
+      - '.github/workflows/backends.yml'
+      - 'src/**/*.rs'
+      - 'backends/**/*.rs'
+      - 'ort-sys/src/lib.rs'
+      - 'Cargo.toml'
+env:
+  RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
+jobs:
+  candle:
+    name: Candle
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - os: ubuntu-latest
+          - os: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt-get update && sudo apt-get install protobuf-compiler -y
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            brew install protobuf
+          fi
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v1
+      - name: Run tests
+        run: |
+          cargo test --manifest-path backends/candle/Cargo.toml --verbose -- --test-threads 1
+  tract:
+    name: Tract
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - os: ubuntu-latest
+          - os: windows-latest
+          - os: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v1
+      - name: Run tests
+        run: |
+          cargo test --manifest-path backends/tract/Cargo.toml --verbose -- --test-threads 1

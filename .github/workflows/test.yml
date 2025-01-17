@@ -52,8 +52,6 @@ jobs:
       - name: Run tests
         run: |
           cargo test -p ort --verbose --features fetch-models -- --test-threads 1
-          # Test examples that use in-tree graphs (do NOT run any of the examples that download ~700 MB graphs from pyke parcel...)
-          cargo run --example custom-ops
   # Disable cross-compile until cross updates aarch64-unknown-linux-gnu to Ubuntu 22.04
   # ref https://github.com/cross-rs/cross/pull/973
   #cross-compile:

@@ -23,7 +23,6 @@ import { Callout, Card, Cards, Steps } from 'nextra/components';
 Converting a neural network to a graph representation like ONNX opens the door to more optimizations and broader acceleration hardware support. ONNX Runtime can significantly improve the inference speed/latency of most models and enable acceleration with NVIDIA CUDA & TensorRT, Intel OpenVINO, Qualcomm QNN, Huawei CANN, and [much more](/perf/execution-providers).
 
 `ort` is the Rust gateway to ONNX Runtime, allowing you to infer your ONNX models via an easy-to-use and ergonomic API. Many commercial, open-source, & research projects use `ort` in some pretty serious production scenarios to boost inference performance:
-- [**Twitter**](https://twitter.com/) uses `ort` in [part of their recommendations system](https://github.com/twitter/the-algorithm/tree/main/navi), serving hundreds of millions of requests a day.
 - [**Bloop**](https://bloop.ai/)'s semantic code search feature is powered by `ort`.
 - [**SurrealDB**](https://surrealdb.com/)'s powerful SurrealQL query language supports calling ML models, including ONNX graphs through `ort`.
 - [**Google's Magika**](https://github.com/google/magika) file type detection library is powered by `ort`.

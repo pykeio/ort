@@ -43,3 +43,15 @@ jobs:
       - name: Run checks
         run: |
           cargo check -p ort --no-default-features
+  msrv:
+    name: MSRV (1.72)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@1.72
+      - uses: Swatinem/rust-cache@v1
+      - name: Run checks
+        run: |
+          cargo check -p ort
+          cargo check -p ort --features load-dynamic

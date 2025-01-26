@@ -6,9 +6,10 @@ title: Cargo features
 
 - ✅ **`ndarray`**: Enables tensors to be created from/extracted to [`ndarray`](https://crates.io/crates/ndarray) multi-dimensional arrays. We highly recommend this feature if you need to do a lot of complex pre/post-processing requiring multi-dimensional array access, but for something like an LLM, omitting this feature won't require too much extra work but will save a fair amount of compile time.
 - ✅ **`download-binaries`**: Downloads prebuilt binaries from pyke's CDN service for supported platforms. Disabling this means you'll need to compile ONNX Runtime from source yourself, and [link `ort` to it](/setup/linking).
-- ✅ **`half`**: Enables support for float16 & bfloat16 tensors via the [`half`](https://crates.io/crates/half) crate. ONNX models that are converted to 16-bit precision will typically convert to/from 32-bit floats at the input/output, so you will likely never actually need to interact with a 16-bit tensor on the Rust side. Though, `half` isn't a heavy enough crate to worry about it affecting compile times.
+- ✅ **`half`**: Enables support for float16 & bfloat16 tensors via the [`half`](https://crates.io/crates/half) crate. ONNX models that are converted to 16-bit precision will typically convert to/from 32-bit floats at the input/output, so you will likely never actually need to interact with a 16-bit tensor on the Rust side.
 - ✅ **`copy-dylibs`**: In case dynamic libraries are used (like with the CUDA execution provider), creates a symlink to them in the relevant places in the `target` folder to make [compile-time dynamic linking](/setup/linking#compile-time-dynamic-linking) work.
 - ⚒️ **`load-dynamic`**: Enables [runtime dynamic linking](/setup/linking#runtime-loading-with-load-dynamic), which alleviates many of the troubles with compile-time dynamic linking and offers greater flexibility.
+- ⚒️ **`alternative-backend`**: Disables linking to ONNX Runtime, allowing you to instead configure an [alternative backend](/backends).
 - ⚒️ **`fetch-models`**: Enables the [`SessionBuilder::commit_from_url`](https://docs.rs/ort/2.0.0-rc.9/ort/session/builder/struct.SessionBuilder.html#method.commit_from_url) method, allowing you to quickly download & run a model from a URL. This should only be used for quick testing.
 
 ## Execution providers

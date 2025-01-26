@@ -1,0 +1,66 @@
+import { Steps } from 'nextra/components';
+
+# `ort-tract`
+`ort-tract` is an [alternative backend](/backends) for `ort` based on [`tract`](https://github.com/sonos/tract).
+
+## Supported APIs
+- ✅ `ort::init`
+- 🔷 `ort::environment::EnvironmentBuilder`
+    - `EnvironmentBuilder::commit`
+- 🔷 `ort::memory::Allocator`
+    - `Allocator::default`
+    - `Allocator::memory_info`
+- ✅ `ort::memory::MemoryInfo`
+- 🔷 `ort::session::Session`
+    - `Session::builder`
+    - `Session::allocator`
+    - `Session::run`
+    - `Session::run_with_options`
+- 🔷 `ort::session::builder::SessionBuilder`
+    - `SessionBuilder::new`
+    - `SessionBuilder::commit_from_file`
+    - `SessionBuilder::commit_from_memory`
+    - `SessionBuilder::commit_from_memory_directly`
+    - `SessionBuilder::commit_from_url`
+    - `SessionBuilder::with_optimization_level`
+- ✅ `ort::value::DynValue`, `ort::value::DynValueRef`, `ort::value::DynValueRefMut`
+    - Only `Tensor` types are supported.
+- ✅ `ort::value::Tensor`, `TensorRef`, `TensorRefMut`, etc.
+- ✅ `ort::value::ValueType`
+
+## Usage
+
+<Steps>
+
+### Install `ort-tract`
+```toml filename="Cargo.toml"
+[dependencies]
+ort-tract = "0.1.0+0.21"
+...
+```
+
+### Enable the `alternative-backend` feature
+This instructs `ort` to not try to download/link to ONNX Runtime.
+
+```toml filename="Cargo.toml"
+[dependencies.ort]
+version = "=2.0.0-rc.10"
+default-features = false # Disables the `download-binaries` feature since we don't need it
+features = [
+    "alternative-backend"
+]
+```
+
+### Initialize the backend
+Use `ort::set_api` to use the crate's API implementation.
+
+```rs
+fn main() {
+    // This should run as early in your application as possible - before you ever use `ort`!
+    ort::set_api(ort_tract::api());
+}
+```
+
+### Done!
+
+</Steps>

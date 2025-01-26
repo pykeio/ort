@@ -78,6 +78,12 @@ let predictions = outputs["output0"].try_extract_tensor::<f32>()?;
 ### Unlock more performance with EPs
 Use [execution providers](/perf/execution-providers) to enable hardware acceleration in your app and unlock the full power of your GPU or NPU.
 
+### Optimize I/O with `IoBinding`
+Control where and when inputs/outputs end up with [`IoBinding`](/perf/io-binding) to maximize I/O efficiency.
+
+### Go beyond ONNX Runtime
+Deploy your application to WASM with `ort`'s [`tract`](/backends/tract) or [`candle`](/backends/candle) backends.
+
 ### Show off your project!
 We'd love to see what you've made with `ort`! Show off your project in [GitHub Discussions](https://github.com/pykeio/ort/discussions/categories/show-and-tell) or on our [Discord](https://discord.gg/uQtsNu2xMa).
 

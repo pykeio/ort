@@ -1,9 +1,11 @@
 ---
 title: Platform support
-description: ONNX Runtime, and by extension `ort`, supports a wide variety of platforms. For most desktop users, pre-built binaries are available, so setting up `ort` is as simple as adding it to your `Cargo.toml`!
+description: `ort` supports a wide variety of platforms. For most desktop users, pre-built binaries are available, so setting up `ort` is as simple as adding it to your `Cargo.toml`!
 ---
 
 import { Callout } from 'nextra/components';
+
+# Platform compatibility with ONNX Runtime
 
 Here are the supported platforms and binary availability status, as of v2.0.0-rc.9.
 
@@ -32,3 +34,6 @@ For platforms marked as 🔷, you'll need to [compile ONNX Runtime from source](
 <Callout type='info'>
     Certain execution providers may not have binaries available. You can check EP binary support in the [Execution providers](/perf/execution-providers) documentation.
 </Callout>
+
+## Alternative backends & WebAssembly
+`ort`'s [alternative backends](/backends) typically have far more lax platform requirements. If you're looking to deploy your application to WASM, or a platform not supported by ONNX Runtime, it's worth giving one of them a shot!

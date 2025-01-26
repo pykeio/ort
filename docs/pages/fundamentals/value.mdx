@@ -206,5 +206,5 @@ let tensor_view: ort::value::TensorRef<'_, f32> = dyn_value.view().downcast()?;
 <Callout type='info'>
     Note that `DynTensor` cannot be downcast to `Tensor<T>`, but `DynTensor` can be upcast to `DynValue` with `.into_dyn()`, and then downcast to `Tensor<T>` with `.downcast()`.
 
-    Downcasts are cheap, as they only check the value's type. Upcasts compile to a no-op.
+    Type casting is computationally cheap; upcasts and `.into_dyn()` compile to a no-op.
 </Callout>

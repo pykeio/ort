@@ -27,6 +27,9 @@ export default {
 	"perf": {
 		"title": "Performance"
 	},
+	"backends": {
+		"title": "Backends"
+	},
 	"troubleshooting": {
 		"title": "Troubleshooting"
 	},

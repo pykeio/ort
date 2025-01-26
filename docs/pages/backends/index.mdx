@@ -1,0 +1,69 @@
+---
+title: Backends
+---
+
+import { Callout, Steps } from 'nextra/components';
+
+Since [ONNX Runtime](https://onnxruntime.ai/) is written in C++, linking troubles often arise when attempting to use it in a Rust project - especially with WASM. `v2.0.0-rc.10` of `ort` introduced support for **alternative backends** -- that is, ONNX executors that do not use ONNX Runtime.
+
+As the Rust ML scene has evolved, many exciting new inference engines supporting ONNX models have popped up, like 🤗 Hugging Face's [`candle`](https://github.com/huggingface/candle), [Burn](https://github.com/tracel-ai/burn), and [`tract`](https://github.com/sonos/tract). These libraries, being written in pure Rust (minus some GPU kernels) play much nicer when it comes to linking, and often support any platform Rust's standard library does. They're also, of course, memory safe and 🦀blazingly🔥fast🚀!
+
+Internally, alternative backend implementations are simply glue code between these libraries and the ONNX Runtime C API. Because they implement the same API as ONNX Runtime, using them in `ort` is as simple as adding one line of code!
+
+## Using an alternative backend
+
+<Callout type='warning'>
+    Alternative backends are experimental, and are constantly changing and growing -- use them at your own risk!
+
+    We may not be able to provide the same level of support for different backends as we do with ONNX Runtime.
+</Callout>
+
+<Steps>
+
+### Install the alternative backend
+We'll use [`ort-tract`](/backends/tract) for this example.
+
+```toml filename="Cargo.toml"
+[dependencies]
+ort-tract = "0.1.0+0.21"
+...
+```
+
+### Enable the `alternative-backend` feature
+This instructs `ort` to not try to download/link to ONNX Runtime.
+
+```toml filename="Cargo.toml"
+[dependencies.ort]
+version = "=2.0.0-rc.10"
+default-features = false # Disables the `download-binaries` feature since we don't need it
+features = [
+    "alternative-backend"
+]
+```
+
+### Initialize the backend
+Use `ort::set_api` to use the crate's API implementation (replacing `ort_tract` with whichever backend crate you choose to use):
+
+```rs
+fn main() {
+    // This should run as early in your application as possible - before you ever use `ort`!
+    ort::set_api(ort_tract::api());
+}
+```
+
+### Done!
+<Callout type='info'>
+    Be sure to check each backend's docs page to see which APIs are and are not implemented.
+</Callout>
+
+</Steps>
+
+## Available backends
+`ort` currently has the following backends:
+
+- [`ort-candle`](/backends/candle), based on [🤗 Hugging Face `candle`](https://github.com/huggingface/candle)
+    - 🔷 **Supports**: CPU, CUDA (though not available via `ort-candle` right now), WebAssembly
+    - ⚠️ Limited operator support; though most transformer models have good support.
+- [`ort-tract`](/backends/tract), based on [`tract`](https://github.com/sonos/tract)
+    - 🔷 **Supports**: CPU, WebAssembly
+    - ✅ [Great operator support](https://github.com/sonos/tract?tab=readme-ov-file#onnx)

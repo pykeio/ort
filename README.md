@@ -31,6 +31,7 @@
 - **[`sbv2-api`](https://github.com/tuna2134/sbv2-api)** is a fast implementation of Style-BERT-VITS2 text-to-speech using `ort`.
 - **[Ahnlich](https://github.com/deven96/ahnlich)** uses `ort` to power their AI proxy for semantic search applications.
 - **[Spacedrive](https://github.com/spacedriveapp/spacedrive)** is a cross-platform file manager with AI features powered by `ort`.
+- **[BoquilaHUB](https://github.com/boquila/boquilahub/)** uses `ort` for local AI deployment in biodiversity conservation efforts.
 
 ## 🌠 Sponsor `ort`
 <a href="https://opencollective.com/pyke-osai">

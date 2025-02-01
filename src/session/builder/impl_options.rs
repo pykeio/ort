@@ -174,7 +174,13 @@ impl SessionBuilder {
 		#[cfg(target_family = "windows")]
 		let file_name: Vec<u16> = file_name.as_ref().encode_utf16().chain(core::iter::once(0)).collect();
 		#[cfg(not(target_family = "windows"))]
-		let file_name: Vec<u8> = file_name.as_ref().as_bytes().into_iter().copied().chain(core::iter::once(0)).collect();
+		let file_name: Vec<core::ffi::c_char> = file_name
+			.as_ref()
+			.as_bytes()
+			.into_iter()
+			.map(|c| *c as _)
+			.chain(core::iter::once(0))
+			.collect();
 		let sizes = [buffer.len()];
 		ortsys![unsafe AddExternalInitializersFromMemory(self.ptr_mut(), &file_name.as_ptr(), &buffer.as_ptr().cast::<c_char>().cast_mut(), sizes.as_ptr(), 1)?];
 		self.external_initializer_buffers.push(buffer);

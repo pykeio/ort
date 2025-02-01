@@ -1,11 +1,22 @@
-use std::{
-	collections::HashMap,
+use alloc::{
+	boxed::Box,
+	format,
+	string::{String, ToString},
+	sync::Arc,
+	vec,
+	vec::Vec
+};
+use core::{
+	ffi::c_void,
 	fmt::Debug,
 	hash::Hash,
 	marker::PhantomData,
+	mem,
 	ptr::{self, NonNull},
-	sync::Arc
+	slice
 };
+#[cfg(feature = "std")]
+use std::collections::HashMap;
 
 use super::{
 	DowncastableTarget, DynValue, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker,
@@ -77,7 +88,7 @@ pub type MapRef<'v, K, V> = ValueRef<'v, MapValueType<K, V>>;
 pub type MapRefMut<'v, K, V> = ValueRefMut<'v, MapValueType<K, V>>;
 
 impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
-	pub fn try_extract_map<K: IntoTensorElementType + Clone + Hash + Eq, V: PrimitiveTensorElementType + Clone>(&self) -> Result<HashMap<K, V>> {
+	pub fn try_extract_raw_map<K: IntoTensorElementType + Clone + Hash + Eq, V: PrimitiveTensorElementType + Clone>(&self) -> Result<Vec<(K, V)>> {
 		match self.dtype() {
 			ValueType::Map { key, value } => {
 				let k_type = K::into_tensor_element_type();
@@ -112,11 +123,11 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 							if *ty == K::into_tensor_element_type() {
 								let mut output_array_ptr: *mut K = ptr::null_mut();
 								let output_array_ptr_ptr: *mut *mut K = &mut output_array_ptr;
-								let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
+								let output_array_ptr_ptr_void: *mut *mut c_void = output_array_ptr_ptr.cast();
 								ortsys![unsafe GetTensorMutableData(key_tensor_ptr, output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
 								let len = calculate_tensor_size(dimensions);
-								(dimensions, unsafe { std::slice::from_raw_parts(output_array_ptr, len) })
+								(dimensions, unsafe { slice::from_raw_parts(output_array_ptr, len) })
 							} else {
 								return Err(Error::new_with_code(
 									ErrorCode::InvalidArgument,
@@ -146,13 +157,13 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 					for i in 0..key_tensor_shape[0] as usize {
 						vec.push((key_tensor[i].clone(), value_tensor[i].clone()));
 					}
-					Ok(vec.into_iter().collect())
+					Ok(vec)
 				} else {
 					let (key_tensor_shape, key_tensor) = key_value.try_extract_raw_string_tensor()?;
 					// SAFETY: `IntoTensorElementType` is a private trait, and we only map the `String` type to `TensorElementType::String`,
 					// so at this point, `K` is **always** the `String` type, and this transmute really does nothing but please the type
 					// checker.
-					let key_tensor: Vec<K> = unsafe { std::mem::transmute(key_tensor) };
+					let key_tensor: Vec<K> = unsafe { mem::transmute(key_tensor) };
 
 					let mut value_tensor_ptr = ptr::null_mut();
 					ortsys![unsafe GetValue(self.ptr(), 1, allocator.ptr().cast_mut(), &mut value_tensor_ptr)?; nonNull(value_tensor_ptr)];
@@ -176,13 +187,19 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 			))
 		}
 	}
+
+	#[cfg(feature = "std")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+	pub fn try_extract_map<K: IntoTensorElementType + Clone + Hash + Eq, V: PrimitiveTensorElementType + Clone>(&self) -> Result<HashMap<K, V>> {
+		self.try_extract_raw_map().map(|c| c.into_iter().collect())
+	}
 }
 
 impl<K: PrimitiveTensorElementType + Debug + Clone + Hash + Eq + 'static, V: PrimitiveTensorElementType + Debug + Clone + 'static> Value<MapValueType<K, V>> {
 	/// Creates a [`Map`] from an iterable emitting `K` and `V`.
 	///
 	/// ```
-	/// # use std::collections::HashMap;
+	/// # use alloc::collections::HashMap;
 	/// # use ort::value::Map;
 	/// # fn main() -> ort::Result<()> {
 	/// let mut map = HashMap::<i64, f32>::new();
@@ -206,7 +223,7 @@ impl<V: PrimitiveTensorElementType + Debug + Clone + 'static> Value<MapValueType
 	/// Creates a [`Map`] from an iterable emitting `K` and `V`.
 	///
 	/// ```
-	/// # use std::collections::HashMap;
+	/// # use alloc::collections::HashMap;
 	/// # use ort::value::Map;
 	/// # fn main() -> ort::Result<()> {
 	/// let mut map = HashMap::<String, f32>::new();
@@ -230,7 +247,7 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq + 'static, V: IntoTens
 	/// Creates a [`Map`] from two tensors of keys & values respectively.
 	///
 	/// ```
-	/// # use std::collections::HashMap;
+	/// # use alloc::collections::HashMap;
 	/// # use ort::value::{Map, Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// let keys = Tensor::<i64>::from_array(([4], vec![0, 1, 2, 3]))?;
@@ -267,6 +284,14 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq + 'static, V: IntoTens
 }
 
 impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: PrimitiveTensorElementType + Debug + Clone> Value<MapValueType<K, V>> {
+	#[cfg(feature = "std")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+	pub fn extract_raw_map(&self) -> Vec<(K, V)> {
+		self.try_extract_raw_map().expect("Failed to extract map")
+	}
+
+	#[cfg(feature = "std")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn extract_map(&self) -> HashMap<K, V> {
 		self.try_extract_map().expect("Failed to extract map")
 	}
@@ -276,7 +301,7 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementT
 	/// Converts from a strongly-typed [`Map<K, V>`] to a type-erased [`DynMap`].
 	#[inline]
 	pub fn upcast(self) -> DynMap {
-		unsafe { std::mem::transmute(self) }
+		unsafe { mem::transmute(self) }
 	}
 
 	/// Converts from a strongly-typed [`Map<K, V>`] to a reference to a type-erased [`DynMap`].

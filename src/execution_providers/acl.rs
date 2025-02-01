@@ -1,3 +1,5 @@
+use alloc::format;
+
 use crate::{
 	error::{Error, Result},
 	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
@@ -6,7 +8,7 @@ use crate::{
 
 #[cfg(all(not(feature = "load-dynamic"), feature = "acl"))]
 extern "C" {
-	fn OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut ort_sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> ort_sys::OrtStatusPtr;
+	fn OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut ort_sys::OrtSessionOptions, use_arena: core::ffi::c_int) -> ort_sys::OrtStatusPtr;
 }
 
 #[derive(Debug, Default, Clone)]
@@ -48,7 +50,7 @@ impl ExecutionProvider for ACLExecutionProvider {
 		{
 			use crate::AsPointer;
 
-			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut ort_sys::OrtSessionOptions, use_arena: std::os::raw::c_int) -> ort_sys::OrtStatusPtr);
+			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut ort_sys::OrtSessionOptions, use_arena: core::ffi::c_int) -> ort_sys::OrtStatusPtr);
 			return unsafe { crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_ACL(session_builder.ptr_mut(), self.use_arena.into())) };
 		}
 

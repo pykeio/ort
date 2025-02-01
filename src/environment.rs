@@ -11,25 +11,18 @@
 //! # }
 //! ```
 
-use std::{
+use alloc::{boxed::Box, ffi::CString, string::String, vec::Vec};
+use core::{
 	any::Any,
-	ffi::CString,
-	os::raw::c_void,
-	ptr::{self, NonNull},
-	sync::{Arc, RwLock}
+	ffi::c_void,
+	ptr::{self, NonNull}
 };
 
 #[cfg(feature = "load-dynamic")]
 use crate::G_ORT_DYLIB_PATH;
-use crate::{AsPointer, error::Result, execution_providers::ExecutionProviderDispatch, ortsys};
+use crate::{AsPointer, error::Result, execution_providers::ExecutionProviderDispatch, ortsys, util::OnceLock};
 
-struct EnvironmentSingleton {
-	lock: RwLock<Option<Arc<Environment>>>
-}
-
-unsafe impl Sync for EnvironmentSingleton {}
-
-static G_ENV: EnvironmentSingleton = EnvironmentSingleton { lock: RwLock::new(None) };
+static G_ENV: OnceLock<Environment> = OnceLock::new();
 
 /// An `Environment` is a process-global structure, under which [`Session`](crate::session::Session)s are created.
 ///
@@ -39,9 +32,7 @@ static G_ENV: EnvironmentSingleton = EnvironmentSingleton { lock: RwLock::new(No
 /// environments are also used to configure ONNX Runtime to send log messages through the [`tracing`] crate in Rust.
 ///
 /// For ease of use, and since sessions require an environment to be created, `ort` will automatically create an
-/// environment if one is not configured via [`init`] (or [`init_from`]). [`init`] can be called at any point in the
-/// program (even after an environment has been automatically created), though every session created before the
-/// re-configuration would need to be re-created in order to use the config from the new environment.
+/// environment if one is not configured via [`init`] (or [`init_from`]).
 #[derive(Debug)]
 pub struct Environment {
 	pub(crate) execution_providers: Vec<ExecutionProviderDispatch>,
@@ -70,17 +61,11 @@ impl Drop for Environment {
 
 /// Gets a reference to the global environment, creating one if an environment has not been
 /// [`commit`](EnvironmentBuilder::commit)ted yet.
-pub fn get_environment() -> Result<Arc<Environment>> {
-	let env = G_ENV.lock.read().expect("poisoned lock");
-	if let Some(env) = env.as_ref() {
-		Ok(Arc::clone(env))
-	} else {
-		// drop our read lock so we dont deadlock when `commit` takes a write lock
-		drop(env);
-
+pub fn get_environment() -> Result<&'static Environment> {
+	G_ENV.get_or_try_init(|| {
 		crate::debug!("Environment not yet initialized, creating a new one");
-		Ok(EnvironmentBuilder::new().commit()?)
-	}
+		EnvironmentBuilder::new().commit_internal()
+	})
 }
 
 #[derive(Debug)]
@@ -179,10 +164,14 @@ pub(crate) unsafe extern "system" fn thread_create<T: ThreadManager + Any>(
 		worker: ort_thread_worker_fn
 	};
 
-	let res = std::panic::catch_unwind(|| {
+	let runner = || {
 		let manager = unsafe { &mut *ort_custom_thread_creation_options.cast::<T>() };
 		<T as ThreadManager>::create(manager, thread_worker)
-	});
+	};
+	#[cfg(not(feature = "std"))]
+	let res = Result::<_, crate::Error>::Ok(runner()); // dumb hack
+	#[cfg(feature = "std")]
+	let res = std::panic::catch_unwind(runner);
 	match res {
 		Ok(Ok(thread)) => (Box::leak(Box::new(thread)) as *mut <T as ThreadManager>::Thread)
 			.cast_const()
@@ -219,9 +208,9 @@ pub struct EnvironmentBuilder {
 impl EnvironmentBuilder {
 	pub(crate) fn new() -> Self {
 		EnvironmentBuilder {
-			name: "default".to_string(),
+			name: String::from("default"),
 			telemetry: true,
-			execution_providers: vec![],
+			execution_providers: Vec::new(),
 			global_thread_pool_options: None
 		}
 	}
@@ -275,10 +264,9 @@ impl EnvironmentBuilder {
 		self
 	}
 
-	/// Commit the environment configuration and set the global environment.
-	pub fn commit(self) -> Result<Arc<Environment>> {
+	pub(crate) fn commit_internal(self) -> Result<Environment> {
 		let (env_ptr, thread_manager, has_global_threadpool) = if let Some(mut thread_pool_options) = self.global_thread_pool_options {
-			let mut env_ptr: *mut ort_sys::OrtEnv = std::ptr::null_mut();
+			let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
 			let cname = CString::new(self.name.clone()).unwrap_or_else(|_| unreachable!());
 
 			#[cfg(feature = "tracing")]
@@ -307,7 +295,7 @@ impl EnvironmentBuilder {
 			let thread_manager = thread_pool_options.thread_manager.take();
 			(env_ptr, thread_manager, true)
 		} else {
-			let mut env_ptr: *mut ort_sys::OrtEnv = std::ptr::null_mut();
+			let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
 			let cname = CString::new(self.name.clone()).unwrap_or_else(|_| unreachable!());
 
 			#[cfg(feature = "tracing")]
@@ -333,7 +321,7 @@ impl EnvironmentBuilder {
 
 			(env_ptr, None, false)
 		};
-		crate::debug!(env_ptr = format!("{env_ptr:?}").as_str(), "Environment created");
+		crate::debug!(env_ptr = alloc::format!("{env_ptr:?}").as_str(), "Environment created");
 
 		if self.telemetry {
 			ortsys![unsafe EnableTelemetryEvents(env_ptr)?];
@@ -341,21 +329,19 @@ impl EnvironmentBuilder {
 			ortsys![unsafe DisableTelemetryEvents(env_ptr)?];
 		}
 
-		let mut env_lock = G_ENV.lock.write().expect("poisoned lock");
-		// drop global reference to previous environment
-		if let Some(env_arc) = env_lock.take() {
-			drop(env_arc);
-		}
-		let env = Arc::new(Environment {
+		Ok(Environment {
 			execution_providers: self.execution_providers,
 			// we already asserted the env pointer is non-null in the `CreateEnvWithCustomLogger` call
 			ptr: unsafe { NonNull::new_unchecked(env_ptr) },
 			has_global_threadpool,
 			_thread_manager: thread_manager
-		});
-		env_lock.replace(Arc::clone(&env));
+		})
+	}
 
-		Ok(env)
+	/// Commit the environment configuration.
+	pub fn commit(self) -> Result<bool> {
+		let env = self.commit_internal()?;
+		Ok(G_ENV.try_insert(env))
 	}
 }
 
@@ -409,6 +395,6 @@ pub fn init() -> EnvironmentBuilder {
 #[cfg_attr(docsrs, doc(cfg(feature = "load-dynamic")))]
 #[must_use = "commit() must be called in order for the environment to take effect"]
 pub fn init_from(path: impl ToString) -> EnvironmentBuilder {
-	let _ = G_ORT_DYLIB_PATH.set(Arc::new(path.to_string()));
+	let _ = G_ORT_DYLIB_PATH.get_or_init(|| alloc::sync::Arc::new(path.to_string()));
 	EnvironmentBuilder::new()
 }

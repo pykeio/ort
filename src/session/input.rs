@@ -1,4 +1,5 @@
-use std::{borrow::Cow, collections::HashMap, ops::Deref};
+use alloc::{borrow::Cow, vec::Vec};
+use core::ops::Deref;
 
 use crate::value::{DynValueTypeMarker, Value, ValueRef, ValueRefMut, ValueTypeMarker};
 
@@ -50,8 +51,10 @@ pub enum SessionInputs<'i, 'v, const N: usize = 0> {
 	ValueArray([SessionInputValue<'v>; N])
 }
 
-impl<'i, 'v, K: Into<Cow<'i, str>>, V: Into<SessionInputValue<'v>>> From<HashMap<K, V>> for SessionInputs<'i, 'v> {
-	fn from(val: HashMap<K, V>) -> Self {
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+impl<'i, 'v, K: Into<Cow<'i, str>>, V: Into<SessionInputValue<'v>>> From<std::collections::HashMap<K, V>> for SessionInputs<'i, 'v> {
+	fn from(val: std::collections::HashMap<K, V>) -> Self {
 		SessionInputs::ValueMap(val.into_iter().map(|(k, v)| (k.into(), v.into())).collect())
 	}
 }
@@ -108,10 +111,10 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 #[macro_export]
 macro_rules! inputs {
 	($($v:expr),+ $(,)?) => (
-		[$(::std::convert::Into::<$crate::session::SessionInputValue<'_>>::into($v)),+]
+		[$($crate::__private::core::convert::Into::<$crate::session::SessionInputValue<'_>>::into($v)),+]
 	);
 	($($n:expr => $v:expr),+ $(,)?) => (
-		vec![$((::std::borrow::Cow::<str>::from($n), $crate::session::SessionInputValue::<'_>::from($v)),)+]
+		vec![$(($crate::__private::alloc::borrow::Cow::<str>::from($n), $crate::session::SessionInputValue::<'_>::from($v)),)+]
 	);
 }
 

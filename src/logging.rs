@@ -1,5 +1,5 @@
 #[cfg(feature = "tracing")]
-use std::{
+use core::{
 	ffi::{self, CStr},
 	ptr
 };
@@ -42,6 +42,7 @@ pub(crate) use warning;
 
 #[cfg(not(feature = "tracing"))]
 pub fn default_log_level() -> ort_sys::OrtLoggingLevel {
+	#[cfg(feature = "std")]
 	match std::env::var("ORT_LOG").as_deref() {
 		Ok("fatal") => ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_FATAL,
 		Ok("error") => ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_ERROR,
@@ -50,6 +51,8 @@ pub fn default_log_level() -> ort_sys::OrtLoggingLevel {
 		Ok("verbose") => ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
 		_ => ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_ERROR
 	}
+	#[cfg(not(feature = "std"))]
+	ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING
 }
 
 /// Callback from C that will handle ONNX logging, forwarding ONNX's logs to the `tracing` crate.

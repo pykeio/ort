@@ -1,9 +1,7 @@
 //! Contains traits for implementing custom operator domains & kernels.
 
-use std::{
-	ffi::CString,
-	ptr::{self, NonNull}
-};
+use alloc::{boxed::Box, ffi::CString, vec::Vec};
+use core::ptr::{self, NonNull};
 
 pub(crate) mod bound;
 pub mod io;

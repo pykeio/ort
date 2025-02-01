@@ -1,44 +1,27 @@
 //! Helper traits to extend [`ndarray`] functionality.
 
+use core::ops::{DivAssign, SubAssign};
+
 use ndarray::{Array, ArrayBase};
 
 /// Trait extending [`ndarray::ArrayBase`](https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html)
 /// with useful tensor operations.
-///
-/// # Generic
-///
-/// The trait is generic over:
-/// * `S`: [`ndarray::ArrayBase`](https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html)'s data container
-/// * `T`: Type contained inside the tensor (for example `f32`)
-/// * `D`: Tensor's dimension ([`ndarray::Dimension`](https://docs.rs/ndarray/latest/ndarray/trait.Dimension.html))
 pub trait ArrayExtensions<S, T, D> {
-	/// Calculate the [softmax](https://en.wikipedia.org/wiki/Softmax_function) of the tensor along a given axis
-	///
-	/// # Trait Bounds
-	///
-	/// The function is generic and thus has some trait bounds:
-	/// * `D: ndarray::RemoveAxis`: The summation over an axis reduces the dimension of the tensor. A 0-D tensor thus
-	///   cannot have a softmax calculated.
-	/// * `S: ndarray::RawData + ndarray::Data + ndarray::RawData<Elem = T>`: The storage of the tensor can be an owned
-	///   array ([`ndarray::Array`](https://docs.rs/ndarray/latest/ndarray/type.Array.html)) or an array view
-	///   ([`ndarray::ArrayView`](https://docs.rs/ndarray/latest/ndarray/type.ArrayView.html)).
-	/// * `<S as ndarray::RawData>::Elem: std::clone::Clone`: The elements of the tensor must be `Clone`.
-	/// * `T: ndarray::NdFloat + std::ops::SubAssign + std::ops::DivAssign`: The elements of the tensor must be workable
-	///   as floats and must support `-=` and `/=` operations.
+	/// Calculate the [softmax](https://en.wikipedia.org/wiki/Softmax_function) of the tensor along a given axis.
 	fn softmax(&self, axis: ndarray::Axis) -> Array<T, D>
 	where
 		D: ndarray::RemoveAxis,
 		S: ndarray::RawData + ndarray::Data + ndarray::RawData<Elem = T>,
-		<S as ndarray::RawData>::Elem: std::clone::Clone,
-		T: ndarray::NdFloat + std::ops::SubAssign + std::ops::DivAssign;
+		<S as ndarray::RawData>::Elem: Clone,
+		T: ndarray::NdFloat + SubAssign + DivAssign;
 }
 
 impl<S, T, D> ArrayExtensions<S, T, D> for ArrayBase<S, D>
 where
 	D: ndarray::RemoveAxis,
 	S: ndarray::RawData + ndarray::Data + ndarray::RawData<Elem = T>,
-	<S as ndarray::RawData>::Elem: std::clone::Clone,
-	T: ndarray::NdFloat + std::ops::SubAssign + std::ops::DivAssign
+	<S as ndarray::RawData>::Elem: Clone,
+	T: ndarray::NdFloat + SubAssign + DivAssign
 {
 	fn softmax(&self, axis: ndarray::Axis) -> Array<T, D> {
 		let mut new_array: Array<T, D> = self.to_owned();

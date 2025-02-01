@@ -1,4 +1,5 @@
-use std::num::NonZeroUsize;
+use alloc::{format, string::ToString};
+use core::num::NonZeroUsize;
 
 use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
 use crate::{
@@ -54,10 +55,9 @@ impl ExecutionProvider for XNNPACKExecutionProvider {
 			use crate::AsPointer;
 
 			let ffi_options = self.options.to_ffi();
-			let ep_name = std::ffi::CString::new("XNNPACK").unwrap_or_else(|_| unreachable!());
 			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider(
 				session_builder.ptr_mut(),
-				ep_name.as_ptr(),
+				b"XNNPACK\0".as_ptr().cast::<core::ffi::c_char>(),
 				ffi_options.key_ptrs(),
 				ffi_options.value_ptrs(),
 				ffi_options.len(),

@@ -3,6 +3,7 @@
 #![allow(clippy::tabs_in_doc_comments, clippy::arc_with_non_send_sync)]
 #![allow(clippy::macro_metavars_in_unsafe)]
 #![warn(clippy::unwrap_used)]
+#![cfg_attr(all(not(test), not(feature = "std")), no_std)]
 
 //! <div align=center>
 //! 	<img src="https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/docs/trend-banner.png" width="350px">
@@ -11,6 +12,15 @@
 //!
 //! `ort` is a Rust binding for [ONNX Runtime](https://onnxruntime.ai/). For information on how to get started with `ort`,
 //! see <https://ort.pyke.io/introduction>.
+
+extern crate alloc;
+extern crate core;
+
+#[doc(hidden)]
+pub mod __private {
+	pub extern crate alloc;
+	pub extern crate core;
+}
 
 #[cfg(all(test, not(feature = "fetch-models")))]
 compile_error!("`cargo test --features fetch-models`!!1!");
@@ -35,14 +45,20 @@ pub(crate) mod util;
 pub mod value;
 
 #[cfg(feature = "load-dynamic")]
-use std::sync::Arc;
-use std::{ffi::CStr, os::raw::c_char, ptr::NonNull, sync::OnceLock};
+use alloc::sync::Arc;
+use alloc::{borrow::ToOwned, boxed::Box, string::String};
+use core::{
+	ffi::{CStr, c_char},
+	ptr::NonNull,
+	slice, str
+};
 
 pub use ort_sys as sys;
 
 #[cfg(feature = "load-dynamic")]
 pub use self::environment::init_from;
 pub(crate) use self::logging::{debug, error, info, trace, warning as warn};
+use self::util::OnceLock;
 pub use self::{
 	environment::init,
 	error::{Error, ErrorCode, Result}
@@ -105,7 +121,7 @@ pub fn info() -> &'static str {
 	while unsafe { *str.add(len) } != 0x00 {
 		len += 1;
 	}
-	unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(str.cast::<u8>(), len)) }
+	unsafe { str::from_utf8_unchecked(slice::from_raw_parts(str.cast::<u8>(), len)) }
 }
 
 struct ApiPointer(NonNull<ort_sys::OrtApi>);
@@ -133,6 +149,8 @@ pub fn api() -> &'static ort_sys::OrtApi {
 		.get_or_init(|| {
 			#[cfg(feature = "load-dynamic")]
 			unsafe {
+				use core::cmp::Ordering;
+
 				let dylib = lib_handle();
 				let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const ort_sys::OrtApiBase> = dylib
 					.get(b"OrtGetApiBase")
@@ -146,17 +164,17 @@ pub fn api() -> &'static ort_sys::OrtApi {
 
 				let lib_minor_version = version_string.split('.').nth(1).map_or(0, |x| x.parse::<u32>().unwrap_or(0));
 				match lib_minor_version.cmp(&MINOR_VERSION) {
-					std::cmp::Ordering::Less => panic!(
+					Ordering::Less => panic!(
 						"ort {} is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
 						env!("CARGO_PKG_VERSION"),
 						dylib_path()
 					),
-					std::cmp::Ordering::Greater => crate::warn!(
+					Ordering::Greater => crate::warn!(
 						"ort {} may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
 						env!("CARGO_PKG_VERSION"),
 						dylib_path()
 					),
-					std::cmp::Ordering::Equal => {}
+					Ordering::Equal => {}
 				};
 				let api: *const ort_sys::OrtApi = ((*base).GetApi)(ort_sys::ORT_API_VERSION);
 				ApiPointer(NonNull::new(api.cast_mut()).expect("Failed to initialize ORT API"))
@@ -174,13 +192,7 @@ pub fn api() -> &'static ort_sys::OrtApi {
 }
 
 pub fn set_api(api: ort_sys::OrtApi) -> bool {
-	match G_ORT_API.set(ApiPointer(unsafe { NonNull::new_unchecked(Box::leak(Box::new(api))) })) {
-		Ok(()) => true,
-		Err(api) => {
-			drop(unsafe { Box::from_raw(api.0.as_ptr()) });
-			false
-		}
-	}
+	G_ORT_API.try_insert(ApiPointer(unsafe { NonNull::new_unchecked(Box::leak(Box::new(api))) }))
 }
 
 /// Trait to access raw pointers from safe types which wrap unsafe [`ort_sys`] types.
@@ -246,12 +258,12 @@ pub(crate) fn char_p_to_string(raw: *const c_char) -> Result<String> {
 		return Ok(String::new());
 	}
 	let c_string = unsafe { CStr::from_ptr(raw.cast_mut()).to_owned() };
-	Ok(c_string.to_string_lossy().to_string())
+	Ok(c_string.to_string_lossy().into())
 }
 
 #[cfg(test)]
 mod test {
-	use std::ffi::CString;
+	use alloc::ffi::CString;
 
 	use super::*;
 

@@ -1,4 +1,4 @@
-use std::ffi::CString;
+use alloc::{ffi::CString, format};
 
 use crate::{
 	error::{Error, Result},
@@ -87,6 +87,8 @@ impl ExecutionProvider for MIGraphXExecutionProvider {
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "migraphx"))]
 		{
+			use core::ptr;
+
 			use crate::AsPointer;
 
 			let options = ort_sys::OrtMIGraphXProviderOptions {
@@ -94,15 +96,11 @@ impl ExecutionProvider for MIGraphXExecutionProvider {
 				migraphx_fp16_enable: self.enable_fp16.into(),
 				migraphx_int8_enable: self.enable_int8.into(),
 				migraphx_use_native_calibration_table: self.use_native_calibration_table.into(),
-				migraphx_int8_calibration_table_name: self
-					.int8_calibration_table_name
-					.as_ref()
-					.map(|c| c.as_ptr())
-					.unwrap_or_else(std::ptr::null),
+				migraphx_int8_calibration_table_name: self.int8_calibration_table_name.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null),
 				migraphx_load_compiled_model: self.load_model_path.is_some().into(),
-				migraphx_load_model_path: self.load_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(std::ptr::null),
+				migraphx_load_model_path: self.load_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null),
 				migraphx_save_compiled_model: self.save_model_path.is_some().into(),
-				migraphx_save_model_path: self.save_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(std::ptr::null),
+				migraphx_save_model_path: self.save_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null),
 				migraphx_exhaustive_tune: self.exhaustive_tune
 			};
 			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_MIGraphX(session_builder.ptr_mut(), &options)?];

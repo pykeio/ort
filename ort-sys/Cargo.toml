@@ -16,7 +16,8 @@ authors = [
 include = [ "src/", "dist.txt", "build.rs", "LICENSE-APACHE", "LICENSE-MIT" ]
 
 [features]
-default = []
+default = [ "std" ]
+std = []
 training = []
 download-binaries = [ "ureq", "tar", "flate2", "sha2" ]
 load-dynamic = []

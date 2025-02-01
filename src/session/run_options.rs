@@ -1,9 +1,9 @@
-use std::{
-	collections::HashMap,
-	ffi::{CStr, CString, c_char},
+use alloc::{ffi::CString, string::String, sync::Arc, vec::Vec};
+use core::{
+	ffi::{CStr, c_char},
 	marker::PhantomData,
-	ptr::{self, NonNull},
-	sync::Arc
+	mem,
+	ptr::{self, NonNull}
 };
 
 use crate::{
@@ -12,13 +12,14 @@ use crate::{
 	error::Result,
 	ortsys,
 	session::Output,
+	util::MiniMap,
 	value::{DynValue, Value, ValueTypeMarker}
 };
 
 /// Allows selecting/deselecting/preallocating the outputs of a [`Session`] inference call.
 ///
 /// ```
-/// # use std::sync::Arc;
+/// # use alloc::sync::Arc;
 /// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
 /// # fn main() -> ort::Result<()> {
 /// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
@@ -46,7 +47,7 @@ pub struct OutputSelector {
 	use_defaults: bool,
 	default_blocklist: Vec<String>,
 	allowlist: Vec<String>,
-	preallocated_outputs: HashMap<String, Value>
+	preallocated_outputs: MiniMap<String, Value>
 }
 
 impl Default for OutputSelector {
@@ -57,7 +58,7 @@ impl Default for OutputSelector {
 			use_defaults: true,
 			allowlist: Vec::new(),
 			default_blocklist: Vec::new(),
-			preallocated_outputs: HashMap::new()
+			preallocated_outputs: MiniMap::new()
 		}
 	}
 }
@@ -97,7 +98,7 @@ impl OutputSelector {
 	/// for an ODE or embeddings model.
 	///
 	/// ```
-	/// # use std::sync::Arc;
+	/// # use alloc::sync::Arc;
 	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
@@ -178,7 +179,7 @@ unsafe impl Sync for RunOptions<NoSelectedOutputs> {}
 impl RunOptions {
 	/// Creates a new [`RunOptions`] struct.
 	pub fn new() -> Result<RunOptions<NoSelectedOutputs>> {
-		let mut run_options_ptr: *mut ort_sys::OrtRunOptions = std::ptr::null_mut();
+		let mut run_options_ptr: *mut ort_sys::OrtRunOptions = ptr::null_mut();
 		ortsys![unsafe CreateRunOptions(&mut run_options_ptr)?; nonNull(run_options_ptr)];
 		Ok(RunOptions {
 			run_options_ptr: unsafe { NonNull::new_unchecked(run_options_ptr) },
@@ -195,7 +196,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// See [`OutputSelector`] for more details.
 	///
 	/// ```
-	/// # use std::sync::Arc;
+	/// # use alloc::sync::Arc;
 	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
@@ -218,7 +219,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// ```
 	pub fn with_outputs(mut self, outputs: OutputSelector) -> RunOptions<HasSelectedOutputs> {
 		self.outputs = outputs;
-		unsafe { std::mem::transmute(self) }
+		unsafe { mem::transmute(self) }
 	}
 
 	/// Sets a tag to identify this run in logs.
@@ -250,7 +251,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	///
 	/// ```no_run
 	/// # // no_run because upsample.onnx is too simple of a model for the termination signal to be reliable enough
-	/// # use std::sync::Arc;
+	/// # use alloc::sync::Arc;
 	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, value::Value};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
@@ -279,7 +280,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// Resets the termination flag for the runs associated with [`RunOptions`].
 	///
 	/// ```no_run
-	/// # use std::sync::Arc;
+	/// # use alloc::sync::Arc;
 	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, value::Value};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
@@ -308,7 +309,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// This can be used to, for example, configure the graph ID when using compute graphs with an execution provider
 	/// like CUDA:
 	/// ```no_run
-	/// # use std::sync::Arc;
+	/// # use alloc::sync::Arc;
 	/// # use ort::session::run_options::RunOptions;
 	/// # fn main() -> ort::Result<()> {
 	/// let mut run_options = RunOptions::new()?;

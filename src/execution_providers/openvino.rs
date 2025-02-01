@@ -1,4 +1,5 @@
-use std::os::raw::c_void;
+use alloc::{ffi::CString, format};
+use core::{ffi::c_void, ptr};
 
 use crate::{
 	error::{Error, Result},
@@ -8,10 +9,10 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct OpenVINOExecutionProvider {
-	device_type: Option<String>,
-	device_id: Option<String>,
+	device_type: Option<CString>,
+	device_id: Option<CString>,
 	num_threads: usize,
-	cache_dir: Option<String>,
+	cache_dir: Option<CString>,
 	context: *mut c_void,
 	enable_opencl_throttling: bool,
 	enable_dynamic_shapes: bool,
@@ -28,7 +29,7 @@ impl Default for OpenVINOExecutionProvider {
 			device_id: None,
 			num_threads: 8,
 			cache_dir: None,
-			context: std::ptr::null_mut(),
+			context: ptr::null_mut(),
 			enable_opencl_throttling: false,
 			enable_dynamic_shapes: false,
 			enable_npu_fast_compile: false
@@ -40,16 +41,16 @@ impl OpenVINOExecutionProvider {
 	/// Overrides the accelerator hardware type and precision with these values at runtime. If this option is not
 	/// explicitly set, default hardware and precision specified during build time is used.
 	#[must_use]
-	pub fn with_device_type(mut self, device_type: impl ToString) -> Self {
-		self.device_type = Some(device_type.to_string());
+	pub fn with_device_type(mut self, device_type: impl AsRef<str>) -> Self {
+		self.device_type = Some(CString::new(device_type.as_ref()).expect("invalid string"));
 		self
 	}
 
 	/// Selects a particular hardware device for inference. If this option is not explicitly set, an arbitrary free
 	/// device will be automatically selected by OpenVINO runtime.
 	#[must_use]
-	pub fn with_device_id(mut self, device_id: impl ToString) -> Self {
-		self.device_id = Some(device_id.to_string());
+	pub fn with_device_id(mut self, device_id: impl AsRef<str>) -> Self {
+		self.device_id = Some(CString::new(device_id.as_ref()).expect("invalid string"));
 		self
 	}
 
@@ -63,8 +64,8 @@ impl OpenVINOExecutionProvider {
 
 	/// Explicitly specify the path to save and load the blobs, enabling model caching.
 	#[must_use]
-	pub fn with_cache_dir(mut self, dir: impl ToString) -> Self {
-		self.cache_dir = Some(dir.to_string());
+	pub fn with_cache_dir(mut self, dir: impl AsRef<str>) -> Self {
+		self.cache_dir = Some(CString::new(dir.as_ref()).expect("invalid string"));
 		self
 	}
 
@@ -123,33 +124,28 @@ impl ExecutionProvider for OpenVINOExecutionProvider {
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "openvino"))]
 		{
-			use std::ffi::CString;
+			use alloc::ffi::CString;
+			use core::ffi::c_char;
 
 			use crate::AsPointer;
 
 			// Like TensorRT, the OpenVINO EP is also pretty picky about needing an environment by this point.
 			let _ = crate::environment::get_environment();
 
-			let device_type = self.device_type.as_deref().map(CString::new).transpose()?;
-			let device_id = self.device_id.as_deref().map(CString::new).transpose()?;
-			let cache_dir = self.cache_dir.as_deref().map(CString::new).transpose()?;
 			let openvino_options = ort_sys::OrtOpenVINOProviderOptions {
-				device_type: device_type
+				device_type: self
+					.device_type
 					.as_ref()
-					.map_or_else(std::ptr::null, |x| x.as_bytes().as_ptr().cast::<std::ffi::c_char>()),
-				device_id: device_id
-					.as_ref()
-					.map_or_else(std::ptr::null, |x| x.as_bytes().as_ptr().cast::<std::ffi::c_char>()),
+					.map_or_else(ptr::null, |x| x.as_bytes().as_ptr().cast::<c_char>()),
+				device_id: self.device_id.as_ref().map_or_else(ptr::null, |x| x.as_bytes().as_ptr().cast::<c_char>()),
 				num_of_threads: self.num_threads,
-				cache_dir: cache_dir
-					.as_ref()
-					.map_or_else(std::ptr::null, |x| x.as_bytes().as_ptr().cast::<std::ffi::c_char>()),
+				cache_dir: self.cache_dir.as_ref().map_or_else(ptr::null, |x| x.as_bytes().as_ptr().cast::<c_char>()),
 				context: self.context,
 				enable_opencl_throttling: self.enable_opencl_throttling.into(),
 				enable_dynamic_shapes: self.enable_dynamic_shapes.into(),
 				enable_npu_fast_compile: self.enable_npu_fast_compile.into()
 			};
-			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO(session_builder.ptr_mut(), std::ptr::addr_of!(openvino_options))?];
+			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO(session_builder.ptr_mut(), ptr::addr_of!(openvino_options))?];
 			return Ok(());
 		}
 

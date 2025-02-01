@@ -1,3 +1,5 @@
+use alloc::{format, string::ToString};
+
 use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
 use crate::{
 	error::{Error, Result},
@@ -51,7 +53,7 @@ impl ExecutionProvider for OneDNNExecutionProvider {
 		{
 			use crate::AsPointer;
 
-			let mut dnnl_options: *mut ort_sys::OrtDnnlProviderOptions = std::ptr::null_mut();
+			let mut dnnl_options: *mut ort_sys::OrtDnnlProviderOptions = core::ptr::null_mut();
 			crate::ortsys![unsafe CreateDnnlProviderOptions(&mut dnnl_options)?];
 			let ffi_options = self.options.to_ffi();
 			if let Err(e) = unsafe {

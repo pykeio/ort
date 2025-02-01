@@ -1,10 +1,11 @@
 //! Types for managing memory & device allocations.
 
-use std::{
+use alloc::sync::Arc;
+use core::{
 	ffi::{c_char, c_int, c_void},
 	mem,
-	ptr::NonNull,
-	sync::Arc
+	ptr::{self, NonNull},
+	slice, str
 };
 
 use crate::{
@@ -151,7 +152,7 @@ impl Allocator {
 	/// Creates a new [`Allocator`] for the given session, to allocate memory on the device described in the
 	/// [`MemoryInfo`].
 	pub fn new(session: &Session, memory_info: MemoryInfo) -> Result<Self> {
-		let mut allocator_ptr: *mut ort_sys::OrtAllocator = std::ptr::null_mut();
+		let mut allocator_ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
 		ortsys![unsafe CreateAllocator(session.ptr(), memory_info.ptr.as_ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
 		Ok(Self {
 			ptr: unsafe { NonNull::new_unchecked(allocator_ptr) },
@@ -169,7 +170,7 @@ impl Default for Allocator {
 	/// The allocator returned by this function is actually shared across all invocations (though this behavior is
 	/// transparent to the user).
 	fn default() -> Self {
-		let mut allocator_ptr: *mut ort_sys::OrtAllocator = std::ptr::null_mut();
+		let mut allocator_ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
 		unsafe { status_to_result(ortsys![GetAllocatorWithDefaultOptions(&mut allocator_ptr); nonNull(allocator_ptr)]) }
 			.expect("Failed to get default allocator");
 		Self {
@@ -389,7 +390,7 @@ impl MemoryInfo {
 	/// # }
 	/// ```
 	pub fn new(allocation_device: AllocationDevice, device_id: c_int, allocator_type: AllocatorType, memory_type: MemoryType) -> Result<Self> {
-		let mut memory_info_ptr: *mut ort_sys::OrtMemoryInfo = std::ptr::null_mut();
+		let mut memory_info_ptr: *mut ort_sys::OrtMemoryInfo = ptr::null_mut();
 		ortsys![
 			unsafe CreateMemoryInfo(allocation_device.as_str().as_ptr().cast(), allocator_type.into(), device_id, memory_type.into(), &mut memory_info_ptr)?;
 			nonNull(memory_info_ptr)
@@ -404,7 +405,7 @@ impl MemoryInfo {
 		let mut is_tensor = 0;
 		ortsys![unsafe IsTensor(value_ptr, &mut is_tensor)]; // infallible
 		if is_tensor != 0 {
-			let mut memory_info_ptr: *const ort_sys::OrtMemoryInfo = std::ptr::null_mut();
+			let mut memory_info_ptr: *const ort_sys::OrtMemoryInfo = ptr::null_mut();
 			// infallible, and `memory_info_ptr` will never be null
 			ortsys![unsafe GetTensorMemoryInfo(value_ptr, &mut memory_info_ptr)];
 			Some(Self::from_raw(unsafe { NonNull::new_unchecked(memory_info_ptr.cast_mut()) }, false))
@@ -465,7 +466,7 @@ impl MemoryInfo {
 	/// # }
 	/// ```
 	pub fn allocation_device(&self) -> AllocationDevice {
-		let mut name_ptr: *const c_char = std::ptr::null_mut();
+		let mut name_ptr: *const c_char = ptr::null_mut();
 		ortsys![unsafe MemoryInfoGetName(self.ptr.as_ptr(), &mut name_ptr)];
 
 		// SAFETY: `name_ptr` can never be null - `CreateMemoryInfo` internally checks against builtin device names, erroring
@@ -478,7 +479,7 @@ impl MemoryInfo {
 
 		// SAFETY: ONNX Runtime internally only ever defines allocation device names as ASCII. can't wait for this to blow up
 		// one day regardless
-		let name = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr.cast::<u8>(), len + 1)) };
+		let name = unsafe { str::from_utf8_unchecked(slice::from_raw_parts(name_ptr.cast::<u8>(), len + 1)) };
 		AllocationDevice(name)
 	}
 

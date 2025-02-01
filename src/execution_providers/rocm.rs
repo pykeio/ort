@@ -1,4 +1,5 @@
-use std::os::raw::c_void;
+use alloc::format;
+use core::ffi::c_void;
 
 use crate::{
 	error::{Error, Result},
@@ -134,6 +135,8 @@ impl ExecutionProvider for ROCmExecutionProvider {
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		#[cfg(any(feature = "load-dynamic", feature = "rocm"))]
 		{
+			use core::ptr;
+
 			use crate::AsPointer;
 
 			let rocm_options = ort_sys::OrtROCMProviderOptions {
@@ -146,14 +149,14 @@ impl ExecutionProvider for ROCmExecutionProvider {
 				},
 				do_copy_in_default_stream: self.do_copy_in_default_stream.into(),
 				has_user_compute_stream: self.user_compute_stream.is_some().into(),
-				user_compute_stream: self.user_compute_stream.unwrap_or_else(std::ptr::null_mut),
-				default_memory_arena_cfg: self.default_memory_arena_cfg.unwrap_or_else(std::ptr::null_mut),
+				user_compute_stream: self.user_compute_stream.unwrap_or_else(ptr::null_mut),
+				default_memory_arena_cfg: self.default_memory_arena_cfg.unwrap_or_else(ptr::null_mut),
 				enable_hip_graph: self.enable_hip_graph.into(),
 				tunable_op_enable: self.tunable_op_enable.into(),
 				tunable_op_tuning_enable: self.tunable_op_tuning_enable.into(),
 				tunable_op_max_tuning_duration_ms: self.tunable_op_max_tuning_duration_ms
 			};
-			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(session_builder.ptr_mut(), std::ptr::addr_of!(rocm_options))?];
+			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(session_builder.ptr_mut(), ptr::addr_of!(rocm_options))?];
 			return Ok(());
 		}
 

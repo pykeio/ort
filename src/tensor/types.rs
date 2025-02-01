@@ -1,6 +1,7 @@
-use std::fmt;
+use alloc::string::String;
+use core::fmt;
 #[cfg(feature = "ndarray")]
-use std::ptr;
+use core::{ffi::c_void, ptr};
 
 #[cfg(feature = "ndarray")]
 use crate::{error::Result, ortsys};
@@ -194,7 +195,7 @@ pub(crate) fn extract_primitive_array<'t, T>(shape: ndarray::IxDyn, tensor: *con
 	// Get pointer to output tensor values
 	let mut output_array_ptr: *mut T = ptr::null_mut();
 	let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
-	let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
+	let output_array_ptr_ptr_void: *mut *mut c_void = output_array_ptr_ptr.cast();
 	ortsys![unsafe GetTensorMutableData(tensor.cast_mut(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
 	let array_view = unsafe { ndarray::ArrayView::from_shape_ptr(shape, output_array_ptr) };
@@ -210,7 +211,7 @@ pub(crate) fn extract_primitive_array_mut<'t, T>(shape: ndarray::IxDyn, tensor: 
 	// Get pointer to output tensor values
 	let mut output_array_ptr: *mut T = ptr::null_mut();
 	let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
-	let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
+	let output_array_ptr_ptr_void: *mut *mut c_void = output_array_ptr_ptr.cast();
 	ortsys![unsafe GetTensorMutableData(tensor, output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
 	let array_view = unsafe { ndarray::ArrayViewMut::from_shape_ptr(shape, output_array_ptr) };

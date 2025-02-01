@@ -1,3 +1,5 @@
+use alloc::{format, string::ToString};
+
 use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
 use crate::{
 	error::{Error, Result},

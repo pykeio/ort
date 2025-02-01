@@ -16,14 +16,19 @@
 //!
 //! ONNX Runtime also supports [`Sequence`]s and [`Map`]s, though they are less commonly used.
 
-use std::{
+use alloc::{
+	boxed::Box,
+	format,
+	string::{String, ToString},
+	sync::Arc
+};
+use core::{
 	any::Any,
 	fmt::Debug,
 	marker::PhantomData,
 	mem::transmute,
 	ops::{Deref, DerefMut},
-	ptr::NonNull,
-	sync::Arc
+	ptr::{self, NonNull}
 };
 
 mod impl_map;
@@ -102,7 +107,7 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + ?Sized>(self) -> Result<ValueRef<'v, OtherType>> {
 		let dt = self.dtype();
 		if OtherType::can_downcast(dt) {
-			Ok(unsafe { std::mem::transmute::<ValueRef<'v, Type>, ValueRef<'v, OtherType>>(self) })
+			Ok(unsafe { transmute::<ValueRef<'v, Type>, ValueRef<'v, OtherType>>(self) })
 		} else {
 			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &{dt} to &{}", OtherType::format())))
 		}
@@ -118,7 +123,7 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 	}
 
 	pub fn into_dyn(self) -> ValueRef<'v, DynValueTypeMarker> {
-		unsafe { std::mem::transmute(self) }
+		unsafe { transmute(self) }
 	}
 }
 
@@ -155,7 +160,7 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + ?Sized>(self) -> Result<ValueRefMut<'v, OtherType>> {
 		let dt = self.dtype();
 		if OtherType::can_downcast(dt) {
-			Ok(unsafe { std::mem::transmute::<ValueRefMut<'v, Type>, ValueRefMut<'v, OtherType>>(self) })
+			Ok(unsafe { transmute::<ValueRefMut<'v, Type>, ValueRefMut<'v, OtherType>>(self) })
 		} else {
 			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &mut {dt} to &mut {}", OtherType::format())))
 		}
@@ -171,7 +176,7 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 	}
 
 	pub fn into_dyn(self) -> ValueRefMut<'v, DynValueTypeMarker> {
-		unsafe { std::mem::transmute(self) }
+		unsafe { transmute(self) }
 	}
 }
 
@@ -309,7 +314,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	/// - `session` must be `Some` for values returned from a session.
 	#[must_use]
 	pub unsafe fn from_ptr(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value<Type> {
-		let mut typeinfo_ptr = std::ptr::null_mut();
+		let mut typeinfo_ptr = ptr::null_mut();
 		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr)];
 		Value {
 			inner: Arc::new(ValueInner {
@@ -327,7 +332,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	/// contexts.
 	#[must_use]
 	pub(crate) unsafe fn from_ptr_nodrop(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value<Type> {
-		let mut typeinfo_ptr = std::ptr::null_mut();
+		let mut typeinfo_ptr = ptr::null_mut();
 		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr)];
 		Value {
 			inner: Arc::new(ValueInner {
@@ -353,7 +358,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 
 	/// Converts this value into a type-erased [`DynValue`].
 	pub fn into_dyn(self) -> DynValue {
-		unsafe { std::mem::transmute(self) }
+		unsafe { transmute(self) }
 	}
 
 	pub(crate) fn clone_of(value: &Self) -> Self {
@@ -388,7 +393,7 @@ impl Value<DynValueTypeMarker> {
 	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + ?Sized>(self) -> Result<Value<OtherType>> {
 		let dt = self.dtype();
 		if OtherType::can_downcast(dt) {
-			Ok(unsafe { std::mem::transmute::<Value<DynValueTypeMarker>, Value<OtherType>>(self) })
+			Ok(unsafe { transmute::<Value<DynValueTypeMarker>, Value<OtherType>>(self) })
 		} else {
 			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast {dt} to {}", OtherType::format())))
 		}
@@ -482,13 +487,13 @@ mod tests {
 
 	#[test]
 	fn test_sequence_map() -> crate::Result<()> {
-		let map_contents = [("meaning".to_owned(), 42.0), ("pi".to_owned(), std::f32::consts::PI)];
+		let map_contents = [("meaning".to_owned(), 42.0), ("pi".to_owned(), core::f32::consts::PI)];
 		let value = Sequence::new([Map::<String, f32>::new(map_contents)?])?;
 
 		for map in value.extract_sequence(&Allocator::default()) {
 			let map = map.extract_map();
 			assert_eq!(map["meaning"], 42.0);
-			assert_eq!(map["pi"], std::f32::consts::PI);
+			assert_eq!(map["pi"], core::f32::consts::PI);
 		}
 
 		Ok(())

@@ -1,3 +1,5 @@
+use alloc::{format, string::ToString};
+
 use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
 use crate::{
 	error::{Error, Result},
@@ -144,7 +146,7 @@ impl ExecutionProvider for CANNExecutionProvider {
 		{
 			use crate::AsPointer;
 
-			let mut cann_options: *mut ort_sys::OrtCANNProviderOptions = std::ptr::null_mut();
+			let mut cann_options: *mut ort_sys::OrtCANNProviderOptions = core::ptr::null_mut();
 			crate::ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)?];
 			let ffi_options = self.options.to_ffi();
 			if let Err(e) = unsafe {

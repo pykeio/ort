@@ -1,3 +1,5 @@
+use alloc::{format, string::String};
+
 use crate::{
 	error::{Error, Result},
 	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
@@ -6,7 +8,7 @@ use crate::{
 
 #[cfg(all(not(feature = "load-dynamic"), feature = "tvm"))]
 extern "C" {
-	fn OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut ort_sys::OrtSessionOptions, opt_str: *const std::os::raw::c_char) -> ort_sys::OrtStatusPtr;
+	fn OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut ort_sys::OrtSessionOptions, opt_str: *const core::ffi::c_char) -> ort_sys::OrtStatusPtr;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,7 +74,7 @@ impl ExecutionProvider for TVMExecutionProvider {
 		{
 			use crate::AsPointer;
 
-			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut ort_sys::OrtSessionOptions, opt_str: *const std::os::raw::c_char) -> ort_sys::OrtStatusPtr);
+			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut ort_sys::OrtSessionOptions, opt_str: *const core::ffi::c_char) -> ort_sys::OrtStatusPtr);
 			let mut option_string = Vec::new();
 			if let Some(check_hash) = self.check_hash {
 				option_string.push(format!("check_hash:{}", if check_hash { "True" } else { "False" }));
@@ -110,7 +112,7 @@ impl ExecutionProvider for TVMExecutionProvider {
 			if let Some(to_nhwc) = self.to_nhwc {
 				option_string.push(format!("to_nhwc:{}", if to_nhwc { "True" } else { "False" }));
 			}
-			let options_string = std::ffi::CString::new(option_string.join(",")).unwrap_or_else(|_| unreachable!());
+			let options_string = alloc::ffi::CString::new(option_string.join(",")).expect("invalid option string");
 			return unsafe { crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_Tvm(session_builder.ptr_mut(), options_string.as_ptr())) };
 		}
 

@@ -1,4 +1,5 @@
-use std::{ffi::CString, ptr};
+use alloc::{boxed::Box, ffi::CString, vec::Vec};
+use core::ptr;
 
 use super::{
 	Operator, ShapeInferenceContext,

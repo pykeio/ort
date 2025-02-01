@@ -1,7 +1,9 @@
-use std::{
-	ffi::{CString, c_char, c_void},
+use alloc::{boxed::Box, ffi::CString, string::String, vec, vec::Vec};
+use core::{
+	ffi::{c_char, c_void},
 	ops::{Deref, DerefMut},
-	ptr::{self, NonNull}
+	ptr::{self, NonNull},
+	slice
 };
 
 use crate::{
@@ -199,12 +201,12 @@ impl<T> Deref for ScratchBuffer<T> {
 	type Target = [T];
 
 	fn deref(&self) -> &Self::Target {
-		unsafe { std::slice::from_raw_parts(self.buffer.cast_const(), self.size) }
+		unsafe { slice::from_raw_parts(self.buffer.cast_const(), self.size) }
 	}
 }
 impl<T> DerefMut for ScratchBuffer<T> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
-		unsafe { std::slice::from_raw_parts_mut(self.buffer, self.size) }
+		unsafe { slice::from_raw_parts_mut(self.buffer, self.size) }
 	}
 }
 
@@ -283,7 +285,7 @@ impl KernelContext {
 	// 		unsafe KernelContext_GetScratchBuffer(
 	// 			self.ptr.as_ptr(),
 	// 			memory_info.ptr.as_ptr(),
-	// 			len * std::mem::size_of::<T>(),
+	// 			len * core::mem::size_of::<T>(),
 	// 			&mut buffer
 	// 		)?;
 	// 		nonNull(buffer)

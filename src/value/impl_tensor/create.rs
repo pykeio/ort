@@ -1,11 +1,11 @@
-use std::{
+use alloc::{boxed::Box, ffi::CString, format, string::String, sync::Arc, vec, vec::Vec};
+use core::{
 	any::Any,
-	ffi,
+	ffi::c_void,
 	fmt::Debug,
 	marker::PhantomData,
 	mem::size_of,
-	ptr::{self, NonNull},
-	sync::Arc
+	ptr::{self, NonNull}
 };
 
 #[cfg(feature = "ndarray")]
@@ -59,11 +59,11 @@ impl Tensor<String> {
 		];
 
 		// create null-terminated copies of each string, as per `FillStringTensor` docs
-		let null_terminated_copies: Vec<ffi::CString> = data
+		let null_terminated_copies: Vec<CString> = data
 			.iter()
 			.map(|elt| {
 				let slice = elt.as_utf8_bytes();
-				ffi::CString::new(slice)
+				CString::new(slice)
 			})
 			.collect::<Result<Vec<_>, _>>()
 			.map_err(Error::wrap)?;
@@ -130,7 +130,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 		// do it manually.
 		let memory_info = MemoryInfo::from_value(value_ptr).expect("CreateTensorAsOrtValue returned non-tensor");
 		if memory_info.is_cpu_accessible() {
-			let mut buffer_ptr: *mut ort_sys::c_void = std::ptr::null_mut();
+			let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
 			ortsys![unsafe GetTensorMutableData(value_ptr, &mut buffer_ptr)?; nonNull(buffer_ptr)];
 
 			unsafe { buffer_ptr.write_bytes(0, calculate_tensor_size(&shape) * size_of::<T>()) };
@@ -188,14 +188,14 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 		let shape_ptr: *const i64 = shape.as_ptr();
 		let shape_len = shape.len();
 
-		let tensor_values_ptr: *mut std::ffi::c_void = ptr.cast();
+		let tensor_values_ptr: *mut c_void = ptr.cast();
 		assert_non_null_pointer(tensor_values_ptr, "TensorValues")?;
 
 		ortsys![
 			unsafe CreateTensorWithDataAsOrtValue(
 				memory_info.ptr(),
 				tensor_values_ptr,
-				num_elements * std::mem::size_of::<T>(),
+				num_elements * size_of::<T>(),
 				shape_ptr,
 				shape_len,
 				T::into_tensor_element_type().into(),
@@ -262,14 +262,14 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRef<'a, T> {
 		let shape_ptr: *const i64 = shape.as_ptr();
 		let shape_len = shape.len();
 
-		let tensor_values_ptr: *mut std::ffi::c_void = data.as_ptr() as *mut _;
+		let tensor_values_ptr: *mut c_void = data.as_ptr() as *mut _;
 		assert_non_null_pointer(tensor_values_ptr, "TensorValues")?;
 
 		ortsys![
 			unsafe CreateTensorWithDataAsOrtValue(
 				memory_info.ptr(),
 				tensor_values_ptr,
-				num_elements * std::mem::size_of::<T>(),
+				num_elements * size_of::<T>(),
 				shape_ptr,
 				shape_len,
 				T::into_tensor_element_type().into(),
@@ -337,14 +337,14 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 		let shape_ptr: *const i64 = shape.as_ptr();
 		let shape_len = shape.len();
 
-		let tensor_values_ptr: *mut std::ffi::c_void = data.as_ptr() as *mut _;
+		let tensor_values_ptr: *mut c_void = data.as_ptr() as *mut _;
 		assert_non_null_pointer(tensor_values_ptr, "TensorValues")?;
 
 		ortsys![
 			unsafe CreateTensorWithDataAsOrtValue(
 				memory_info.ptr(),
 				tensor_values_ptr,
-				num_elements * std::mem::size_of::<T>(),
+				num_elements * size_of::<T>(),
 				shape_ptr,
 				shape_len,
 				T::into_tensor_element_type().into(),
@@ -374,7 +374,7 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 	/// Create a mutable tensor view from a raw pointer and shape.
 	///
 	/// The length of data is determined by `T` and the given shape, so the given buffer must be at least
-	/// `shape.iter().product() * std::mem::size_of::<T>()` bytes.
+	/// `shape.iter().product() * size_of::<T>()` bytes.
 	///
 	/// This function can be used to create data from raw device memory, e.g. to directly provide data to an execution
 	/// provider. For instance, to create a tensor from a raw CUDA buffer using [`cudarc`](https://docs.rs/cudarc):
@@ -401,7 +401,7 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 		let shape_ptr: *const i64 = shape.as_ptr();
 		let shape_len = shape.len();
 
-		let data_len = calculate_tensor_size(&shape) * std::mem::size_of::<T>();
+		let data_len = calculate_tensor_size(&shape) * size_of::<T>();
 
 		ortsys![
 			unsafe CreateTensorWithDataAsOrtValue(

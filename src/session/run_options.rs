@@ -19,7 +19,7 @@ use crate::{
 /// Allows selecting/deselecting/preallocating the outputs of a [`Session`] inference call.
 ///
 /// ```
-/// # use alloc::sync::Arc;
+/// # use std::sync::Arc;
 /// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
 /// # fn main() -> ort::Result<()> {
 /// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
@@ -98,7 +98,7 @@ impl OutputSelector {
 	/// for an ODE or embeddings model.
 	///
 	/// ```
-	/// # use alloc::sync::Arc;
+	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
@@ -196,7 +196,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// See [`OutputSelector`] for more details.
 	///
 	/// ```
-	/// # use alloc::sync::Arc;
+	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
@@ -251,7 +251,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	///
 	/// ```no_run
 	/// # // no_run because upsample.onnx is too simple of a model for the termination signal to be reliable enough
-	/// # use alloc::sync::Arc;
+	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, value::Value};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
@@ -280,7 +280,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// Resets the termination flag for the runs associated with [`RunOptions`].
 	///
 	/// ```no_run
-	/// # use alloc::sync::Arc;
+	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, value::Value};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
@@ -309,7 +309,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// This can be used to, for example, configure the graph ID when using compute graphs with an execution provider
 	/// like CUDA:
 	/// ```no_run
-	/// # use alloc::sync::Arc;
+	/// # use std::sync::Arc;
 	/// # use ort::session::run_options::RunOptions;
 	/// # fn main() -> ort::Result<()> {
 	/// let mut run_options = RunOptions::new()?;

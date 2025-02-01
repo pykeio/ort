@@ -199,7 +199,7 @@ impl<K: PrimitiveTensorElementType + Debug + Clone + Hash + Eq + 'static, V: Pri
 	/// Creates a [`Map`] from an iterable emitting `K` and `V`.
 	///
 	/// ```
-	/// # use alloc::collections::HashMap;
+	/// # use std::collections::HashMap;
 	/// # use ort::value::Map;
 	/// # fn main() -> ort::Result<()> {
 	/// let mut map = HashMap::<i64, f32>::new();
@@ -223,7 +223,7 @@ impl<V: PrimitiveTensorElementType + Debug + Clone + 'static> Value<MapValueType
 	/// Creates a [`Map`] from an iterable emitting `K` and `V`.
 	///
 	/// ```
-	/// # use alloc::collections::HashMap;
+	/// # use std::collections::HashMap;
 	/// # use ort::value::Map;
 	/// # fn main() -> ort::Result<()> {
 	/// let mut map = HashMap::<String, f32>::new();
@@ -247,7 +247,7 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq + 'static, V: IntoTens
 	/// Creates a [`Map`] from two tensors of keys & values respectively.
 	///
 	/// ```
-	/// # use alloc::collections::HashMap;
+	/// # use std::collections::HashMap;
 	/// # use ort::value::{Map, Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// let keys = Tensor::<i64>::from_array(([4], vec![0, 1, 2, 3]))?;

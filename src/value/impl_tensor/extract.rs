@@ -29,7 +29,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// - the alternative function for strings, [`Tensor::try_extract_string_tensor`].
 	///
 	/// ```
-	/// # use alloc::sync::Arc;
+	/// # use std::sync::Arc;
 	/// # use ort::value::TensorRef;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
@@ -75,7 +75,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// Attempt to extract the scalar from a tensor of type `T`.
 	///
 	/// ```
-	/// # use alloc::sync::Arc;
+	/// # use std::sync::Arc;
 	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let value = Tensor::from_array(((), vec![3.14_f32]))?.into_dyn();
@@ -133,7 +133,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// See also the infallible counterpart, [`Tensor::extract_tensor_mut`], for typed [`Tensor<T>`]s.
 	///
 	/// ```
-	/// # use alloc::sync::Arc;
+	/// # use std::sync::Arc;
 	/// # use ort::value::TensorRefMut;
 	/// # fn main() -> ort::Result<()> {
 	/// let mut array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
@@ -451,7 +451,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// Extracts the underlying data into a read-only [`ndarray::ArrayView`].
 	///
 	/// ```
-	/// # use alloc::sync::Arc;
+	/// # use std::sync::Arc;
 	/// # use ort::value::TensorRef;
 	/// # fn main() -> ort::Result<()> {
 	/// let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
@@ -471,7 +471,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// Extracts the underlying data into a mutable [`ndarray::ArrayViewMut`].
 	///
 	/// ```
-	/// # use alloc::sync::Arc;
+	/// # use std::sync::Arc;
 	/// # use ort::value::TensorRefMut;
 	/// # fn main() -> ort::Result<()> {
 	/// let mut array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));

@@ -185,7 +185,7 @@ impl Session {
 	/// dynamically.
 	///
 	/// ```
-	/// # use alloc::sync::Arc;
+	/// # use std::sync::Arc;
 	/// # use ort::{session::{run_options::RunOptions, Session}, tensor::TensorElementType, value::{Value, ValueType, TensorRef}};
 	/// # fn main() -> ort::Result<()> {
 	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
@@ -215,7 +215,7 @@ impl Session {
 	///
 	/// ```no_run
 	/// # // no_run because upsample.onnx is too simple of a model for the termination signal to be reliable enough
-	/// # use alloc::sync::Arc;
+	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef}, tensor::TensorElementType};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
@@ -343,7 +343,7 @@ impl Session {
 	/// dynamically.
 	///
 	/// ```
-	/// # use alloc::sync::Arc;
+	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef}, tensor::TensorElementType};
 	/// # fn main() -> ort::Result<()> { tokio_test::block_on(async {
 	/// let session = Session::builder()?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
@@ -480,7 +480,7 @@ impl Session {
 	/// efficiency.
 	///
 	/// ```
-	/// # use alloc::sync::Arc;
+	/// # use std::sync::Arc;
 	/// # use ort::{session::{run_options::RunOptions, Session, WorkloadType}, tensor::TensorElementType, value::{Value, ValueType, TensorRef}};
 	/// # fn main() -> ort::Result<()> {
 	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;

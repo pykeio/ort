@@ -15,7 +15,7 @@ use crate::{ortsys, tensor::TensorElementType};
 /// The type of a [`Value`][super::Value], or a session input/output.
 ///
 /// ```
-/// # use alloc::sync::Arc;
+/// # use std::sync::Arc;
 /// # use ort::{session::Session, value::{ValueType, Tensor}, tensor::TensorElementType};
 /// # fn main() -> ort::Result<()> {
 /// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;

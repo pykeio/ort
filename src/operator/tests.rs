@@ -77,9 +77,10 @@ impl Operator for CustomOpTwo {
 
 #[test]
 fn test_custom_ops() -> crate::Result<()> {
+	let model = std::fs::read("tests/data/custom_op_test.onnx").expect("");
 	let session = Session::builder()?
 		.with_operators(OperatorDomain::new("test.customop")?.add(CustomOpOne)?.add(CustomOpTwo)?)?
-		.commit_from_file("tests/data/custom_op_test.onnx")?;
+		.commit_from_memory(&model)?;
 
 	let allocator = session.allocator();
 	let mut value1 = Tensor::<f32>::new(allocator, [3, 5])?;

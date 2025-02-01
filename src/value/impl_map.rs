@@ -284,8 +284,6 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq + 'static, V: IntoTens
 }
 
 impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: PrimitiveTensorElementType + Debug + Clone> Value<MapValueType<K, V>> {
-	#[cfg(feature = "std")]
-	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn extract_raw_map(&self) -> Vec<(K, V)> {
 		self.try_extract_raw_map().expect("Failed to extract map")
 	}

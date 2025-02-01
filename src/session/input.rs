@@ -126,6 +126,7 @@ mod tests {
 	use crate::value::{DynTensor, Tensor};
 
 	#[test]
+	#[cfg(feature = "std")]
 	fn test_hashmap_static_keys() -> crate::Result<()> {
 		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
 		let shape = vec![v.len() as i64];
@@ -138,6 +139,7 @@ mod tests {
 	}
 
 	#[test]
+	#[cfg(feature = "std")]
 	fn test_hashmap_string_keys() -> crate::Result<()> {
 		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
 		let shape = vec![v.len() as i64];

@@ -165,13 +165,15 @@ mod tests {
 
 	#[test]
 	fn test_lora() -> crate::Result<()> {
-		let model = Session::builder()?.commit_from_file("tests/data/lora_model.onnx")?;
-		let lora = Adapter::from_file("tests/data/adapter.orl", None)?;
+		let model = std::fs::read("tests/data/lora_model.onnx").expect("");
+		let session = Session::builder()?.commit_from_memory(&model)?;
+		let lora = std::fs::read("tests/data/adapter.orl").expect("");
+		let lora = Adapter::from_memory(&lora, None)?;
 
 		let mut run_options = RunOptions::new()?;
 		run_options.add_adapter(&lora)?;
 
-		let output: Tensor<f32> = model
+		let output: Tensor<f32> = session
 			.run_with_options(crate::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?], &run_options)?
 			.remove("output")
 			.expect("")
@@ -187,7 +189,8 @@ mod tests {
 
 	#[test]
 	fn test_lora_from_memory() -> crate::Result<()> {
-		let model = Session::builder()?.commit_from_file("tests/data/lora_model.onnx")?;
+		let model = std::fs::read("tests/data/lora_model.onnx").expect("");
+		let session = Session::builder()?.commit_from_memory(&model)?;
 
 		let lora_bytes = std::fs::read("tests/data/adapter.orl").expect("");
 		let lora = Adapter::from_memory(&lora_bytes, None)?;
@@ -196,7 +199,7 @@ mod tests {
 		let mut run_options = RunOptions::new()?;
 		run_options.add_adapter(&lora)?;
 
-		let output: Tensor<f32> = model
+		let output: Tensor<f32> = session
 			.run_with_options(crate::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?], &run_options)?
 			.remove("output")
 			.expect("")

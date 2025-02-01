@@ -269,16 +269,19 @@ mod tests {
 	use core::cmp::Ordering;
 
 	use image::{ImageBuffer, Luma, Pixel};
+	#[cfg(feature = "ndarray")]
 	use ndarray::{Array2, Array4, Axis};
 
+	#[cfg(feature = "ndarray")]
+	use crate::tensor::ArrayExtensions;
 	use crate::{
 		Result,
 		memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
 		session::Session,
-		tensor::ArrayExtensions,
 		value::{Tensor, TensorValueTypeMarker, Value}
 	};
 
+	#[cfg(feature = "ndarray")]
 	fn get_image() -> Array4<f32> {
 		let image_buffer: ImageBuffer<Luma<u8>, Vec<u8>> = image::open("tests/data/mnist_5.jpg").expect("failed to load image").to_luma8();
 		ndarray::Array::from_shape_fn((1, 1, 28, 28), |(_, c, j, i)| {
@@ -288,6 +291,7 @@ mod tests {
 		})
 	}
 
+	#[cfg(feature = "ndarray")]
 	fn extract_probabilities<T: TensorValueTypeMarker>(output: &Value<T>) -> Result<Vec<(usize, f32)>> {
 		let mut probabilities: Vec<(usize, f32)> = output
 			.try_extract_tensor()?
@@ -302,6 +306,7 @@ mod tests {
 
 	// not terribly useful since CI is CPU-only, but it at least ensures the API won't segfault or something silly
 	#[test]
+	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_mnist_input_bound() -> Result<()> {
 		let session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
 
@@ -319,6 +324,7 @@ mod tests {
 	}
 
 	#[test]
+	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_mnist_input_output_bound() -> Result<()> {
 		let session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
 
@@ -338,6 +344,7 @@ mod tests {
 	}
 
 	#[test]
+	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_send_iobinding() -> Result<()> {
 		let session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
 
@@ -362,6 +369,7 @@ mod tests {
 	}
 
 	#[test]
+	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_mnist_clear_bounds() -> Result<()> {
 		let session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
 

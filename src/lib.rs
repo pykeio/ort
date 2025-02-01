@@ -22,9 +22,6 @@ pub mod __private {
 	pub extern crate core;
 }
 
-#[cfg(all(test, not(feature = "fetch-models")))]
-compile_error!("`cargo test --features fetch-models`!!1!");
-
 pub mod adapter;
 pub mod environment;
 pub mod error;

@@ -275,6 +275,7 @@ pub(crate) fn calculate_tensor_size(shape: &[i64]) -> usize {
 mod tests {
 	use alloc::sync::Arc;
 
+	#[cfg(feature = "ndarray")]
 	use ndarray::{ArcArray1, Array1, CowArray};
 
 	use super::Tensor;

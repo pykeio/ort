@@ -1,0 +1,12 @@
+[env]
+ORT_LIB_LOCATION = { value = ".", relative = true }
+
+[unstable]
+build-std = ["std"]
+
+[build]
+target = "wasm32-unknown-emscripten"
+rustflags = [
+    "-Clink-args=-sEXPORTED_FUNCTIONS=['_hello_ort'] -fno-rtti -pthread -msimd128 -msse4.2 -sSTACK_SIZE=5MB -sUSE_PTHREADS -sDEFAULT_PTHREAD_STACK_SIZE=2MB -sPTHREAD_POOL_SIZE=20 -sALLOW_MEMORY_GROWTH -sINITIAL_MEMORY=1GB -sMAXIMUM_MEMORY=2GB -sEXPORT_ES6 --no-entry",
+    "-Ctarget-feature=+atomics,+bulk-memory,+mutable-globals"
+]

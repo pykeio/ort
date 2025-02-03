@@ -1,0 +1,20 @@
+# WASM-Emscripten Example
+Tested on Linux and macOS.
+
+## Prepare environment
+1. Install the Rust nightly toolchain with `rustup install nightly`.
+1. Add Emscripten as Rust target with `rustup target add wasm32-unknown-emscripten --toolchain nightly`.
+1. Clone Emscripten SDK via `git clone https://github.com/emscripten-core/emsdk.git --depth 1`.
+1. Install Emscripten SDK 3.1.59 locally to [match version used in ONNX runtime](https://github.com/microsoft/onnxruntime/blob/1d97d6ef55433298dee58634b0ea59f736e8a72e/.gitmodules#L10) via `./emsdk/emsdk install 3.1.59`.
+1. Prepare local Emscripten SDK via `./emsdk/emsdk activate 3.1.59`.
+
+## Build example
+1. Set local Emscripten SDK in current session via `source ./emsdk/emsdk_env.sh`.
+1. Build the example via `cargo build --release`.
+
+## Serve example
+1. Serve the example via `python3 serve.py`.
+
+## TODO
+1. Enable debug build with different linker flags.
+1. Exchange model and make it interactive on the `index.html`.

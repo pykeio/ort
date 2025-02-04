@@ -1,5 +1,5 @@
 # WASM-Emscripten Example
-Example how to use `ort` to execute `onnxruntime` in the Web with threaded execution.
+Example how to use `ort` to run `onnxruntime` in the Web with multi-threaded execution. Here inferencing the YoloV8 model.
 
 ## Prepare environment
 1. Requires a recent Rust installation via `rustup`, `git`, `cmake` and `build-essentials`, `libssl-dev`, and `pkg-config` under Ubuntu or `xcode-select` under macOS.
@@ -16,8 +16,4 @@ Environment tested on Ubuntu 24.04 and macOS 14.7.1.
 1. Build the example via `cargo build --release`.
 
 ## Serve example
-1. Serve the example via `python3 serve.py`.
-
-## TODO
-1. Enable debug build with different linker flags.
-1. Exchange model and make it interactive on the `index.html`.
+1. Serve the example via `python3 serve.py`. Pre-installed Python 3 should be sufficient.

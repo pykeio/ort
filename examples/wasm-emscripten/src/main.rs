@@ -64,7 +64,7 @@ pub extern "C" fn detect_objects(ptr: *const u8, width: u32, height: u32) {
 		.commit_from_memory(&model)
 		.expect("Cannot commit model.");
 
-	let image_data = unsafe { slice::from_raw_parts(ptr, (width * height * 4) as usize).to_vec() }; // Copy via .to_vec might be not necessary as memory lives long enough.
+	let image_data = unsafe { std::slice::from_raw_parts(ptr, (width * height * 4) as usize).to_vec() }; // Copy via .to_vec might be not necessary as memory lives long enough.
 	let image = image::ImageBuffer::<image::Rgba<u8>, Vec<u8>>::from_raw(width, height, image_data).expect("Cannot parse input image.");
 	let image640 = image::imageops::resize(&image, 640, 640, image::imageops::FilterType::CatmullRom);
 	let tensor =

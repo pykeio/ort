@@ -1,5 +1,7 @@
+#[cfg(feature = "download-binaries")]
+use std::fs;
 use std::{
-	env, fs,
+	env,
 	path::{Path, PathBuf}
 };
 
@@ -14,10 +16,13 @@ const ENV_CXXSTDLIB: &str = "CXXSTDLIB"; // Used by the `cc` crate - we should m
 #[cfg(feature = "download-binaries")]
 const ORT_EXTRACT_DIR: &str = "onnxruntime";
 
+#[cfg(feature = "download-binaries")]
 const DIST_TABLE: &str = include_str!("dist.txt");
 
 #[path = "src/internal/mod.rs"]
+#[cfg(feature = "download-binaries")]
 mod internal;
+#[cfg(feature = "download-binaries")]
 use self::internal::dirs::cache_dir;
 
 #[cfg(feature = "download-binaries")]
@@ -43,6 +48,7 @@ fn fetch_file(source_url: &str) -> Vec<u8> {
 	buffer
 }
 
+#[cfg(feature = "download-binaries")]
 fn find_dist(target: &str, feature_set: &str) -> Option<(&'static str, &'static str)> {
 	DIST_TABLE
 		.split('\n')
@@ -63,7 +69,7 @@ fn hex_str_to_bytes(c: impl AsRef<[u8]>) -> Vec<u8> {
 		}
 	}
 
-	c.as_ref().chunks(2).map(|n| nibble(n[0]) << 4 | nibble(n[1])).collect()
+	c.as_ref().chunks(2).map(|n| (nibble(n[0]) << 4) | nibble(n[1])).collect()
 }
 
 #[cfg(feature = "download-binaries")]

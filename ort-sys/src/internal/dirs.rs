@@ -1,5 +1,7 @@
 // based on https://github.com/dirs-dev/dirs-sys-rs/blob/main/src/lib.rs
 
+#![allow(unused)]
+
 pub const PYKE_ROOT: &str = "ort.pyke.io";
 
 #[cfg(all(target_os = "windows", target_arch = "x86"))]
@@ -48,8 +50,8 @@ mod windows {
 		pub const fn from_u128(uuid: u128) -> Self {
 			Self {
 				data1: (uuid >> 96) as u32,
-				data2: (uuid >> 80 & 0xffff) as u16,
-				data3: (uuid >> 64 & 0xffff) as u16,
+				data2: ((uuid >> 80) & 0xffff) as u16,
+				data3: ((uuid >> 64) & 0xffff) as u16,
 				#[allow(clippy::cast_possible_truncation)]
 				data4: (uuid as u64).to_be_bytes()
 			}

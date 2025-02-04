@@ -1,8 +1,15 @@
-use std::{
+use alloc::{
+	boxed::Box,
+	format,
+	string::{String, ToString},
+	sync::Arc,
+	vec::Vec
+};
+use core::{
 	fmt::Debug,
 	marker::PhantomData,
-	ptr::{self, NonNull},
-	sync::Arc
+	mem,
+	ptr::{self, NonNull}
 };
 
 use super::{DowncastableTarget, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker};
@@ -158,7 +165,7 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized> Value<SequenceValu
 	/// Converts from a strongly-typed [`Sequence<T>`] to a type-erased [`DynSequence`].
 	#[inline]
 	pub fn upcast(self) -> DynSequence {
-		unsafe { std::mem::transmute(self) }
+		unsafe { mem::transmute(self) }
 	}
 
 	/// Converts from a strongly-typed [`Sequence<T>`] to a reference to a type-erased [`DynSequence`].

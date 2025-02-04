@@ -1,4 +1,5 @@
-use std::ops::BitOr;
+use alloc::{format, string::ToString};
+use core::ops::BitOr;
 
 use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
 use crate::{
@@ -269,7 +270,7 @@ impl ExecutionProvider for CUDAExecutionProvider {
 		{
 			use crate::AsPointer;
 
-			let mut cuda_options: *mut ort_sys::OrtCUDAProviderOptionsV2 = std::ptr::null_mut();
+			let mut cuda_options: *mut ort_sys::OrtCUDAProviderOptionsV2 = core::ptr::null_mut();
 			crate::ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)?];
 			let ffi_options = self.options.to_ffi();
 			if let Err(e) = unsafe {

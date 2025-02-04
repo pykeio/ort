@@ -1,4 +1,10 @@
-use std::{fmt::Debug, ptr, string::FromUtf8Error};
+use alloc::{
+	format,
+	string::{FromUtf8Error, String},
+	vec,
+	vec::Vec
+};
+use core::{ffi::c_void, fmt::Debug, ptr, slice};
 
 #[cfg(feature = "ndarray")]
 use ndarray::IxDyn;
@@ -107,7 +113,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 
 					let mut output_array_ptr: *mut T = ptr::null_mut();
 					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
-					let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
+					let output_array_ptr_ptr_void: *mut *mut c_void = output_array_ptr_ptr.cast();
 					ortsys![unsafe GetTensorMutableData(self.ptr().cast_mut(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
 					Ok(unsafe { *output_array_ptr })
@@ -211,11 +217,11 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 				if *ty == T::into_tensor_element_type() {
 					let mut output_array_ptr: *mut T = ptr::null_mut();
 					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
-					let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
+					let output_array_ptr_ptr_void: *mut *mut c_void = output_array_ptr_ptr.cast();
 					ortsys![unsafe GetTensorMutableData(self.ptr().cast_mut(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
 					let len = calculate_tensor_size(dimensions);
-					Ok((dimensions, unsafe { std::slice::from_raw_parts(output_array_ptr, len) }))
+					Ok((dimensions, unsafe { slice::from_raw_parts(output_array_ptr, len) }))
 				} else {
 					Err(Error::new_with_code(
 						ErrorCode::InvalidArgument,
@@ -264,11 +270,11 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 				if *ty == T::into_tensor_element_type() {
 					let mut output_array_ptr: *mut T = ptr::null_mut();
 					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
-					let output_array_ptr_ptr_void: *mut *mut std::ffi::c_void = output_array_ptr_ptr.cast();
+					let output_array_ptr_ptr_void: *mut *mut c_void = output_array_ptr_ptr.cast();
 					ortsys![unsafe GetTensorMutableData(self.ptr().cast_mut(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
 					let len = calculate_tensor_size(dimensions);
-					Ok((dimensions, unsafe { std::slice::from_raw_parts_mut(output_array_ptr, len) }))
+					Ok((dimensions, unsafe { slice::from_raw_parts_mut(output_array_ptr, len) }))
 				} else {
 					Err(Error::new_with_code(
 						ErrorCode::InvalidArgument,
@@ -424,7 +430,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # }
 	/// ```
 	pub fn shape(&self) -> Result<Vec<i64>> {
-		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = ptr::null_mut();
 		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr)?];
 
 		let res = {

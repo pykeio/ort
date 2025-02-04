@@ -52,18 +52,23 @@ strip = true
 codegen-units = 1
 
 [package.metadata.docs.rs]
-features = [ "ndarray", "half", "training", "fetch-models", "load-dynamic", "copy-dylibs" ]
+features = [ "std", "ndarray", "half", "training", "fetch-models", "load-dynamic", "copy-dylibs" ]
 targets = ["x86_64-unknown-linux-gnu"]
 rustdoc-args = [ "--cfg", "docsrs" ]
 
 [features]
-default = [ "ndarray", "half", "tracing", "download-binaries", "copy-dylibs" ]
+default = [ "std", "ndarray", "half", "tracing", "download-binaries", "copy-dylibs" ]
 
+std = [ "ort-sys/std", "ndarray/std", "tracing?/std" ]
 training = [ "ort-sys/training" ]
 
-fetch-models = [ "ureq", "sha2" ]
+ndarray = [ "dep:ndarray" ]
+half = [ "dep:half" ]
+tracing = [ "dep:tracing" ]
+
+fetch-models = [ "std", "dep:ureq", "dep:sha2" ]
 download-binaries = [ "ort-sys/download-binaries" ]
-load-dynamic = [ "libloading", "ort-sys/load-dynamic" ]
+load-dynamic = [ "std", "libloading", "ort-sys/load-dynamic" ]
 copy-dylibs = [ "ort-sys/copy-dylibs" ]
 
 alternative-backend = [ "ort-sys/disable-linking" ]
@@ -87,14 +92,14 @@ cann = [ "ort-sys/cann" ]
 qnn = [ "ort-sys/qnn" ]
 
 [dependencies]
-ndarray = { version = "0.16", optional = true }
-ort-sys = { version = "=2.0.0-rc.9", path = "ort-sys" }
+ndarray = { version = "0.16", default-features = false, optional = true }
+ort-sys = { version = "=2.0.0-rc.9", path = "ort-sys", default-features = false }
 libloading = { version = "0.8", optional = true }
 
 ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }
 sha2 = { version = "0.10", optional = true }
-tracing = { version = "0.1", optional = true, default-features = false, features = [ "std" ] }
-half = { version = "2.1", optional = true }
+tracing = { version = "0.1", optional = true, default-features = false }
+half = { version = "2.1", default-features = false, optional = true }
 
 [dev-dependencies]
 anyhow = "1.0"

@@ -1,9 +1,9 @@
-use std::{
-	collections::HashMap,
-	ffi::{CStr, CString, c_char},
+use alloc::{ffi::CString, string::String, sync::Arc, vec::Vec};
+use core::{
+	ffi::{CStr, c_char},
 	marker::PhantomData,
-	ptr::{self, NonNull},
-	sync::Arc
+	mem,
+	ptr::{self, NonNull}
 };
 
 use crate::{
@@ -12,6 +12,7 @@ use crate::{
 	error::Result,
 	ortsys,
 	session::Output,
+	util::MiniMap,
 	value::{DynValue, Value, ValueTypeMarker}
 };
 
@@ -46,7 +47,7 @@ pub struct OutputSelector {
 	use_defaults: bool,
 	default_blocklist: Vec<String>,
 	allowlist: Vec<String>,
-	preallocated_outputs: HashMap<String, Value>
+	preallocated_outputs: MiniMap<String, Value>
 }
 
 impl Default for OutputSelector {
@@ -57,7 +58,7 @@ impl Default for OutputSelector {
 			use_defaults: true,
 			allowlist: Vec::new(),
 			default_blocklist: Vec::new(),
-			preallocated_outputs: HashMap::new()
+			preallocated_outputs: MiniMap::new()
 		}
 	}
 }
@@ -178,7 +179,7 @@ unsafe impl Sync for RunOptions<NoSelectedOutputs> {}
 impl RunOptions {
 	/// Creates a new [`RunOptions`] struct.
 	pub fn new() -> Result<RunOptions<NoSelectedOutputs>> {
-		let mut run_options_ptr: *mut ort_sys::OrtRunOptions = std::ptr::null_mut();
+		let mut run_options_ptr: *mut ort_sys::OrtRunOptions = ptr::null_mut();
 		ortsys![unsafe CreateRunOptions(&mut run_options_ptr)?; nonNull(run_options_ptr)];
 		Ok(RunOptions {
 			run_options_ptr: unsafe { NonNull::new_unchecked(run_options_ptr) },
@@ -218,7 +219,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// ```
 	pub fn with_outputs(mut self, outputs: OutputSelector) -> RunOptions<HasSelectedOutputs> {
 		self.outputs = outputs;
-		unsafe { std::mem::transmute(self) }
+		unsafe { mem::transmute(self) }
 	}
 
 	/// Sets a tag to identify this run in logs.

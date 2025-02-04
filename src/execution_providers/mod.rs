@@ -14,9 +14,14 @@
 //! }
 //! ```
 
-use std::{collections::HashMap, ffi::CString, fmt::Debug, os::raw::c_char, sync::Arc};
+use alloc::{ffi::CString, string::ToString, sync::Arc, vec::Vec};
+use core::{
+	ffi::c_char,
+	fmt::{self, Debug},
+	ptr
+};
 
-use crate::{char_p_to_string, error::Result, ortsys, session::builder::SessionBuilder};
+use crate::{char_p_to_string, error::Result, ortsys, session::builder::SessionBuilder, util::MiniMap};
 
 pub mod cpu;
 pub use self::cpu::CPUExecutionProvider;
@@ -94,7 +99,7 @@ pub trait ExecutionProvider: Send + Sync {
 	/// enabled), you'll instead want to manually register this EP via [`ExecutionProvider::register`] and detect
 	/// and handle any errors returned by that function.
 	fn is_available(&self) -> Result<bool> {
-		let mut providers: *mut *mut c_char = std::ptr::null_mut();
+		let mut providers: *mut *mut c_char = ptr::null_mut();
 		let mut num_providers = 0;
 		ortsys![unsafe GetAvailableProviders(&mut providers, &mut num_providers)?];
 		if providers.is_null() {
@@ -180,7 +185,7 @@ impl ExecutionProviderDispatch {
 }
 
 impl Debug for ExecutionProviderDispatch {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct(self.inner.as_str())
 			.field("error_on_failure", &self.error_on_failure)
 			.finish()
@@ -188,7 +193,7 @@ impl Debug for ExecutionProviderDispatch {
 }
 
 #[derive(Default, Debug, Clone)]
-pub(crate) struct ExecutionProviderOptions(HashMap<CString, CString>);
+pub(crate) struct ExecutionProviderOptions(MiniMap<CString, CString>);
 
 impl ExecutionProviderOptions {
 	pub fn set(&mut self, key: impl Into<Vec<u8>>, value: impl Into<Vec<u8>>) {
@@ -231,14 +236,14 @@ macro_rules! get_ep_register {
 		#[allow(non_snake_case)]
 		let $symbol = unsafe {
 			let dylib = $crate::lib_handle();
-			let symbol: ::std::result::Result<
+			let symbol: ::core::result::Result<
 				::libloading::Symbol<unsafe extern "C" fn($($id: $type),*) -> $rt>,
 				::libloading::Error
 			> = dylib.get(stringify!($symbol).as_bytes());
 			match symbol {
 				Ok(symbol) => symbol.into_raw(),
 				Err(e) => {
-					return ::std::result::Result::Err($crate::Error::new(format!("Error attempting to load symbol `{}` from dynamic library: {}", stringify!($symbol), e)));
+					return ::core::result::Result::Err($crate::Error::new(format!("Error attempting to load symbol `{}` from dynamic library: {}", stringify!($symbol), e)));
 				}
 			}
 		};

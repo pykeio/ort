@@ -1,12 +1,11 @@
 //! An input adapter, allowing for loading many static inputs from disk at once.
 
-use std::{
-	path::Path,
-	ptr::{self, NonNull},
-	sync::Arc
-};
+use alloc::sync::Arc;
+use core::ptr::{self, NonNull};
+#[cfg(feature = "std")]
+use std::path::Path;
 
-use crate::{AsPointer, Result, memory::Allocator, ortsys, util};
+use crate::{AsPointer, Result, memory::Allocator, ortsys};
 
 #[derive(Debug)]
 pub(crate) struct AdapterInner {
@@ -88,8 +87,10 @@ impl Adapter {
 	/// # Ok(())
 	/// # }
 	/// ```
+	#[cfg(feature = "std")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn from_file(path: impl AsRef<Path>, allocator: Option<&Allocator>) -> Result<Self> {
-		let path = util::path_to_os_char(path);
+		let path = crate::util::path_to_os_char(path);
 		let allocator_ptr = allocator.map(|c| c.ptr().cast_mut()).unwrap_or_else(ptr::null_mut);
 		let mut ptr = ptr::null_mut();
 		ortsys![unsafe CreateLoraAdapter(path.as_ptr(), allocator_ptr, &mut ptr)?];
@@ -156,8 +157,6 @@ impl AsPointer for Adapter {
 
 #[cfg(test)]
 mod tests {
-	use std::fs;
-
 	use super::Adapter;
 	use crate::{
 		session::{RunOptions, Session},
@@ -166,13 +165,15 @@ mod tests {
 
 	#[test]
 	fn test_lora() -> crate::Result<()> {
-		let model = Session::builder()?.commit_from_file("tests/data/lora_model.onnx")?;
-		let lora = Adapter::from_file("tests/data/adapter.orl", None)?;
+		let model = std::fs::read("tests/data/lora_model.onnx").expect("");
+		let session = Session::builder()?.commit_from_memory(&model)?;
+		let lora = std::fs::read("tests/data/adapter.orl").expect("");
+		let lora = Adapter::from_memory(&lora, None)?;
 
 		let mut run_options = RunOptions::new()?;
 		run_options.add_adapter(&lora)?;
 
-		let output: Tensor<f32> = model
+		let output: Tensor<f32> = session
 			.run_with_options(crate::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?], &run_options)?
 			.remove("output")
 			.expect("")
@@ -188,16 +189,17 @@ mod tests {
 
 	#[test]
 	fn test_lora_from_memory() -> crate::Result<()> {
-		let model = Session::builder()?.commit_from_file("tests/data/lora_model.onnx")?;
+		let model = std::fs::read("tests/data/lora_model.onnx").expect("");
+		let session = Session::builder()?.commit_from_memory(&model)?;
 
-		let lora_bytes = fs::read("tests/data/adapter.orl").expect("");
+		let lora_bytes = std::fs::read("tests/data/adapter.orl").expect("");
 		let lora = Adapter::from_memory(&lora_bytes, None)?;
 		drop(lora_bytes);
 
 		let mut run_options = RunOptions::new()?;
 		run_options.add_adapter(&lora)?;
 
-		let output: Tensor<f32> = model
+		let output: Tensor<f32> = session
 			.run_with_options(crate::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?], &run_options)?
 			.remove("output")
 			.expect("")

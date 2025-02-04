@@ -1,10 +1,7 @@
-use std::{
+use alloc::{borrow::Cow, ffi::CString, rc::Rc, sync::Arc, vec::Vec};
+use core::{
 	any::Any,
-	borrow::Cow,
-	ffi::CString,
-	ptr::{self, NonNull},
-	rc::Rc,
-	sync::Arc
+	ptr::{self, NonNull}
 };
 
 use crate::{
@@ -89,7 +86,7 @@ impl SessionBuilder {
 	/// # }
 	/// ```
 	pub fn new() -> Result<Self> {
-		let mut session_options_ptr: *mut ort_sys::OrtSessionOptions = std::ptr::null_mut();
+		let mut session_options_ptr: *mut ort_sys::OrtSessionOptions = ptr::null_mut();
 		ortsys![unsafe CreateSessionOptions(&mut session_options_ptr)?; nonNull(session_options_ptr)];
 
 		Ok(Self {

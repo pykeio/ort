@@ -1,5 +1,12 @@
-use std::{
-	ffi::{CStr, CString, c_char},
+use alloc::{
+	boxed::Box,
+	ffi::CString,
+	string::{String, ToString},
+	vec,
+	vec::Vec
+};
+use core::{
+	ffi::{CStr, c_char},
 	fmt, ptr
 };
 
@@ -83,15 +90,15 @@ impl ValueType {
 		ortsys![unsafe GetOnnxTypeFromTypeInfo(typeinfo_ptr, &mut ty)]; // infallible
 		let io_type = match ty {
 			ort_sys::ONNXType::ONNX_TYPE_TENSOR | ort_sys::ONNXType::ONNX_TYPE_SPARSETENSOR => {
-				let mut info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+				let mut info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = ptr::null_mut();
 				ortsys![unsafe CastTypeInfoToTensorInfo(typeinfo_ptr, &mut info_ptr)]; // infallible
 				unsafe { extract_data_type_from_tensor_info(info_ptr) }
 			}
 			ort_sys::ONNXType::ONNX_TYPE_SEQUENCE => {
-				let mut info_ptr: *const ort_sys::OrtSequenceTypeInfo = std::ptr::null_mut();
+				let mut info_ptr: *const ort_sys::OrtSequenceTypeInfo = ptr::null_mut();
 				ortsys![unsafe CastTypeInfoToSequenceTypeInfo(typeinfo_ptr, &mut info_ptr)]; // infallible
 
-				let mut element_type_info: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
+				let mut element_type_info: *mut ort_sys::OrtTypeInfo = ptr::null_mut();
 				ortsys![unsafe GetSequenceElementType(info_ptr, &mut element_type_info)]; // infallible
 
 				let mut ty: ort_sys::ONNXType = ort_sys::ONNXType::ONNX_TYPE_UNKNOWN;
@@ -99,13 +106,13 @@ impl ValueType {
 
 				match ty {
 					ort_sys::ONNXType::ONNX_TYPE_TENSOR => {
-						let mut info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+						let mut info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = ptr::null_mut();
 						ortsys![unsafe CastTypeInfoToTensorInfo(element_type_info, &mut info_ptr)]; // infallible
 						let ty = unsafe { extract_data_type_from_tensor_info(info_ptr) };
 						ValueType::Sequence(Box::new(ty))
 					}
 					ort_sys::ONNXType::ONNX_TYPE_MAP => {
-						let mut info_ptr: *const ort_sys::OrtMapTypeInfo = std::ptr::null_mut();
+						let mut info_ptr: *const ort_sys::OrtMapTypeInfo = ptr::null_mut();
 						ortsys![unsafe CastTypeInfoToMapTypeInfo(element_type_info, &mut info_ptr)]; // infallible
 						let ty = unsafe { extract_data_type_from_map_info(info_ptr) };
 						ValueType::Sequence(Box::new(ty))
@@ -114,15 +121,15 @@ impl ValueType {
 				}
 			}
 			ort_sys::ONNXType::ONNX_TYPE_MAP => {
-				let mut info_ptr: *const ort_sys::OrtMapTypeInfo = std::ptr::null_mut();
+				let mut info_ptr: *const ort_sys::OrtMapTypeInfo = ptr::null_mut();
 				ortsys![unsafe CastTypeInfoToMapTypeInfo(typeinfo_ptr, &mut info_ptr)]; // infallible
 				unsafe { extract_data_type_from_map_info(info_ptr) }
 			}
 			ort_sys::ONNXType::ONNX_TYPE_OPTIONAL => {
-				let mut info_ptr: *const ort_sys::OrtOptionalTypeInfo = std::ptr::null_mut();
+				let mut info_ptr: *const ort_sys::OrtOptionalTypeInfo = ptr::null_mut();
 				ortsys![unsafe CastTypeInfoToOptionalTypeInfo(typeinfo_ptr, &mut info_ptr)]; // infallible
 
-				let mut contained_type: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
+				let mut contained_type: *mut ort_sys::OrtTypeInfo = ptr::null_mut();
 				ortsys![unsafe GetOptionalContainedTypeInfo(info_ptr, &mut contained_type)]; // infallible
 
 				ValueType::Optional(Box::new(ValueType::from_type_info(contained_type)))
@@ -273,9 +280,9 @@ unsafe fn extract_data_type_from_map_info(info_ptr: *const ort_sys::OrtMapTypeIn
 	ortsys![GetMapKeyType(info_ptr, &mut key_type_sys)]; // infallible
 	assert_ne!(key_type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 
-	let mut value_type_info: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
+	let mut value_type_info: *mut ort_sys::OrtTypeInfo = ptr::null_mut();
 	ortsys![GetMapValueType(info_ptr, &mut value_type_info)]; // infallible
-	let mut value_info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = std::ptr::null_mut();
+	let mut value_info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = ptr::null_mut();
 	ortsys![unsafe CastTypeInfoToTensorInfo(value_type_info, &mut value_info_ptr)]; // infallible
 	let mut value_type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
 	ortsys![GetTensorElementType(value_info_ptr, &mut value_type_sys)]; // infallible

@@ -1,3 +1,5 @@
+use alloc::{format, string::ToString};
+
 use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
 use crate::{
 	error::{Error, Result},
@@ -292,7 +294,7 @@ impl ExecutionProvider for TensorRTExecutionProvider {
 			// environment initialized.
 			let _ = crate::environment::get_environment();
 
-			let mut trt_options: *mut ort_sys::OrtTensorRTProviderOptionsV2 = std::ptr::null_mut();
+			let mut trt_options: *mut ort_sys::OrtTensorRTProviderOptionsV2 = core::ptr::null_mut();
 			crate::ortsys![unsafe CreateTensorRTProviderOptions(&mut trt_options)?];
 			let ffi_options = self.options.to_ffi();
 			if let Err(e) = unsafe {

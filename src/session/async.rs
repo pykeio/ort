@@ -1,14 +1,15 @@
-use std::{
+use alloc::{ffi::CString, sync::Arc};
+use core::{
 	cell::UnsafeCell,
-	ffi::{CString, c_char},
+	ffi::c_char,
 	future::Future,
 	marker::PhantomData,
 	ops::Deref,
 	pin::Pin,
 	ptr::NonNull,
-	sync::{Arc, Mutex},
 	task::{Context, Poll, Waker}
 };
+use std::sync::Mutex;
 
 use ort_sys::{OrtStatus, c_void};
 

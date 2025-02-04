@@ -1,14 +1,15 @@
-use std::{
+use alloc::{borrow::Cow, ffi::CString, rc::Rc, sync::Arc, vec::Vec};
+use core::{
 	any::Any,
-	borrow::Cow,
-	ffi::{CString, c_char},
-	path::Path,
-	ptr,
-	rc::Rc,
-	sync::Arc
+	ffi::{c_char, c_void},
+	ptr
 };
+#[cfg(feature = "std")]
+use std::path::Path;
 
 use super::SessionBuilder;
+#[cfg(feature = "std")]
+use crate::util::path_to_os_char;
 use crate::{
 	AsPointer,
 	environment::{self, ThreadManager},
@@ -17,7 +18,6 @@ use crate::{
 	memory::MemoryInfo,
 	operator::OperatorDomain,
 	ortsys,
-	util::path_to_os_char,
 	value::DynValue
 };
 
@@ -89,6 +89,8 @@ impl SessionBuilder {
 	/// newly optimized model to the given path (for 'offline' graph optimization).
 	///
 	/// Note that the file will only be created after the model is committed.
+	#[cfg(feature = "std")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn with_optimized_model_path<S: AsRef<Path>>(mut self, path: S) -> Result<Self> {
 		let path = crate::util::path_to_os_char(path);
 		ortsys![unsafe SetOptimizedModelFilePath(self.ptr_mut(), path.as_ptr())?];
@@ -99,6 +101,8 @@ impl SessionBuilder {
 	/// See [`Session::end_profiling`].
 	///
 	/// [`Session::end_profiling`]: crate::session::Session::end_profiling
+	#[cfg(feature = "std")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn with_profiling<S: AsRef<Path>>(mut self, profiling_file: S) -> Result<Self> {
 		let profiling_file = crate::util::path_to_os_char(profiling_file);
 		ortsys![unsafe EnableProfiling(self.ptr_mut(), profiling_file.as_ptr())?];
@@ -124,6 +128,8 @@ impl SessionBuilder {
 	}
 
 	/// Registers a custom operator library at the given library path.
+	#[cfg(feature = "std")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn with_operator_library(mut self, lib_path: impl AsRef<Path>) -> Result<Self> {
 		let path_cstr = path_to_os_char(lib_path);
 		ortsys![unsafe RegisterCustomOpsLibrary_V2(self.ptr_mut(), path_cstr.as_ptr())?];
@@ -160,12 +166,21 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
-	pub fn with_external_initializer_file(mut self, file_name: impl AsRef<Path>, buffer: Cow<'static, [u8]>) -> Result<Self> {
+	pub fn with_external_initializer_file_in_memory(mut self, file_name: impl AsRef<str>, buffer: Cow<'static, [u8]>) -> Result<Self> {
 		// We need to hold onto `buffer` until the session is actually committed. This means `buffer` must outlive 'self (if
 		// SessionBuilder were to have a lifetime). Adding a lifetime to SessionBuilder would be breaking, so right now we
-		// either accept a &'static [u8] or Vec<u8> via Cow<'_, [u8]>, which still allows users to use include_bytes!.
+		// either accept a &'static [u8] or Vec<u8> via Cow<'static, [u8]>, which still allows users to use include_bytes!.
 
-		let file_name = crate::util::path_to_os_char(file_name);
+		#[cfg(target_family = "windows")]
+		let file_name: Vec<u16> = file_name.as_ref().encode_utf16().chain(core::iter::once(0)).collect();
+		#[cfg(not(target_family = "windows"))]
+		let file_name: Vec<core::ffi::c_char> = file_name
+			.as_ref()
+			.as_bytes()
+			.into_iter()
+			.map(|c| *c as _)
+			.chain(core::iter::once(0))
+			.collect();
 		let sizes = [buffer.len()];
 		ortsys![unsafe AddExternalInitializersFromMemory(self.ptr_mut(), &file_name.as_ptr(), &buffer.as_ptr().cast::<c_char>().cast_mut(), sizes.as_ptr(), 1)?];
 		self.external_initializer_buffers.push(buffer);
@@ -204,7 +219,7 @@ impl SessionBuilder {
 
 	pub fn with_thread_manager<T: ThreadManager + Any + 'static>(mut self, manager: T) -> Result<Self> {
 		let manager = Rc::new(manager);
-		ortsys![unsafe SessionOptionsSetCustomThreadCreationOptions(self.ptr_mut(), (&*manager as *const T) as *mut std::ffi::c_void)?];
+		ortsys![unsafe SessionOptionsSetCustomThreadCreationOptions(self.ptr_mut(), (&*manager as *const T) as *mut c_void)?];
 		ortsys![unsafe SessionOptionsSetCustomCreateThreadFn(self.ptr_mut(), Some(environment::thread_create::<T>))?];
 		ortsys![unsafe SessionOptionsSetCustomJoinThreadFn(self.ptr_mut(), Some(environment::thread_join::<T>))?];
 		self.thread_manager = Some(manager as Rc<dyn Any>);

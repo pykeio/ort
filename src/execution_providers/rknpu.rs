@@ -1,3 +1,5 @@
+use alloc::format;
+
 use crate::{
 	error::{Error, Result},
 	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},

@@ -10,19 +10,18 @@
 //! # }
 //! ```
 
-use std::{
+use alloc::{boxed::Box, ffi::CString, format, string::String, sync::Arc, vec::Vec};
+use core::{
 	any::Any,
-	ffi::{CStr, CString},
+	ffi::{CStr, c_char},
+	iter,
 	marker::PhantomData,
 	ops::Deref,
-	os::raw::c_char,
-	ptr::NonNull,
-	sync::Arc
+	ptr::{self, NonNull}
 };
 
 use crate::{
 	AsPointer, char_p_to_string,
-	environment::Environment,
 	error::{Error, ErrorCode, Result, assert_non_null_pointer, status_to_result},
 	io_binding::IoBinding,
 	memory::Allocator,
@@ -31,20 +30,21 @@ use crate::{
 	value::{Value, ValueType}
 };
 
+#[cfg(feature = "std")]
 mod r#async;
 pub mod builder;
 pub mod input;
 pub mod output;
 pub mod run_options;
+#[cfg(feature = "std")]
+pub use self::r#async::InferenceFut;
+#[cfg(feature = "std")]
+use self::r#async::{AsyncInferenceContext, InferenceFutInner, RunOptionsRef};
+use self::builder::SessionBuilder;
 pub use self::{
-	r#async::InferenceFut,
 	input::{SessionInputValue, SessionInputs},
 	output::SessionOutputs,
 	run_options::{HasSelectedOutputs, NoSelectedOutputs, RunOptions, SelectedOutputMarker}
-};
-use self::{
-	r#async::{AsyncInferenceContext, InferenceFutInner, RunOptionsRef},
-	builder::SessionBuilder
 };
 
 /// Holds onto an [`ort_sys::OrtSession`] pointer and its associated allocator.
@@ -57,8 +57,7 @@ pub struct SharedSessionInner {
 	pub(crate) allocator: Allocator,
 	/// Additional things we may need to hold onto for the duration of this session, like `OperatorDomain`s and
 	/// DLL handles for operator libraries.
-	_extras: Vec<Box<dyn Any>>,
-	_environment: Arc<Environment>
+	_extras: Vec<Box<dyn Any>>
 }
 
 unsafe impl Send for SharedSessionInner {}
@@ -168,10 +167,10 @@ impl Session {
 		let allocator = Allocator::default();
 		(0..size)
 			.map(|i| {
-				let mut name: *mut c_char = std::ptr::null_mut();
+				let mut name: *mut c_char = ptr::null_mut();
 				ortsys![unsafe SessionGetOverridableInitializerName(self.ptr(), i, allocator.ptr().cast_mut(), &mut name).expect("infallible")];
 				let name = unsafe { CStr::from_ptr(name) }.to_string_lossy().into_owned();
-				let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
+				let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = ptr::null_mut();
 				ortsys![unsafe SessionGetOverridableInitializerTypeInfo(self.ptr(), i, &mut typeinfo_ptr).expect("infallible")];
 				let dtype = ValueType::from_type_info(typeinfo_ptr);
 				OverridableInitializer { name, dtype }
@@ -269,7 +268,7 @@ impl Session {
 
 		let (output_names, mut output_tensors) = match run_options {
 			Some(r) => r.outputs.resolve_outputs(&self.outputs),
-			None => (self.outputs.iter().map(|o| o.name.as_str()).collect(), std::iter::repeat_with(|| None).take(self.outputs.len()).collect())
+			None => (self.outputs.iter().map(|o| o.name.as_str()).collect(), iter::repeat_with(|| None).take(self.outputs.len()).collect())
 		};
 		let output_names_ptr: Vec<*const c_char> = output_names
 			.iter()
@@ -280,7 +279,7 @@ impl Session {
 			.iter_mut()
 			.map(|c| match c {
 				Some(v) => v.ptr_mut(),
-				None => std::ptr::null_mut()
+				None => ptr::null_mut()
 			})
 			.collect();
 
@@ -297,7 +296,7 @@ impl Session {
 			));
 		}
 
-		let run_options_ptr = if let Some(run_options) = &run_options { run_options.ptr() } else { std::ptr::null() };
+		let run_options_ptr = if let Some(run_options) = &run_options { run_options.ptr() } else { ptr::null() };
 
 		ortsys![
 			unsafe Run(
@@ -353,6 +352,8 @@ impl Session {
 	/// # 	Ok(())
 	/// # }) }
 	/// ```
+	#[cfg(feature = "std")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "std")))] // TODO: parking_lot
 	pub fn run_async<'s, 'i, 'v: 'i + 's, const N: usize>(
 		&'s self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>>
@@ -370,6 +371,8 @@ impl Session {
 
 	/// Asynchronously run input data through the ONNX graph, performing inference, with the given [`RunOptions`].
 	/// See [`Session::run_with_options`] and [`Session::run_async`] for more details.
+	#[cfg(feature = "std")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "std")))] // TODO: parking_lot
 	pub fn run_async_with_options<'s, 'i, 'v: 'i + 's, 'r, O: SelectedOutputMarker, const N: usize>(
 		&'s self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>>,
@@ -388,6 +391,7 @@ impl Session {
 		}
 	}
 
+	#[cfg(feature = "std")]
 	fn run_inner_async<'s, 'v: 's, 'r, O: SelectedOutputMarker>(
 		&'s self,
 		input_names: &[String],
@@ -400,7 +404,7 @@ impl Session {
 			// (performance-wise) for routines involving `tokio::select!` or timeouts
 			None => RunOptionsRef::Arc(Arc::new(unsafe {
 				// SAFETY: transmuting from `RunOptions<NoSelectedOutputs>` to `RunOptions<O>`; safe because its just a marker
-				std::mem::transmute::<RunOptions<NoSelectedOutputs>, RunOptions<O>>(RunOptions::new()?)
+				core::mem::transmute::<RunOptions<NoSelectedOutputs>, RunOptions<O>>(RunOptions::new()?)
 			}))
 		};
 
@@ -416,7 +420,7 @@ impl Session {
 			.map(|n| n.into_raw().cast_const())
 			.collect();
 
-		let output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![std::ptr::null_mut(); self.outputs.len()];
+		let output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![ptr::null_mut(); self.outputs.len()];
 
 		let input_values: Vec<_> = input_values.collect();
 		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.iter().map(|input_array_ort| input_array_ort.ptr()).collect();
@@ -456,7 +460,7 @@ impl Session {
 
 	/// Gets the session model metadata. See [`ModelMetadata`] for more info.
 	pub fn metadata(&self) -> Result<ModelMetadata<'_>> {
-		let mut metadata_ptr: *mut ort_sys::OrtModelMetadata = std::ptr::null_mut();
+		let mut metadata_ptr: *mut ort_sys::OrtModelMetadata = ptr::null_mut();
 		ortsys![unsafe SessionGetModelMetadata(self.inner.session_ptr.as_ptr(), &mut metadata_ptr)?; nonNull(metadata_ptr)];
 		Ok(ModelMetadata::new(unsafe { NonNull::new_unchecked(metadata_ptr) }, &self.inner.allocator))
 	}
@@ -465,7 +469,7 @@ impl Session {
 	///
 	/// Note that this must be explicitly called at the end of profiling, otherwise the profiling file will be empty.
 	pub fn end_profiling(&self) -> Result<String> {
-		let mut profiling_name: *mut c_char = std::ptr::null_mut();
+		let mut profiling_name: *mut c_char = ptr::null_mut();
 
 		ortsys![unsafe SessionEndProfiling(self.inner.session_ptr.as_ptr(), self.inner.allocator.ptr().cast_mut(), &mut profiling_name)];
 		assert_non_null_pointer(profiling_name, "ProfilingName")?;
@@ -594,7 +598,7 @@ mod dangerous {
 		allocator: &Allocator,
 		i: usize
 	) -> Result<String> {
-		let mut name_bytes: *mut c_char = std::ptr::null_mut();
+		let mut name_bytes: *mut c_char = ptr::null_mut();
 
 		let status = unsafe { f(session_ptr.as_ptr(), i, allocator.ptr().cast_mut(), &mut name_bytes) };
 		unsafe { status_to_result(status) }?;
@@ -622,7 +626,7 @@ mod dangerous {
 		session_ptr: NonNull<ort_sys::OrtSession>,
 		i: usize
 	) -> Result<ValueType> {
-		let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = std::ptr::null_mut();
+		let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = ptr::null_mut();
 
 		let status = unsafe { f(session_ptr.as_ptr(), i, &mut typeinfo_ptr) };
 		unsafe { status_to_result(status) }?;

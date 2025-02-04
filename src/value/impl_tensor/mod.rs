@@ -1,11 +1,17 @@
 mod create;
 mod extract;
 
-use std::{
+use alloc::{
+	format,
+	string::{String, ToString},
+	sync::Arc
+};
+use core::{
 	fmt::Debug,
 	marker::PhantomData,
+	mem,
 	ops::{Index, IndexMut},
-	sync::Arc
+	ptr
 };
 
 pub use self::create::{OwnedTensorArrayData, TensorArrayData, TensorArrayDataMut, TensorArrayDataParts};
@@ -88,7 +94,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # }
 	/// ```
 	pub fn data_ptr_mut(&mut self) -> Result<*mut ort_sys::c_void> {
-		let mut buffer_ptr: *mut ort_sys::c_void = std::ptr::null_mut();
+		let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
 		ortsys![unsafe GetTensorMutableData(self.ptr_mut(), &mut buffer_ptr)?; nonNull(buffer_ptr)];
 		Ok(buffer_ptr)
 	}
@@ -111,7 +117,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # }
 	/// ```
 	pub fn data_ptr(&self) -> Result<*const ort_sys::c_void> {
-		let mut buffer_ptr: *mut ort_sys::c_void = std::ptr::null_mut();
+		let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
 		ortsys![unsafe GetTensorMutableData(self.ptr().cast_mut(), &mut buffer_ptr)?; nonNull(buffer_ptr)];
 		Ok(buffer_ptr)
 	}
@@ -157,7 +163,7 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// ```
 	#[inline]
 	pub fn upcast(self) -> DynTensor {
-		unsafe { std::mem::transmute(self) }
+		unsafe { mem::transmute(self) }
 	}
 
 	/// Creates a type-erased [`DynTensorRef`] from a strongly-typed [`Tensor<T>`].
@@ -237,7 +243,7 @@ impl<T: IntoTensorElementType + Clone + Debug, const N: usize> Index<[i64; N]> f
 			panic!("Cannot directly index a tensor which is not allocated on the CPU.");
 		}
 
-		let mut out: *mut ort_sys::c_void = std::ptr::null_mut();
+		let mut out: *mut ort_sys::c_void = ptr::null_mut();
 		ortsys![unsafe TensorAt(self.ptr().cast_mut(), index.as_ptr(), N, &mut out).expect("Failed to index tensor")];
 		unsafe { &*out.cast::<T>() }
 	}
@@ -248,7 +254,7 @@ impl<T: IntoTensorElementType + Clone + Debug, const N: usize> IndexMut<[i64; N]
 			panic!("Cannot directly index a tensor which is not allocated on the CPU.");
 		}
 
-		let mut out: *mut ort_sys::c_void = std::ptr::null_mut();
+		let mut out: *mut ort_sys::c_void = ptr::null_mut();
 		ortsys![unsafe TensorAt(self.ptr_mut(), index.as_ptr(), N, &mut out).expect("Failed to index tensor")];
 		unsafe { &mut *out.cast::<T>() }
 	}
@@ -267,8 +273,9 @@ pub(crate) fn calculate_tensor_size(shape: &[i64]) -> usize {
 
 #[cfg(test)]
 mod tests {
-	use std::sync::Arc;
+	use alloc::sync::Arc;
 
+	#[cfg(feature = "ndarray")]
 	use ndarray::{ArcArray1, Array1, CowArray};
 
 	use super::Tensor;

@@ -1,3 +1,17 @@
+fn copy_dir_all(src: impl AsRef<std::path::Path>, dst: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+	std::fs::create_dir_all(&dst)?;
+	for entry in std::fs::read_dir(src)? {
+		let entry = entry?;
+		let ty = entry.file_type()?;
+		if ty.is_dir() {
+			copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
+		} else {
+			std::fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
+		}
+	}
+	Ok(())
+}
+
 fn main() {
 	// Download precompiled libonnxruntime.a.
 	{
@@ -28,22 +42,25 @@ fn main() {
 		use data_downloader::{DownloadRequest, get};
 
 		let request = DownloadRequest {
-			url: "https://github.com/snakers4/silero-vad/raw/refs/heads/master/src/silero_vad/data/silero_vad.onnx",
-			sha256_hash: &hex_literal::hex!("2623a2953f6ff3d2c1e61740c6cdb7168133479b267dfef114a4a3cc5bdd788f")
+			url: "https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/yolov8m.onnx",
+			sha256_hash: &hex_literal::hex!("e91bd39ce15420f9623d5e3d46580f7ce4dfc85d061e4ee2e7b78ccd3e5b9453")
 		};
 		let bytes = get(&request).expect("Cannot request model.");
 		create_dir_all("models").expect("Cannot create models directory.");
-		let mut file = File::create("models/silero_vad.onnx").expect("Cannot create model file.");
+		let mut file = File::create("models/yolov8m.onnx").expect("Cannot create model file.");
 		file.write_all(&bytes).expect("Cannot store model file.");
 	}
 
-	// Copy index.html to target directory.
+	// Copy index.html and pictures to target directory.
 	{
-		println!("cargo:rerun-if-changed=index.html");
 		let mode = match cfg!(debug_assertions) {
 			true => "debug",
 			false => "release"
 		};
-		std::fs::copy("index.html", format!("../../target/wasm32-unknown-emscripten/{mode}/index.html")).expect("Cannot find target directory.");
+		println!("cargo:rerun-if-changed=index.html");
+		std::fs::copy("index.html", format!("../../target/wasm32-unknown-emscripten/{mode}/index.html")).expect("Cannot copy index.html.");
+
+		println!("cargo:rerun-if-changed=pictures/*");
+		copy_dir_all("pictures", format!("../../target/wasm32-unknown-emscripten/{mode}/pictures")).expect("Cannot copy pictures.");
 	}
 }

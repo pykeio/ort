@@ -8,7 +8,9 @@ edition = "2021"
 ort = { path = "../../" }
 ndarray = "0.16"
 rust-embed = { version = "8", features = ["debug-embed"] } # Embed in debug to debug WASM.
+image = "0.25"
 
 [build-dependencies]
 data_downloader = { version = "0.2", features = ["zip"] }
 hex-literal = "0.4"
+glob = "0.3"

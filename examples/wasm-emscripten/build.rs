@@ -13,50 +13,60 @@ fn copy_dir_all(src: impl AsRef<std::path::Path>, dst: impl AsRef<std::path::Pat
 }
 
 fn main() {
+	use std::{
+		fs::{File, create_dir_all},
+		io::{Cursor, Read, Write}
+	};
+
+	use reqwest::blocking::get;
+	use zip::ZipArchive;
+
+	// Determine mode.
+	let mode = match cfg!(debug_assertions) {
+		true => "debug",
+		false => "release"
+	};
+
 	// Download precompiled libonnxruntime.a.
 	{
-		use std::{fs::File, io::Write};
+		// Request archive.
+		let mut request = get("https://github.com/alfatraining/onnxruntime-wasm-builds/releases/download/v1.20.1/libonnxruntime-v1.20.1-wasm.zip")
+			.expect("Cannot request precompiled onnxruntime.");
+		let mut buf = Vec::<u8>::new();
+		request.read_to_end(&mut buf).expect("Cannot read precompiled onnxruntime.");
 
-		use data_downloader::{DownloadRequest, InZipDownloadRequest, get};
+		// Prepare extraction.
+		let reader = Cursor::new(buf);
+		let mut zip = ZipArchive::new(reader).expect("Cannot incept unzipper.");
 
-		let request = InZipDownloadRequest {
-			parent: &DownloadRequest {
-				url: "https://github.com/alfatraining/onnxruntime-wasm-builds/releases/download/v1.20.1/libonnxruntime-v1.20.1-wasm.zip",
-				sha256_hash: &hex_literal::hex!("bf22b0bf1336babf116839fa58a257aa91112e9bb2dae7fcd4c4a4dee11b70af")
-			},
-			path: "Release/libonnxruntime.a",
-			sha256_hash: &hex_literal::hex!("abcf64d106168458d08905f97114f0289ebad0912ee96b92e8130670297b5c22")
-		};
-		let bytes = get(&request).expect("Cannot request libonnxruntime.a.");
-		let mut file = File::create("libonnxruntime.a").expect("Cannot create libonnxruntime.a.");
-		file.write_all(&bytes).expect("Cannot store libonnxruntime.a.");
+		// Extract precompiled library.
+		{
+			let mut buf = Vec::<u8>::new();
+			let mut mode_title_case = mode.to_string();
+			mode_title_case = format!("{}{mode_title_case}", mode_title_case.remove(0).to_uppercase());
+			zip.by_name(format!("{mode_title_case}/libonnxruntime.a").as_str())
+				.expect("Cannot find precompiled onnxruntime.")
+				.read_to_end(&mut buf)
+				.expect("Cannot read precompiled onnxruntime.");
+			File::create("./libonnxruntime.a")
+				.expect("Cannot create precompiled onnxruntime.")
+				.write_all(&buf)
+				.expect("Cannot store precompiled onnxruntime.");
+		}
 	}
 
 	// Download model.
 	{
-		use std::{
-			fs::{File, create_dir_all},
-			io::Write
-		};
-
-		use data_downloader::{DownloadRequest, get};
-
-		let request = DownloadRequest {
-			url: "https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/yolov8m.onnx",
-			sha256_hash: &hex_literal::hex!("e91bd39ce15420f9623d5e3d46580f7ce4dfc85d061e4ee2e7b78ccd3e5b9453")
-		};
-		let bytes = get(&request).expect("Cannot request model.");
+		let mut request = get("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/yolov8m.onnx").expect("Cannot request model.");
+		let mut buf = Vec::<u8>::new();
+		request.read_to_end(&mut buf).expect("Cannot read model.");
 		create_dir_all("models").expect("Cannot create models directory.");
 		let mut file = File::create("models/yolov8m.onnx").expect("Cannot create model file.");
-		file.write_all(&bytes).expect("Cannot store model file.");
+		file.write_all(&buf).expect("Cannot store model.");
 	}
 
 	// Copy index.html and pictures to target directory.
 	{
-		let mode = match cfg!(debug_assertions) {
-			true => "debug",
-			false => "release"
-		};
 		println!("cargo:rerun-if-changed=index.html");
 		std::fs::copy("index.html", format!("../../target/wasm32-unknown-emscripten/{mode}/index.html")).expect("Cannot copy index.html.");
 

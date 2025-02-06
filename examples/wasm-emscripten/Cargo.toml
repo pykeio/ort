@@ -11,6 +11,6 @@ rust-embed = { version = "8", features = ["debug-embed"] } # Embed in debug to d
 image = "0.25"
 
 [build-dependencies]
-data_downloader = { version = "0.2", features = ["zip"] }
-hex-literal = "0.4"
 glob = "0.3"
+reqwest = { version = "0.12", features = ["blocking"] }
+zip = "2"

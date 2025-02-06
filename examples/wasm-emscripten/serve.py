@@ -1,5 +1,15 @@
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from os import chdir, path
+from argparse import ArgumentParser
+
+parser = ArgumentParser()
+parser.add_argument("-d", "--debug", action="store_true", help="serve debug build")
+parser.add_argument("-r", "--release", action="store_true", help="serve release build")
+args = parser.parse_args()
+if args.release:
+    mode = "release"
+else:
+    mode = "debug"
 
 # SharedArrayBuffer required for threaded execution need specific CORS headers.
 # See: https://rustwasm.github.io/wasm-bindgen/examples/raytrace.html#browser-requirements
@@ -11,8 +21,8 @@ class CORSRequestHandler (SimpleHTTPRequestHandler):
         self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
         SimpleHTTPRequestHandler.end_headers(self)
 
-# Serve index.html from release build.
-chdir(path.join(path.dirname(__file__), "../../target/wasm32-unknown-emscripten/release"))
+# Serve index.html.
+chdir(path.join(path.dirname(__file__), f"../../target/wasm32-unknown-emscripten/{mode}"))
 httpd = HTTPServer(("localhost", 5555), CORSRequestHandler)
-print("Serving site at: http://localhost:5555")
+print(f"Serving {mode} build at: http://localhost:5555")
 httpd.serve_forever()

@@ -13,7 +13,7 @@ Environment tested on Ubuntu 24.04 and macOS 14.7.1.
 
 ## Build example
 1. Set local Emscripten SDK in current session via `source ./emsdk/emsdk_env.sh`.
-1. Build the example via `cargo build --release`.
+1. Build the example via `cargo build` for a debug build or `cargo build --release` for a release build.
 
 ## Serve example
-1. Serve the example via `python3 serve.py`. Pre-installed Python 3 should be sufficient.
+1. Serve a debug build via `python3 serve.py` or a release build via `python3 serve.py --release`. Pre-installed Python 3 should be sufficient.

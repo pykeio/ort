@@ -14,7 +14,7 @@ fn copy_dir_all(src: impl AsRef<std::path::Path>, dst: impl AsRef<std::path::Pat
 
 fn main() {
 	use std::{
-		fs::{File, create_dir_all},
+		fs::File,
 		io::{Cursor, Read, Write}
 	};
 
@@ -60,8 +60,7 @@ fn main() {
 		let mut request = get("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/yolov8m.onnx").expect("Cannot request model.");
 		let mut buf = Vec::<u8>::new();
 		request.read_to_end(&mut buf).expect("Cannot read model.");
-		create_dir_all("models").expect("Cannot create models directory.");
-		let mut file = File::create("models/yolov8m.onnx").expect("Cannot create model file.");
+		let mut file = File::create("./yolov8m.onnx").expect("Cannot create model file.");
 		file.write_all(&buf).expect("Cannot store model.");
 	}
 

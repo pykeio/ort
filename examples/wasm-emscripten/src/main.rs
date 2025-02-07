@@ -1,10 +1,5 @@
 #![no_main]
 
-// Embed models into the .wasm file.
-#[derive(rust_embed::RustEmbed)]
-#[folder = "models/"]
-pub struct Models;
-
 // Below YoloV8 implementation partly copied from the "yolov8" example.
 #[derive(Debug, Clone, Copy)]
 struct BoundingBox {
@@ -27,17 +22,18 @@ static YOLOV8_CLASS_LABELS: [&str; 80] = [
 ];
 
 #[no_mangle]
-pub extern "C" fn alloc(capacity: usize) -> *mut std::os::raw::c_void {
-	let mut buf = Vec::with_capacity(capacity);
-	let ptr = buf.as_mut_ptr();
-	std::mem::forget(buf);
-	return ptr as *mut std::os::raw::c_void;
+pub extern "C" fn alloc(size: usize) -> *mut std::os::raw::c_void {
+	unsafe {
+		let layout = std::alloc::Layout::from_size_align(size, std::mem::align_of::<u8>()).expect("Cannot create memory layout.");
+		return std::alloc::alloc(layout) as *mut std::os::raw::c_void;
+	}
 }
 
 #[no_mangle]
-pub extern "C" fn dealloc(ptr: *mut std::os::raw::c_void, capacity: usize) {
+pub extern "C" fn dealloc(ptr: *mut std::os::raw::c_void, size: usize) {
 	unsafe {
-		let _buf = Vec::from_raw_parts(ptr, 0, capacity);
+		let layout = std::alloc::Layout::from_size_align(size, std::mem::align_of::<u8>()).expect("Cannot create memory layout.");
+		std::alloc::dealloc(ptr as *mut u8, layout);
 	}
 }
 
@@ -49,8 +45,6 @@ pub extern "C" fn detect_objects(ptr: *const u8, width: u32, height: u32) {
 		.commit()
 		.expect("Cannot initialize ort.");
 
-	let model = Models::get("yolov8m.onnx").expect("Cannot find model.").data.to_vec();
-
 	let session = ort::session::Session::builder()
 		.expect("Cannot create Session builder.")
 		.with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level3)
@@ -61,7 +55,7 @@ pub extern "C" fn detect_objects(ptr: *const u8, width: u32, height: u32) {
 		.expect("Cannot set intra thread count.")
 		.with_inter_threads(1)
 		.expect("Cannot set inter thread count.")
-		.commit_from_memory(&model)
+		.commit_from_memory(include_bytes!("../yolov8m.onnx"))
 		.expect("Cannot commit model.");
 
 	let image_data = unsafe { std::slice::from_raw_parts(ptr, (width * height * 4) as usize).to_vec() }; // Copy via .to_vec might be not necessary as memory lives long enough.

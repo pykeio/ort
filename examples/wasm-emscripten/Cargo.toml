@@ -7,7 +7,6 @@ edition = "2021"
 [dependencies]
 ort = { path = "../../" }
 ndarray = "0.16"
-rust-embed = { version = "8", features = ["debug-embed"] } # Embed in debug to debug WASM.
 image = "0.25"
 
 [build-dependencies]

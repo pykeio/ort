@@ -251,21 +251,27 @@ impl fmt::Display for ValueType {
 
 pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo) -> ValueType {
 	let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-	ortsys![GetTensorElementType(info_ptr, &mut type_sys)];
+	ortsys![unsafe GetTensorElementType(info_ptr, &mut type_sys)];
 	assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 	// This transmute should be safe since its value is read from GetTensorElementType, which we must trust
 	let mut num_dims = 0;
-	ortsys![GetDimensionsCount(info_ptr, &mut num_dims)];
+	ortsys![unsafe GetDimensionsCount(info_ptr, &mut num_dims)];
 
 	let mut node_dims: Vec<i64> = vec![0; num_dims];
-	ortsys![GetDimensions(info_ptr, node_dims.as_mut_ptr(), num_dims)];
+	ortsys![unsafe GetDimensions(info_ptr, node_dims.as_mut_ptr(), num_dims)];
 
 	let mut symbolic_dims: Vec<*const c_char> = vec![ptr::null(); num_dims];
-	ortsys![GetSymbolicDimensions(info_ptr, symbolic_dims.as_mut_ptr(), num_dims)];
+	ortsys![unsafe GetSymbolicDimensions(info_ptr, symbolic_dims.as_mut_ptr(), num_dims)];
 
 	let dimension_symbols = symbolic_dims
 		.into_iter()
-		.map(|c| if !c.is_null() && *c != 0 { CStr::from_ptr(c).to_str().ok().map(str::to_string) } else { None })
+		.map(|c| {
+			if !c.is_null() && unsafe { *c } != 0 {
+				unsafe { CStr::from_ptr(c) }.to_str().ok().map(str::to_string)
+			} else {
+				None
+			}
+		})
 		.collect();
 
 	ValueType::Tensor {
@@ -277,15 +283,15 @@ pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys
 
 unsafe fn extract_data_type_from_map_info(info_ptr: *const ort_sys::OrtMapTypeInfo) -> ValueType {
 	let mut key_type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-	ortsys![GetMapKeyType(info_ptr, &mut key_type_sys)]; // infallible
+	ortsys![unsafe GetMapKeyType(info_ptr, &mut key_type_sys)]; // infallible
 	assert_ne!(key_type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 
 	let mut value_type_info: *mut ort_sys::OrtTypeInfo = ptr::null_mut();
-	ortsys![GetMapValueType(info_ptr, &mut value_type_info)]; // infallible
+	ortsys![unsafe GetMapValueType(info_ptr, &mut value_type_info)]; // infallible
 	let mut value_info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = ptr::null_mut();
 	ortsys![unsafe CastTypeInfoToTensorInfo(value_type_info, &mut value_info_ptr)]; // infallible
 	let mut value_type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-	ortsys![GetTensorElementType(value_info_ptr, &mut value_type_sys)]; // infallible
+	ortsys![unsafe GetTensorElementType(value_info_ptr, &mut value_type_sys)]; // infallible
 	assert_ne!(value_type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 
 	ValueType::Map {

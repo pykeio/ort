@@ -297,14 +297,14 @@ impl ExecutionProvider for TensorRTExecutionProvider {
 			let mut trt_options: *mut ort_sys::OrtTensorRTProviderOptionsV2 = core::ptr::null_mut();
 			crate::ortsys![unsafe CreateTensorRTProviderOptions(&mut trt_options)?];
 			let ffi_options = self.options.to_ffi();
-			if let Err(e) = unsafe {
-				crate::error::status_to_result(crate::ortsys![UpdateTensorRTProviderOptions(
-					trt_options,
-					ffi_options.key_ptrs(),
-					ffi_options.value_ptrs(),
-					ffi_options.len()
-				)])
-			} {
+
+			let res = crate::ortsys![unsafe UpdateTensorRTProviderOptions(
+				trt_options,
+				ffi_options.key_ptrs(),
+				ffi_options.value_ptrs(),
+				ffi_options.len()
+			)];
+			if let Err(e) = unsafe { crate::error::status_to_result(res) } {
 				crate::ortsys![unsafe ReleaseTensorRTProviderOptions(trt_options)];
 				return Err(e);
 			}

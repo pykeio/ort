@@ -48,37 +48,19 @@ macro_rules! trainsys {
 	($method:ident) => {
 		($crate::training::training_api().unwrap().as_ref().$method)
 	};
-	($method:ident($($n:expr),+ $(,)?)) => {
-		($crate::training::training_api().unwrap().as_ref().$method)($($n),+)
-	};
 	(unsafe $method:ident($($n:expr),+ $(,)?)) => {
 		unsafe { ($crate::training::training_api().unwrap().as_ref().$method)($($n),+) }
-	};
-	($method:ident($($n:expr),+ $(,)?).expect($e:expr)) => {
-		$crate::error::status_to_result(($crate::training::training_api().unwrap().as_ref().$method)($($n),+)).expect($e)
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?).expect($e:expr)) => {
 		unsafe { $crate::error::status_to_result(($crate::training::training_api().unwrap().as_ref().$method)($($n),+)) }.expect($e)
 	};
-	($method:ident($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {{
-		let _x = ($crate::training::training_api().unwrap().as_ref().$method)($($n),+);
-		$($crate::error::assert_non_null_pointer($check, stringify!($method)).unwrap();)+
-		_x
-	}};
 	(unsafe $method:ident($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {{
 		let _x = unsafe { ($crate::training::training_api().unwrap().as_ref().$method)($($n),+) };
 		$($crate::error::assert_non_null_pointer($check, stringify!($method)).unwrap();)+
 		_x
 	}};
-	($method:ident($($n:expr),+ $(,)?)?) => {
-		$crate::error::status_to_result(($crate::training::training_api()?.as_ref().$method)($($n),+))?;
-	};
 	(unsafe $method:ident($($n:expr),+ $(,)?)?) => {
 		unsafe { $crate::error::status_to_result(($crate::training::training_api()?.as_ref().$method)($($n),+)) }?;
-	};
-	($method:ident($($n:expr),+ $(,)?)?; nonNull($($check:expr),+ $(,)?)$(;)?) => {
-		$crate::error::status_to_result(($crate::training::training_api()?.as_ref().$method)($($n),+))?;
-		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?)?; nonNull($($check:expr),+ $(,)?)$(;)?) => {{
 		unsafe { $crate::error::status_to_result(($crate::training::training_api()?.as_ref().$method)($($n),+)) }?;

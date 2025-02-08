@@ -212,37 +212,19 @@ macro_rules! ortsys {
 	($method:ident) => {
 		($crate::api().$method)
 	};
-	($method:ident($($n:expr),+ $(,)?)) => {
-		($crate::api().$method)($($n),+)
-	};
 	(unsafe $method:ident($($n:expr),+ $(,)?)) => {
 		unsafe { ($crate::api().$method)($($n),+) }
-	};
-	($method:ident($($n:expr),+ $(,)?).expect($e:expr)) => {
-		$crate::error::status_to_result(($crate::api().$method)($($n),+)).expect($e)
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?).expect($e:expr)) => {
 		unsafe { $crate::error::status_to_result(($crate::api().$method)($($n),+)) }.expect($e)
 	};
-	($method:ident($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {{
-		let _x = ($crate::api().$method)($($n),+);
-		$($crate::error::assert_non_null_pointer($check, stringify!($method)).unwrap();)+
-		_x
-	}};
 	(unsafe $method:ident($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {{
 		let _x = unsafe { ($crate::api().$method)($($n),+) };
 		$($crate::error::assert_non_null_pointer($check, stringify!($method)).unwrap();)+
 		_x
 	}};
-	($method:ident($($n:expr),+ $(,)?)?) => {
-		$crate::error::status_to_result(($crate::api().$method)($($n),+))?;
-	};
 	(unsafe $method:ident($($n:expr),+ $(,)?)?) => {
 		unsafe { $crate::error::status_to_result(($crate::api().$method)($($n),+)) }?;
-	};
-	($method:ident($($n:expr),+ $(,)?)?; nonNull($($check:expr),+ $(,)?)$(;)?) => {
-		$crate::error::status_to_result(($crate::api().$method)($($n),+))?;
-		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?)?; nonNull($($check:expr),+ $(,)?)$(;)?) => {{
 		unsafe { $crate::error::status_to_result(($crate::api().$method)($($n),+)) }?;

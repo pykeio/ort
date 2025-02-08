@@ -149,14 +149,14 @@ impl ExecutionProvider for CANNExecutionProvider {
 			let mut cann_options: *mut ort_sys::OrtCANNProviderOptions = core::ptr::null_mut();
 			crate::ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)?];
 			let ffi_options = self.options.to_ffi();
-			if let Err(e) = unsafe {
-				crate::error::status_to_result(crate::ortsys![UpdateCANNProviderOptions(
-					cann_options,
-					ffi_options.key_ptrs(),
-					ffi_options.value_ptrs(),
-					ffi_options.len()
-				)])
-			} {
+
+			let res = crate::ortsys![unsafe UpdateCANNProviderOptions(
+				cann_options,
+				ffi_options.key_ptrs(),
+				ffi_options.value_ptrs(),
+				ffi_options.len()
+			)];
+			if let Err(e) = unsafe { crate::error::status_to_result(res) } {
 				crate::ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
 				return Err(e);
 			}

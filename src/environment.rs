@@ -190,7 +190,7 @@ pub(crate) unsafe extern "system" fn thread_create<T: ThreadManager + Any>(
 }
 
 pub(crate) unsafe extern "system" fn thread_join<T: ThreadManager + Any>(ort_custom_thread_handle: ort_sys::OrtCustomThreadHandle) {
-	let handle = Box::from_raw(ort_custom_thread_handle.cast_mut().cast::<<T as ThreadManager>::Thread>());
+	let handle = unsafe { Box::from_raw(ort_custom_thread_handle.cast_mut().cast::<<T as ThreadManager>::Thread>()) };
 	if let Err(e) = <T as ThreadManager>::join(*handle) {
 		crate::error!("Failed to join thread using manager: {e}");
 		let _ = e;

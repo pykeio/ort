@@ -230,7 +230,7 @@ impl<T> OnceLock<T> {
 
 	#[inline]
 	pub unsafe fn get_unchecked(&self) -> &T {
-		&*(*self.data.get()).as_ptr()
+		unsafe { &*(*self.data.get()).as_ptr() }
 	}
 
 	#[inline]

@@ -86,7 +86,7 @@ unsafe impl Send for Allocator {}
 impl Allocator {
 	pub(crate) unsafe fn from_raw_unchecked(ptr: *mut ort_sys::OrtAllocator) -> Allocator {
 		Allocator {
-			ptr: NonNull::new_unchecked(ptr),
+			ptr: unsafe { NonNull::new_unchecked(ptr) },
 			is_default: false,
 			// currently, this function is only ever used in session creation, where we call `CreateAllocator` manually and store the allocator resulting from
 			// this function in the `SharedSessionInner` - we don't need to hold onto the session, because the session is holding onto us.
@@ -140,7 +140,7 @@ impl Allocator {
 	/// };
 	/// ```
 	pub unsafe fn free<T>(&self, ptr: *mut T) {
-		self.ptr.as_ref().Free.unwrap_or_else(|| unreachable!("Allocator method `Free` is null"))(self.ptr.as_ptr(), ptr.cast());
+		unsafe { self.ptr.as_ref().Free.unwrap_or_else(|| unreachable!("Allocator method `Free` is null"))(self.ptr.as_ptr(), ptr.cast()) };
 	}
 
 	/// Returns the [`MemoryInfo`] describing this allocator.
@@ -171,8 +171,8 @@ impl Default for Allocator {
 	/// transparent to the user).
 	fn default() -> Self {
 		let mut allocator_ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
-		unsafe { status_to_result(ortsys![GetAllocatorWithDefaultOptions(&mut allocator_ptr); nonNull(allocator_ptr)]) }
-			.expect("Failed to get default allocator");
+		let res = ortsys![unsafe GetAllocatorWithDefaultOptions(&mut allocator_ptr); nonNull(allocator_ptr)];
+		unsafe { status_to_result(res) }.expect("Failed to get default allocator");
 		Self {
 			ptr: unsafe { NonNull::new_unchecked(allocator_ptr) },
 			is_default: true,

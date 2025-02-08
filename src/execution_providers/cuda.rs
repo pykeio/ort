@@ -273,14 +273,14 @@ impl ExecutionProvider for CUDAExecutionProvider {
 			let mut cuda_options: *mut ort_sys::OrtCUDAProviderOptionsV2 = core::ptr::null_mut();
 			crate::ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)?];
 			let ffi_options = self.options.to_ffi();
-			if let Err(e) = unsafe {
-				crate::error::status_to_result(crate::ortsys![UpdateCUDAProviderOptions(
-					cuda_options,
-					ffi_options.key_ptrs(),
-					ffi_options.value_ptrs(),
-					ffi_options.len()
-				)])
-			} {
+
+			let res = crate::ortsys![unsafe UpdateCUDAProviderOptions(
+				cuda_options,
+				ffi_options.key_ptrs(),
+				ffi_options.value_ptrs(),
+				ffi_options.len()
+			)];
+			if let Err(e) = unsafe { crate::error::status_to_result(res) } {
 				crate::ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
 				return Err(e);
 			}

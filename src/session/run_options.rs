@@ -22,7 +22,7 @@ use crate::{
 /// # use std::sync::Arc;
 /// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
 /// # fn main() -> ort::Result<()> {
-/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// let input = Tensor::<f32>::new(&Allocator::default(), [1, 64, 64, 3])?;
 ///
 /// let output0 = session.outputs[0].name.as_str();
@@ -101,7 +101,7 @@ impl OutputSelector {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
-	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = Tensor::<f32>::new(&Allocator::default(), [1, 64, 64, 3])?;
 	///
 	/// let output0 = session.outputs[0].name.as_str();
@@ -199,7 +199,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
-	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = Tensor::<f32>::new(&Allocator::default(), [1, 64, 64, 3])?;
 	///
 	/// let output0 = session.outputs[0].name.as_str();
@@ -254,7 +254,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, value::Value};
 	/// # fn main() -> ort::Result<()> {
-	/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// # 	let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
 	/// let run_options = Arc::new(RunOptions::new()?);
 	///
@@ -283,7 +283,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, value::Value};
 	/// # fn main() -> ort::Result<()> {
-	/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// # 	let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
 	/// let run_options = Arc::new(RunOptions::new()?);
 	///

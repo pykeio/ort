@@ -102,7 +102,7 @@ fn main() -> ort::Result<()> {
 
 	trainer.export("trained-clm.onnx", ["probs"])?;
 
-	let session = Session::builder()?.commit_from_file("trained-clm.onnx")?;
+	let mut session = Session::builder()?.commit_from_file("trained-clm.onnx")?;
 
 	let mut stdout = std::io::stdout();
 

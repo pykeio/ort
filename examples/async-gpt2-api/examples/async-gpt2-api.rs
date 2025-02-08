@@ -17,7 +17,7 @@ use ort::{
 };
 use rand::Rng;
 use tokenizers::Tokenizer;
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, sync::Mutex};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -44,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
 	let tokenizer = Tokenizer::from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("tokenizer.json")).unwrap();
 
 	let app_state = AppState {
-		session: Arc::new(session),
+		session: Arc::new(Mutex::new(session)),
 		tokenizer: Arc::new(tokenizer)
 	};
 
@@ -59,15 +59,21 @@ async fn main() -> anyhow::Result<()> {
 
 #[derive(Clone)]
 struct AppState {
-	session: Arc<Session>,
+	session: Arc<Mutex<Session>>,
 	tokenizer: Arc<Tokenizer>
 }
 
-fn generate_stream(tokenizer: Arc<Tokenizer>, session: Arc<Session>, mut tokens: Vec<i64>, gen_tokens: usize) -> impl Stream<Item = ort::Result<Event>> + Send {
+fn generate_stream(
+	tokenizer: Arc<Tokenizer>,
+	session: Arc<Mutex<Session>>,
+	mut tokens: Vec<i64>,
+	gen_tokens: usize
+) -> impl Stream<Item = ort::Result<Event>> + Send {
 	async_stream_lite::try_async_stream(|yielder| async move {
 		for _ in 0..gen_tokens {
+			let input = TensorRef::from_array_view((vec![1, 1, tokens.len() as i64], tokens.as_slice()))?;
 			let probabilities = {
-				let input = TensorRef::from_array_view((vec![1, 1, tokens.len() as i64], tokens.as_slice()))?;
+				let mut session = session.lock().await;
 				let outputs = session.run_async(ort::inputs![input])?.await?;
 				let (dim, probabilities) = outputs["output1"].try_extract_raw_tensor()?;
 
@@ -93,7 +99,7 @@ fn generate_stream(tokenizer: Arc<Tokenizer>, session: Arc<Session>, mut tokens:
 	})
 }
 
-impl FromRef<AppState> for Arc<Session> {
+impl FromRef<AppState> for Arc<Mutex<Session>> {
 	fn from_ref(input: &AppState) -> Self {
 		Arc::clone(&input.session)
 	}
@@ -104,6 +110,6 @@ impl FromRef<AppState> for Arc<Tokenizer> {
 	}
 }
 
-async fn generate(State(session): State<Arc<Session>>, State(tokenizer): State<Arc<Tokenizer>>) -> Sse<impl Stream<Item = ort::Result<Event>>> {
+async fn generate(State(session): State<Arc<Mutex<Session>>>, State(tokenizer): State<Arc<Tokenizer>>) -> Sse<impl Stream<Item = ort::Result<Event>>> {
 	Sse::new(generate_stream(tokenizer, session, vec![0], 50)).keep_alive(KeepAlive::new())
 }

@@ -36,7 +36,7 @@ impl Drop for AdapterInner {
 /// ```
 /// # use ort::{adapter::Adapter, session::{run_options::RunOptions, Session}, value::Tensor};
 /// # fn main() -> ort::Result<()> {
-/// let model = Session::builder()?.commit_from_file("tests/data/lora_model.onnx")?;
+/// let mut model = Session::builder()?.commit_from_file("tests/data/lora_model.onnx")?;
 /// let lora = Adapter::from_file("tests/data/adapter.orl", None)?;
 ///
 /// let mut run_options = RunOptions::new()?;
@@ -69,7 +69,7 @@ impl Adapter {
 	/// # 	value::Tensor
 	/// # };
 	/// # fn main() -> ort::Result<()> {
-	/// let model = Session::builder()?
+	/// let mut model = Session::builder()?
 	/// 	.with_execution_providers([CUDAExecutionProvider::default().build()])?
 	/// 	.commit_from_file("tests/data/lora_model.onnx")?;
 	///
@@ -116,7 +116,7 @@ impl Adapter {
 	/// # 	value::Tensor
 	/// # };
 	/// # fn main() -> ort::Result<()> {
-	/// let model = Session::builder()?
+	/// let mut model = Session::builder()?
 	/// 	.with_execution_providers([CUDAExecutionProvider::default().build()])?
 	/// 	.commit_from_file("tests/data/lora_model.onnx")?;
 	///
@@ -166,7 +166,7 @@ mod tests {
 	#[test]
 	fn test_lora() -> crate::Result<()> {
 		let model = std::fs::read("tests/data/lora_model.onnx").expect("");
-		let session = Session::builder()?.commit_from_memory(&model)?;
+		let mut session = Session::builder()?.commit_from_memory(&model)?;
 		let lora = std::fs::read("tests/data/adapter.orl").expect("");
 		let lora = Adapter::from_memory(&lora, None)?;
 
@@ -190,7 +190,7 @@ mod tests {
 	#[test]
 	fn test_lora_from_memory() -> crate::Result<()> {
 		let model = std::fs::read("tests/data/lora_model.onnx").expect("");
-		let session = Session::builder()?.commit_from_memory(&model)?;
+		let mut session = Session::builder()?.commit_from_memory(&model)?;
 
 		let lora_bytes = std::fs::read("tests/data/adapter.orl").expect("");
 		let lora = Adapter::from_memory(&lora_bytes, None)?;

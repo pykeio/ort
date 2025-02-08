@@ -24,7 +24,7 @@ fn get_current_time() -> Instant {
 	Instant::now()
 }
 
-fn get_image_embedding(vision_model: &Session, img: &Option<DynamicImage>) -> Result<Array3<f32>> {
+fn get_image_embedding(vision_model: &mut Session, img: &Option<DynamicImage>) -> Result<Array3<f32>> {
 	let visual_features = if let Some(img) = img {
 		let image_processor = image_process::Phi3VImageProcessor::new();
 		let result = image_processor.preprocess(img)?;
@@ -46,7 +46,7 @@ fn get_image_embedding(vision_model: &Session, img: &Option<DynamicImage>) -> Re
 	Ok(visual_features)
 }
 
-fn get_text_embedding(text_embedding_model: &Session, input_ids: &Array2<i64>) -> Result<Array3<f32>> {
+fn get_text_embedding(text_embedding_model: &mut Session, input_ids: &Array2<i64>) -> Result<Array3<f32>> {
 	let outputs = text_embedding_model.run(ort::inputs![
 		"input_ids" => TensorRef::from_array_view(input_ids)?,
 	])?;
@@ -102,9 +102,9 @@ fn format_chat_template(img: &Option<DynamicImage>, txt: &str) -> String {
 
 pub async fn generate_text(
 	tokenizer: &Tokenizer,
-	vision_model: &Session,
-	text_embedding_model: &Session,
-	generation_model: &Session,
+	vision_model: &mut Session,
+	text_embedding_model: &mut Session,
+	generation_model: &mut Session,
 	image: &Option<DynamicImage>,
 	text: &str
 ) -> Result<()> {
@@ -213,19 +213,19 @@ async fn main() -> Result<()> {
 
 	let data_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("data");
 	let tokenizer = Tokenizer::from_file(data_dir.join("tokenizer.json")).map_err(|e| anyhow::anyhow!("Error loading tokenizer: {:?}", e))?;
-	let vision_model = Session::builder()?.commit_from_file(data_dir.join(VISION_MODEL_NAME))?;
-	let text_embedding_model = Session::builder()?.commit_from_file(data_dir.join(TEXT_EMBEDDING_MODEL_NAME))?;
-	let generation_model = Session::builder()?.commit_from_file(data_dir.join(GENERATION_MODEL_NAME))?;
+	let mut vision_model = Session::builder()?.commit_from_file(data_dir.join(VISION_MODEL_NAME))?;
+	let mut text_embedding_model = Session::builder()?.commit_from_file(data_dir.join(TEXT_EMBEDDING_MODEL_NAME))?;
+	let mut generation_model = Session::builder()?.commit_from_file(data_dir.join(GENERATION_MODEL_NAME))?;
 
 	// Generate text from text
 	let image: Option<DynamicImage> = None;
 	let text = "Who are you?".to_string();
-	generate_text(&tokenizer, &vision_model, &text_embedding_model, &generation_model, &image, &text).await?;
+	generate_text(&tokenizer, &mut vision_model, &mut text_embedding_model, &mut generation_model, &image, &text).await?;
 
 	// Generate text from image and text
 	let image: Option<DynamicImage> = Some(image::open(data_dir.join("example.jpg"))?);
 	let text = "What is shown in this image?".to_string();
-	generate_text(&tokenizer, &vision_model, &text_embedding_model, &generation_model, &image, &text).await?;
+	generate_text(&tokenizer, &mut vision_model, &mut text_embedding_model, &mut generation_model, &image, &text).await?;
 
 	Ok(())
 }

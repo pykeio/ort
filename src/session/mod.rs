@@ -3,7 +3,7 @@
 //! ```
 //! # use ort::{session::Session, value::TensorRef};
 //! # fn main() -> ort::Result<()> {
-//! let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+//! let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 //! let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 //! let outputs = session.run(ort::inputs![TensorRef::from_array_view(&input)?])?;
 //! # 	Ok(())
@@ -16,8 +16,9 @@ use core::{
 	ffi::{CStr, c_char},
 	iter,
 	marker::PhantomData,
-	ops::Deref,
-	ptr::{self, NonNull}
+	ops::{Deref, DerefMut},
+	ptr::{self, NonNull},
+	slice
 };
 
 use crate::{
@@ -27,7 +28,7 @@ use crate::{
 	memory::Allocator,
 	metadata::ModelMetadata,
 	ortsys,
-	value::{Value, ValueType}
+	value::{DynValue, Value, ValueType}
 };
 
 #[cfg(feature = "std")]
@@ -83,7 +84,7 @@ impl Drop for SharedSessionInner {
 /// ```
 /// # use ort::{session::Session, value::TensorRef};
 /// # fn main() -> ort::Result<()> {
-/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 /// let outputs = session.run(ort::inputs![TensorRef::from_array_view(&input)?])?;
 /// # 	Ok(())
@@ -111,6 +112,11 @@ impl Deref for InMemorySession<'_> {
 	type Target = Session;
 	fn deref(&self) -> &Self::Target {
 		&self.session
+	}
+}
+impl DerefMut for InMemorySession<'_> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.session
 	}
 }
 
@@ -188,13 +194,13 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{run_options::RunOptions, Session}, tensor::TensorElementType, value::{Value, ValueType, TensorRef}};
 	/// # fn main() -> ort::Result<()> {
-	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 	/// let outputs = session.run(ort::inputs![TensorRef::from_array_view(&input)?])?;
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn run<'s, 'i, 'v: 'i, const N: usize>(&'s self, input_values: impl Into<SessionInputs<'i, 'v, N>>) -> Result<SessionOutputs<'s, 's>> {
+	pub fn run<'s, 'i, 'v: 'i, const N: usize>(&'s mut self, input_values: impl Into<SessionInputs<'i, 'v, N>>) -> Result<SessionOutputs<'s, 's>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
 				self.run_inner::<NoSelectedOutputs>(&self.inputs.iter().map(|input| input.name.as_str()).collect::<Vec<_>>(), input_values.iter(), None)
@@ -218,7 +224,7 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef}, tensor::TensorElementType};
 	/// # fn main() -> ort::Result<()> {
-	/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// # 	let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
 	/// let run_options = Arc::new(RunOptions::new()?);
 	///
@@ -237,7 +243,7 @@ impl Session {
 	/// # }
 	/// ```
 	pub fn run_with_options<'r, 's: 'r, 'i, 'v: 'i, O: SelectedOutputMarker, const N: usize>(
-		&'s self,
+		&'s mut self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>>,
 		run_options: &'r RunOptions<O>
 	) -> Result<SessionOutputs<'r, 's>> {
@@ -333,6 +339,58 @@ impl Session {
 		Ok(SessionOutputs::new(output_names, outputs))
 	}
 
+	pub fn run_binding<'b, 's: 'b>(&'s mut self, binding: &'b IoBinding) -> Result<SessionOutputs<'b, 's>> {
+		self.run_binding_inner(binding, None)
+	}
+
+	pub fn run_binding_with_options<'r, 'b, 's: 'b>(
+		&'s mut self,
+		binding: &'b IoBinding,
+		run_options: &'r RunOptions<NoSelectedOutputs>
+	) -> Result<SessionOutputs<'b, 's>> {
+		self.run_binding_inner(binding, Some(run_options))
+	}
+
+	fn run_binding_inner<'r, 'b, 's: 'b>(
+		&'s self,
+		binding: &'b IoBinding,
+		run_options: Option<&'r RunOptions<NoSelectedOutputs>>
+	) -> Result<SessionOutputs<'b, 's>> {
+		let run_options_ptr = if let Some(run_options) = run_options { run_options.ptr() } else { ptr::null() };
+		ortsys![unsafe RunWithBinding(self.inner.ptr().cast_mut(), run_options_ptr, binding.ptr())?];
+
+		// let owned_ptrs: HashMap<*mut ort_sys::OrtValue, &Value> = self.output_values.values().map(|c| (c.ptr().cast_mut(),
+		// c)).collect();
+		let mut count = binding.output_values.len();
+		if count > 0 {
+			let mut output_values_ptr: *mut *mut ort_sys::OrtValue = ptr::null_mut();
+			ortsys![unsafe GetBoundOutputValues(binding.ptr(), self.inner.allocator.ptr().cast_mut(), &mut output_values_ptr, &mut count)?; nonNull(output_values_ptr)];
+
+			let output_values = unsafe { slice::from_raw_parts(output_values_ptr, count).to_vec() }
+				.into_iter()
+				.zip(binding.output_values.iter())
+				.map(|(ptr, (_, value))| unsafe {
+					if let Some(value) = value {
+						DynValue::clone_of(value)
+					} else {
+						DynValue::from_ptr(NonNull::new(ptr).expect("OrtValue ptrs returned by GetBoundOutputValues should not be null"), Some(self.inner()))
+					}
+				})
+				.collect::<Vec<_>>();
+
+			// output values will be freed when the `Value`s in `SessionOutputs` drop
+
+			Ok(SessionOutputs::new_backed(
+				binding.output_values.iter().map(|(k, _)| k.as_str()).collect(),
+				output_values,
+				self.allocator(),
+				output_values_ptr.cast()
+			))
+		} else {
+			Ok(SessionOutputs::new_empty())
+		}
+	}
+
 	/// Asynchronously run input data through the ONNX graph, performing inference.
 	///
 	/// Inference will be performed on a thread in the session's thread pool. **Thus, the session must have been
@@ -346,16 +404,16 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef}, tensor::TensorElementType};
 	/// # fn main() -> ort::Result<()> { tokio_test::block_on(async {
-	/// let session = Session::builder()?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
+	/// let mut session = Session::builder()?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 	/// let outputs = session.run_async(ort::inputs![TensorRef::from_array_view(&input)?])?.await?;
 	/// # 	Ok(())
 	/// # }) }
 	/// ```
 	#[cfg(feature = "std")]
-	#[cfg_attr(docsrs, doc(cfg(feature = "std")))] // TODO: parking_lot
+	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn run_async<'s, 'i, 'v: 'i + 's, const N: usize>(
-		&'s self,
+		&'s mut self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>>
 	) -> Result<InferenceFut<'s, 's, 'v, NoSelectedOutputs>> {
 		match input_values.into() {
@@ -372,9 +430,9 @@ impl Session {
 	/// Asynchronously run input data through the ONNX graph, performing inference, with the given [`RunOptions`].
 	/// See [`Session::run_with_options`] and [`Session::run_async`] for more details.
 	#[cfg(feature = "std")]
-	#[cfg_attr(docsrs, doc(cfg(feature = "std")))] // TODO: parking_lot
+	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn run_async_with_options<'s, 'i, 'v: 'i + 's, 'r, O: SelectedOutputMarker, const N: usize>(
-		&'s self,
+		&'s mut self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>>,
 		run_options: &'r RunOptions<O>
 	) -> Result<InferenceFut<'s, 'r, 'v, O>> {
@@ -468,7 +526,7 @@ impl Session {
 	/// Ends profiling for this session.
 	///
 	/// Note that this must be explicitly called at the end of profiling, otherwise the profiling file will be empty.
-	pub fn end_profiling(&self) -> Result<String> {
+	pub fn end_profiling(&mut self) -> Result<String> {
 		let mut profiling_name: *mut c_char = ptr::null_mut();
 
 		ortsys![unsafe SessionEndProfiling(self.inner.session_ptr.as_ptr(), self.inner.allocator.ptr().cast_mut(), &mut profiling_name)];
@@ -483,7 +541,7 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{run_options::RunOptions, Session, WorkloadType}, tensor::TensorElementType, value::{Value, ValueType, TensorRef}};
 	/// # fn main() -> ort::Result<()> {
-	/// let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// session.set_workload_type(WorkloadType::Efficient)?;
 	///
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
@@ -491,7 +549,7 @@ impl Session {
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn set_workload_type(&self, workload_type: WorkloadType) -> Result<()> {
+	pub fn set_workload_type(&mut self, workload_type: WorkloadType) -> Result<()> {
 		static KEY: &[u8] = b"ep.dynamic.workload_type\0";
 		match workload_type {
 			WorkloadType::Default => self.set_dynamic_option(KEY.as_ptr().cast(), b"Default\0".as_ptr().cast()),
@@ -499,7 +557,7 @@ impl Session {
 		}
 	}
 
-	pub(crate) fn set_dynamic_option(&self, key: *const c_char, value: *const c_char) -> Result<()> {
+	pub(crate) fn set_dynamic_option(&mut self, key: *const c_char, value: *const c_char) -> Result<()> {
 		ortsys![unsafe SetEpDynamicOptions(self.inner.session_ptr.as_ptr(), &key, &value, 1)?];
 		Ok(())
 	}

@@ -12,17 +12,19 @@ use test_log::test;
 
 #[test]
 fn vectorizer() -> ort::Result<()> {
-	let session = Session::builder()?
+	let mut session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
 		.commit_from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("vectorizer.onnx"))
 		.expect("Could not load model");
 
-	let metadata = session.metadata()?;
-	assert_eq!(metadata.producer()?, "skl2onnx");
-	assert_eq!(metadata.description()?, "test description");
-	assert_eq!(metadata.custom_keys()?, ["custom_key"]);
-	assert_eq!(metadata.custom("custom_key")?.as_deref(), Some("custom_value"));
+	{
+		let metadata = session.metadata()?;
+		assert_eq!(metadata.producer()?, "skl2onnx");
+		assert_eq!(metadata.description()?, "test description");
+		assert_eq!(metadata.custom_keys()?, ["custom_key"]);
+		assert_eq!(metadata.custom("custom_key")?.as_deref(), Some("custom_value"));
+	}
 
 	let array = ndarray::CowArray::from(ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap());
 

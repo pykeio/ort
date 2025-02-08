@@ -21,23 +21,27 @@ fn squeezenet_mushroom() -> ort::Result<()> {
 
 	ort::init().with_name("integration_test").commit()?;
 
-	let session = Session::builder()?
+	let mut session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
 		.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/squeezenet.onnx")
 		.expect("Could not download model from file");
 
-	let metadata = session.metadata()?;
-	assert_eq!(metadata.name()?, "main_graph");
-	assert_eq!(metadata.producer()?, "pytorch");
-
 	let class_labels = get_imagenet_labels()?;
 
-	let input0_shape: &Vec<i64> = session.inputs[0].input_type.tensor_dimensions().expect("input0 to be a tensor type");
-	let output0_shape: &Vec<i64> = session.outputs[0].output_type.tensor_dimensions().expect("output0 to be a tensor type");
+	let input0_shape = {
+		let metadata = session.metadata()?;
+		assert_eq!(metadata.name()?, "main_graph");
+		assert_eq!(metadata.producer()?, "pytorch");
 
-	assert_eq!(input0_shape, &[1, 3, 224, 224]);
-	assert_eq!(output0_shape, &[1, 1000]);
+		let input0_shape: &Vec<i64> = session.inputs[0].input_type.tensor_dimensions().expect("input0 to be a tensor type");
+		let output0_shape: &Vec<i64> = session.outputs[0].output_type.tensor_dimensions().expect("output0 to be a tensor type");
+
+		assert_eq!(input0_shape, &[1, 3, 224, 224]);
+		assert_eq!(output0_shape, &[1, 1000]);
+
+		input0_shape
+	};
 
 	// Load image and resize to model's shape, converting to RGB format
 	let image_buffer: ImageBuffer<Rgb<u8>, Vec<u8>> = image::open(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join(IMAGE_TO_LOAD))

@@ -203,7 +203,7 @@ impl<Type: ValueTypeMarker + ?Sized> DerefMut for ValueRefMut<'_, Type> {
 /// ```
 /// # use ort::{session::Session, value::Tensor};
 /// # fn main() -> ort::Result<()> {
-/// # 	let upsample = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+/// # 	let mut upsample = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// // Create a Tensor value from a raw data vector
 /// let value = Tensor::from_array(([1usize, 1, 1, 3], vec![1.0_f32, 2.0, 3.0].into_boxed_slice()))?;
 ///

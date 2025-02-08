@@ -15,7 +15,7 @@ fn main() -> ort::Result<()> {
 		.with_execution_providers([CUDAExecutionProvider::default().build()])
 		.commit()?;
 
-	let model =
+	let mut session =
 		Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/modnet_photographic_portrait_matting.onnx")?;
 
 	let original_img = image::open(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("photo.jpg")).unwrap();
@@ -31,7 +31,7 @@ fn main() -> ort::Result<()> {
 		input[[0, 2, y, x]] = (b as f32 - 127.5) / 127.5;
 	}
 
-	let outputs = model.run(inputs!["input" => TensorRef::from_array_view(input.view())?])?;
+	let outputs = session.run(inputs!["input" => TensorRef::from_array_view(input.view())?])?;
 
 	let output = outputs["output"].try_extract_tensor::<f32>()?;
 

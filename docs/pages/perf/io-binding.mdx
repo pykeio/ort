@@ -62,9 +62,9 @@ Outputs can be bound to any device -- they can even stay on the EP device if you
 If you do bind an output to the session's device, it is not guaranteed to be synchronized after `run`, just like `bind_input`. You can force outputs to synchronize immediately using `IoBinding::synchronize_outputs`.
 
 ## Running
-To run a session using an I/O binding, you simply call `run()` on `IoBinding` instead of on the session:
+To run a session using an I/O binding, you simply call the session's `run_binding()` function with the created `IoBinding`:
 ```rs
-let outputs = io_binding.run()?;
+let outputs = session.run_binding(&binding)?;
 ```
 
 `outputs` provides the same interface as the outputs returned by `Session::run`, it just returns the outputs that you bound earlier.
@@ -77,10 +77,10 @@ let action: Tensor<f32> = outputs.remove("action").unwrap().downcast()?;
 Here is a more complete example of the I/O binding API in a scenario where I/O performance can be improved significantly. This example features a typical text-to-image diffusion pipeline, using a text encoder like CLIP to create the condition tensor and a UNet for diffusion.
 
 ```rs
-let text_encoder = Session::builder()?
+let mut text_encoder = Session::builder()?
 	.with_execution_providers([CUDAExecutionProvider::default().build()])?
 	.commit_from_file("text_encoder.onnx")?;
-let unet = Session::builder()?
+let mut unet = Session::builder()?
 	.with_execution_providers([CUDAExecutionProvider::default().build()])?
 	.commit_from_file("unet.onnx")?;
 
@@ -91,7 +91,7 @@ let text_condition = {
         vec![49, 272, 503, 286, 1396, 353, 9653, 284, 1234, 287, 616, 2438, 11, 7926, 13, 3423, 338, 3362, 25, 12520, 238, 242]
     ))?)?;
     binding.bind_output_to_device("output0", &text_encoder.allocator().memory_info())?;
-    binding.run()?.remove("output0").unwrap()
+    text_encoder.run_binding(&binding)?.remove("output0").unwrap()
 };
 
 let input_allocator = Allocator::new(
@@ -111,7 +111,7 @@ io_binding.bind_output("noise_pred", Tensor::<f32>::new(&output_allocator, [1, 4
 
 for _ in 0..20 {
 	io_binding.bind_input("latents", &latents)?;
-	let noise_pred = io_binding.run()?.remove("noise_pred").unwrap();
+	let noise_pred = unet.run_binding(&io_binding)?.remove("noise_pred").unwrap();
 
 	let mut latents = latents.extract_tensor_mut();
 	latents += &noise_pred.try_extract_tensor::<f32>()?;

@@ -25,7 +25,7 @@ fn main() -> ort::Result<()> {
 		.commit()?;
 
 	// Load our model
-	let session = Session::builder()?
+	let mut session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
 		.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/all-MiniLM-L6-v2.onnx")?;

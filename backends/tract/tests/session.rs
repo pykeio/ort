@@ -14,7 +14,7 @@ fn mnist_5() -> ort::Result<()> {
 
 	ort::set_api(ort_tract::api());
 
-	let session = Session::builder()?
+	let mut session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level3)?
 		.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")
 		.expect("Could not download model from file");

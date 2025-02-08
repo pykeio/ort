@@ -3,13 +3,11 @@
 use alloc::{
 	ffi::CString,
 	string::{String, ToString},
-	sync::Arc,
-	vec::Vec
+	sync::Arc
 };
 use core::{
 	fmt::Debug,
-	ptr::{self, NonNull},
-	slice
+	ptr::{self, NonNull}
 };
 
 use crate::{
@@ -17,7 +15,7 @@ use crate::{
 	error::Result,
 	memory::MemoryInfo,
 	ortsys,
-	session::{NoSelectedOutputs, RunOptions, Session, SharedSessionInner, output::SessionOutputs},
+	session::{Session, SharedSessionInner},
 	util::MiniMap,
 	value::{DynValue, Value, ValueInner, ValueTypeMarker}
 };
@@ -50,10 +48,10 @@ use crate::{
 /// # 	value::Tensor
 /// # };
 /// # fn main() -> ort::Result<()> {
-/// let text_encoder = Session::builder()?
+/// let mut text_encoder = Session::builder()?
 /// 	.with_execution_providers([CUDAExecutionProvider::default().build()])?
 /// 	.commit_from_file("text_encoder.onnx")?;
-/// let unet = Session::builder()?
+/// let mut unet = Session::builder()?
 /// 	.with_execution_providers([CUDAExecutionProvider::default().build()])?
 /// 	.commit_from_file("unet.onnx")?;
 ///
@@ -82,7 +80,7 @@ use crate::{
 ///
 /// for _ in 0..20 {
 /// 	io_binding.bind_input("latents", &latents)?;
-/// 	let noise_pred = io_binding.run()?.remove("noise_pred").unwrap();
+/// 	let noise_pred = unet.run_binding(&io_binding)?.remove("noise_pred").unwrap();
 ///
 /// 	let mut latents = latents.extract_tensor_mut();
 /// 	latents += &noise_pred.try_extract_tensor::<f32>()?;
@@ -99,8 +97,8 @@ use crate::{
 pub struct IoBinding {
 	ptr: NonNull<ort_sys::OrtIoBinding>,
 	held_inputs: MiniMap<String, Arc<ValueInner>>,
-	output_values: MiniMap<String, Option<DynValue>>,
-	session: Arc<SharedSessionInner>
+	pub(crate) output_values: MiniMap<String, Option<DynValue>>,
+	_session: Arc<SharedSessionInner>
 }
 
 impl IoBinding {
@@ -109,9 +107,9 @@ impl IoBinding {
 		ortsys![unsafe CreateIoBinding(session.ptr().cast_mut(), &mut ptr)?; nonNull(ptr)];
 		Ok(Self {
 			ptr: unsafe { NonNull::new_unchecked(ptr) },
-			session: session.inner(),
 			held_inputs: MiniMap::new(),
-			output_values: MiniMap::new()
+			output_values: MiniMap::new(),
+			_session: session.inner()
 		})
 	}
 
@@ -197,55 +195,6 @@ impl IoBinding {
 		self.synchronize_outputs()?;
 		Ok(())
 	}
-
-	/// Performs inference on the session using the bound inputs specified by [`IoBinding::bind_input`].
-	pub fn run(&mut self) -> Result<SessionOutputs<'_, '_>> {
-		self.run_inner(None)
-	}
-
-	/// Performs inference on the session using the bound inputs specified by [`IoBinding::bind_input`].
-	pub fn run_with_options(&mut self, run_options: &RunOptions<NoSelectedOutputs>) -> Result<SessionOutputs<'_, '_>> {
-		self.run_inner(Some(run_options))
-	}
-
-	fn run_inner(&mut self, run_options: Option<&RunOptions<NoSelectedOutputs>>) -> Result<SessionOutputs<'_, '_>> {
-		let run_options_ptr = if let Some(run_options) = run_options { run_options.ptr() } else { ptr::null() };
-		ortsys![unsafe RunWithBinding(self.session.ptr().cast_mut(), run_options_ptr, self.ptr())?];
-
-		// let owned_ptrs: HashMap<*mut ort_sys::OrtValue, &Value> = self.output_values.values().map(|c| (c.ptr().cast_mut(),
-		// c)).collect();
-		let mut count = self.output_values.len();
-		if count > 0 {
-			let mut output_values_ptr: *mut *mut ort_sys::OrtValue = ptr::null_mut();
-			ortsys![unsafe GetBoundOutputValues(self.ptr(), self.session.allocator.ptr().cast_mut(), &mut output_values_ptr, &mut count)?; nonNull(output_values_ptr)];
-
-			let output_values = unsafe { slice::from_raw_parts(output_values_ptr, count).to_vec() }
-				.into_iter()
-				.zip(self.output_values.iter())
-				.map(|(ptr, (_, value))| unsafe {
-					if let Some(value) = value {
-						DynValue::clone_of(value)
-					} else {
-						DynValue::from_ptr(
-							NonNull::new(ptr).expect("OrtValue ptrs returned by GetBoundOutputValues should not be null"),
-							Some(Arc::clone(&self.session))
-						)
-					}
-				})
-				.collect::<Vec<_>>();
-
-			// output values will be freed when the `Value`s in `SessionOutputs` drop
-
-			Ok(SessionOutputs::new_backed(
-				self.output_values.iter().map(|(k, _)| k.as_str()).collect(),
-				output_values,
-				&self.session.allocator,
-				output_values_ptr.cast()
-			))
-		} else {
-			Ok(SessionOutputs::new_empty())
-		}
-	}
 }
 
 unsafe impl Send for IoBinding {}
@@ -308,7 +257,7 @@ mod tests {
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_mnist_input_bound() -> Result<()> {
-		let session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
+		let mut session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
 
 		let array = get_image();
 
@@ -316,7 +265,7 @@ mod tests {
 		binding.bind_input(&session.inputs[0].name, &Tensor::from_array(array)?)?;
 		binding.bind_output_to_device(&session.outputs[0].name, &MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::CPUOutput)?)?;
 
-		let outputs = binding.run()?;
+		let outputs = session.run_binding(&binding)?;
 		let probabilities = extract_probabilities(&outputs[0])?;
 		assert_eq!(probabilities[0].0, 5);
 
@@ -326,7 +275,7 @@ mod tests {
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_mnist_input_output_bound() -> Result<()> {
-		let session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
+		let mut session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
 
 		let array = get_image();
 
@@ -336,7 +285,7 @@ mod tests {
 		let output = Array2::from_shape_simple_fn((1, 10), || 0.0_f32);
 		binding.bind_output(&session.outputs[0].name, Tensor::from_array(output)?)?;
 
-		let outputs = binding.run()?;
+		let outputs = session.run_binding(&binding)?;
 		let probabilities = extract_probabilities(&outputs[0])?;
 		assert_eq!(probabilities[0].0, 5);
 
@@ -346,7 +295,7 @@ mod tests {
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_send_iobinding() -> Result<()> {
-		let session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
+		let mut session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
 
 		let array = get_image();
 
@@ -356,7 +305,7 @@ mod tests {
 
 		let probabilities = std::thread::spawn(move || {
 			binding.bind_input(&session.inputs[0].name, &Tensor::from_array(array)?)?;
-			let outputs = binding.run()?;
+			let outputs = session.run_binding(&binding)?;
 			let probabilities = extract_probabilities(&outputs[0])?;
 			Ok::<Vec<(usize, f32)>, crate::Error>(probabilities)
 		})
@@ -371,7 +320,7 @@ mod tests {
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_mnist_clear_bounds() -> Result<()> {
-		let session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
+		let mut session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
 
 		let array = get_image();
 
@@ -382,7 +331,7 @@ mod tests {
 		binding.bind_output(&session.outputs[0].name, Tensor::from_array(output)?)?;
 
 		{
-			let outputs = binding.run()?;
+			let outputs = session.run_binding(&binding)?;
 			let probabilities = extract_probabilities(&outputs[0])?;
 			assert_eq!(probabilities[0].0, 5);
 		}
@@ -391,13 +340,13 @@ mod tests {
 		binding.bind_output_to_device(&session.outputs[0].name, &MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::CPUOutput)?)?;
 
 		{
-			let outputs = binding.run()?;
+			let outputs = session.run_binding(&binding)?;
 			let probabilities = extract_probabilities(&outputs[0])?;
 			assert_eq!(probabilities[0].0, 5);
 		}
 
 		binding.clear_inputs();
-		assert!(binding.run().is_err());
+		assert!(session.run_binding(&binding).is_err());
 
 		Ok(())
 	}

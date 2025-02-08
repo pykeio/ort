@@ -19,7 +19,7 @@ fn main() -> anyhow::Result<()> {
 		.with_execution_providers([CUDAExecutionProvider::default().build().error_on_failure()])
 		.commit()?;
 
-	let model =
+	let mut session =
 		Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/modnet_photographic_portrait_matting.onnx")?;
 
 	let original_img = image::open(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("photo.jpg")).unwrap();
@@ -45,7 +45,7 @@ fn main() -> anyhow::Result<()> {
 		)
 		.unwrap()
 	};
-	let outputs = model.run(ort::inputs![tensor])?;
+	let outputs = session.run(ort::inputs![tensor])?;
 
 	let output = outputs["output"].try_extract_tensor::<f32>()?;
 

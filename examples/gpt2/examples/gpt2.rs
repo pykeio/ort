@@ -35,7 +35,7 @@ fn main() -> ort::Result<()> {
 	let mut rng = rand::thread_rng();
 
 	// Load our model
-	let session = Session::builder()?
+	let mut session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
 		.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/gpt2.onnx")?;

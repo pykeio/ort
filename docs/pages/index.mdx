@@ -53,7 +53,7 @@ Once you've got a model, load it via `ort` by creating a [`Session`](/fundamenta
 ```rust
 use ort::session::{builder::GraphOptimizationLevel, Session};
 
-let model = Session::builder()?
+let mut model = Session::builder()?
     .with_optimization_level(GraphOptimizationLevel::Level3)?
     .with_intra_threads(4)?
     .commit_from_file("yolov8m.onnx")?;

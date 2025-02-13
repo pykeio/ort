@@ -9,7 +9,8 @@ members = [
 	'examples/phi-3-vision',
 	'examples/modnet',
 	'examples/sentence-transformers',
-	'examples/training'
+	'examples/training',
+	'examples/wasm-emscripten',
 ]
 default-members = [
 	'.',

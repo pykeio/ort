@@ -27,25 +27,30 @@ use self::internal::dirs::cache_dir;
 
 #[cfg(feature = "download-binaries")]
 fn fetch_file(source_url: &str) -> Vec<u8> {
-	let resp = ureq::AgentBuilder::new()
-		.try_proxy_from_env(true)
-		.build()
-		.get(source_url)
-		.timeout(std::time::Duration::from_secs(1800))
-		.call()
-		.unwrap_or_else(|err| panic!("Failed to GET `{source_url}`: {err}"));
+	let resp = ureq::Agent::new_with_config(
+		ureq::config::Config::builder()
+			.proxy(ureq::Proxy::try_from_env())
+			.max_redirects(0)
+			.https_only(true)
+			.user_agent(format!(
+				"{}/{} (host {}; for {})",
+				env!("CARGO_PKG_NAME"),
+				env!("CARGO_PKG_VERSION"),
+				std::env::var("HOST").unwrap(),
+				std::env::var("TARGET").unwrap()
+			))
+			.timeout_global(Some(std::time::Duration::from_secs(1800)))
+			.build()
+	)
+	.get(source_url)
+	.call()
+	.unwrap_or_else(|err| panic!("Failed to GET `{source_url}`: {err}"));
 
-	let len = resp
-		.header("Content-Length")
-		.and_then(|s| s.parse::<usize>().ok())
-		.expect("Content-Length header should be present on archive response");
-	let mut reader = resp.into_reader();
-	let mut buffer = Vec::new();
-	reader
-		.read_to_end(&mut buffer)
-		.unwrap_or_else(|err| panic!("Failed to download from `{source_url}`: {err}"));
-	assert_eq!(buffer.len(), len);
-	buffer
+	resp.into_body()
+		.into_with_config()
+		.limit(1_073_741_824)
+		.read_to_vec()
+		.unwrap_or_else(|err| panic!("Failed to download from `{source_url}`: {err}"))
 }
 
 #[cfg(feature = "download-binaries")]

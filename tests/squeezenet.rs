@@ -1,8 +1,7 @@
 use std::{
 	fs,
 	io::{self, BufRead, BufReader},
-	path::Path,
-	time::Duration
+	path::Path
 };
 
 use image::{ImageBuffer, Pixel, Rgb, imageops::FilterType};
@@ -101,21 +100,13 @@ fn get_imagenet_labels() -> ort::Result<Vec<String>> {
 	if !labels_path.exists() {
 		let url = "https://s3.amazonaws.com/onnx-model-zoo/synset.txt";
 		println!("Downloading {:?} to {:?}...", url, labels_path);
-		let resp = ureq::get(url)
-            .timeout(Duration::from_secs(180)) // 3 minutes
-            .call()
-            .map_err(Error::wrap)?;
+		let resp = ureq::get(url).call().map_err(Error::wrap)?;
 
-		assert!(resp.has("Content-Length"));
-		let len = resp.header("Content-Length").and_then(|s| s.parse::<usize>().ok()).unwrap();
-		println!("Downloading {} bytes...", len);
-
-		let mut reader = resp.into_reader();
+		let mut reader = resp.into_body().into_reader();
 		let f = fs::File::create(&labels_path).unwrap();
 		let mut writer = io::BufWriter::new(f);
 
-		let bytes_io_count = io::copy(&mut reader, &mut writer).unwrap();
-		assert_eq!(bytes_io_count, len as u64);
+		io::copy(&mut reader, &mut writer).unwrap();
 	}
 
 	let file = BufReader::new(fs::File::open(labels_path).unwrap());

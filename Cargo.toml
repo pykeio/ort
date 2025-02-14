@@ -96,14 +96,14 @@ ndarray = { version = "0.16", default-features = false, optional = true }
 ort-sys = { version = "=2.0.0-rc.9", path = "ort-sys", default-features = false }
 libloading = { version = "0.8", optional = true }
 
-ureq = { version = "2.1", optional = true, default-features = false, features = [ "tls" ] }
+ureq = { version = "3", optional = true, default-features = false, features = [ "native-tls" ] }
 sha2 = { version = "0.10", optional = true }
 tracing = { version = "0.1", optional = true, default-features = false }
 half = { version = "2.1", default-features = false, optional = true }
 
 [dev-dependencies]
 anyhow = "1.0"
-ureq = "2.1"
+ureq = { version = "3", default-features = false, features = [ "native-tls" ] }
 image = "0.25"
 test-log = { version = "0.2", default-features = false, features = [ "trace" ] }
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }

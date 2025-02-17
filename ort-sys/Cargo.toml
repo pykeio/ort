@@ -42,6 +42,7 @@ rknpu = []
 vitis = []
 cann = []
 qnn = []
+webgpu = []
 
 [build-dependencies]
 ureq = { version = "3", optional = true, default-features = false, features = [ "native-tls", "socks-proxy" ] }

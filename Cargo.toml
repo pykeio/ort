@@ -90,6 +90,7 @@ rknpu = [ "ort-sys/rknpu" ]
 vitis = [ "ort-sys/vitis" ]
 cann = [ "ort-sys/cann" ]
 qnn = [ "ort-sys/qnn" ]
+webgpu = [ "ort-sys/webgpu" ]
 
 [dependencies]
 ndarray = { version = "0.16", default-features = false, optional = true }

@@ -1,4 +1,7 @@
-use alloc::{format, string::ToString};
+use alloc::{
+	format,
+	string::{String, ToString}
+};
 
 use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
 use crate::{

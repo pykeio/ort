@@ -45,7 +45,7 @@ pub extern "C" fn detect_objects(ptr: *const u8, width: u32, height: u32) {
 		.commit()
 		.expect("Cannot initialize ort.");
 
-	let session = ort::session::Session::builder()
+	let mut session = ort::session::Session::builder()
 		.expect("Cannot create Session builder.")
 		.with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level3)
 		.expect("Cannot optimize graph.")

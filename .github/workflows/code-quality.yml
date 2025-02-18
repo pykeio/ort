@@ -64,7 +64,7 @@ jobs:
         id: rust-version
         run: echo "::set-output name=version::$(cargo --version | cut -d ' ' -f 2)"
         shell: bash
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         id: tarpaulin-cache
         with:
           path: ~/.cargo/bin/cargo-tarpaulin

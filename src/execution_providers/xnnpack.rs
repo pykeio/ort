@@ -41,7 +41,7 @@ impl From<XNNPACKExecutionProvider> for ExecutionProviderDispatch {
 
 impl ExecutionProvider for XNNPACKExecutionProvider {
 	fn as_str(&self) -> &'static str {
-		"XNNPACKExecutionProvider"
+		"XnnpackExecutionProvider"
 	}
 
 	fn supported_by_platform(&self) -> bool {

@@ -32,7 +32,12 @@ ONNX Runtime must be compiled from source with support for each execution provid
 | [AMD MIGraphX](https://onnxruntime.ai/docs/execution-providers/MIGraphX-ExecutionProvider.html) | `migraphx` | 🔷 | ❌ |
 | [AMD Vitis AI](https://onnxruntime.ai/docs/execution-providers/Vitis-AI-ExecutionProvider.html) | `vitis` | 🔷 | ❌ |
 | [Rockchip RKNPU](https://onnxruntime.ai/docs/execution-providers/community-maintained/RKNPU-ExecutionProvider.html) | `rknpu` | 🔷 | ❌ |
+| WebGPU | `webgpu` | 🔷 | ✅<sup>\*</sup> |
 | [Microsoft Azure](https://onnxruntime.ai/docs/execution-providers/Azure-ExecutionProvider.html) | - | ❌ | - |
+
+<div style={{ opacity: 0.5, display: 'flex', flexDirection: 'column', fontSize: '0.75rem' }}>
+<p>\* WebGPU binaries are currently only available for <code>wasm32-unknown-emscripten</code>.</p>
+</div>
 
 <Callout type='default'>
     Note that a few execution providers (notably CUDA, TensorRT, and ROCm) are only available with **dynamic linking**. Dynamic linking may require additional setup to get working; see [Linking > Dynamic linking](/setup/linking#dynamic-linking).

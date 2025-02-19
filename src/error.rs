@@ -89,6 +89,16 @@ impl fmt::Display for Error {
 #[cfg(feature = "std")] // sigh...
 impl std::error::Error for Error {}
 
+#[cfg(feature = "std")]
+impl From<Box<dyn std::error::Error + Send + Sync + 'static>> for Error {
+	fn from(err: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
+		Error {
+			code: ErrorCode::GenericFailure,
+			msg: err.to_string()
+		}
+	}
+}
+
 impl From<Infallible> for Error {
 	fn from(value: Infallible) -> Self {
 		match value {}

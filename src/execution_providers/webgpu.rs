@@ -181,7 +181,7 @@ impl From<WebGPUExecutionProvider> for ExecutionProviderDispatch {
 
 impl ExecutionProvider for WebGPUExecutionProvider {
 	fn as_str(&self) -> &'static str {
-		"WebGPUExecutionProvider"
+		"WebGpuExecutionProvider"
 	}
 
 	fn supported_by_platform(&self) -> bool {

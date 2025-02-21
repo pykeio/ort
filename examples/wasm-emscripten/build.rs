@@ -30,7 +30,7 @@ fn main() {
 	// Download precompiled libonnxruntime.a.
 	{
 		// Request archive.
-		let mut request = get("https://github.com/alfatraining/onnxruntime-wasm-builds/releases/download/v1.20.1/libonnxruntime-v1.20.1-wasm.zip")
+		let mut request = get("https://github.com/alfatraining/ort-artifacts-staging/releases/download/754ee21/ort_static-main-wasm32-unknown-emscripten.zip")
 			.expect("Cannot request precompiled onnxruntime.");
 		let mut buf = Vec::<u8>::new();
 		request.read_to_end(&mut buf).expect("Cannot read precompiled onnxruntime.");
@@ -40,11 +40,11 @@ fn main() {
 		let mut zip = ZipArchive::new(reader).expect("Cannot incept unzipper.");
 
 		// Extract precompiled library.
+		// TODO: For debug builds, link to a debug build of onnxruntime.
 		{
 			let mut buf = Vec::<u8>::new();
-			let mut mode_title_case = mode.to_string();
-			mode_title_case = format!("{}{mode_title_case}", mode_title_case.remove(0).to_uppercase());
-			zip.by_name(format!("{mode_title_case}/libonnxruntime.a").as_str())
+
+			zip.by_name("onnxruntime/lib/libonnxruntime.a")
 				.expect("Cannot find precompiled onnxruntime.")
 				.read_to_end(&mut buf)
 				.expect("Cannot read precompiled onnxruntime.");

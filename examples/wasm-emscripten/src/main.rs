@@ -41,11 +41,10 @@ pub extern "C" fn dealloc(ptr: *mut std::os::raw::c_void, size: usize) {
 pub extern "C" fn detect_objects(ptr: *const u8, width: u32, height: u32) {
 	ort::init()
 		.with_global_thread_pool(ort::environment::GlobalThreadPoolOptions::default())
-		.with_execution_providers([ort::execution_providers::cpu::CPUExecutionProvider::default().build()])
 		.commit()
 		.expect("Cannot initialize ort.");
 
-	let mut session = ort::session::Session::builder()
+	let mut builder = ort::session::Session::builder()
 		.expect("Cannot create Session builder.")
 		.with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level3)
 		.expect("Cannot optimize graph.")
@@ -54,7 +53,20 @@ pub extern "C" fn detect_objects(ptr: *const u8, width: u32, height: u32) {
 		.with_intra_threads(2)
 		.expect("Cannot set intra thread count.")
 		.with_inter_threads(1)
-		.expect("Cannot set inter thread count.")
+		.expect("Cannot set inter thread count.");
+
+	let use_webgpu = true; // TODO: Make `use_webgpu` a parameter of `detect_objects`? Or say in README to change it here.
+	if use_webgpu {
+		use ort::execution_providers::ExecutionProvider;
+		let ep = ort::execution_providers::WebGPUExecutionProvider::default();
+		if ep.is_available().expect("Cannot check for availability of WebGPU ep.") {
+			ep.register(&mut builder).expect("Cannot register WebGPU ep.");
+		} else {
+			println!("WebGPU ep is not available.");
+		}
+	}
+
+	let mut session = builder
 		.commit_from_memory(include_bytes!("../yolov8m.onnx"))
 		.expect("Cannot commit model.");
 

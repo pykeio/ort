@@ -5,7 +5,7 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
-ort = { path = "../../" }
+ort = { path = "../../", default-features = false, features = ["ndarray", "webgpu"] }
 ndarray = "0.16"
 image = "0.25"
 

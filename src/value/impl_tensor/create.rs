@@ -11,7 +11,7 @@ use core::{
 #[cfg(feature = "ndarray")]
 use ndarray::{ArcArray, Array, ArrayView, ArrayViewMut, CowArray, Dimension};
 
-use super::{Tensor, TensorRef, TensorRefMut, calculate_tensor_size};
+use super::{DynTensor, Tensor, TensorRef, TensorRefMut, calculate_tensor_size};
 use crate::{
 	AsPointer,
 	error::{Error, ErrorCode, Result, assert_non_null_pointer},
@@ -109,47 +109,8 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// # }
 	/// ```
 	pub fn new(allocator: &Allocator, shape: impl ToDimensions) -> Result<Tensor<T>> {
-		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
-
-		let shape = shape.to_dimensions(None)?;
-		let shape_ptr: *const i64 = shape.as_ptr();
-		let shape_len = shape.len();
-
-		ortsys![
-			unsafe CreateTensorAsOrtValue(
-				allocator.ptr().cast_mut(),
-				shape_ptr,
-				shape_len,
-				T::into_tensor_element_type().into(),
-				&mut value_ptr
-			)?;
-			nonNull(value_ptr)
-		];
-
-		// `CreateTensorAsOrtValue` actually does not guarantee that the data allocated is zero'd out, so if we can, we should
-		// do it manually.
-		let memory_info = MemoryInfo::from_value(value_ptr).expect("CreateTensorAsOrtValue returned non-tensor");
-		if memory_info.is_cpu_accessible() {
-			let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
-			ortsys![unsafe GetTensorMutableData(value_ptr, &mut buffer_ptr)?; nonNull(buffer_ptr)];
-
-			unsafe { buffer_ptr.write_bytes(0, calculate_tensor_size(&shape) * size_of::<T>()) };
-		}
-
-		Ok(Value {
-			inner: Arc::new(ValueInner {
-				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
-				dtype: ValueType::Tensor {
-					ty: T::into_tensor_element_type(),
-					dimensions: shape,
-					dimension_symbols: vec![None; shape_len]
-				},
-				drop: true,
-				memory_info: MemoryInfo::from_value(value_ptr),
-				_backing: None
-			}),
-			_markers: PhantomData
-		})
+		let tensor = DynTensor::new(allocator, T::into_tensor_element_type(), shape)?;
+		Ok(unsafe { core::mem::transmute::<DynTensor, Tensor<T>>(tensor) })
 	}
 
 	/// Construct an owned tensor from an array of data.

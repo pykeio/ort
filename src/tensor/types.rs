@@ -43,6 +43,29 @@ pub enum TensorElementType {
 	Bfloat16
 }
 
+impl TensorElementType {
+	pub fn size(&self) -> usize {
+		match self {
+			TensorElementType::Bool => 1,
+			#[cfg(feature = "half")]
+			TensorElementType::Bfloat16 => 2,
+			#[cfg(feature = "half")]
+			TensorElementType::Float16 => 2,
+			TensorElementType::Float32 => 4,
+			TensorElementType::Float64 => 8,
+			TensorElementType::Int16 => 2,
+			TensorElementType::Int32 => 4,
+			TensorElementType::Int64 => 8,
+			TensorElementType::Int8 => 1,
+			TensorElementType::String => 0,
+			TensorElementType::Uint16 => 2,
+			TensorElementType::Uint32 => 4,
+			TensorElementType::Uint64 => 8,
+			TensorElementType::Uint8 => 1
+		}
+	}
+}
+
 impl fmt::Display for TensorElementType {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.write_str(match self {

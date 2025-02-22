@@ -11,12 +11,18 @@ use core::{
 	marker::PhantomData,
 	mem,
 	ops::{Index, IndexMut},
-	ptr
+	ptr::{self, NonNull}
 };
 
-pub use self::create::{OwnedTensorArrayData, TensorArrayData, TensorArrayDataMut, TensorArrayDataParts};
-use super::{DowncastableTarget, DynValue, Value, ValueRef, ValueRefMut, ValueType, ValueTypeMarker};
-use crate::{AsPointer, error::Result, memory::MemoryInfo, ortsys, tensor::IntoTensorElementType};
+pub use self::create::{OwnedTensorArrayData, TensorArrayData, TensorArrayDataMut, TensorArrayDataParts, ToDimensions};
+use super::{DowncastableTarget, DynValue, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker};
+use crate::{
+	AsPointer,
+	error::Result,
+	memory::{Allocator, MemoryInfo},
+	ortsys,
+	tensor::{IntoTensorElementType, TensorElementType}
+};
 
 pub trait TensorValueTypeMarker: ValueTypeMarker {
 	private_trait!();
@@ -68,6 +74,70 @@ impl DowncastableTarget for DynTensorValueType {
 	}
 
 	private_impl!();
+}
+
+impl DynTensor {
+	/// Construct a tensor via a given allocator with a given shape and datatype. The data in the tensor will be
+	/// **uninitialized**.
+	///
+	/// This can be used to create a tensor with data on a certain device. For example, to create a tensor with pinned
+	/// (CPU) memory for use with CUDA:
+	/// ```no_run
+	/// # use ort::{memory::{Allocator, MemoryInfo, MemoryType, AllocationDevice, AllocatorType}, session::Session, tensor::TensorElementType, value::DynTensor};
+	/// # fn main() -> ort::Result<()> {
+	/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// let allocator = Allocator::new(
+	/// 	&session,
+	/// 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
+	/// )?;
+	///
+	/// let mut img_input = DynTensor::new(&allocator, TensorElementType::Float32, [1, 128, 128, 3])?;
+	/// # Ok(())
+	/// # }
+	/// ```
+	pub fn new(allocator: &Allocator, data_type: TensorElementType, shape: impl ToDimensions) -> Result<DynTensor> {
+		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
+
+		let shape = shape.to_dimensions(None)?;
+		let shape_ptr: *const i64 = shape.as_ptr();
+		let shape_len = shape.len();
+
+		ortsys![
+			unsafe CreateTensorAsOrtValue(
+				allocator.ptr().cast_mut(),
+				shape_ptr,
+				shape_len,
+				data_type.into(),
+				&mut value_ptr
+			)?;
+			nonNull(value_ptr)
+		];
+
+		// `CreateTensorAsOrtValue` actually does not guarantee that the data allocated is zero'd out, so if we can, we should
+		// do it manually.
+		let memory_info = MemoryInfo::from_value(value_ptr).expect("CreateTensorAsOrtValue returned non-tensor");
+		if memory_info.is_cpu_accessible() && data_type != TensorElementType::String {
+			let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
+			ortsys![unsafe GetTensorMutableData(value_ptr, &mut buffer_ptr)?; nonNull(buffer_ptr)];
+
+			unsafe { buffer_ptr.write_bytes(0, calculate_tensor_size(&shape) * data_type.size()) };
+		}
+
+		Ok(Value {
+			inner: Arc::new(ValueInner {
+				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
+				dtype: ValueType::Tensor {
+					ty: data_type,
+					dimensions: shape,
+					dimension_symbols: vec![None; shape_len]
+				},
+				drop: true,
+				memory_info: MemoryInfo::from_value(value_ptr),
+				_backing: None
+			}),
+			_markers: PhantomData
+		})
+	}
 }
 
 impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {

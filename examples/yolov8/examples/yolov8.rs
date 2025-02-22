@@ -29,7 +29,7 @@ fn union(box1: &BoundingBox, box2: &BoundingBox) -> f32 {
 	((box1.x2 - box1.x1) * (box1.y2 - box1.y1)) + ((box2.x2 - box2.x1) * (box2.y2 - box2.y1)) - intersection(box1, box2)
 }
 
-const YOLOV8M_URL: &str = "https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/yolov8m.onnx";
+const YOLOV8M_URL: &str = "https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/yolov8m.onnx";
 
 #[rustfmt::skip]
 const YOLOV8_CLASS_LABELS: [&str; 80] = [

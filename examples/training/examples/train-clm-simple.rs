@@ -61,7 +61,7 @@ fn main() -> ort::Result<()> {
 	)
 	.unwrap();
 
-	let mut dataset = File::open("dataset.bin").unwrap();
+	let mut dataset = File::open("train-clm-dataset.bin").unwrap();
 	let file_size = dataset.metadata().unwrap().len();
 	let num_tokens = (file_size / 2) as usize; // 16-bit tokens
 	let mut rng = rand::thread_rng();

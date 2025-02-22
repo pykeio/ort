@@ -12,7 +12,7 @@ const MAX_TOKENS: usize = 500_000;
 
 fn main() {
 	let input = env::args().nth(1).expect("provide input jsonl");
-	let output = env::args().nth(2).unwrap_or_else(|| "dataset.bin".into());
+	let output = env::args().nth(2).unwrap_or_else(|| "train-clm-dataset.bin".into());
 
 	let input = BufReader::new(File::open(input).unwrap());
 	let mut output = BufWriter::new(File::create(output).unwrap());

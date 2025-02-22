@@ -28,7 +28,7 @@ fn main() -> ort::Result<()> {
 	let mut session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
-		.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/all-MiniLM-L6-v2.onnx")?;
+		.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/all-MiniLM-L6-v2.onnx")?;
 
 	// Load the tokenizer and encode the text.
 	let tokenizer = Tokenizer::from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("tokenizer.json")).unwrap();

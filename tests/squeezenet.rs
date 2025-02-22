@@ -23,7 +23,7 @@ fn squeezenet_mushroom() -> ort::Result<()> {
 	let mut session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
-		.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/squeezenet.onnx")
+		.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/squeezenet.onnx")
 		.expect("Could not download model from file");
 
 	let class_labels = get_imagenet_labels()?;

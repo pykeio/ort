@@ -257,7 +257,7 @@ mod tests {
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_mnist_input_bound() -> Result<()> {
-		let mut session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
+		let mut session = Session::builder()?.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/mnist.onnx")?;
 
 		let array = get_image();
 
@@ -275,7 +275,7 @@ mod tests {
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_mnist_input_output_bound() -> Result<()> {
-		let mut session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
+		let mut session = Session::builder()?.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/mnist.onnx")?;
 
 		let array = get_image();
 
@@ -295,7 +295,7 @@ mod tests {
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_send_iobinding() -> Result<()> {
-		let mut session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
+		let mut session = Session::builder()?.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/mnist.onnx")?;
 
 		let array = get_image();
 
@@ -320,7 +320,7 @@ mod tests {
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_mnist_clear_bounds() -> Result<()> {
-		let mut session = Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/mnist.onnx")?;
+		let mut session = Session::builder()?.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/mnist.onnx")?;
 
 		let array = get_image();
 

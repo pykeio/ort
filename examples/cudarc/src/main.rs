@@ -20,7 +20,7 @@ fn main() -> anyhow::Result<()> {
 		.commit()?;
 
 	let mut session =
-		Session::builder()?.commit_from_url("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/modnet_photographic_portrait_matting.onnx")?;
+		Session::builder()?.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/modnet_photographic_portrait_matting.onnx")?;
 
 	let original_img = image::open(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("photo.jpg")).unwrap();
 	let (img_width, img_height) = (original_img.width(), original_img.height());

@@ -10,6 +10,7 @@
 	"rust-analyzer.diagnostics.experimental.enable": true,
 	"rust-analyzer.showUnlinkedFileNotification": false,
 	"deno.enablePaths": [
-		"tools/api-coverage.ts"
+		"tools/api-coverage.ts",
+		"tools/training-api-coverage.ts"
 	]
 }

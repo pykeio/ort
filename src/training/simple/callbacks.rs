@@ -65,7 +65,7 @@ impl<'t> TrainerControl<'t> {
 		self.trainer.export(out_path, output_names)
 	}
 
-	pub fn optimizer(&self) -> &Optimizer {
+	pub fn optimizer(&self) -> Optimizer<'_> {
 		self.trainer.optimizer()
 	}
 

@@ -45,7 +45,7 @@ fn main() -> ort::Result<()> {
 	)
 	.unwrap();
 
-	let optimizer = trainer.optimizer();
+	let mut optimizer = trainer.optimizer();
 	optimizer.set_lr(7e-5)?;
 
 	let mut dataset = File::open("dataset.bin").unwrap();
@@ -93,6 +93,8 @@ fn main() -> ort::Result<()> {
 		if loss.is_nan() {
 			return Ok(());
 		}
+
+		let mut optimizer = trainer.optimizer();
 		optimizer.step()?;
 		optimizer.reset_grad()?;
 	}

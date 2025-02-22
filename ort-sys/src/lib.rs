@@ -552,6 +552,41 @@ pub struct OrtTrainingApi {
 		inference_model_path: *const ortchar,
 		graph_outputs_len: usize,
 		graph_output_names: *const *const c_char
+	) -> OrtStatusPtr,
+	pub SetSeed: unsafe extern "system" fn(seed: i64) -> OrtStatusPtr,
+	pub TrainingSessionGetTrainingModelInputCount: unsafe extern "system" fn(session: *const OrtTrainingSession, out: *mut usize) -> OrtStatusPtr,
+	pub TrainingSessionGetEvalModelInputCount: unsafe extern "system" fn(session: *const OrtTrainingSession, out: *mut usize) -> OrtStatusPtr,
+	pub TrainingSessionGetTrainingModelInputName:
+		unsafe extern "system" fn(session: *const OrtTrainingSession, index: usize, allocator: *mut OrtAllocator, output: *mut *const c_char) -> OrtStatusPtr,
+	pub TrainingSessionGetEvalModelInputName:
+		unsafe extern "system" fn(session: *const OrtTrainingSession, index: usize, allocator: *mut OrtAllocator, output: *mut *const c_char) -> OrtStatusPtr,
+	pub AddProperty: unsafe extern "system" fn(
+		checkpoint_state: *mut OrtCheckpointState,
+		property_name: *const c_char,
+		property_type: OrtPropertyType,
+		property_value: *const ()
+	) -> OrtStatusPtr,
+	pub GetProperty: unsafe extern "system" fn(
+		checkpoint_state: *mut OrtCheckpointState,
+		property_name: *const c_char,
+		allocator: *mut OrtAllocator,
+		property_type: *mut OrtPropertyType,
+		property_value: *mut *const ()
+	) -> OrtStatusPtr,
+	pub LoadCheckpointFromBuffer:
+		unsafe extern "system" fn(checkpoint_buffer: *const (), num_bytes: usize, checkpoint_state: *mut *mut OrtCheckpointState) -> OrtStatusPtr,
+	pub GetParameterTypeAndShape: unsafe extern "system" fn(
+		checkpoint_state: *const OrtCheckpointState,
+		parameter_name: *const c_char,
+		parameter_type_and_shape: *mut *mut OrtTensorTypeAndShapeInfo
+	) -> OrtStatusPtr,
+	pub UpdateParameter:
+		unsafe extern "system" fn(checkpoint_state: *mut OrtCheckpointState, parameter_name: *const c_char, parameter: *mut OrtValue) -> OrtStatusPtr,
+	pub GetParameter: unsafe extern "system" fn(
+		checkpoint_state: *const OrtCheckpointState,
+		parameter_name: *const c_char,
+		allocator: *mut OrtAllocator,
+		parameter: *mut *mut OrtValue
 	) -> OrtStatusPtr
 }
 #[doc = " \\brief The helper interface to get the right version of OrtApi\n\n Get a pointer to this structure through ::OrtGetApiBase"]

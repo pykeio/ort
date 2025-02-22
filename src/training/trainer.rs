@@ -1,8 +1,6 @@
-use std::{
-	ffi::CString,
-	path::Path,
-	ptr::{self, NonNull}
-};
+use alloc::ffi::CString;
+use core::ptr::{self, NonNull};
+use std::path::Path;
 
 use ort_sys::c_char;
 
@@ -19,7 +17,7 @@ use crate::{
 pub struct Trainer {
 	ptr: NonNull<ort_sys::OrtTrainingSession>,
 	train_output_names: Vec<String>,
-	optimizer: Optimizer,
+	eval_output_names: Vec<String>,
 	ckpt: Checkpoint,
 	_allocator: Allocator
 }
@@ -43,32 +41,7 @@ impl Trainer {
 		trainsys![unsafe CreateTrainingSession(env.ptr(), session_options.ptr(), ckpt.ptr.as_ptr(), training_model_path.as_ptr(), eval_model_path.as_ptr(), optimizer_model_path.as_ptr(), &mut ptr)?; nonNull(ptr)];
 
 		let ptr = unsafe { NonNull::new_unchecked(ptr) };
-
-		let mut train_output_len = 0;
-		trainsys![unsafe TrainingSessionGetTrainingModelOutputCount(ptr.as_ptr(), &mut train_output_len)?];
-		let train_output_names = (0..train_output_len)
-			.map(|i| {
-				let mut name_bytes: *mut c_char = std::ptr::null_mut();
-				trainsys![unsafe TrainingSessionGetTrainingModelOutputName(ptr.as_ptr(), i, allocator.ptr().cast_mut(), &mut name_bytes)?];
-				let name = match char_p_to_string(name_bytes) {
-					Ok(name) => name,
-					Err(e) => {
-						unsafe { allocator.free(name_bytes) };
-						return Err(e);
-					}
-				};
-				unsafe { allocator.free(name_bytes) };
-				Ok(name)
-			})
-			.collect::<Result<Vec<String>>>()?;
-
-		Ok(Self {
-			ptr,
-			_allocator: allocator,
-			train_output_names,
-			optimizer: Optimizer(ptr),
-			ckpt
-		})
+		Self::new_inner(ptr, allocator, ckpt)
 	}
 
 	pub fn new_from_artifacts(
@@ -91,6 +64,83 @@ impl Trainer {
 			base_dir.join("eval_model.onnx"),
 			base_dir.join("optimizer_model.onnx")
 		)
+	}
+
+	pub fn new_from_memory(
+		session_options: SessionBuilder,
+		allocator: Allocator,
+		ckpt: Checkpoint,
+		training_model: &[u8],
+		eval_model: &[u8],
+		optimizer_model: &[u8]
+	) -> Result<Self> {
+		let env = crate::environment::get_environment()?;
+
+		let mut ptr: *mut ort_sys::OrtTrainingSession = ptr::null_mut();
+		trainsys![
+			unsafe CreateTrainingSessionFromBuffer(
+				env.ptr(),
+				session_options.ptr(),
+				ckpt.ptr.as_ptr(),
+				training_model.as_ptr().cast(),
+				training_model.len(),
+				eval_model.as_ptr().cast(),
+				eval_model.len(),
+				optimizer_model.as_ptr().cast(),
+				optimizer_model.len(),
+				&mut ptr
+			)?;
+			nonNull(ptr)
+		];
+
+		let ptr = unsafe { NonNull::new_unchecked(ptr) };
+		Self::new_inner(ptr, allocator, ckpt)
+	}
+
+	fn new_inner(ptr: NonNull<ort_sys::OrtTrainingSession>, allocator: Allocator, ckpt: Checkpoint) -> Result<Self> {
+		let mut train_output_len = 0;
+		trainsys![unsafe TrainingSessionGetTrainingModelOutputCount(ptr.as_ptr(), &mut train_output_len)?];
+		let train_output_names = (0..train_output_len)
+			.map(|i| {
+				let mut name_bytes: *mut c_char = std::ptr::null_mut();
+				trainsys![unsafe TrainingSessionGetTrainingModelOutputName(ptr.as_ptr(), i, allocator.ptr().cast_mut(), &mut name_bytes)?];
+				let name = match char_p_to_string(name_bytes) {
+					Ok(name) => name,
+					Err(e) => {
+						unsafe { allocator.free(name_bytes) };
+						return Err(e);
+					}
+				};
+				unsafe { allocator.free(name_bytes) };
+				Ok(name)
+			})
+			.collect::<Result<Vec<String>>>()?;
+
+		let mut eval_output_len = 0;
+		trainsys![unsafe TrainingSessionGetEvalModelOutputCount(ptr.as_ptr(), &mut eval_output_len)?];
+		let eval_output_names = (0..eval_output_len)
+			.map(|i| {
+				let mut name_bytes: *mut c_char = std::ptr::null_mut();
+				trainsys![unsafe TrainingSessionGetEvalModelOutputName(ptr.as_ptr(), i, allocator.ptr().cast_mut(), &mut name_bytes)?];
+				let name = match char_p_to_string(name_bytes) {
+					Ok(name) => name,
+					Err(e) => {
+						unsafe { allocator.free(name_bytes) };
+						return Err(e);
+					}
+				};
+				unsafe { allocator.free(name_bytes) };
+				Ok(name)
+			})
+			.collect::<Result<Vec<String>>>()?;
+
+		Ok(Self {
+			ptr,
+			_allocator: allocator,
+			train_output_names,
+			eval_output_names,
+			ckpt
+		})
 	}
 
 	pub fn step<'s, 'i1, 'v1: 'i1, 'i2: 'i1, 'v2: 'i2 + 'i1, const N1: usize, const N2: usize>(
@@ -163,7 +213,7 @@ impl Trainer {
 		input_values: impl Iterator<Item = &'i1 SessionInputValue<'v1>>,
 		run_options: Option<&'r RunOptions>
 	) -> Result<SessionOutputs<'r, 's>> {
-		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![std::ptr::null_mut(); self.train_output_names.len()];
+		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![std::ptr::null_mut(); self.eval_output_names.len()];
 
 		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.map(|input_array_ort| input_array_ort.ptr()).collect();
 
@@ -180,7 +230,7 @@ impl Trainer {
 			})
 			.collect();
 
-		Ok(SessionOutputs::new(self.train_output_names.iter().map(String::as_str).collect(), outputs))
+		Ok(SessionOutputs::new(self.eval_output_names.iter().map(String::as_str).collect(), outputs))
 	}
 
 	pub fn export<O: AsRef<str>>(&self, out_path: impl AsRef<Path>, output_names: impl AsRef<[O]>) -> Result<()> {
@@ -211,8 +261,8 @@ impl Trainer {
 		Ok(())
 	}
 
-	pub fn optimizer(&self) -> &Optimizer {
-		&self.optimizer
+	pub fn optimizer(&self) -> Optimizer<'_> {
+		Optimizer::new(self.ptr)
 	}
 
 	pub fn checkpoint(&self) -> &Checkpoint {

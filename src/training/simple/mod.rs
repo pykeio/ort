@@ -45,7 +45,7 @@ impl Trainer {
 		&self,
 		mut args: TrainingArguments<I, L, NI, NL>
 	) -> Result<()> {
-		let optimizer = self.optimizer();
+		let mut optimizer = self.optimizer();
 		optimizer.set_lr(args.lr)?;
 
 		let mut saved_ckpts = VecDeque::new();

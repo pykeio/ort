@@ -44,12 +44,12 @@ jobs:
         run: |
           cargo check -p ort --no-default-features
   msrv:
-    name: MSRV (1.72)
+    name: MSRV (1.80)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install stable Rust toolchain
-        uses: dtolnay/rust-toolchain@1.72
+        uses: dtolnay/rust-toolchain@1.80
       - uses: Swatinem/rust-cache@v1
       - name: Run checks
         run: |

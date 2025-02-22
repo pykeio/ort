@@ -210,7 +210,7 @@ impl ExecutionProvider for QNNExecutionProvider {
 			let ffi_options = self.options.to_ffi();
 			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider(
 				session_builder.ptr_mut(),
-				b"QNN\0".as_ptr().cast::<core::ffi::c_char>(),
+				c"QNN".as_ptr().cast::<core::ffi::c_char>(),
 				ffi_options.key_ptrs(),
 				ffi_options.value_ptrs(),
 				ffi_options.len(),

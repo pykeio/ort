@@ -552,8 +552,8 @@ impl Session {
 	pub fn set_workload_type(&mut self, workload_type: WorkloadType) -> Result<()> {
 		static KEY: &[u8] = b"ep.dynamic.workload_type\0";
 		match workload_type {
-			WorkloadType::Default => self.set_dynamic_option(KEY.as_ptr().cast(), b"Default\0".as_ptr().cast()),
-			WorkloadType::Efficient => self.set_dynamic_option(KEY.as_ptr().cast(), b"Efficient\0".as_ptr().cast())
+			WorkloadType::Default => self.set_dynamic_option(KEY.as_ptr().cast(), c"Default".as_ptr().cast()),
+			WorkloadType::Efficient => self.set_dynamic_option(KEY.as_ptr().cast(), c"Efficient".as_ptr().cast())
 		}
 	}
 

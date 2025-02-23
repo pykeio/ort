@@ -16,7 +16,7 @@ use crate::{
 	memory::Allocator,
 	ortsys,
 	session::{NoSelectedOutputs, RunOptions},
-	value::DynTensor
+	value::{DynTensor, Value, ValueType, ValueTypeMarker, r#type::extract_data_type_from_tensor_info}
 };
 
 mod simple;
@@ -36,14 +36,14 @@ pub use self::{
 /// May panic if:
 /// - Getting the `OrtApi` struct fails, due to `ort` loading an unsupported version of ONNX Runtime.
 /// - Loading the ONNX Runtime dynamic library fails if the `load-dynamic` feature is enabled.
-pub fn training_api() -> Result<NonNull<ort_sys::OrtTrainingApi>> {
+pub fn training_api() -> Result<&'static ort_sys::OrtTrainingApi> {
 	struct TrainingApiPointer(*const ort_sys::OrtTrainingApi);
 	unsafe impl Send for TrainingApiPointer {}
 	unsafe impl Sync for TrainingApiPointer {}
 
 	static TRAINING_API: OnceLock<TrainingApiPointer> = OnceLock::new();
 
-	NonNull::new(
+	let ptr = NonNull::new(
 		TRAINING_API
 			.get_or_init(|| {
 				let training_api = ortsys![unsafe GetTrainingApi(ort_sys::ORT_API_VERSION)];
@@ -52,7 +52,8 @@ pub fn training_api() -> Result<NonNull<ort_sys::OrtTrainingApi>> {
 			.0
 			.cast_mut()
 	)
-	.ok_or_else(|| Error::new("Training is not enbled in this build of ONNX Runtime."))
+	.ok_or_else(|| Error::new("Training is not enbled in this build of ONNX Runtime."))?;
+	Ok(unsafe { ptr.as_ref() })
 }
 
 /// Sets the seed used for RNG when training.
@@ -63,24 +64,24 @@ pub fn set_seed(seed: i64) -> Result<()> {
 
 macro_rules! trainsys {
 	($method:ident) => {
-		($crate::training::training_api().unwrap().as_ref().$method)
+		($crate::training::training_api().unwrap().$method)
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?)) => {
-		unsafe { ($crate::training::training_api().unwrap().as_ref().$method)($($n),+) }
+		unsafe { ($crate::training::training_api().unwrap().$method)($($n),+) }
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?).expect($e:expr)) => {
-		unsafe { $crate::error::status_to_result(($crate::training::training_api().unwrap().as_ref().$method)($($n),+)) }.expect($e)
+		unsafe { $crate::error::status_to_result(($crate::training::training_api().unwrap().$method)($($n),+)) }.expect($e)
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {{
-		let _x = unsafe { ($crate::training::training_api().unwrap().as_ref().$method)($($n),+) };
+		let _x = unsafe { ($crate::training::training_api().unwrap().$method)($($n),+) };
 		$($crate::error::assert_non_null_pointer($check, stringify!($method)).unwrap();)+
 		_x
 	}};
 	(unsafe $method:ident($($n:expr),+ $(,)?)?) => {
-		unsafe { $crate::error::status_to_result(($crate::training::training_api()?.as_ref().$method)($($n),+)) }?
+		unsafe { $crate::error::status_to_result(($crate::training::training_api()?.$method)($($n),+)) }?
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?)?; nonNull($($check:expr),+ $(,)?)$(;)?) => {{
-		unsafe { $crate::error::status_to_result(($crate::training::training_api()?.as_ref().$method)($($n),+)) }?;
+		unsafe { $crate::error::status_to_result(($crate::training::training_api()?.$method)($($n),+)) }?;
 		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
 	}};
 }
@@ -164,6 +165,22 @@ impl Checkpoint {
 		let mut value_ptr = ptr::null_mut();
 		trainsys![unsafe GetParameter(self.ptr.as_ptr(), name.as_ptr(), allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
 		Ok(unsafe { DynTensor::from_ptr(NonNull::new_unchecked(value_ptr), None) })
+	}
+
+	pub fn update_parameter<T: ValueTypeMarker>(&mut self, name: impl AsRef<str>, value: &Value<T>) -> Result<()> {
+		let name = CString::new(name.as_ref())?;
+		trainsys![unsafe UpdateParameter(self.ptr.as_ptr(), name.as_ptr(), value.ptr().cast_mut())?];
+		Ok(())
+	}
+
+	pub fn get_parameter_type(&self, name: impl AsRef<str>) -> Result<ValueType> {
+		let name = CString::new(name.as_ref())?;
+
+		let mut shape_info = ptr::null_mut();
+		trainsys![unsafe GetParameterTypeAndShape(self.ptr.as_ptr(), name.as_ptr(), &mut shape_info)?; nonNull(shape_info)];
+		let value_type = unsafe { extract_data_type_from_tensor_info(shape_info) };
+		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(shape_info)];
+		Ok(value_type)
 	}
 }
 

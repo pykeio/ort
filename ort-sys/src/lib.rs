@@ -514,9 +514,9 @@ pub struct OrtTrainingApi {
 	pub TrainingSessionGetTrainingModelOutputCount: unsafe extern "system" fn(sess: *const OrtTrainingSession, out: *mut usize) -> OrtStatusPtr,
 	pub TrainingSessionGetEvalModelOutputCount: unsafe extern "system" fn(sess: *const OrtTrainingSession, out: *mut usize) -> OrtStatusPtr,
 	pub TrainingSessionGetTrainingModelOutputName:
-		unsafe extern "system" fn(sess: *const OrtTrainingSession, index: usize, allocator: *mut OrtAllocator, output: *mut *mut c_char) -> OrtStatusPtr,
+		unsafe extern "system" fn(sess: *const OrtTrainingSession, index: usize, allocator: *mut OrtAllocator, output: *mut *const c_char) -> OrtStatusPtr,
 	pub TrainingSessionGetEvalModelOutputName:
-		unsafe extern "system" fn(sess: *const OrtTrainingSession, index: usize, allocator: *mut OrtAllocator, output: *mut *mut c_char) -> OrtStatusPtr,
+		unsafe extern "system" fn(sess: *const OrtTrainingSession, index: usize, allocator: *mut OrtAllocator, output: *mut *const c_char) -> OrtStatusPtr,
 	pub LazyResetGrad: unsafe extern "system" fn(session: *mut OrtTrainingSession) -> OrtStatusPtr,
 	pub TrainStep: unsafe extern "system" fn(
 		session: *mut OrtTrainingSession,

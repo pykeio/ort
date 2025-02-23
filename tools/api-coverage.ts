@@ -7,8 +7,6 @@ const SYMBOL_DEF_REGEX = /pub\s+([A-Za-z_][A-Za-z0-9_]+):/;
 const SYMBOL_USAGE_REGEX = /ortsys!\[\s*(?:unsafe\s+)?([A-Za-z_][A-Za-z0-9_]+)/gm;
 
 const IGNORED_SYMBOLS = new Set<string>([
-	'CreateEnv', // we will always create an env with a custom logger for integration w/ tracing
-	'CreateEnvWithGlobalThreadPools',
 	'KernelContext_GetScratchBuffer', // implemented in src/operator/kernel.rs but impl appears to be broken so ignoring
 	'RegisterCustomOpsLibrary', // we use RegisterCustomOpsLibrary_V2
 	'RegisterCustomOpsUsingFunction',
@@ -29,7 +27,23 @@ const IGNORED_SYMBOLS = new Set<string>([
 	'GetCUDAProviderOptionsAsString',
 	'GetTensorRTProviderOptionsAsString',
 	'GetCANNProviderOptionsAsString',
-	'GetDnnlProviderOptionsAsString'
+	'GetDnnlProviderOptionsAsString',
+	'GetROCMProviderOptionsAsString',
+	'GetTensorRTProviderOptionsByName',
+	'GetCUDAProviderOptionsByName',
+
+	// maybe these are meant to be used for custom ops?
+	'CreateOpaqueValue',
+	'GetOpaqueValue',
+
+	// non-use
+	'HasValue',
+	'GetExecutionProviderApi', // available via ort_sys for those who need it
+	'CreateCpuMemoryInfo',
+	'ReleaseMapTypeInfo', // neither map or sequence type infos ever get directly allocated, so im not sure why these exist
+	'ReleaseSequenceTypeInfo',
+	'UpdateTensorRTProviderOptionsWithValue',
+	'UpdateCUDAProviderOptionsWithValue'
 ]);
 
 const sysSymbols = new Set<string>();

@@ -194,6 +194,23 @@ impl Debug for ExecutionProviderDispatch {
 	}
 }
 
+/// Sets the current GPU device of the active EP to the device specified by `device_id`.
+///
+/// This only works for [`CUDAExecutionProvider`] & [`ROCmExecutionProvider`].
+pub fn set_gpu_device(device_id: i32) -> Result<()> {
+	ortsys![unsafe SetCurrentGpuDeviceId(device_id)?];
+	Ok(())
+}
+
+/// Returns the ID of the GPU device being used by the active EP.
+///
+/// This only works for [`CUDAExecutionProvider`] & [`ROCmExecutionProvider`].
+pub fn get_gpu_device() -> Result<i32> {
+	let mut out = 0;
+	ortsys![unsafe GetCurrentGpuDeviceId(&mut out)?];
+	Ok(out)
+}
+
 #[derive(Default, Debug, Clone)]
 pub(crate) struct ExecutionProviderOptions(MiniMap<CString, CString>);
 

@@ -14,11 +14,11 @@ impl Error {
 		}
 	}
 
-	pub fn into_sys(self) -> *mut ort_sys::OrtStatus {
-		(Box::leak(Box::new(self)) as *mut Error).cast()
+	pub fn into_sys(self) -> ort_sys::OrtStatusPtr {
+		ort_sys::OrtStatusPtr((Box::leak(Box::new(self)) as *mut Error).cast())
 	}
 
-	pub fn new_sys(code: ort_sys::OrtErrorCode, message: impl Into<String>) -> *mut ort_sys::OrtStatus {
+	pub fn new_sys(code: ort_sys::OrtErrorCode, message: impl Into<String>) -> ort_sys::OrtStatusPtr {
 		Self::new(code, message).into_sys()
 	}
 

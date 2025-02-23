@@ -25,7 +25,7 @@ use crate::{
 	tensor::TypeInfo
 };
 
-unsafe extern "system" fn CreateStatus(code: OrtErrorCode, msg: *const ::std::os::raw::c_char) -> *mut OrtStatus {
+unsafe extern "system" fn CreateStatus(code: OrtErrorCode, msg: *const ::std::os::raw::c_char) -> OrtStatusPtr {
 	let msg = CString::from_raw(msg.cast_mut());
 	Error::new_sys(code, msg.to_string_lossy())
 }
@@ -40,7 +40,7 @@ unsafe extern "system" fn GetErrorMessage(status: *const OrtStatus) -> *const ::
 
 unsafe extern "system" fn CreateEnv(log_severity_level: OrtLoggingLevel, logid: *const ::std::os::raw::c_char, out: *mut *mut OrtEnv) -> OrtStatusPtr {
 	*out = Environment::new_sys();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn CreateEnvWithCustomLogger(
@@ -51,15 +51,15 @@ unsafe extern "system" fn CreateEnvWithCustomLogger(
 	out: *mut *mut OrtEnv
 ) -> OrtStatusPtr {
 	*out = Environment::new_sys();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn EnableTelemetryEvents(env: *const OrtEnv) -> OrtStatusPtr {
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn DisableTelemetryEvents(env: *const OrtEnv) -> OrtStatusPtr {
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn CreateSession(
@@ -89,7 +89,7 @@ unsafe extern "system" fn CreateSession(
 	match Session::from_buffer(env, options, &buf) {
 		Ok(session) => {
 			*out = (Box::leak(Box::new(session)) as *mut Session).cast();
-			ptr::null_mut()
+			OrtStatusPtr::default()
 		}
 		Err(e) => Error::new_sys(OrtErrorCode::ORT_FAIL, format!("Failed to parse model: {e}"))
 	}
@@ -110,7 +110,7 @@ unsafe extern "system" fn CreateSessionFromArray(
 	match Session::from_buffer(env, options, buf) {
 		Ok(session) => {
 			*out = (Box::leak(Box::new(session)) as *mut Session).cast();
-			ptr::null_mut()
+			OrtStatusPtr::default()
 		}
 		Err(e) => Error::new_sys(OrtErrorCode::ORT_FAIL, format!("Failed to parse model: {e}"))
 	}
@@ -156,7 +156,7 @@ unsafe extern "system" fn Run(
 				}
 			}
 
-			ptr::null_mut()
+			OrtStatusPtr::default()
 		}
 		Err(e) => Error::new_sys(OrtErrorCode::ORT_FAIL, format!("Failed to run session: {e}"))
 	}
@@ -164,7 +164,7 @@ unsafe extern "system" fn Run(
 
 unsafe extern "system" fn CreateSessionOptions(options: *mut *mut OrtSessionOptions) -> OrtStatusPtr {
 	*options = (Box::leak(Box::new(SessionOptions::default())) as *mut SessionOptions).cast();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn SetOptimizedModelFilePath(options: *mut OrtSessionOptions, optimized_model_filepath: *const ortchar) -> OrtStatusPtr {
@@ -174,7 +174,7 @@ unsafe extern "system" fn SetOptimizedModelFilePath(options: *mut OrtSessionOpti
 unsafe extern "system" fn CloneSessionOptions(in_options: *const OrtSessionOptions, out_options: *mut *mut OrtSessionOptions) -> OrtStatusPtr {
 	let options = unsafe { &*in_options.cast::<SessionOptions>() };
 	*out_options = (Box::leak(Box::new(options.clone())) as *mut SessionOptions).cast();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn SetSessionExecutionMode(options: *mut OrtSessionOptions, execution_mode: ExecutionMode) -> OrtStatusPtr {
@@ -220,7 +220,7 @@ unsafe extern "system" fn SetSessionLogSeverityLevel(options: *mut OrtSessionOpt
 unsafe extern "system" fn SetSessionGraphOptimizationLevel(options: *mut OrtSessionOptions, graph_optimization_level: GraphOptimizationLevel) -> OrtStatusPtr {
 	let options = unsafe { &mut *options.cast::<SessionOptions>() };
 	options.perform_optimizations = graph_optimization_level != GraphOptimizationLevel::ORT_DISABLE_ALL;
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn SetIntraOpNumThreads(options: *mut OrtSessionOptions, intra_op_num_threads: ::std::os::raw::c_int) -> OrtStatusPtr {
@@ -254,18 +254,18 @@ unsafe extern "system" fn RegisterCustomOpsLibrary(
 unsafe extern "system" fn SessionGetInputCount(session: *const OrtSession, out: *mut usize) -> OrtStatusPtr {
 	let session = unsafe { &*session.cast::<Session>() };
 	*out = session.inputs.len();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn SessionGetOutputCount(session: *const OrtSession, out: *mut usize) -> OrtStatusPtr {
 	let session = unsafe { &*session.cast::<Session>() };
 	*out = session.outputs.len();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn SessionGetOverridableInitializerCount(session: *const OrtSession, out: *mut usize) -> OrtStatusPtr {
 	*out = 0;
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn SessionGetInputTypeInfo(session: *const OrtSession, index: usize, type_info: *mut *mut OrtTypeInfo) -> OrtStatusPtr {
@@ -285,7 +285,7 @@ unsafe extern "system" fn SessionGetInputTypeInfo(session: *const OrtSession, in
 			})
 			.collect()
 	);
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn SessionGetOutputTypeInfo(session: *const OrtSession, index: usize, type_info: *mut *mut OrtTypeInfo) -> OrtStatusPtr {
@@ -305,7 +305,7 @@ unsafe extern "system" fn SessionGetOutputTypeInfo(session: *const OrtSession, i
 			})
 			.collect()
 	);
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn SessionGetOverridableInitializerTypeInfo(session: *const OrtSession, index: usize, type_info: *mut *mut OrtTypeInfo) -> OrtStatusPtr {
@@ -324,7 +324,7 @@ unsafe extern "system" fn SessionGetInputName(
 		None => return Error::new_sys(OrtErrorCode::ORT_FAIL, format!("Invalid input #{}", index + 1))
 	};
 	*value = name.into_raw();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn SessionGetOutputName(
@@ -339,7 +339,7 @@ unsafe extern "system" fn SessionGetOutputName(
 		None => return Error::new_sys(OrtErrorCode::ORT_FAIL, format!("Invalid output #{}", index + 1))
 	};
 	*value = name.into_raw();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn SessionGetOverridableInitializerName(
@@ -407,7 +407,7 @@ unsafe extern "system" fn CreateTensorAsOrtValue(
 	match Tensor::zero_dt(dtype, &shape) {
 		Ok(tensor) => {
 			*out = (Box::leak(Box::new(tensor)) as *mut Tensor).cast();
-			ptr::null_mut()
+			OrtStatusPtr::default()
 		}
 		Err(e) => Error::new_sys(OrtErrorCode::ORT_EP_FAIL, format!("Failed to create tensor: {e}"))
 	}
@@ -435,7 +435,7 @@ unsafe extern "system" fn CreateTensorWithDataAsOrtValue(
 	match Tensor::from_raw_dt(dtype, &shape, data_slice) {
 		Ok(tensor) => {
 			*out = (Box::leak(Box::new(tensor)) as *mut Tensor).cast();
-			ptr::null_mut()
+			OrtStatusPtr::default()
 		}
 		Err(e) => Error::new_sys(OrtErrorCode::ORT_EP_FAIL, format!("Failed to create tensor: {e}"))
 	}
@@ -443,13 +443,13 @@ unsafe extern "system" fn CreateTensorWithDataAsOrtValue(
 
 unsafe extern "system" fn IsTensor(value: *const OrtValue, out: *mut ::std::os::raw::c_int) -> OrtStatusPtr {
 	*out = 1;
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn GetTensorMutableData(value: *mut OrtValue, out: *mut *mut ::std::os::raw::c_void) -> OrtStatusPtr {
 	let tensor = unsafe { &mut *value.cast::<Tensor>() };
 	*out = tensor.as_bytes_mut().as_mut_ptr().cast();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn FillStringTensor(value: *mut OrtValue, s: *const *const ::std::os::raw::c_char, s_len: usize) -> OrtStatusPtr {
@@ -472,17 +472,17 @@ unsafe extern "system" fn GetStringTensorContent(
 
 unsafe extern "system" fn CastTypeInfoToTensorInfo(type_info: *const OrtTypeInfo, out: *mut *const OrtTensorTypeAndShapeInfo) -> OrtStatusPtr {
 	*out = type_info.cast();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn GetOnnxTypeFromTypeInfo(type_info: *const OrtTypeInfo, out: *mut ONNXType) -> OrtStatusPtr {
 	*out = ONNXType::ONNX_TYPE_TENSOR;
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn CreateTensorTypeAndShapeInfo(out: *mut *mut OrtTensorTypeAndShapeInfo) -> OrtStatusPtr {
 	*out = TypeInfo::new_sys(DatumType::F32, Vec::new()).cast();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn SetTensorElementType(info: *mut OrtTensorTypeAndShapeInfo, type_: ONNXTensorElementDataType) -> OrtStatusPtr {
@@ -490,7 +490,7 @@ unsafe extern "system" fn SetTensorElementType(info: *mut OrtTensorTypeAndShapeI
 	match convert_sys_to_datum_type(type_) {
 		Ok(dtype) => {
 			info.dtype = dtype;
-			ptr::null_mut()
+			OrtStatusPtr::default()
 		}
 		Err(e) => e.into_sys()
 	}
@@ -499,19 +499,19 @@ unsafe extern "system" fn SetTensorElementType(info: *mut OrtTensorTypeAndShapeI
 unsafe extern "system" fn SetDimensions(info: *mut OrtTensorTypeAndShapeInfo, dim_values: *const i64, dim_count: usize) -> OrtStatusPtr {
 	let info = unsafe { &mut *info.cast::<TypeInfo>() };
 	info.shape = unsafe { std::slice::from_raw_parts(dim_values.cast(), dim_count) }.to_vec();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn GetTensorElementType(info: *const OrtTensorTypeAndShapeInfo, out: *mut ONNXTensorElementDataType) -> OrtStatusPtr {
 	let info = unsafe { &*info.cast::<TypeInfo>() };
 	*out = convert_datum_type_to_sys(info.dtype);
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn GetDimensionsCount(info: *const OrtTensorTypeAndShapeInfo, out: *mut usize) -> OrtStatusPtr {
 	let info = unsafe { &*info.cast::<TypeInfo>() };
 	*out = info.shape.len();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn GetDimensions(info: *const OrtTensorTypeAndShapeInfo, dim_values: *mut i64, dim_values_length: usize) -> OrtStatusPtr {
@@ -519,7 +519,7 @@ unsafe extern "system" fn GetDimensions(info: *const OrtTensorTypeAndShapeInfo, 
 	for (i, dim) in info.shape.iter().enumerate().take(dim_values_length) {
 		*dim_values.add(i) = *dim as _;
 	}
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn GetSymbolicDimensions(
@@ -530,7 +530,7 @@ unsafe extern "system" fn GetSymbolicDimensions(
 	for i in 0..dim_params_length {
 		*dim_params.add(i) = ptr::null();
 	}
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn GetTensorShapeElementCount(info: *const OrtTensorTypeAndShapeInfo, out: *mut usize) -> OrtStatusPtr {
@@ -540,24 +540,24 @@ unsafe extern "system" fn GetTensorShapeElementCount(info: *const OrtTensorTypeA
 		size *= *dim as usize;
 	}
 	*out = size;
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn GetTensorTypeAndShape(value: *const OrtValue, out: *mut *mut OrtTensorTypeAndShapeInfo) -> OrtStatusPtr {
 	let tensor = unsafe { &*value.cast::<Tensor>() };
 	*out = TypeInfo::new_sys(tensor.datum_type(), tensor.shape().iter().map(|c| *c as i64).collect()).cast();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn GetTypeInfo(value: *const OrtValue, out: *mut *mut OrtTypeInfo) -> OrtStatusPtr {
 	let tensor = unsafe { &*value.cast::<Tensor>() };
 	*out = TypeInfo::new_sys(tensor.datum_type(), tensor.shape().iter().map(|c| *c as i64).collect());
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn GetValueType(value: *const OrtValue, out: *mut ONNXType) -> OrtStatusPtr {
 	*out = ONNXType::ONNX_TYPE_TENSOR;
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn CreateMemoryInfo(
@@ -573,37 +573,37 @@ unsafe extern "system" fn CreateMemoryInfo(
 		return Error::new(OrtErrorCode::ORT_ENGINE_ERROR, format!("tract does not support the '{device_name}' device")).into_sys();
 	}
 	unsafe { *out = ptr::dangling_mut() };
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn CreateCpuMemoryInfo(type_: OrtAllocatorType, mem_type: OrtMemType, out: *mut *mut OrtMemoryInfo) -> OrtStatusPtr {
 	unsafe { *out = ptr::dangling_mut() };
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn CompareMemoryInfo(info1: *const OrtMemoryInfo, info2: *const OrtMemoryInfo, out: *mut ::std::os::raw::c_int) -> OrtStatusPtr {
 	*out = 0;
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn MemoryInfoGetName(ptr: *const OrtMemoryInfo, out: *mut *const ::std::os::raw::c_char) -> OrtStatusPtr {
 	*out = b"Cpu\0".as_ptr().cast();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn MemoryInfoGetId(ptr: *const OrtMemoryInfo, out: *mut ::std::os::raw::c_int) -> OrtStatusPtr {
 	*out = 0;
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn MemoryInfoGetMemType(ptr: *const OrtMemoryInfo, out: *mut OrtMemType) -> OrtStatusPtr {
 	*out = OrtMemType::OrtMemTypeDefault;
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn MemoryInfoGetType(ptr: *const OrtMemoryInfo, out: *mut OrtAllocatorType) -> OrtStatusPtr {
 	*out = OrtAllocatorType::OrtDeviceAllocator;
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn AllocatorAlloc(ort_allocator: *mut OrtAllocator, size: usize, out: *mut *mut ::std::os::raw::c_void) -> OrtStatusPtr {
@@ -611,22 +611,22 @@ unsafe extern "system" fn AllocatorAlloc(ort_allocator: *mut OrtAllocator, size:
 	if unsafe { *out }.is_null() {
 		return Error::new_sys(OrtErrorCode::ORT_RUNTIME_EXCEPTION, "Allocation failed");
 	}
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn AllocatorFree(ort_allocator: *mut OrtAllocator, p: *mut ::std::os::raw::c_void) -> OrtStatusPtr {
 	unsafe { &*ort_allocator }.Free.unwrap()(ort_allocator, p);
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn AllocatorGetInfo(ort_allocator: *const OrtAllocator, out: *mut *const OrtMemoryInfo) -> OrtStatusPtr {
 	*out = unsafe { &*ort_allocator }.Info.unwrap()(ort_allocator);
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn GetAllocatorWithDefaultOptions(out: *mut *mut OrtAllocator) -> OrtStatusPtr {
 	*out = (&crate::memory::DEFAULT_CPU_ALLOCATOR as *const Allocator).cast_mut().cast();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn AddFreeDimensionOverride(
@@ -900,7 +900,7 @@ unsafe extern "system" fn AddSessionConfigEntry(
 
 unsafe extern "system" fn CreateAllocator(session: *const OrtSession, mem_info: *const OrtMemoryInfo, out: *mut *mut OrtAllocator) -> OrtStatusPtr {
 	*out = (Box::leak(Box::new(Allocator::new())) as *mut Allocator).cast();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn ReleaseAllocator(input: *mut OrtAllocator) {
@@ -1296,7 +1296,7 @@ unsafe extern "system" fn KernelContext_GetGPUComputeStream(context: *const OrtK
 
 unsafe extern "system" fn GetTensorMemoryInfo(value: *const OrtValue, mem_info: *mut *const OrtMemoryInfo) -> OrtStatusPtr {
 	*mem_info = ptr::dangling();
-	ptr::null_mut()
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn GetExecutionProviderApi(

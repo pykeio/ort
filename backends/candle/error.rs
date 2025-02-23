@@ -14,11 +14,11 @@ impl Error {
 		}
 	}
 
-	pub fn into_sys(self) -> *mut ort_sys::OrtStatus {
-		(Box::leak(Box::new(self)) as *mut Error).cast()
+	pub fn into_sys(self) -> ort_sys::OrtStatusPtr {
+		ort_sys::OrtStatusPtr((Box::leak(Box::new(self)) as *mut Error).cast())
 	}
 
-	pub fn new_sys(code: ort_sys::OrtErrorCode, message: impl Into<String>) -> *mut ort_sys::OrtStatus {
+	pub fn new_sys(code: ort_sys::OrtErrorCode, message: impl Into<String>) -> ort_sys::OrtStatusPtr {
 		Self::new(code, message).into_sys()
 	}
 
@@ -32,11 +32,11 @@ impl Error {
 		self.message.as_ptr()
 	}
 
-	pub unsafe fn cast_from_sys<'e>(ptr: *const ort_sys::OrtStatus) -> &'e Error {
-		unsafe { &*ptr.cast::<Error>() }
+	pub unsafe fn cast_from_sys<'e>(status: *const ort_sys::OrtStatus) -> &'e Error {
+		unsafe { &*status.cast::<Error>() }
 	}
 
-	pub unsafe fn consume_sys(ptr: *mut ort_sys::OrtStatus) -> Box<Error> {
-		Box::from_raw(ptr.cast::<Error>())
+	pub unsafe fn consume_sys(status: *mut ort_sys::OrtStatus) -> Box<Error> {
+		Box::from_raw(status.cast::<Error>())
 	}
 }

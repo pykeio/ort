@@ -260,6 +260,11 @@ pub struct OrtLoraAdapter {
 #[derive(Debug, Copy, Clone)]
 #[must_use = "statuses must be freed with `OrtApi::ReleaseStatus` if they are not null"]
 pub struct OrtStatusPtr(pub *mut OrtStatus);
+impl Default for OrtStatusPtr {
+	fn default() -> Self {
+		OrtStatusPtr(core::ptr::null_mut())
+	}
+}
 #[doc = " \\brief Memory allocation interface\n\n Structure of function pointers that defines a memory allocator. This can be created and filled in by the user for custom allocators.\n\n When an allocator is passed to any function, be sure that the allocator object is not destroyed until the last allocated object using it is freed."]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]

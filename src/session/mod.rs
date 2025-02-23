@@ -520,7 +520,14 @@ impl Session {
 	pub fn metadata(&self) -> Result<ModelMetadata<'_>> {
 		let mut metadata_ptr: *mut ort_sys::OrtModelMetadata = ptr::null_mut();
 		ortsys![unsafe SessionGetModelMetadata(self.inner.session_ptr.as_ptr(), &mut metadata_ptr)?; nonNull(metadata_ptr)];
-		Ok(ModelMetadata::new(unsafe { NonNull::new_unchecked(metadata_ptr) }, &self.inner.allocator))
+		Ok(ModelMetadata::new(unsafe { NonNull::new_unchecked(metadata_ptr) }))
+	}
+
+	/// Returns the time that profiling was started, in nanoseconds.
+	pub fn profiling_start_ns(&self) -> Result<u64> {
+		let mut out = 0;
+		ortsys![unsafe SessionGetProfilingStartTimeNs(self.inner.session_ptr.as_ptr(), &mut out)?];
+		Ok(out)
 	}
 
 	/// Ends profiling for this session.
@@ -529,7 +536,7 @@ impl Session {
 	pub fn end_profiling(&mut self) -> Result<String> {
 		let mut profiling_name: *mut c_char = ptr::null_mut();
 
-		ortsys![unsafe SessionEndProfiling(self.inner.session_ptr.as_ptr(), self.inner.allocator.ptr().cast_mut(), &mut profiling_name)];
+		ortsys![unsafe SessionEndProfiling(self.inner.session_ptr.as_ptr(), self.inner.allocator.ptr().cast_mut(), &mut profiling_name)?];
 		assert_non_null_pointer(profiling_name, "ProfilingName")?;
 		dangerous::raw_pointer_to_string(&self.inner.allocator, profiling_name)
 	}
@@ -619,7 +626,7 @@ mod dangerous {
 	}
 
 	fn extract_io_count(
-		f: unsafe extern "system" fn(*const ort_sys::OrtSession, *mut usize) -> *mut ort_sys::OrtStatus,
+		f: unsafe extern "system" fn(*const ort_sys::OrtSession, *mut usize) -> ort_sys::OrtStatusPtr,
 		session_ptr: NonNull<ort_sys::OrtSession>
 	) -> Result<usize> {
 		let mut num_nodes = 0;
@@ -651,7 +658,7 @@ mod dangerous {
 	}
 
 	fn extract_io_name(
-		f: unsafe extern "system" fn(*const ort_sys::OrtSession, usize, *mut ort_sys::OrtAllocator, *mut *mut c_char) -> *mut ort_sys::OrtStatus,
+		f: unsafe extern "system" fn(*const ort_sys::OrtSession, usize, *mut ort_sys::OrtAllocator, *mut *mut c_char) -> ort_sys::OrtStatusPtr,
 		session_ptr: NonNull<ort_sys::OrtSession>,
 		allocator: &Allocator,
 		i: usize
@@ -680,7 +687,7 @@ mod dangerous {
 	}
 
 	fn extract_io(
-		f: unsafe extern "system" fn(*const ort_sys::OrtSession, usize, *mut *mut ort_sys::OrtTypeInfo) -> *mut ort_sys::OrtStatus,
+		f: unsafe extern "system" fn(*const ort_sys::OrtSession, usize, *mut *mut ort_sys::OrtTypeInfo) -> ort_sys::OrtStatusPtr,
 		session_ptr: NonNull<ort_sys::OrtSession>,
 		i: usize
 	) -> Result<ValueType> {

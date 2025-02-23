@@ -403,11 +403,11 @@ impl MemoryInfo {
 
 	pub(crate) fn from_value(value_ptr: *mut ort_sys::OrtValue) -> Option<Self> {
 		let mut is_tensor = 0;
-		ortsys![unsafe IsTensor(value_ptr, &mut is_tensor)]; // infallible
+		ortsys![unsafe IsTensor(value_ptr, &mut is_tensor).expect("infallible")];
 		if is_tensor != 0 {
 			let mut memory_info_ptr: *const ort_sys::OrtMemoryInfo = ptr::null_mut();
 			// infallible, and `memory_info_ptr` will never be null
-			ortsys![unsafe GetTensorMemoryInfo(value_ptr, &mut memory_info_ptr)];
+			ortsys![unsafe GetTensorMemoryInfo(value_ptr, &mut memory_info_ptr).expect("infallible")];
 			Some(Self::from_raw(unsafe { NonNull::new_unchecked(memory_info_ptr.cast_mut()) }, false))
 		} else {
 			None
@@ -433,7 +433,7 @@ impl MemoryInfo {
 	/// ```
 	pub fn memory_type(&self) -> MemoryType {
 		let mut raw_type: ort_sys::OrtMemType = ort_sys::OrtMemType::OrtMemTypeDefault;
-		ortsys![unsafe MemoryInfoGetMemType(self.ptr.as_ptr(), &mut raw_type)];
+		ortsys![unsafe MemoryInfoGetMemType(self.ptr.as_ptr(), &mut raw_type).expect("infallible")];
 		MemoryType::from(raw_type)
 	}
 
@@ -448,7 +448,7 @@ impl MemoryInfo {
 	/// ```
 	pub fn allocator_type(&self) -> AllocatorType {
 		let mut raw_type: ort_sys::OrtAllocatorType = ort_sys::OrtAllocatorType::OrtInvalidAllocator;
-		ortsys![unsafe MemoryInfoGetType(self.ptr.as_ptr(), &mut raw_type)];
+		ortsys![unsafe MemoryInfoGetType(self.ptr.as_ptr(), &mut raw_type).expect("infallible")];
 		match raw_type {
 			ort_sys::OrtAllocatorType::OrtArenaAllocator => AllocatorType::Arena,
 			ort_sys::OrtAllocatorType::OrtDeviceAllocator => AllocatorType::Device,
@@ -467,7 +467,7 @@ impl MemoryInfo {
 	/// ```
 	pub fn allocation_device(&self) -> AllocationDevice {
 		let mut name_ptr: *const c_char = ptr::null_mut();
-		ortsys![unsafe MemoryInfoGetName(self.ptr.as_ptr(), &mut name_ptr)];
+		ortsys![unsafe MemoryInfoGetName(self.ptr.as_ptr(), &mut name_ptr).expect("infallible")];
 
 		// SAFETY: `name_ptr` can never be null - `CreateMemoryInfo` internally checks against builtin device names, erroring
 		// if a non-builtin device is passed
@@ -494,7 +494,7 @@ impl MemoryInfo {
 	/// ```
 	pub fn device_id(&self) -> i32 {
 		let mut raw: ort_sys::c_int = 0;
-		ortsys![unsafe MemoryInfoGetId(self.ptr.as_ptr(), &mut raw)];
+		ortsys![unsafe MemoryInfoGetId(self.ptr.as_ptr(), &mut raw).expect("infallible")];
 		raw as _
 	}
 
@@ -521,7 +521,7 @@ impl Clone for MemoryInfo {
 impl PartialEq<MemoryInfo> for MemoryInfo {
 	fn eq(&self, other: &MemoryInfo) -> bool {
 		let mut out = 0;
-		ortsys![unsafe CompareMemoryInfo(self.ptr.as_ptr(), other.ptr.as_ptr(), &mut out)]; // implementation always returns ok status
+		ortsys![unsafe CompareMemoryInfo(self.ptr.as_ptr(), other.ptr.as_ptr(), &mut out).expect("infallible")]; // implementation always returns ok status
 		out == 0
 	}
 }

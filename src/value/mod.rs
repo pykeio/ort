@@ -315,7 +315,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	#[must_use]
 	pub unsafe fn from_ptr(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value<Type> {
 		let mut typeinfo_ptr = ptr::null_mut();
-		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr)];
+		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible")];
 		Value {
 			inner: Arc::new(ValueInner {
 				ptr,
@@ -333,7 +333,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	#[must_use]
 	pub(crate) unsafe fn from_ptr_nodrop(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value<Type> {
 		let mut typeinfo_ptr = ptr::null_mut();
-		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr)];
+		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible")];
 		Value {
 			inner: Arc::new(ValueInner {
 				ptr,
@@ -383,7 +383,7 @@ impl Value<DynValueTypeMarker> {
 	/// ```
 	pub fn is_tensor(&self) -> bool {
 		let mut result = 0;
-		ortsys![unsafe IsTensor(self.ptr(), &mut result)]; // infallible
+		ortsys![unsafe IsTensor(self.ptr(), &mut result).expect("infallible")];
 		result == 1
 	}
 

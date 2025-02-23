@@ -1,7 +1,7 @@
 use alloc::{ffi::CString, sync::Arc};
 use core::{
 	cell::UnsafeCell,
-	ffi::c_char,
+	ffi::{c_char, c_void},
 	future::Future,
 	marker::PhantomData,
 	ops::Deref,
@@ -10,8 +10,6 @@ use core::{
 	task::{Context, Poll, Waker}
 };
 use std::sync::Mutex;
-
-use ort_sys::{OrtStatus, c_void};
 
 use crate::{
 	error::Result,
@@ -137,7 +135,7 @@ pub(crate) struct AsyncInferenceContext<'r, 's, 'v> {
 	pub(crate) output_value_ptrs: Vec<*mut ort_sys::OrtValue>
 }
 
-pub(crate) extern "system" fn async_callback(user_data: *mut c_void, _: *mut *mut ort_sys::OrtValue, _: usize, status: *mut OrtStatus) {
+pub(crate) extern "system" fn async_callback(user_data: *mut c_void, _: *mut *mut ort_sys::OrtValue, _: usize, status: ort_sys::OrtStatusPtr) {
 	let ctx = unsafe { Box::from_raw(user_data.cast::<AsyncInferenceContext<'_, '_, '_>>()) };
 
 	// Reconvert name ptrs to CString so drop impl is called and memory is freed

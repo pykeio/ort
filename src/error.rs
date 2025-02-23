@@ -11,13 +11,13 @@ use crate::{char_p_to_string, ortsys};
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 pub(crate) trait IntoStatus {
-	fn into_status(self) -> *mut ort_sys::OrtStatus;
+	fn into_status(self) -> ort_sys::OrtStatusPtr;
 }
 
 impl<T> IntoStatus for Result<T, Error> {
-	fn into_status(self) -> *mut ort_sys::OrtStatus {
+	fn into_status(self) -> ort_sys::OrtStatusPtr {
 		let (code, message) = match &self {
-			Ok(_) => return ptr::null_mut(),
+			Ok(_) => return ort_sys::OrtStatusPtr(ptr::null_mut()),
 			Err(e) => (ort_sys::OrtErrorCode::ORT_FAIL, Some(e.to_string()))
 		};
 		let message = message.map(|c| CString::new(c).unwrap_or_else(|_| unreachable!()));
@@ -177,7 +177,8 @@ pub(crate) fn assert_non_null_pointer<T>(ptr: *const T, name: &'static str) -> R
 /// Converts an [`ort_sys::OrtStatus`] to a [`Result`].
 ///
 /// Note that this frees `status`!
-pub(crate) unsafe fn status_to_result(status: *mut ort_sys::OrtStatus) -> Result<(), Error> {
+pub(crate) unsafe fn status_to_result(status: ort_sys::OrtStatusPtr) -> Result<(), Error> {
+	let status = status.0;
 	if status.is_null() {
 		Ok(())
 	} else {

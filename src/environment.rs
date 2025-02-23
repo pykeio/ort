@@ -77,7 +77,7 @@ pub struct GlobalThreadPoolOptions {
 impl Default for GlobalThreadPoolOptions {
 	fn default() -> Self {
 		let mut ptr = ptr::null_mut();
-		ortsys![unsafe CreateThreadingOptions(&mut ptr)];
+		ortsys![unsafe CreateThreadingOptions(&mut ptr).expect("failed to create threading options")];
 		Self { ptr, thread_manager: None }
 	}
 }

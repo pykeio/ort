@@ -256,7 +256,10 @@ pub struct OrtShapeInferContext {
 pub struct OrtLoraAdapter {
 	_unused: [u8; 0]
 }
-pub type OrtStatusPtr = *mut OrtStatus;
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone)]
+#[must_use = "statuses must be freed with `OrtApi::ReleaseStatus` if they are not null"]
+pub struct OrtStatusPtr(pub *mut OrtStatus);
 #[doc = " \\brief Memory allocation interface\n\n Structure of function pointers that defines a memory allocator. This can be created and filled in by the user for custom allocators.\n\n When an allocator is passed to any function, be sure that the allocator object is not destroyed until the last allocated object using it is freed."]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -628,7 +631,7 @@ pub type RunAsyncCallbackFn =
 #[derive(Debug, Copy, Clone)]
 pub struct OrtApi {
 	#[doc = " \\brief Create an OrtStatus from a null terminated string\n\n \\param[in] code\n \\param[in] msg A null-terminated string. Its contents will be copied.\n \\return A new OrtStatus object, must be destroyed with OrtApi::ReleaseStatus"]
-	pub CreateStatus: unsafe extern "system" fn(code: OrtErrorCode, msg: *const core::ffi::c_char) -> *mut OrtStatus,
+	pub CreateStatus: unsafe extern "system" fn(code: OrtErrorCode, msg: *const core::ffi::c_char) -> OrtStatusPtr,
 	#[doc = " \\brief Get OrtErrorCode from OrtStatus\n\n \\param[in] status\n \\return OrtErrorCode that \\p status was created with"]
 	pub GetErrorCode: unsafe extern "system" fn(status: *const OrtStatus) -> OrtErrorCode,
 	#[doc = " \\brief Get error string from OrtStatus\n\n \\param[in] status\n \\return The error message inside the `status`. Do not free the returned value."]

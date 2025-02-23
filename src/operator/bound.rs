@@ -72,7 +72,7 @@ impl BoundOperator {
 		_: *const ort_sys::OrtApi,
 		info: *const ort_sys::OrtKernelInfo,
 		kernel_ptr: *mut *mut ort_sys::c_void
-	) -> *mut ort_sys::OrtStatus {
+	) -> ort_sys::OrtStatusPtr {
 		let safe = Self::safe(op);
 		let kernel = match safe.operator.create_kernel(&KernelAttributes::new(info)) {
 			Ok(kernel) => kernel,
@@ -82,7 +82,7 @@ impl BoundOperator {
 		Ok(()).into_status()
 	}
 
-	pub(crate) extern "system" fn compute_kernel(kernel_ptr: *mut ort_sys::c_void, context: *mut ort_sys::OrtKernelContext) -> *mut ort_sys::OrtStatus {
+	pub(crate) extern "system" fn compute_kernel(kernel_ptr: *mut ort_sys::c_void, context: *mut ort_sys::OrtKernelContext) -> ort_sys::OrtStatusPtr {
 		let context = KernelContext::new(context);
 		unsafe { &mut *kernel_ptr.cast::<Box<dyn Kernel>>() }.compute(&context).into_status()
 	}
@@ -194,7 +194,7 @@ impl BoundOperator {
 			.into()
 	}
 
-	pub(crate) extern "system" fn infer_output_shape(op: *const ort_sys::OrtCustomOp, ctx: *mut ort_sys::OrtShapeInferContext) -> *mut ort_sys::OrtStatus {
+	pub(crate) extern "system" fn infer_output_shape(op: *const ort_sys::OrtCustomOp, ctx: *mut ort_sys::OrtShapeInferContext) -> ort_sys::OrtStatusPtr {
 		let safe = Self::safe(op);
 		let mut ctx = ShapeInferenceContext { ptr: ctx };
 		safe.operator.infer_shape(&mut ctx).into_status()

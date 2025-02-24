@@ -47,7 +47,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - name: Run tests
         run: |
-          cargo test --manifest-path backends/candle/Cargo.toml --verbose -- --test-threads 1
+          cargo test --manifest-path backends/candle/Cargo.toml -p ort-candle --verbose -- --test-threads 1
   tract:
     name: Tract
     runs-on: ${{ matrix.platform.os }}
@@ -67,4 +67,4 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - name: Run tests
         run: |
-          cargo test --manifest-path backends/tract/Cargo.toml --verbose -- --test-threads 1
+          cargo test --manifest-path backends/tract/Cargo.toml -p ort-tract --verbose -- --test-threads 1

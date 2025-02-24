@@ -1975,7 +1975,7 @@ unsafe extern "system" fn SetEpDynamicOptions(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-pub fn api() -> OrtApi {
+pub const fn api() -> OrtApi {
 	OrtApi {
 		CreateStatus,
 		GetErrorCode,

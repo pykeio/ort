@@ -1,0 +1,23 @@
+[package]
+name = "ort-candle-standalone"
+publish = false
+version = "1.20.0"
+edition = "2021"
+
+[package.metadata.winresource]
+ProductName = "ONNX Runtime (candle)"
+FileDescription = "API-compatible ONNX Runtime implementation using candle"
+LegalCopyright = "Copyright ©️ 2025 pyke.io"
+OriginalFilename = "onnxruntime+candle.dll"
+
+[lib]
+name = "onnxruntime"
+crate-type = [ "staticlib", "cdylib" ]
+path = "lib.rs"
+
+[dependencies]
+ort-candle = { path = "../" }
+ort-sys = { workspace = true, features = [ "disable-linking" ] }
+
+[build-dependencies]
+winresource = "0.1"

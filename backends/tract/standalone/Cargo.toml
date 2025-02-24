@@ -1,0 +1,23 @@
+[package]
+name = "ort-tract-standalone"
+publish = false
+version = "1.20.0"
+edition = "2021"
+
+[package.metadata.winresource]
+ProductName = "ONNX Runtime (tract)"
+FileDescription = "API-compatible ONNX Runtime implementation using tract"
+LegalCopyright = "Copyright ©️ 2025 pyke.io"
+OriginalFilename = "onnxruntime+tract.dll"
+
+[lib]
+name = "onnxruntime"
+crate-type = [ "staticlib", "cdylib" ]
+path = "lib.rs"
+
+[dependencies]
+ort-tract = { path = "../" }
+ort-sys = { workspace = true, features = [ "disable-linking" ] }
+
+[build-dependencies]
+winresource = "0.1"

@@ -13,14 +13,28 @@ authors = [
 	"pyke.io <contact@pyke.io>"
 ]
 
+[workspace]
+resolver = "2"
+members = [ "standalone" ]
+default-members = []
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+codegen-units = 1
+
 [lib]
 name = "ort_candle"
 path = "lib.rs"
 
 [features]
 
-[dependencies]
+[workspace.dependencies]
 ort-sys = { version = "=2.0.0-rc.9", path = "../../ort-sys", default-features = false }
+
+[dependencies]
+ort-sys = { workspace = true }
 candle-core = { version = "0.8.1", default-features = false }
 candle-onnx = { version = "0.8.1" }
 prost = { version = "0.12.1", default-features = false }

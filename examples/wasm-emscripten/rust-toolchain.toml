@@ -1,0 +1,5 @@
+# Threading requires to compile the standard library with "+atomics,+bulk-memory,+mutable-globals".
+# See: https://rustwasm.github.io/wasm-bindgen/examples/raytrace.html#building-the-demo
+[toolchain]
+channel = "nightly"
+components = ["rust-src"]

@@ -1,48 +1,76 @@
 use alloc::format;
 
+use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
 use crate::{
 	error::{Error, Result},
 	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
 	session::builder::SessionBuilder
 };
 
-#[cfg(all(not(feature = "load-dynamic"), feature = "coreml"))]
-extern "C" {
-	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_CoreML(options: *mut ort_sys::OrtSessionOptions, flags: u32) -> ort_sys::OrtStatusPtr;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CoreMLExecutionProviderSpecializationStrategy {
+	Default,
+	FastPrediction
+}
+
+impl CoreMLExecutionProviderSpecializationStrategy {
+	#[must_use]
+	pub fn as_str(&self) -> &'static str {
+		match self {
+			Self::Default => "Default",
+			Self::FastPrediction => "FastPrediction"
+		}
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CoreMLExecutionProviderComputeUnits {
+	All,
+	CPUAndNeuralEngine,
+	CPUAndGPU,
+	CPUOnly
+}
+
+impl CoreMLExecutionProviderComputeUnits {
+	#[must_use]
+	pub fn as_str(&self) -> &'static str {
+		match self {
+			Self::All => "ALL",
+			Self::CPUAndNeuralEngine => "CPUAndNeuralEngine",
+			Self::CPUAndGPU => "CPUAndGPU",
+			Self::CPUOnly => "CPUOnly"
+		}
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CoreMLExecutionProviderModelFormat {
+	/// Requires Core ML 5 or later (iOS 15+ or macOS 12+).
+	MLProgram,
+	/// Default; requires Core ML 3 or later (iOS 13+ or macOS 10.15+).
+	NeuralNetwork
+}
+
+impl CoreMLExecutionProviderModelFormat {
+	#[must_use]
+	pub fn as_str(&self) -> &'static str {
+		match self {
+			Self::MLProgram => "MLProgram",
+			Self::NeuralNetwork => "NeuralNetwork"
+		}
+	}
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct CoreMLExecutionProvider {
-	use_cpu_only: bool,
-	enable_on_subgraph: bool,
-	only_enable_device_with_ane: bool,
-	only_static_input_shapes: bool,
-	mlprogram: bool,
-	use_cpu_and_gpu: bool
+	options: ExecutionProviderOptions
 }
 
 impl CoreMLExecutionProvider {
-	/// Limit CoreML to running on CPU only. This may decrease the performance but will provide reference output value
-	/// without precision loss, which is useful for validation.
-	#[must_use]
-	pub fn with_cpu_only(mut self, enable: bool) -> Self {
-		self.use_cpu_only = enable;
-		self
-	}
-
 	/// Enable CoreML EP to run on a subgraph in the body of a control flow operator (i.e. a Loop, Scan or If operator).
 	#[must_use]
 	pub fn with_subgraphs(mut self, enable: bool) -> Self {
-		self.enable_on_subgraph = enable;
-		self
-	}
-
-	/// By default the CoreML EP will be enabled for all compatible Apple devices. Setting this option will only enable
-	/// CoreML EP for Apple devices with a compatible Apple Neural Engine (ANE). Note, enabling this option does not
-	/// guarantee the entire model to be executed using ANE only.
-	#[must_use]
-	pub fn with_ane_only(mut self, enable: bool) -> Self {
-		self.only_enable_device_with_ane = enable;
+		self.options.set("EnableOnSubgraphs", if enable { "1" } else { "0" });
 		self
 	}
 
@@ -50,27 +78,52 @@ impl CoreMLExecutionProvider {
 	/// allow inputs with dynamic shapes, however performance may be negatively impacted by inputs with dynamic shapes.
 	#[must_use]
 	pub fn with_static_input_shapes(mut self, enable: bool) -> Self {
-		self.only_static_input_shapes = enable;
-		self
-	}
-
-	/// Create an MLProgram format model. Requires Core ML 5 or later (iOS 15+ or macOS 12+). The default is for a
-	/// NeuralNetwork model to be created as that requires Core ML 3 or later (iOS 13+ or macOS 10.15+).
-	#[must_use]
-	pub fn with_mlprogram(mut self, enable: bool) -> Self {
-		self.mlprogram = enable;
+		self.options.set("RequireStaticInputShapes", if enable { "1" } else { "0" });
 		self
 	}
 
 	#[must_use]
-	pub fn with_cpu_and_gpu(mut self, enable: bool) -> Self {
-		self.use_cpu_and_gpu = enable;
+	pub fn with_model_format(mut self, model_format: CoreMLExecutionProviderModelFormat) -> Self {
+		self.options.set("ModelFormat", model_format.as_str());
+		self
+	}
+
+	#[must_use]
+	pub fn with_specialization_strategy(mut self, strategy: CoreMLExecutionProviderSpecializationStrategy) -> Self {
+		self.options.set("SpecializationStrategy", strategy.as_str());
+		self
+	}
+
+	#[must_use]
+	pub fn with_compute_units(mut self, units: CoreMLExecutionProviderComputeUnits) -> Self {
+		self.options.set("MLComputeUnits", units.as_str());
+		self
+	}
+
+	/// This logs the hardware each operator is dispatched to and the estimated execution time.
+	/// Intended for developer usage but provide useful diagnostic information if performance is not as expected.
+	#[must_use]
+	pub fn with_profile_compute_plan(mut self, enable: bool) -> Self {
+		self.options.set("ProfileComputePlan", if enable { "1" } else { "0" });
+		self
+	}
+
+	#[must_use]
+	pub fn with_low_precision_accumulation(mut self, enable: bool) -> Self {
+		self.options.set("AllowLowPrecisionAccumulationOnGPU", if enable { "1" } else { "0" });
 		self
 	}
 
 	#[must_use]
 	pub fn build(self) -> ExecutionProviderDispatch {
 		self.into()
+	}
+}
+
+impl ArbitrarilyConfigurableExecutionProvider for CoreMLExecutionProvider {
+	fn with_arbitrary_config(mut self, key: impl ToString, value: impl ToString) -> Self {
+		self.options.set(key.to_string(), value.to_string());
+		self
 	}
 }
 
@@ -95,27 +148,15 @@ impl ExecutionProvider for CoreMLExecutionProvider {
 		{
 			use crate::AsPointer;
 
-			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_CoreML(options: *mut ort_sys::OrtSessionOptions, flags: u32) -> ort_sys::OrtStatusPtr);
-			let mut flags = 0;
-			if self.use_cpu_only {
-				flags |= 0x001;
-			}
-			if self.enable_on_subgraph {
-				flags |= 0x002;
-			}
-			if self.only_enable_device_with_ane {
-				flags |= 0x004;
-			}
-			if self.only_static_input_shapes {
-				flags |= 0x008;
-			}
-			if self.mlprogram {
-				flags |= 0x010;
-			}
-			if self.use_cpu_and_gpu {
-				flags |= 0x020;
-			}
-			return unsafe { crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_CoreML(session_builder.ptr_mut(), flags)) };
+			let ffi_options = self.options.to_ffi();
+			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider(
+				session_builder.ptr_mut(),
+				c"CoreML".as_ptr().cast::<core::ffi::c_char>(),
+				ffi_options.key_ptrs(),
+				ffi_options.value_ptrs(),
+				ffi_options.len(),
+			)?];
+			return Ok(());
 		}
 
 		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))

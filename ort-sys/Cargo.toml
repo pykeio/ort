@@ -43,6 +43,7 @@ vitis = []
 cann = []
 qnn = []
 webgpu = []
+azure = []
 
 [build-dependencies]
 ureq = { version = "3", optional = true, default-features = false, features = [ "native-tls", "socks-proxy" ] }

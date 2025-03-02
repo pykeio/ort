@@ -91,6 +91,7 @@ vitis = [ "ort-sys/vitis" ]
 cann = [ "ort-sys/cann" ]
 qnn = [ "ort-sys/qnn" ]
 webgpu = [ "ort-sys/webgpu" ]
+azure = [ "ort-sys/azure" ]
 
 [dependencies]
 ndarray = { version = "0.16", default-features = false, optional = true }

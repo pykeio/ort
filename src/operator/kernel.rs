@@ -324,15 +324,12 @@ pub struct ScratchBuffer<T> {
 	size: usize
 }
 
-impl<T> Deref for ScratchBuffer<T> {
-	type Target = [T];
-
-	fn deref(&self) -> &Self::Target {
+impl<T> ScratchBuffer<T> {
+	pub unsafe fn as_slice(&self) -> &[T] {
 		unsafe { slice::from_raw_parts(self.buffer.cast_const(), self.size) }
 	}
-}
-impl<T> DerefMut for ScratchBuffer<T> {
-	fn deref_mut(&mut self) -> &mut Self::Target {
+
+	pub unsafe fn as_mut_slice(&mut self) -> &mut [T] {
 		unsafe { slice::from_raw_parts_mut(self.buffer, self.size) }
 	}
 }

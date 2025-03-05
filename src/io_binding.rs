@@ -175,22 +175,26 @@ impl IoBinding {
 		self.clear_outputs();
 	}
 
+	// technically the synchronize methods do not have to be &mut like the other methods, as they do not mutate any state
+	// on the C side - all they do is iterate through all nodes' EPs and call their device synchronize function
+	// (cudaDeviceSynchronize/hipDeviceSynchronize), which I assume would be thread-safe
+
 	/// Synchronize all bound inputs.
 	///
 	/// Each input previously bound via [`IoBinding::bind_input`] will have its data re-copied to the session device
 	/// immediately. Unlike [`IoBinding::bind_input`], this is a **synchronous** operation.
-	pub fn synchronize_inputs(&mut self) -> Result<()> {
-		ortsys![unsafe SynchronizeBoundInputs(self.ptr_mut())?];
+	pub fn synchronize_inputs(&self) -> Result<()> {
+		ortsys![unsafe SynchronizeBoundInputs(self.ptr().cast_mut())?];
 		Ok(())
 	}
 	/// Synchronize all bound outputs.
-	pub fn synchronize_outputs(&mut self) -> Result<()> {
-		ortsys![unsafe SynchronizeBoundOutputs(self.ptr_mut())?];
+	pub fn synchronize_outputs(&self) -> Result<()> {
+		ortsys![unsafe SynchronizeBoundOutputs(self.ptr().cast_mut())?];
 		Ok(())
 	}
 	/// Synchronizes both inputs & outputs; equivalent to [`IoBinding::synchronize_inputs`] followed by
 	/// [`IoBinding::synchronize_outputs`].
-	pub fn synchronize(&mut self) -> Result<()> {
+	pub fn synchronize(&self) -> Result<()> {
 		self.synchronize_inputs()?;
 		self.synchronize_outputs()?;
 		Ok(())

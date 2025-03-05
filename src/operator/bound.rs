@@ -1,5 +1,5 @@
 use alloc::{boxed::Box, ffi::CString, vec::Vec};
-use core::ptr;
+use core::ptr::{self, NonNull};
 
 use super::{
 	Operator, ShapeInferenceContext,
@@ -74,7 +74,10 @@ impl BoundOperator {
 		kernel_ptr: *mut *mut ort_sys::c_void
 	) -> ort_sys::OrtStatusPtr {
 		let safe = Self::safe(op);
-		let kernel = match safe.operator.create_kernel(&KernelAttributes::new(info)) {
+		let kernel = match safe
+			.operator
+			.create_kernel(&KernelAttributes::from_ptr(NonNull::new(info.cast_mut()).expect("infallible"), false))
+		{
 			Ok(kernel) => kernel,
 			e => return e.into_status()
 		};

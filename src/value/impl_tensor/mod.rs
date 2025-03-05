@@ -121,7 +121,7 @@ impl DynTensor {
 			let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
 			ortsys![unsafe GetTensorMutableData(value_ptr, &mut buffer_ptr)?; nonNull(buffer_ptr)];
 
-			unsafe { buffer_ptr.write_bytes(0, calculate_tensor_size(&shape) * data_type.size()) };
+			unsafe { buffer_ptr.write_bytes(0, data_type.byte_size(calculate_tensor_size(&shape))) };
 		}
 
 		Ok(Value {

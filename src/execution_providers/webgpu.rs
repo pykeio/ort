@@ -11,73 +11,73 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WebGPUExecutionProviderPreferredLayout {
+pub enum WebGPUPreferredLayout {
 	NCHW,
 	NHWC
 }
 
-impl WebGPUExecutionProviderPreferredLayout {
+impl WebGPUPreferredLayout {
 	#[must_use]
 	pub fn as_str(&self) -> &'static str {
 		match self {
-			WebGPUExecutionProviderPreferredLayout::NCHW => "NCHW",
-			WebGPUExecutionProviderPreferredLayout::NHWC => "NHWC"
+			WebGPUPreferredLayout::NCHW => "NCHW",
+			WebGPUPreferredLayout::NHWC => "NHWC"
 		}
 	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WebGPUExecutionProviderDawnBackendType {
+pub enum WebGPUDawnBackendType {
 	Vulkan,
 	D3D12
 }
 
-impl WebGPUExecutionProviderDawnBackendType {
+impl WebGPUDawnBackendType {
 	#[must_use]
 	pub fn as_str(&self) -> &'static str {
 		match self {
-			WebGPUExecutionProviderDawnBackendType::Vulkan => "Vulkan",
-			WebGPUExecutionProviderDawnBackendType::D3D12 => "D3D12"
+			WebGPUDawnBackendType::Vulkan => "Vulkan",
+			WebGPUDawnBackendType::D3D12 => "D3D12"
 		}
 	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WebGPUExecutionProviderBufferCacheMode {
+pub enum WebGPUBufferCacheMode {
 	Disabled,
 	LazyRelease,
 	Simple,
 	Bucket
 }
 
-impl WebGPUExecutionProviderBufferCacheMode {
+impl WebGPUBufferCacheMode {
 	#[must_use]
 	pub fn as_str(&self) -> &'static str {
 		match self {
-			WebGPUExecutionProviderBufferCacheMode::Disabled => "disabled",
-			WebGPUExecutionProviderBufferCacheMode::LazyRelease => "lazyRelease",
-			WebGPUExecutionProviderBufferCacheMode::Simple => "simple",
-			WebGPUExecutionProviderBufferCacheMode::Bucket => "bucket"
+			WebGPUBufferCacheMode::Disabled => "disabled",
+			WebGPUBufferCacheMode::LazyRelease => "lazyRelease",
+			WebGPUBufferCacheMode::Simple => "simple",
+			WebGPUBufferCacheMode::Bucket => "bucket"
 		}
 	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WebGPUExecutionProviderValidationMode {
+pub enum WebGPUValidationMode {
 	Disabled,
 	WgpuOnly,
 	Basic,
 	Full
 }
 
-impl WebGPUExecutionProviderValidationMode {
+impl WebGPUValidationMode {
 	#[must_use]
 	pub fn as_str(&self) -> &'static str {
 		match self {
-			WebGPUExecutionProviderValidationMode::Disabled => "disabled",
-			WebGPUExecutionProviderValidationMode::WgpuOnly => "wgpuOnly",
-			WebGPUExecutionProviderValidationMode::Basic => "basic",
-			WebGPUExecutionProviderValidationMode::Full => "full"
+			WebGPUValidationMode::Disabled => "disabled",
+			WebGPUValidationMode::WgpuOnly => "wgpuOnly",
+			WebGPUValidationMode::Basic => "basic",
+			WebGPUValidationMode::Full => "full"
 		}
 	}
 }
@@ -89,7 +89,7 @@ pub struct WebGPUExecutionProvider {
 
 impl WebGPUExecutionProvider {
 	#[must_use]
-	pub fn with_preferred_layout(mut self, layout: WebGPUExecutionProviderPreferredLayout) -> Self {
+	pub fn with_preferred_layout(mut self, layout: WebGPUPreferredLayout) -> Self {
 		self.options.set("WebGPU:preferredLayout", layout.as_str());
 		self
 	}
@@ -107,7 +107,7 @@ impl WebGPUExecutionProvider {
 	}
 
 	#[must_use]
-	pub fn with_dawn_backend_type(mut self, backend_type: WebGPUExecutionProviderDawnBackendType) -> Self {
+	pub fn with_dawn_backend_type(mut self, backend_type: WebGPUDawnBackendType) -> Self {
 		self.options.set("WebGPU:dawnBackendType", backend_type.as_str());
 		self
 	}
@@ -119,31 +119,31 @@ impl WebGPUExecutionProvider {
 	}
 
 	#[must_use]
-	pub fn with_storage_buffer_cache_mode(mut self, mode: WebGPUExecutionProviderBufferCacheMode) -> Self {
+	pub fn with_storage_buffer_cache_mode(mut self, mode: WebGPUBufferCacheMode) -> Self {
 		self.options.set("WebGPU:storageBufferCacheMode", mode.as_str());
 		self
 	}
 
 	#[must_use]
-	pub fn with_uniform_buffer_cache_mode(mut self, mode: WebGPUExecutionProviderBufferCacheMode) -> Self {
+	pub fn with_uniform_buffer_cache_mode(mut self, mode: WebGPUBufferCacheMode) -> Self {
 		self.options.set("WebGPU:uniformBufferCacheMode", mode.as_str());
 		self
 	}
 
 	#[must_use]
-	pub fn with_query_resolve_buffer_cache_mode(mut self, mode: WebGPUExecutionProviderBufferCacheMode) -> Self {
+	pub fn with_query_resolve_buffer_cache_mode(mut self, mode: WebGPUBufferCacheMode) -> Self {
 		self.options.set("WebGPU:queryResolveBufferCacheMode", mode.as_str());
 		self
 	}
 
 	#[must_use]
-	pub fn with_default_buffer_cache_mode(mut self, mode: WebGPUExecutionProviderBufferCacheMode) -> Self {
+	pub fn with_default_buffer_cache_mode(mut self, mode: WebGPUBufferCacheMode) -> Self {
 		self.options.set("WebGPU:defaultBufferCacheMode", mode.as_str());
 		self
 	}
 
 	#[must_use]
-	pub fn with_validation_mode(mut self, mode: WebGPUExecutionProviderValidationMode) -> Self {
+	pub fn with_validation_mode(mut self, mode: WebGPUValidationMode) -> Self {
 		self.options.set("WebGPU:validationMode", mode.as_str());
 		self
 	}

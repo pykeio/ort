@@ -8,12 +8,12 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CoreMLExecutionProviderSpecializationStrategy {
+pub enum CoreMLSpecializationStrategy {
 	Default,
 	FastPrediction
 }
 
-impl CoreMLExecutionProviderSpecializationStrategy {
+impl CoreMLSpecializationStrategy {
 	#[must_use]
 	pub fn as_str(&self) -> &'static str {
 		match self {
@@ -24,14 +24,14 @@ impl CoreMLExecutionProviderSpecializationStrategy {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CoreMLExecutionProviderComputeUnits {
+pub enum CoreMLComputeUnits {
 	All,
 	CPUAndNeuralEngine,
 	CPUAndGPU,
 	CPUOnly
 }
 
-impl CoreMLExecutionProviderComputeUnits {
+impl CoreMLComputeUnits {
 	#[must_use]
 	pub fn as_str(&self) -> &'static str {
 		match self {
@@ -44,14 +44,14 @@ impl CoreMLExecutionProviderComputeUnits {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CoreMLExecutionProviderModelFormat {
+pub enum CoreMLModelFormat {
 	/// Requires Core ML 5 or later (iOS 15+ or macOS 12+).
 	MLProgram,
 	/// Default; requires Core ML 3 or later (iOS 13+ or macOS 10.15+).
 	NeuralNetwork
 }
 
-impl CoreMLExecutionProviderModelFormat {
+impl CoreMLModelFormat {
 	#[must_use]
 	pub fn as_str(&self) -> &'static str {
 		match self {
@@ -83,19 +83,19 @@ impl CoreMLExecutionProvider {
 	}
 
 	#[must_use]
-	pub fn with_model_format(mut self, model_format: CoreMLExecutionProviderModelFormat) -> Self {
+	pub fn with_model_format(mut self, model_format: CoreMLModelFormat) -> Self {
 		self.options.set("ModelFormat", model_format.as_str());
 		self
 	}
 
 	#[must_use]
-	pub fn with_specialization_strategy(mut self, strategy: CoreMLExecutionProviderSpecializationStrategy) -> Self {
+	pub fn with_specialization_strategy(mut self, strategy: CoreMLSpecializationStrategy) -> Self {
 		self.options.set("SpecializationStrategy", strategy.as_str());
 		self
 	}
 
 	#[must_use]
-	pub fn with_compute_units(mut self, units: CoreMLExecutionProviderComputeUnits) -> Self {
+	pub fn with_compute_units(mut self, units: CoreMLComputeUnits) -> Self {
 		self.options.set("MLComputeUnits", units.as_str());
 		self
 	}

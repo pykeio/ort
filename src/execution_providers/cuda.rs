@@ -11,9 +11,9 @@ use crate::{
 // https://github.com/microsoft/onnxruntime/blob/ffceed9d44f2f3efb9dd69fa75fea51163c91d91/onnxruntime/contrib_ops/cpu/bert/attention_common.h#L160-L171
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct CUDAExecutionProviderAttentionBackend(u32);
+pub struct CUDAAttentionBackend(u32);
 
-impl CUDAExecutionProviderAttentionBackend {
+impl CUDAAttentionBackend {
 	pub const FLASH_ATTENTION: Self = Self(1 << 0);
 	pub const EFFICIENT_ATTENTION: Self = Self(1 << 1);
 	pub const TRT_FUSED_ATTENTION: Self = Self(1 << 2);
@@ -24,8 +24,10 @@ impl CUDAExecutionProviderAttentionBackend {
 	pub const TRT_CROSS_ATTENTION: Self = Self(1 << 6);
 	pub const TRT_CAUSAL_ATTENTION: Self = Self(1 << 7);
 
+	pub const LEAN_ATTENTION: Self = Self(1 << 8);
+
 	pub fn none() -> Self {
-		CUDAExecutionProviderAttentionBackend(0)
+		CUDAAttentionBackend(0)
 	}
 
 	pub fn all() -> Self {
@@ -40,7 +42,7 @@ impl CUDAExecutionProviderAttentionBackend {
 	}
 }
 
-impl BitOr for CUDAExecutionProviderAttentionBackend {
+impl BitOr for CUDAAttentionBackend {
 	type Output = Self;
 	fn bitor(self, rhs: Self) -> Self::Output {
 		Self(rhs.0 | self.0)
@@ -49,7 +51,7 @@ impl BitOr for CUDAExecutionProviderAttentionBackend {
 
 /// The type of search done for cuDNN convolution algorithms.
 #[derive(Debug, Clone)]
-pub enum CUDAExecutionProviderCuDNNConvAlgoSearch {
+pub enum CuDNNConvAlgorithmSearch {
 	/// Expensive exhaustive benchmarking using [`cudnnFindConvolutionForwardAlgorithmEx`][exhaustive].
 	/// This function will attempt all possible algorithms for `cudnnConvolutionForward` to find the fastest algorithm.
 	/// Exhaustive search trades off between memory usage and speed. The first execution of a graph will be slow while
@@ -77,7 +79,7 @@ pub enum CUDAExecutionProviderCuDNNConvAlgoSearch {
 	Default
 }
 
-impl Default for CUDAExecutionProviderCuDNNConvAlgoSearch {
+impl Default for CuDNNConvAlgorithmSearch {
 	fn default() -> Self {
 		Self::Exhaustive
 	}
@@ -118,11 +120,11 @@ impl CUDAExecutionProvider {
 	/// configuration (input shape, filter shape, etc.) in each `Conv` node. This option controlls the type of search
 	/// done for cuDNN convolution algorithms. See [`CUDAExecutionProviderCuDNNConvAlgoSearch`] for more info.
 	#[must_use]
-	pub fn with_conv_algorithm_search(mut self, search: CUDAExecutionProviderCuDNNConvAlgoSearch) -> Self {
+	pub fn with_conv_algorithm_search(mut self, search: CuDNNConvAlgorithmSearch) -> Self {
 		self.options.set("cudnn_conv_algo_search", match search {
-			CUDAExecutionProviderCuDNNConvAlgoSearch::Exhaustive => "EXHAUSTIVE",
-			CUDAExecutionProviderCuDNNConvAlgoSearch::Heuristic => "HEURISTIC",
-			CUDAExecutionProviderCuDNNConvAlgoSearch::Default => "DEFAULT"
+			CuDNNConvAlgorithmSearch::Exhaustive => "EXHAUSTIVE",
+			CuDNNConvAlgorithmSearch::Heuristic => "HEURISTIC",
+			CuDNNConvAlgorithmSearch::Default => "DEFAULT"
 		});
 		self
 	}
@@ -222,7 +224,7 @@ impl CUDAExecutionProvider {
 	}
 
 	#[must_use]
-	pub fn with_attention_backend(mut self, flags: CUDAExecutionProviderAttentionBackend) -> Self {
+	pub fn with_attention_backend(mut self, flags: CUDAAttentionBackend) -> Self {
 		self.options.set("sdpa_kernel", flags.0.to_string());
 		self
 	}

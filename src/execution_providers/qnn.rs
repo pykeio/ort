@@ -8,7 +8,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum QNNExecutionProviderPerformanceMode {
+pub enum QNNPerformanceMode {
 	Default,
 	Burst,
 	Balanced,
@@ -20,42 +20,42 @@ pub enum QNNExecutionProviderPerformanceMode {
 	SustainedHighPerformance
 }
 
-impl QNNExecutionProviderPerformanceMode {
+impl QNNPerformanceMode {
 	#[must_use]
 	pub fn as_str(&self) -> &'static str {
 		match self {
-			QNNExecutionProviderPerformanceMode::Default => "default",
-			QNNExecutionProviderPerformanceMode::Burst => "burst",
-			QNNExecutionProviderPerformanceMode::Balanced => "balanced",
-			QNNExecutionProviderPerformanceMode::HighPerformance => "high_performance",
-			QNNExecutionProviderPerformanceMode::HighPowerSaver => "high_power_saver",
-			QNNExecutionProviderPerformanceMode::LowPowerSaver => "low_power_saver",
-			QNNExecutionProviderPerformanceMode::LowBalanced => "low_balanced",
-			QNNExecutionProviderPerformanceMode::PowerSaver => "power_saver",
-			QNNExecutionProviderPerformanceMode::SustainedHighPerformance => "sustained_high_performance"
+			QNNPerformanceMode::Default => "default",
+			QNNPerformanceMode::Burst => "burst",
+			QNNPerformanceMode::Balanced => "balanced",
+			QNNPerformanceMode::HighPerformance => "high_performance",
+			QNNPerformanceMode::HighPowerSaver => "high_power_saver",
+			QNNPerformanceMode::LowPowerSaver => "low_power_saver",
+			QNNPerformanceMode::LowBalanced => "low_balanced",
+			QNNPerformanceMode::PowerSaver => "power_saver",
+			QNNPerformanceMode::SustainedHighPerformance => "sustained_high_performance"
 		}
 	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum QNNExecutionProviderProfilingLevel {
+pub enum QNNProfilingLevel {
 	Off,
 	Basic,
 	Detailed
 }
 
-impl QNNExecutionProviderProfilingLevel {
+impl QNNProfilingLevel {
 	pub fn as_str(&self) -> &'static str {
 		match self {
-			QNNExecutionProviderProfilingLevel::Off => "off",
-			QNNExecutionProviderProfilingLevel::Basic => "basic",
-			QNNExecutionProviderProfilingLevel::Detailed => "detailed"
+			QNNProfilingLevel::Off => "off",
+			QNNProfilingLevel::Basic => "basic",
+			QNNProfilingLevel::Detailed => "detailed"
 		}
 	}
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum QNNExecutionProviderContextPriority {
+pub enum QNNContextPriority {
 	Low,
 	#[default]
 	Normal,
@@ -63,13 +63,13 @@ pub enum QNNExecutionProviderContextPriority {
 	High
 }
 
-impl QNNExecutionProviderContextPriority {
+impl QNNContextPriority {
 	pub fn as_str(&self) -> &'static str {
 		match self {
-			QNNExecutionProviderContextPriority::Low => "low",
-			QNNExecutionProviderContextPriority::Normal => "normal",
-			QNNExecutionProviderContextPriority::NormalHigh => "normal_high",
-			QNNExecutionProviderContextPriority::High => "normal_high"
+			QNNContextPriority::Low => "low",
+			QNNContextPriority::Normal => "normal",
+			QNNContextPriority::NormalHigh => "normal_high",
+			QNNContextPriority::High => "normal_high"
 		}
 	}
 }
@@ -89,7 +89,7 @@ impl QNNExecutionProvider {
 	}
 
 	#[must_use]
-	pub fn with_profiling(mut self, level: QNNExecutionProviderProfilingLevel) -> Self {
+	pub fn with_profiling(mut self, level: QNNProfilingLevel) -> Self {
 		self.options.set("profiling_level", level.as_str());
 		self
 	}
@@ -114,7 +114,7 @@ impl QNNExecutionProvider {
 	}
 
 	#[must_use]
-	pub fn with_performance_mode(mut self, mode: QNNExecutionProviderPerformanceMode) -> Self {
+	pub fn with_performance_mode(mut self, mode: QNNPerformanceMode) -> Self {
 		self.options.set("htp_performance_mode", mode.as_str());
 		self
 	}
@@ -126,7 +126,7 @@ impl QNNExecutionProvider {
 	}
 
 	#[must_use]
-	pub fn with_context_priority(mut self, priority: QNNExecutionProviderContextPriority) -> Self {
+	pub fn with_context_priority(mut self, priority: QNNContextPriority) -> Self {
 		self.options.set("qnn_context_priority", priority.as_str());
 		self
 	}

@@ -2,8 +2,6 @@ name: 🧩 Backends
 on:
   workflow_dispatch:
   push:
-    branches:
-      - 'main'
     paths:
       - '.github/workflows/backends.yml'
       - 'src/**/*.rs'

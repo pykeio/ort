@@ -2,8 +2,6 @@ name: 📋 Code Quality
 on:
   workflow_dispatch:
   push:
-    branches:
-      - 'main'
     paths:
       - '.github/workflows/code-quality.yml'
       - 'src/**/*.rs'

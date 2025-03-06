@@ -2,8 +2,6 @@ name: 🧪 Cargo Tests
 on:
   workflow_dispatch:
   push:
-    branches:
-      - 'main'
     paths:
       - '.github/workflows/test.yml'
       - 'src/**/*.rs'

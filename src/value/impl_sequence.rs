@@ -1,18 +1,11 @@
-use alloc::{
-	boxed::Box,
-	format,
-	string::{String, ToString},
-	sync::Arc,
-	vec::Vec
-};
+use alloc::{boxed::Box, format, sync::Arc, vec::Vec};
 use core::{
-	fmt::Debug,
+	fmt::{self, Debug, Display},
 	marker::PhantomData,
-	mem,
 	ptr::{self, NonNull}
 };
 
-use super::{DowncastableTarget, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker};
+use super::{DowncastableTarget, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker, format_value_type};
 use crate::{
 	AsPointer, ErrorCode,
 	error::{Error, Result},
@@ -27,8 +20,8 @@ pub trait SequenceValueTypeMarker: ValueTypeMarker {
 #[derive(Debug)]
 pub struct DynSequenceValueType;
 impl ValueTypeMarker for DynSequenceValueType {
-	fn format() -> String {
-		"DynSequence".to_string()
+	fn fmt(f: &mut fmt::Formatter) -> fmt::Result {
+		f.write_str("DynSequence")
 	}
 
 	private_impl!();
@@ -48,8 +41,10 @@ impl DowncastableTarget for DynSequenceValueType {
 #[derive(Debug)]
 pub struct SequenceValueType<T: ValueTypeMarker + DowncastableTarget + Debug + ?Sized>(PhantomData<T>);
 impl<T: ValueTypeMarker + DowncastableTarget + Debug + ?Sized> ValueTypeMarker for SequenceValueType<T> {
-	fn format() -> String {
-		format!("Sequence<{}>", T::format())
+	fn fmt(f: &mut fmt::Formatter) -> fmt::Result {
+		f.write_str("Sequence<")?;
+		format_value_type::<T>().fmt(f)?;
+		f.write_str(">")
 	}
 
 	private_impl!();
@@ -99,7 +94,7 @@ impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
 					if !OtherType::can_downcast(value.dtype()) {
 						return Err(Error::new_with_code(
 							ErrorCode::InvalidArgument,
-							format!("Cannot extract Sequence<{}> from {value_type:?}", OtherType::format())
+							format!("Cannot extract Sequence<{}> from {value_type:?}", format_value_type::<OtherType>())
 						));
 					}
 
@@ -107,7 +102,7 @@ impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
 				}
 				Ok(vec)
 			}
-			t => Err(Error::new(format!("Cannot extract Sequence<{}> from {t}", OtherType::format())))
+			t => Err(Error::new(format!("Cannot extract Sequence<{}> from {t}", format_value_type::<OtherType>())))
 		}
 	}
 }
@@ -165,7 +160,7 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized> Value<SequenceValu
 	/// Converts from a strongly-typed [`Sequence<T>`] to a type-erased [`DynSequence`].
 	#[inline]
 	pub fn upcast(self) -> DynSequence {
-		unsafe { mem::transmute(self) }
+		unsafe { self.transmute_type() }
 	}
 
 	/// Converts from a strongly-typed [`Sequence<T>`] to a reference to a type-erased [`DynSequence`].

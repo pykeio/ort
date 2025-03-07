@@ -1,16 +1,10 @@
 mod create;
 mod extract;
 
-use alloc::{
-	format,
-	string::{String, ToString},
-	sync::Arc,
-	vec
-};
+use alloc::{sync::Arc, vec};
 use core::{
-	fmt::Debug,
+	fmt::{self, Debug},
 	marker::PhantomData,
-	mem,
 	ops::{Index, IndexMut},
 	ptr::{self, NonNull}
 };
@@ -22,7 +16,8 @@ use crate::{
 	error::Result,
 	memory::{Allocator, MemoryInfo},
 	ortsys,
-	tensor::{IntoTensorElementType, TensorElementType}
+	tensor::{IntoTensorElementType, TensorElementType},
+	util::element_count
 };
 
 pub trait TensorValueTypeMarker: ValueTypeMarker {
@@ -32,8 +27,8 @@ pub trait TensorValueTypeMarker: ValueTypeMarker {
 #[derive(Debug)]
 pub struct DynTensorValueType;
 impl ValueTypeMarker for DynTensorValueType {
-	fn format() -> String {
-		"DynTensor".to_string()
+	fn fmt(f: &mut fmt::Formatter) -> fmt::Result {
+		f.write_str("DynTensor")
 	}
 
 	private_impl!();
@@ -45,8 +40,10 @@ impl TensorValueTypeMarker for DynTensorValueType {
 #[derive(Debug)]
 pub struct TensorValueType<T: IntoTensorElementType + Debug>(PhantomData<T>);
 impl<T: IntoTensorElementType + Debug> ValueTypeMarker for TensorValueType<T> {
-	fn format() -> String {
-		format!("Tensor<{}>", T::into_tensor_element_type())
+	fn fmt(f: &mut fmt::Formatter) -> fmt::Result {
+		f.write_str("Tensor<")?;
+		<TensorElementType as fmt::Display>::fmt(&T::into_tensor_element_type(), f)?;
+		f.write_str(">")
 	}
 
 	private_impl!();
@@ -121,7 +118,7 @@ impl DynTensor {
 			let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
 			ortsys![unsafe GetTensorMutableData(value_ptr, &mut buffer_ptr)?; nonNull(buffer_ptr)];
 
-			unsafe { buffer_ptr.write_bytes(0, data_type.byte_size(calculate_tensor_size(&shape))) };
+			unsafe { buffer_ptr.write_bytes(0, data_type.byte_size(element_count(&shape))) };
 		}
 
 		Ok(Value {
@@ -234,7 +231,7 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// ```
 	#[inline]
 	pub fn upcast(self) -> DynTensor {
-		unsafe { mem::transmute(self) }
+		unsafe { self.transmute_type() }
 	}
 
 	/// Creates a type-erased [`DynTensorRef`] from a strongly-typed [`Tensor<T>`].
@@ -329,17 +326,6 @@ impl<T: IntoTensorElementType + Clone + Debug, const N: usize> IndexMut<[i64; N]
 		ortsys![unsafe TensorAt(self.ptr_mut(), index.as_ptr(), N, &mut out).expect("Failed to index tensor")];
 		unsafe { &mut *out.cast::<T>() }
 	}
-}
-
-pub(crate) fn calculate_tensor_size(shape: &[i64]) -> usize {
-	let mut size = 1usize;
-	for dim in shape {
-		if *dim < 0 {
-			return 0;
-		}
-		size *= *dim as usize;
-	}
-	size
 }
 
 #[cfg(test)]

@@ -9,6 +9,8 @@ use core::{
 };
 #[cfg(feature = "std")]
 use std::path::Path;
+#[cfg(feature = "fetch-models")]
+use std::path::PathBuf;
 
 use super::SessionBuilder;
 #[cfg(feature = "std")]
@@ -28,6 +30,12 @@ impl SessionBuilder {
 	#[cfg(all(feature = "fetch-models", feature = "std"))]
 	#[cfg_attr(docsrs, doc(cfg(all(feature = "fetch-models", feature = "std"))))]
 	pub fn commit_from_url(self, model_url: impl AsRef<str>) -> Result<Session> {
+		let downloaded_path = SessionBuilder::download(model_url.as_ref())?;
+		self.commit_from_file(downloaded_path)
+	}
+
+	#[cfg(all(feature = "fetch-models", feature = "std"))]
+	fn download(url: &str) -> Result<PathBuf> {
 		let mut download_dir = ort_sys::internal::dirs::cache_dir()
 			.expect("could not determine cache directory")
 			.join("models");
@@ -35,15 +43,14 @@ impl SessionBuilder {
 			download_dir = std::env::current_dir().expect("Failed to obtain current working directory");
 		}
 
-		let url = model_url.as_ref();
 		let model_filename = <sha2::Sha256 as sha2::Digest>::digest(url).into_iter().fold(String::new(), |mut s, b| {
 			let _ = write!(&mut s, "{:02x}", b);
 			s
 		});
 		let model_filepath = download_dir.join(&model_filename);
-		let downloaded_path = if model_filepath.exists() {
+		if model_filepath.exists() {
 			crate::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), "Model already exists, skipping download");
-			model_filepath
+			Ok(model_filepath)
 		} else {
 			crate::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), url = format!("{url:?}").as_str(), "Downloading model");
 
@@ -71,29 +78,31 @@ impl SessionBuilder {
 			drop(writer);
 
 			match std::fs::rename(&temp_filepath, &model_filepath) {
-				Ok(()) => model_filepath,
+				Ok(()) => Ok(model_filepath),
 				Err(e) => {
 					if model_filepath.exists() {
 						let _ = std::fs::remove_file(temp_filepath);
-						model_filepath
+						Ok(model_filepath)
 					} else {
-						return Err(Error::new(format!("Failed to download model: {e}")));
+						Err(Error::new(format!("Failed to download model: {e}")))
 					}
 				}
 			}
-		};
-
-		self.commit_from_file(downloaded_path)
+		}
 	}
 
 	/// Loads an ONNX model from a file and builds the session.
 	#[cfg(feature = "std")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-	pub fn commit_from_file<P>(mut self, model_filepath_ref: P) -> Result<Session>
+	pub fn commit_from_file<P>(self, model_filepath: P) -> Result<Session>
 	where
 		P: AsRef<Path>
 	{
-		let model_filepath = model_filepath_ref.as_ref();
+		self.commit_from_file_inner(model_filepath.as_ref())
+	}
+
+	#[cfg(feature = "std")]
+	fn commit_from_file_inner(mut self, model_filepath: &Path) -> Result<Session> {
 		if !model_filepath.exists() {
 			return Err(Error::new_with_code(ErrorCode::NoSuchFile, format!("File at `{}` does not exist", model_filepath.display())));
 		}
@@ -166,7 +175,6 @@ impl SessionBuilder {
 		self.add_config_entry("session.use_ort_model_bytes_for_initializers", "1")?;
 
 		let session = self.commit_from_memory(model_bytes)?;
-
 		Ok(InMemorySession { session, phantom: PhantomData })
 	}
 

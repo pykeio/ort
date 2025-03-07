@@ -38,7 +38,7 @@ pub mod tensor;
 #[cfg(feature = "training")]
 #[cfg_attr(docsrs, doc(cfg(feature = "training")))]
 pub mod training;
-pub(crate) mod util;
+pub mod util;
 pub mod value;
 
 #[cfg(feature = "load-dynamic")]
@@ -218,17 +218,39 @@ macro_rules! ortsys {
 	(unsafe $method:ident($($n:expr),+ $(,)?).expect($e:expr)) => {
 		unsafe { $crate::error::status_to_result(($crate::api().$method)($($n),+)) }.expect($e)
 	};
-	(unsafe $method:ident($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {{
+	(unsafe $method:ident($($n:expr),+ $(,)?).expect($e:expr); nonNull($($check:ident),+ $(,)?)$(;)?) => {{
+		unsafe { $crate::error::status_to_result(($crate::api().$method)($($n),+)) }.expect($e);
+		$(
+			// TODO: #[cfg(debug_assertions)]?
+			if ($check).is_null() {
+				$crate::util::cold();
+				panic!(concat!("expected `", stringify!($check), "` to not be null"));
+			}
+		)+
+	}};
+	(unsafe $method:ident($($n:expr),+ $(,)?); nonNull($($check:ident),+ $(,)?)$(;)?) => {{
 		let _x = unsafe { ($crate::api().$method)($($n),+) };
-		$($crate::error::assert_non_null_pointer($check, stringify!($method)).unwrap();)+
+		$(
+			// TODO: #[cfg(debug_assertions)]?
+			if ($check).is_null() {
+				$crate::util::cold();
+				panic!(concat!("expected `", stringify!($check), "` to not be null"));
+			}
+		)+
 		_x
 	}};
 	(unsafe $method:ident($($n:expr),+ $(,)?)?) => {
 		unsafe { $crate::error::status_to_result(($crate::api().$method)($($n),+)) }?;
 	};
-	(unsafe $method:ident($($n:expr),+ $(,)?)?; nonNull($($check:expr),+ $(,)?)$(;)?) => {{
+	(unsafe $method:ident($($n:expr),+ $(,)?)?; nonNull($($check:ident),+ $(,)?)$(;)?) => {{
 		unsafe { $crate::error::status_to_result(($crate::api().$method)($($n),+)) }?;
-		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
+		$(
+			// TODO: #[cfg(debug_assertions)]?
+			if ($check).is_null() {
+				$crate::util::cold();
+				return Err($crate::Error::new(concat!("expected `", stringify!($check), "` to not be null")));
+			}
+		)+
 	}};
 }
 

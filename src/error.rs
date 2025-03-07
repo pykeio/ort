@@ -168,12 +168,6 @@ impl From<ErrorCode> for ort_sys::OrtErrorCode {
 	}
 }
 
-pub(crate) fn assert_non_null_pointer<T>(ptr: *const T, name: &'static str) -> Result<()> {
-	(!ptr.is_null())
-		.then_some(())
-		.ok_or_else(|| Error::new(format!("Expected pointer `{name}` to not be null")))
-}
-
 /// Converts an [`ort_sys::OrtStatus`] to a [`Result`].
 ///
 /// Note that this frees `status`!

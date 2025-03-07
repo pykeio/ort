@@ -16,15 +16,10 @@
 //!
 //! ONNX Runtime also supports [`Sequence`]s and [`Map`]s, though they are less commonly used.
 
-use alloc::{
-	boxed::Box,
-	format,
-	string::{String, ToString},
-	sync::Arc
-};
+use alloc::{boxed::Box, format, sync::Arc};
 use core::{
 	any::Any,
-	fmt::Debug,
+	fmt::{self, Debug},
 	marker::PhantomData,
 	mem::transmute,
 	ops::{Deref, DerefMut},
@@ -101,6 +96,10 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 		}
 	}
 
+	pub(crate) fn inner(&self) -> &Arc<ValueInner> {
+		&self.inner.inner
+	}
+
 	/// Attempts to downcast a temporary dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed
 	/// variant, like [`TensorRef<T>`].
 	#[inline]
@@ -109,7 +108,7 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 		if OtherType::can_downcast(dt) {
 			Ok(unsafe { transmute::<ValueRef<'v, Type>, ValueRef<'v, OtherType>>(self) })
 		} else {
-			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &{dt} to &{}", OtherType::format())))
+			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &{dt} to &{}", format_value_type::<OtherType>())))
 		}
 	}
 
@@ -154,6 +153,10 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 		}
 	}
 
+	pub(crate) fn inner(&self) -> &Arc<ValueInner> {
+		&self.inner.inner
+	}
+
 	/// Attempts to downcast a temporary mutable dynamic value (like [`DynValue`] or [`DynTensor`]) to a more
 	/// strongly typed variant, like [`TensorRefMut<T>`].
 	#[inline]
@@ -162,7 +165,7 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 		if OtherType::can_downcast(dt) {
 			Ok(unsafe { transmute::<ValueRefMut<'v, Type>, ValueRefMut<'v, OtherType>>(self) })
 		} else {
-			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &mut {dt} to &mut {}", OtherType::format())))
+			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &mut {dt} to &mut {}", format_value_type::<OtherType>())))
 		}
 	}
 
@@ -251,9 +254,22 @@ pub type DynValue = Value<DynValueTypeMarker>;
 /// inherits this trait), i.e. [`Tensor`]s, [`DynTensor`]s, and [`DynValue`]s.
 pub trait ValueTypeMarker {
 	#[doc(hidden)]
-	fn format() -> String;
+	fn fmt(f: &mut fmt::Formatter) -> fmt::Result;
 
 	private_trait!();
+}
+
+pub(crate) struct ValueTypeFormatter<T: ?Sized>(PhantomData<T>);
+
+#[inline]
+pub(crate) fn format_value_type<T: ValueTypeMarker + ?Sized>() -> ValueTypeFormatter<T> {
+	ValueTypeFormatter(PhantomData)
+}
+
+impl<T: ValueTypeMarker + ?Sized> fmt::Display for ValueTypeFormatter<T> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		<T as ValueTypeMarker>::fmt(f)
+	}
 }
 
 /// Represents a type that a [`DynValue`] can be downcast to.
@@ -276,8 +292,8 @@ impl DowncastableTarget for DynValueTypeMarker {
 #[derive(Debug)]
 pub struct DynValueTypeMarker;
 impl ValueTypeMarker for DynValueTypeMarker {
-	fn format() -> String {
-		"DynValue".to_string()
+	fn fmt(f: &mut fmt::Formatter) -> fmt::Result {
+		f.write_str("DynValue")
 	}
 
 	private_impl!();
@@ -296,6 +312,10 @@ unsafe impl<Type: ValueTypeMarker + ?Sized> Send for Value<Type> {}
 unsafe impl<Type: ValueTypeMarker + ?Sized> Sync for Value<Type> {}
 
 impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
+	pub(crate) fn inner(&self) -> &Arc<ValueInner> {
+		&self.inner
+	}
+
 	/// Returns the data type of this [`Value`].
 	pub fn dtype(&self) -> &ValueType {
 		&self.inner.dtype
@@ -358,7 +378,12 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 
 	/// Converts this value into a type-erased [`DynValue`].
 	pub fn into_dyn(self) -> DynValue {
-		unsafe { transmute(self) }
+		unsafe { self.transmute_type() }
+	}
+
+	#[inline(always)]
+	pub(crate) unsafe fn transmute_type<OtherType: ValueTypeMarker + ?Sized>(self) -> Value<OtherType> {
+		unsafe { transmute::<Value<Type>, Value<OtherType>>(self) }
 	}
 
 	pub(crate) fn clone_of(value: &Self) -> Self {
@@ -395,7 +420,7 @@ impl Value<DynValueTypeMarker> {
 		if OtherType::can_downcast(dt) {
 			Ok(unsafe { transmute::<Value<DynValueTypeMarker>, Value<OtherType>>(self) })
 		} else {
-			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast {dt} to {}", OtherType::format())))
+			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast {dt} to {}", format_value_type::<OtherType>())))
 		}
 	}
 
@@ -407,7 +432,7 @@ impl Value<DynValueTypeMarker> {
 		if OtherType::can_downcast(dt) {
 			Ok(ValueRef::new(unsafe { transmute::<DynValue, Value<OtherType>>(Value::clone_of(self)) }))
 		} else {
-			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &{dt} to &{}", OtherType::format())))
+			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &{dt} to &{}", format_value_type::<OtherType>())))
 		}
 	}
 
@@ -419,7 +444,7 @@ impl Value<DynValueTypeMarker> {
 		if OtherType::can_downcast(dt) {
 			Ok(ValueRefMut::new(unsafe { transmute::<DynValue, Value<OtherType>>(Value::clone_of(self)) }))
 		} else {
-			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &mut {dt} to &mut {}", OtherType::format())))
+			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &mut {dt} to &mut {}", format_value_type::<OtherType>())))
 		}
 	}
 }

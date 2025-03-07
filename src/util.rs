@@ -15,7 +15,7 @@ type OsCharArray = Vec<u16>;
 type OsCharArray = Vec<core::ffi::c_char>;
 
 #[cfg(feature = "std")]
-pub fn path_to_os_char(path: impl AsRef<std::path::Path>) -> OsCharArray {
+pub(crate) fn path_to_os_char(path: impl AsRef<std::path::Path>) -> OsCharArray {
 	#[cfg(not(target_family = "windows"))]
 	use core::ffi::c_char;
 	#[cfg(unix)]
@@ -38,7 +38,7 @@ pub fn path_to_os_char(path: impl AsRef<std::path::Path>) -> OsCharArray {
 
 // generally as performant or faster than HashMap<K, V> for <50 items. good enough for #[no_std]
 #[derive(Clone, PartialEq, Eq)]
-pub struct MiniMap<K, V> {
+pub(crate) struct MiniMap<K, V> {
 	values: Vec<(K, V)>
 }
 
@@ -100,7 +100,7 @@ impl<K: fmt::Debug, V: fmt::Debug> fmt::Debug for MiniMap<K, V> {
 	}
 }
 
-pub struct OnceLock<T> {
+pub(crate) struct OnceLock<T> {
 	data: UnsafeCell<MaybeUninit<T>>,
 	#[cfg(not(feature = "std"))]
 	status: core::sync::atomic::AtomicU8,
@@ -274,4 +274,20 @@ impl<T> Drop for OnceLock<T> {
 			}
 		}
 	}
+}
+
+#[cold]
+#[inline]
+#[doc(hidden)]
+pub fn cold() {}
+
+pub fn element_count(shape: &[i64]) -> usize {
+	let mut size = 1usize;
+	for dim in shape {
+		if *dim < 0 {
+			return 0;
+		}
+		size *= *dim as usize;
+	}
+	size
 }

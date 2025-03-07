@@ -512,6 +512,12 @@ impl MemoryInfo {
 	}
 }
 
+impl Default for MemoryInfo {
+	fn default() -> Self {
+		MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default).expect("failed to create default memory info")
+	}
+}
+
 impl Clone for MemoryInfo {
 	fn clone(&self) -> Self {
 		MemoryInfo::new(self.allocation_device(), self.device_id(), self.allocator_type(), self.memory_type()).expect("failed to clone memory info")

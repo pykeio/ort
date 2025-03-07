@@ -1,14 +1,7 @@
-use alloc::{
-	boxed::Box,
-	format,
-	string::{String, ToString},
-	sync::Arc,
-	vec,
-	vec::Vec
-};
+use alloc::{boxed::Box, format, string::String, sync::Arc, vec, vec::Vec};
 use core::{
 	ffi::c_void,
-	fmt::Debug,
+	fmt::{self, Debug},
 	hash::Hash,
 	marker::PhantomData,
 	mem,
@@ -20,14 +13,15 @@ use std::collections::HashMap;
 
 use super::{
 	DowncastableTarget, DynValue, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker,
-	impl_tensor::{DynTensor, Tensor, calculate_tensor_size}
+	impl_tensor::{DynTensor, Tensor}
 };
 use crate::{
 	AsPointer, ErrorCode,
 	error::{Error, Result},
 	memory::Allocator,
 	ortsys,
-	tensor::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType}
+	tensor::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType},
+	util::element_count
 };
 
 pub trait MapValueTypeMarker: ValueTypeMarker {
@@ -37,8 +31,8 @@ pub trait MapValueTypeMarker: ValueTypeMarker {
 #[derive(Debug)]
 pub struct DynMapValueType;
 impl ValueTypeMarker for DynMapValueType {
-	fn format() -> String {
-		"DynMap".to_string()
+	fn fmt(f: &mut fmt::Formatter) -> fmt::Result {
+		f.write_str("DynMap")
 	}
 
 	private_impl!();
@@ -58,8 +52,12 @@ impl DowncastableTarget for DynMapValueType {
 #[derive(Debug)]
 pub struct MapValueType<K: IntoTensorElementType + Clone + Hash + Eq, V: IntoTensorElementType + Debug>(PhantomData<(K, V)>);
 impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug> ValueTypeMarker for MapValueType<K, V> {
-	fn format() -> String {
-		format!("Map<{}, {}>", K::into_tensor_element_type(), V::into_tensor_element_type())
+	fn fmt(f: &mut fmt::Formatter) -> fmt::Result {
+		f.write_str("Map<")?;
+		<TensorElementType as fmt::Display>::fmt(&K::into_tensor_element_type(), f)?;
+		f.write_str(", ")?;
+		<TensorElementType as fmt::Display>::fmt(&V::into_tensor_element_type(), f)?;
+		f.write_str(">")
 	}
 
 	private_impl!();
@@ -126,7 +124,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 								let output_array_ptr_ptr_void: *mut *mut c_void = output_array_ptr_ptr.cast();
 								ortsys![unsafe GetTensorMutableData(key_tensor_ptr, output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
-								let len = calculate_tensor_size(dimensions);
+								let len = element_count(dimensions);
 								(dimensions, unsafe { slice::from_raw_parts(output_array_ptr, len) })
 							} else {
 								return Err(Error::new_with_code(
@@ -299,7 +297,7 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementT
 	/// Converts from a strongly-typed [`Map<K, V>`] to a type-erased [`DynMap`].
 	#[inline]
 	pub fn upcast(self) -> DynMap {
-		unsafe { mem::transmute(self) }
+		unsafe { self.transmute_type() }
 	}
 
 	/// Converts from a strongly-typed [`Map<K, V>`] to a reference to a type-erased [`DynMap`].

@@ -11,13 +11,14 @@ use core::{
 #[cfg(feature = "ndarray")]
 use ndarray::{ArcArray, Array, ArrayView, ArrayViewMut, CowArray, Dimension};
 
-use super::{DynTensor, Tensor, TensorRef, TensorRefMut, calculate_tensor_size};
+use super::{DynTensor, Tensor, TensorRef, TensorRefMut};
 use crate::{
 	AsPointer,
-	error::{Error, ErrorCode, Result, assert_non_null_pointer},
-	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
+	error::{Error, ErrorCode, Result},
+	memory::{Allocator, MemoryInfo},
 	ortsys,
 	tensor::{PrimitiveTensorElementType, TensorElementType, Utf8Data},
+	util::element_count,
 	value::{Value, ValueInner, ValueType}
 };
 
@@ -110,7 +111,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// ```
 	pub fn new(allocator: &Allocator, shape: impl ToDimensions) -> Result<Tensor<T>> {
 		let tensor = DynTensor::new(allocator, T::into_tensor_element_type(), shape)?;
-		Ok(unsafe { core::mem::transmute::<DynTensor, Tensor<T>>(tensor) })
+		Ok(unsafe { tensor.transmute_type() })
 	}
 
 	/// Construct an owned tensor from an array of data.
@@ -140,46 +141,50 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	///
 	/// Creating string tensors requires a separate method; see [`Tensor::from_string_array`].
 	pub fn from_array(input: impl OwnedTensorArrayData<T>) -> Result<Tensor<T>> {
-		let memory_info = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Arena, MemoryType::CPUInput)?;
-
-		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
-
-		// f16 and bf16 are repr(transparent) to u16, so memory layout should be identical to onnxruntime
 		let TensorArrayDataParts { shape, ptr, num_elements, guard } = input.into_parts()?;
-		let shape_ptr: *const i64 = shape.as_ptr();
-		let shape_len = shape.len();
-
-		let tensor_values_ptr: *mut c_void = ptr.cast();
-		assert_non_null_pointer(tensor_values_ptr, "TensorValues")?;
-
-		ortsys![
-			unsafe CreateTensorWithDataAsOrtValue(
-				memory_info.ptr(),
-				tensor_values_ptr,
-				num_elements * size_of::<T>(),
-				shape_ptr,
-				shape_len,
-				T::into_tensor_element_type().into(),
-				&mut value_ptr
-			)?;
-			nonNull(value_ptr)
-		];
-
-		Ok(Value {
-			inner: Arc::new(ValueInner {
-				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
-				dtype: ValueType::Tensor {
-					ty: T::into_tensor_element_type(),
-					dimensions: shape,
-					dimension_symbols: vec![None; shape_len]
-				},
-				drop: true,
-				memory_info: Some(memory_info),
-				_backing: Some(guard)
-			}),
-			_markers: PhantomData
-		})
+		tensor_from_array(MemoryInfo::default(), shape, ptr.as_ptr().cast(), num_elements, size_of::<T>(), T::into_tensor_element_type(), guard)
+			.map(|tensor| unsafe { tensor.transmute_type() })
 	}
+}
+
+fn tensor_from_array(
+	memory_info: MemoryInfo,
+	shape: Vec<i64>,
+	data: *mut c_void,
+	num_elements: usize,
+	element_size: usize,
+	element_type: TensorElementType,
+	guard: Option<Box<dyn Any>>
+) -> Result<DynTensor> {
+	let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
+
+	ortsys![
+		unsafe CreateTensorWithDataAsOrtValue(
+			memory_info.ptr(),
+			data,
+			num_elements * element_size,
+			shape.as_ptr(),
+			shape.len(),
+			element_type.into(),
+			&mut value_ptr
+		)?;
+		nonNull(value_ptr)
+	];
+
+	Ok(DynTensor {
+		inner: Arc::new(ValueInner {
+			ptr: unsafe { NonNull::new_unchecked(value_ptr) },
+			dtype: ValueType::Tensor {
+				ty: element_type,
+				dimension_symbols: vec![None; shape.len()],
+				dimensions: shape
+			},
+			drop: true,
+			memory_info: Some(memory_info),
+			_backing: guard
+		}),
+		_markers: PhantomData
+	})
 }
 
 impl<'a, T: PrimitiveTensorElementType + Debug> TensorRef<'a, T> {
@@ -213,48 +218,16 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRef<'a, T> {
 	/// When passing an [`ndarray`] type, the data **must** have a contiguous memory layout, or else an error will be
 	/// returned. See [`ndarray::ArrayBase::as_standard_layout`] to convert an array to a contiguous layout.
 	pub fn from_array_view(input: impl TensorArrayData<T> + 'a) -> Result<TensorRef<'a, T>> {
-		let memory_info = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Arena, MemoryType::CPUInput)?;
-
-		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
-
-		// f16 and bf16 are repr(transparent) to u16, so memory layout should be identical to onnxruntime
 		let (shape, data, guard) = input.ref_parts()?;
-		let num_elements = calculate_tensor_size(&shape);
-		let shape_ptr: *const i64 = shape.as_ptr();
-		let shape_len = shape.len();
+		let num_elements = element_count(&shape);
 
-		let tensor_values_ptr: *mut c_void = data.as_ptr() as *mut _;
-		assert_non_null_pointer(tensor_values_ptr, "TensorValues")?;
-
-		ortsys![
-			unsafe CreateTensorWithDataAsOrtValue(
-				memory_info.ptr(),
-				tensor_values_ptr,
-				num_elements * size_of::<T>(),
-				shape_ptr,
-				shape_len,
-				T::into_tensor_element_type().into(),
-				&mut value_ptr
-			)?;
-			nonNull(value_ptr)
-		];
-
-		let mut tensor = TensorRef::new(Tensor {
-			inner: Arc::new(ValueInner {
-				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
-				dtype: ValueType::Tensor {
-					ty: T::into_tensor_element_type(),
-					dimensions: shape,
-					dimension_symbols: vec![None; shape_len]
-				},
-				drop: true,
-				memory_info: Some(memory_info),
-				_backing: guard
-			}),
-			_markers: PhantomData
-		});
-		tensor.upgradable = false;
-		Ok(tensor)
+		tensor_from_array(MemoryInfo::default(), shape, data.as_ptr() as *mut _, num_elements, size_of::<T>(), T::into_tensor_element_type(), guard).map(
+			|tensor| {
+				let mut tensor: TensorRef<'_, T> = TensorRef::new(unsafe { tensor.transmute_type() });
+				tensor.upgradable = false;
+				tensor
+			}
+		)
 	}
 }
 
@@ -288,48 +261,16 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 	/// When passing an [`ndarray`] type, the data **must** have a contiguous memory layout, or else an error will be
 	/// returned. See [`ndarray::ArrayBase::as_standard_layout`] to convert an array to a contiguous layout.
 	pub fn from_array_view_mut(mut input: impl TensorArrayDataMut<T>) -> Result<TensorRefMut<'a, T>> {
-		let memory_info = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Arena, MemoryType::CPUInput)?;
-
-		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
-
-		// f16 and bf16 are repr(transparent) to u16, so memory layout should be identical to onnxruntime
 		let (shape, data, guard) = input.ref_parts_mut()?;
-		let num_elements = calculate_tensor_size(&shape);
-		let shape_ptr: *const i64 = shape.as_ptr();
-		let shape_len = shape.len();
+		let num_elements = element_count(&shape);
 
-		let tensor_values_ptr: *mut c_void = data.as_ptr() as *mut _;
-		assert_non_null_pointer(tensor_values_ptr, "TensorValues")?;
-
-		ortsys![
-			unsafe CreateTensorWithDataAsOrtValue(
-				memory_info.ptr(),
-				tensor_values_ptr,
-				num_elements * size_of::<T>(),
-				shape_ptr,
-				shape_len,
-				T::into_tensor_element_type().into(),
-				&mut value_ptr
-			)?;
-			nonNull(value_ptr)
-		];
-
-		let mut tensor = TensorRefMut::new(Tensor {
-			inner: Arc::new(ValueInner {
-				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
-				dtype: ValueType::Tensor {
-					ty: T::into_tensor_element_type(),
-					dimensions: shape,
-					dimension_symbols: vec![None; shape_len]
-				},
-				drop: true,
-				memory_info: Some(memory_info),
-				_backing: guard
-			}),
-			_markers: PhantomData
-		});
-		tensor.upgradable = false;
-		Ok(tensor)
+		tensor_from_array(MemoryInfo::default(), shape, data.as_ptr() as *mut _, num_elements, size_of::<T>(), T::into_tensor_element_type(), guard).map(
+			|tensor| {
+				let mut tensor: TensorRefMut<'_, T> = TensorRefMut::new(unsafe { tensor.transmute_type() });
+				tensor.upgradable = false;
+				tensor
+			}
+		)
 	}
 
 	/// Create a mutable tensor view from a raw pointer and shape.
@@ -356,43 +297,12 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 	/// - The pointer must be valid for the device description provided by `MemoryInfo`.
 	/// - The returned tensor must outlive the data described by the data pointer.
 	pub unsafe fn from_raw(info: MemoryInfo, data: *mut ort_sys::c_void, shape: Vec<i64>) -> Result<TensorRefMut<'a, T>> {
-		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
-
-		// f16 and bf16 are repr(transparent) to u16, so memory layout should be identical to onnxruntime
-		let shape_ptr: *const i64 = shape.as_ptr();
-		let shape_len = shape.len();
-
-		let data_len = calculate_tensor_size(&shape) * size_of::<T>();
-
-		ortsys![
-			unsafe CreateTensorWithDataAsOrtValue(
-				info.ptr(),
-				data,
-				data_len,
-				shape_ptr,
-				shape_len,
-				T::into_tensor_element_type().into(),
-				&mut value_ptr
-			)?;
-			nonNull(value_ptr)
-		];
-
-		let mut tensor = TensorRefMut::new(Value {
-			inner: Arc::new(ValueInner {
-				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
-				dtype: ValueType::Tensor {
-					ty: T::into_tensor_element_type(),
-					dimensions: shape,
-					dimension_symbols: vec![None; shape_len]
-				},
-				drop: true,
-				memory_info: Some(info),
-				_backing: None
-			}),
-			_markers: PhantomData
-		});
-		tensor.upgradable = false;
-		Ok(tensor)
+		let num_elements = element_count(&shape);
+		tensor_from_array(info, shape, data, num_elements, size_of::<T>(), T::into_tensor_element_type(), None).map(|tensor| {
+			let mut tensor: TensorRefMut<'_, T> = TensorRefMut::new(unsafe { tensor.transmute_type() });
+			tensor.upgradable = false;
+			tensor
+		})
 	}
 }
 
@@ -418,9 +328,9 @@ pub trait OwnedTensorArrayData<I> {
 
 pub struct TensorArrayDataParts<I> {
 	pub shape: Vec<i64>,
-	pub ptr: *mut I,
+	pub ptr: NonNull<I>,
 	pub num_elements: usize,
-	pub guard: Box<dyn Any>
+	pub guard: Option<Box<dyn Any>>
 }
 
 pub trait ToDimensions {
@@ -439,17 +349,17 @@ macro_rules! impl_to_dimensions {
 					} else {
 						Err(Error::new_with_code(
 							ErrorCode::InvalidArgument,
-							format!("Invalid dimension at {}; all dimensions must be >= 1 when creating a tensor from raw data", i)
+							format!("Invalid dimension #{}; all dimensions must be >= 1 when creating a tensor from raw data", i + 1)
 						))
 					}
 				})
 				.collect::<Result<_>>()?;
-			let sum = calculate_tensor_size(&v);
+			let sum = element_count(&v);
 			if let Some(expected_size) = expected_size {
 				if sum != expected_size {
 					Err(Error::new_with_code(
 						ErrorCode::InvalidArgument,
-						format!("Cannot create a tensor from raw data; shape {:?} ({}) is larger than the length of the data provided ({})", v, sum, expected_size)
+						format!("Cannot create a tensor from raw data; shape {:?} ({} elements) is larger than the length of the data provided ({} elements)", v, sum, expected_size)
 					))
 				} else {
 					Ok(v)
@@ -544,19 +454,30 @@ impl<T: Clone + 'static, D: Dimension + 'static> OwnedTensorArrayData<T> for Arr
 	fn into_parts(self) -> Result<TensorArrayDataParts<T>> {
 		if self.is_standard_layout() {
 			// We can avoid the copy here and use the data as is
-			let mut guard = Box::new(self);
-			let shape: Vec<i64> = guard.shape().iter().map(|d| *d as i64).collect();
-			let ptr = guard.as_mut_ptr();
-			let num_elements = guard.len();
-			Ok(TensorArrayDataParts { shape, ptr, num_elements, guard })
+			let mut this = Box::new(self);
+			let shape: Vec<i64> = this.shape().iter().map(|d| *d as i64).collect();
+			// SAFETY: ndarrays internally store their pointer as NonNull
+			let ptr = unsafe { NonNull::new_unchecked(this.as_mut_ptr()) };
+			let num_elements = this.len();
+			Ok(TensorArrayDataParts {
+				shape,
+				ptr,
+				num_elements,
+				guard: Some(this)
+			})
 		} else {
 			// Need to do a copy here to get data in to standard layout
 			let mut contiguous_array = self.as_standard_layout().into_owned();
 			let shape: Vec<i64> = contiguous_array.shape().iter().map(|d| *d as i64).collect();
-			let ptr = contiguous_array.as_mut_ptr();
+			// SAFETY: ndarrays internally store their pointer as NonNull
+			let ptr = unsafe { NonNull::new_unchecked(contiguous_array.as_mut_ptr()) };
 			let num_elements: usize = contiguous_array.len();
-			let guard = Box::new(contiguous_array);
-			Ok(TensorArrayDataParts { shape, ptr, num_elements, guard })
+			Ok(TensorArrayDataParts {
+				shape,
+				ptr,
+				num_elements,
+				guard: Some(Box::new(contiguous_array))
+			})
 		}
 	}
 
@@ -649,13 +570,14 @@ impl<T: Clone + 'static, D: ToDimensions> TensorArrayDataMut<T> for (D, &mut [T]
 impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Vec<T>) {
 	fn into_parts(mut self) -> Result<TensorArrayDataParts<T>> {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
-		let ptr = self.1.as_mut_ptr();
+		// SAFETY: A `Vec` always has a non-null pointer.
+		let ptr = unsafe { NonNull::new_unchecked(self.1.as_mut_ptr()) };
 		let num_elements: usize = self.1.len();
 		Ok(TensorArrayDataParts {
 			shape,
 			ptr,
 			num_elements,
-			guard: Box::new(self.1)
+			guard: Some(Box::new(self.1))
 		})
 	}
 
@@ -665,13 +587,14 @@ impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Vec<T>
 impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Box<[T]>) {
 	fn into_parts(mut self) -> Result<TensorArrayDataParts<T>> {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
-		let ptr = self.1.as_mut_ptr();
+		// SAFETY: A `Box` always has a non-null pointer.
+		let ptr = unsafe { NonNull::new_unchecked(self.1.as_mut_ptr()) };
 		let num_elements: usize = self.1.len();
 		Ok(TensorArrayDataParts {
 			shape,
 			ptr,
 			num_elements,
-			guard: Box::new(self.1)
+			guard: Some(Box::new(self.1))
 		})
 	}
 

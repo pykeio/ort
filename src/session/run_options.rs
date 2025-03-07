@@ -137,6 +137,23 @@ impl SelectedOutputMarker for NoSelectedOutputs {}
 pub struct HasSelectedOutputs;
 impl SelectedOutputMarker for HasSelectedOutputs {}
 
+#[derive(Debug)]
+pub(crate) struct UntypedRunOptions {
+	pub(crate) ptr: NonNull<ort_sys::OrtRunOptions>,
+	pub(crate) outputs: OutputSelector,
+	adapters: Vec<Arc<AdapterInner>>
+}
+
+impl UntypedRunOptions {
+	pub fn terminate(&self) -> Result<()> {
+		ortsys![unsafe RunOptionsSetTerminate(self.ptr.as_ptr())?];
+		Ok(())
+	}
+}
+
+// https://onnxruntime.ai/docs/api/c/struct_ort_api.html#ac2a08cac0a657604bd5899e0d1a13675
+unsafe impl Send for UntypedRunOptions {}
+
 /// Allows for finer control over session inference.
 ///
 /// [`RunOptions`] provides three main features:
@@ -163,14 +180,10 @@ impl SelectedOutputMarker for HasSelectedOutputs {}
 /// [`IoBinding::run_with_options`]: crate::io_binding::IoBinding::run_with_options
 #[derive(Debug)]
 pub struct RunOptions<O: SelectedOutputMarker = NoSelectedOutputs> {
-	run_options_ptr: NonNull<ort_sys::OrtRunOptions>,
-	pub(crate) outputs: OutputSelector,
-	adapters: Vec<Arc<AdapterInner>>,
+	pub(crate) inner: UntypedRunOptions,
 	_marker: PhantomData<O>
 }
 
-// https://onnxruntime.ai/docs/api/c/struct_ort_api.html#ac2a08cac0a657604bd5899e0d1a13675
-unsafe impl<O: SelectedOutputMarker> Send for RunOptions<O> {}
 // Only allow `Sync` if we don't have (potentially pre-allocated) outputs selected.
 // Allowing `Sync` here would mean a single pre-allocated `Value` could be mutated simultaneously in different threads -
 // a brazen crime against crabkind.
@@ -182,9 +195,11 @@ impl RunOptions {
 		let mut run_options_ptr: *mut ort_sys::OrtRunOptions = ptr::null_mut();
 		ortsys![unsafe CreateRunOptions(&mut run_options_ptr)?; nonNull(run_options_ptr)];
 		Ok(RunOptions {
-			run_options_ptr: unsafe { NonNull::new_unchecked(run_options_ptr) },
-			outputs: OutputSelector::default(),
-			adapters: Vec::new(),
+			inner: UntypedRunOptions {
+				ptr: unsafe { NonNull::new_unchecked(run_options_ptr) },
+				outputs: OutputSelector::default(),
+				adapters: Vec::new()
+			},
 			_marker: PhantomData
 		})
 	}
@@ -218,7 +233,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// # }
 	/// ```
 	pub fn with_outputs(mut self, outputs: OutputSelector) -> RunOptions<HasSelectedOutputs> {
-		self.outputs = outputs;
+		self.inner.outputs = outputs;
 		unsafe { mem::transmute(self) }
 	}
 
@@ -230,13 +245,13 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// Sets a tag to identify this run in logs.
 	pub fn set_tag(&mut self, tag: impl AsRef<str>) -> Result<()> {
 		let tag = CString::new(tag.as_ref())?;
-		ortsys![unsafe RunOptionsSetRunTag(self.run_options_ptr.as_ptr(), tag.as_ptr())?];
+		ortsys![unsafe RunOptionsSetRunTag(self.inner.ptr.as_ptr(), tag.as_ptr())?];
 		Ok(())
 	}
 
 	pub fn tag(&self) -> Result<String> {
 		let mut tag_ptr: *const c_char = ptr::null();
-		ortsys![unsafe RunOptionsGetRunTag(self.run_options_ptr.as_ptr(), &mut tag_ptr)?];
+		ortsys![unsafe RunOptionsGetRunTag(self.inner.ptr.as_ptr(), &mut tag_ptr)?];
 		if tag_ptr.is_null() {
 			Ok(String::default())
 		} else {
@@ -273,8 +288,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// # }
 	/// ```
 	pub fn terminate(&self) -> Result<()> {
-		ortsys![unsafe RunOptionsSetTerminate(self.run_options_ptr.as_ptr())?];
-		Ok(())
+		self.inner.terminate()
 	}
 
 	/// Resets the termination flag for the runs associated with [`RunOptions`].
@@ -300,7 +314,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// # }
 	/// ```
 	pub fn unterminate(&self) -> Result<()> {
-		ortsys![unsafe RunOptionsUnsetTerminate(self.run_options_ptr.as_ptr())?];
+		ortsys![unsafe RunOptionsUnsetTerminate(self.inner.ptr.as_ptr())?];
 		Ok(())
 	}
 
@@ -320,13 +334,13 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	pub fn add_config_entry(&mut self, key: impl AsRef<str>, value: impl AsRef<str>) -> Result<()> {
 		let key = CString::new(key.as_ref())?;
 		let value = CString::new(value.as_ref())?;
-		ortsys![unsafe AddRunConfigEntry(self.run_options_ptr.as_ptr(), key.as_ptr(), value.as_ptr())?];
+		ortsys![unsafe AddRunConfigEntry(self.inner.ptr.as_ptr(), key.as_ptr(), value.as_ptr())?];
 		Ok(())
 	}
 
 	pub fn add_adapter(&mut self, adapter: &Adapter) -> Result<()> {
-		ortsys![unsafe RunOptionsAddActiveLoraAdapter(self.run_options_ptr.as_ptr(), adapter.ptr())?];
-		self.adapters.push(Arc::clone(&adapter.inner));
+		ortsys![unsafe RunOptionsAddActiveLoraAdapter(self.inner.ptr.as_ptr(), adapter.ptr())?];
+		self.inner.adapters.push(Arc::clone(&adapter.inner));
 		Ok(())
 	}
 }
@@ -335,12 +349,12 @@ impl<O: SelectedOutputMarker> AsPointer for RunOptions<O> {
 	type Sys = ort_sys::OrtRunOptions;
 
 	fn ptr(&self) -> *const Self::Sys {
-		self.run_options_ptr.as_ptr()
+		self.inner.ptr.as_ptr()
 	}
 }
 
 impl<O: SelectedOutputMarker> Drop for RunOptions<O> {
 	fn drop(&mut self) {
-		ortsys![unsafe ReleaseRunOptions(self.run_options_ptr.as_ptr())];
+		ortsys![unsafe ReleaseRunOptions(self.inner.ptr.as_ptr())];
 	}
 }

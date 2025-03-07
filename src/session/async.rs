@@ -4,7 +4,6 @@ use core::{
 	ffi::{c_char, c_void},
 	future::Future,
 	marker::PhantomData,
-	ops::Deref,
 	pin::Pin,
 	ptr::NonNull,
 	task::{Context, Poll, Waker}
@@ -13,8 +12,8 @@ use std::sync::Mutex;
 
 use crate::{
 	error::Result,
-	session::{RunOptions, SelectedOutputMarker, SessionInputValue, SessionOutputs, SharedSessionInner},
-	value::Value
+	session::{SessionOutputs, SharedSessionInner, run_options::UntypedRunOptions},
+	value::{Value, ValueInner}
 };
 
 #[derive(Debug)]
@@ -53,43 +52,17 @@ impl<'r, 's> InferenceFutInner<'r, 's> {
 unsafe impl Send for InferenceFutInner<'_, '_> {}
 unsafe impl Sync for InferenceFutInner<'_, '_> {}
 
-pub enum RunOptionsRef<'r, O: SelectedOutputMarker> {
-	Arc(Arc<RunOptions<O>>),
-	Ref(&'r RunOptions<O>)
-}
-
-impl<O: SelectedOutputMarker> From<&Arc<RunOptions<O>>> for RunOptionsRef<'_, O> {
-	fn from(value: &Arc<RunOptions<O>>) -> Self {
-		Self::Arc(Arc::clone(value))
-	}
-}
-
-impl<'r, O: SelectedOutputMarker> From<&'r RunOptions<O>> for RunOptionsRef<'r, O> {
-	fn from(value: &'r RunOptions<O>) -> Self {
-		Self::Ref(value)
-	}
-}
-
-impl<O: SelectedOutputMarker> Deref for RunOptionsRef<'_, O> {
-	type Target = RunOptions<O>;
-
-	fn deref(&self) -> &Self::Target {
-		match self {
-			Self::Arc(r) => r,
-			Self::Ref(r) => r
-		}
-	}
-}
-
-pub struct InferenceFut<'s, 'r, 'v, O: SelectedOutputMarker> {
+pub struct InferenceFut<'s, 'r, 'v> {
 	inner: Arc<InferenceFutInner<'r, 's>>,
-	run_options: RunOptionsRef<'r, O>,
+	run_options: &'r UntypedRunOptions,
 	did_receive: bool,
 	_inputs: PhantomData<&'v ()>
 }
 
-impl<'s, 'r, O: SelectedOutputMarker> InferenceFut<'s, 'r, '_, O> {
-	pub(crate) fn new(inner: Arc<InferenceFutInner<'r, 's>>, run_options: RunOptionsRef<'r, O>) -> Self {
+unsafe impl Send for InferenceFut<'_, '_, '_> {}
+
+impl<'s, 'r> InferenceFut<'s, 'r, '_> {
+	pub(crate) fn new(inner: Arc<InferenceFutInner<'r, 's>>, run_options: &'r UntypedRunOptions) -> Self {
 		Self {
 			inner,
 			run_options,
@@ -99,7 +72,7 @@ impl<'s, 'r, O: SelectedOutputMarker> InferenceFut<'s, 'r, '_, O> {
 	}
 }
 
-impl<'s, 'r, O: SelectedOutputMarker> Future for InferenceFut<'s, 'r, '_, O> {
+impl<'s, 'r> Future for InferenceFut<'s, 'r, '_> {
 	type Output = Result<SessionOutputs<'r, 's>>;
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -115,7 +88,7 @@ impl<'s, 'r, O: SelectedOutputMarker> Future for InferenceFut<'s, 'r, '_, O> {
 	}
 }
 
-impl<O: SelectedOutputMarker> Drop for InferenceFut<'_, '_, '_, O> {
+impl Drop for InferenceFut<'_, '_, '_> {
 	fn drop(&mut self) {
 		if !self.did_receive {
 			let _ = self.run_options.terminate();
@@ -124,19 +97,19 @@ impl<O: SelectedOutputMarker> Drop for InferenceFut<'_, '_, '_, O> {
 	}
 }
 
-pub(crate) struct AsyncInferenceContext<'r, 's, 'v> {
+pub(crate) struct AsyncInferenceContext<'r, 's> {
 	pub(crate) inner: Arc<InferenceFutInner<'r, 's>>,
-	pub(crate) _input_values: Vec<SessionInputValue<'v>>,
 	pub(crate) input_ort_values: Vec<*const ort_sys::OrtValue>,
+	pub(crate) _input_inner_holders: Vec<Arc<ValueInner>>,
 	pub(crate) input_name_ptrs: Vec<*const c_char>,
 	pub(crate) output_name_ptrs: Vec<*const c_char>,
 	pub(crate) session_inner: &'s Arc<SharedSessionInner>,
-	pub(crate) output_names: Vec<&'s str>,
+	pub(crate) output_names: Vec<&'r str>,
 	pub(crate) output_value_ptrs: Vec<*mut ort_sys::OrtValue>
 }
 
 pub(crate) extern "system" fn async_callback(user_data: *mut c_void, _: *mut *mut ort_sys::OrtValue, _: usize, status: ort_sys::OrtStatusPtr) {
-	let ctx = unsafe { Box::from_raw(user_data.cast::<AsyncInferenceContext<'_, '_, '_>>()) };
+	let ctx = unsafe { Box::from_raw(user_data.cast::<AsyncInferenceContext<'_, '_>>()) };
 
 	// Reconvert name ptrs to CString so drop impl is called and memory is freed
 	for p in ctx.input_name_ptrs {

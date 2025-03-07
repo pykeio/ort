@@ -4,14 +4,7 @@ use core::{
 	ptr::{self, NonNull}
 };
 
-use crate::{
-	AsPointer,
-	error::{Result, assert_non_null_pointer},
-	memory::MemoryInfo,
-	operator::OperatorDomain,
-	ortsys,
-	value::DynValue
-};
+use crate::{AsPointer, error::Result, memory::MemoryInfo, operator::OperatorDomain, ortsys, value::DynValue};
 
 mod impl_commit;
 mod impl_config_keys;
@@ -51,8 +44,11 @@ pub struct SessionBuilder {
 impl Clone for SessionBuilder {
 	fn clone(&self) -> Self {
 		let mut session_options_ptr = ptr::null_mut();
-		ortsys![unsafe CloneSessionOptions(self.ptr(), ptr::addr_of_mut!(session_options_ptr)).expect("error cloning session options")];
-		assert_non_null_pointer(session_options_ptr, "OrtSessionOptions").expect("Cloned session option pointer is null");
+		ortsys![
+			unsafe CloneSessionOptions(self.ptr(), ptr::addr_of_mut!(session_options_ptr))
+				.expect("error cloning session options");
+			nonNull(session_options_ptr)
+		];
 		Self {
 			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },
 			memory_info: self.memory_info.clone(),

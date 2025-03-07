@@ -74,7 +74,13 @@ macro_rules! trainsys {
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {{
 		let _x = unsafe { ($crate::training::training_api().unwrap().$method)($($n),+) };
-		$($crate::error::assert_non_null_pointer($check, stringify!($method)).unwrap();)+
+		$(
+			// TODO: #[cfg(debug_assertions)]?
+			if ($check).is_null() {
+				$crate::util::cold();
+				panic!(concat!("expected `", stringify!($check), "` to not be null"));
+			}
+		)+
 		_x
 	}};
 	(unsafe $method:ident($($n:expr),+ $(,)?)?) => {
@@ -82,7 +88,13 @@ macro_rules! trainsys {
 	};
 	(unsafe $method:ident($($n:expr),+ $(,)?)?; nonNull($($check:expr),+ $(,)?)$(;)?) => {{
 		unsafe { $crate::error::status_to_result(($crate::training::training_api()?.$method)($($n),+)) }?;
-		$($crate::error::assert_non_null_pointer($check, stringify!($method))?;)+
+		$(
+			// TODO: #[cfg(debug_assertions)]?
+			if ($check).is_null() {
+				$crate::util::cold();
+				return Err($crate::Error::new(concat!("expected `", stringify!($check), "` to not be null")));
+			}
+		)+
 	}};
 }
 pub(crate) use trainsys;

@@ -1,10 +1,5 @@
 use alloc::string::String;
 use core::fmt;
-#[cfg(feature = "ndarray")]
-use core::{ffi::c_void, ptr};
-
-#[cfg(feature = "ndarray")]
-use crate::{error::Result, ortsys};
 
 /// Enum mapping ONNX Runtime's supported tensor data types.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -238,36 +233,4 @@ impl Utf8Data for &str {
 	fn as_utf8_bytes(&self) -> &[u8] {
 		self.as_bytes()
 	}
-}
-
-/// Construct an [`ndarray::ArrayView`] for an ORT tensor.
-///
-/// Only to be used on types whose Rust in-memory representation matches ONNX Runtime's (e.g. primitive numeric types
-/// like u32)
-#[cfg(feature = "ndarray")]
-pub(crate) fn extract_primitive_array<'t, T>(shape: ndarray::IxDyn, tensor: *const ort_sys::OrtValue) -> Result<ndarray::ArrayViewD<'t, T>> {
-	// Get pointer to output tensor values
-	let mut output_array_ptr: *mut T = ptr::null_mut();
-	let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
-	let output_array_ptr_ptr_void: *mut *mut c_void = output_array_ptr_ptr.cast();
-	ortsys![unsafe GetTensorMutableData(tensor.cast_mut(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
-
-	let array_view = unsafe { ndarray::ArrayView::from_shape_ptr(shape, output_array_ptr) };
-	Ok(array_view)
-}
-
-/// Construct an [`ndarray::ArrayViewMut`] for an ORT tensor.
-///
-/// Only to be used on types whose Rust in-memory representation matches ONNX Runtime's (e.g. primitive numeric types
-/// like u32)
-#[cfg(feature = "ndarray")]
-pub(crate) fn extract_primitive_array_mut<'t, T>(shape: ndarray::IxDyn, tensor: *mut ort_sys::OrtValue) -> Result<ndarray::ArrayViewMutD<'t, T>> {
-	// Get pointer to output tensor values
-	let mut output_array_ptr: *mut T = ptr::null_mut();
-	let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
-	let output_array_ptr_ptr_void: *mut *mut c_void = output_array_ptr_ptr.cast();
-	ortsys![unsafe GetTensorMutableData(tensor, output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
-
-	let array_view = unsafe { ndarray::ArrayViewMut::from_shape_ptr(shape, output_array_ptr) };
-	Ok(array_view)
 }

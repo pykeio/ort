@@ -164,11 +164,11 @@ mod tests {
 	};
 
 	#[test]
+	#[cfg(feature = "std")]
 	fn test_lora() -> crate::Result<()> {
 		let model = std::fs::read("tests/data/lora_model.onnx").expect("");
 		let mut session = Session::builder()?.commit_from_memory(&model)?;
-		let lora = std::fs::read("tests/data/adapter.orl").expect("");
-		let lora = Adapter::from_memory(&lora, None)?;
+		let lora = Adapter::from_file("tests/data/adapter.orl", None)?;
 
 		let mut run_options = RunOptions::new()?;
 		run_options.add_adapter(&lora)?;

@@ -9,14 +9,14 @@ use core::{ffi::c_void, fmt::Debug, ptr, slice};
 #[cfg(feature = "ndarray")]
 use ndarray::IxDyn;
 
-use super::{Tensor, TensorValueTypeMarker, calculate_tensor_size};
-#[cfg(feature = "ndarray")]
-use crate::tensor::{extract_primitive_array, extract_primitive_array_mut};
+use super::{Tensor, TensorValueTypeMarker};
 use crate::{
 	AsPointer,
 	error::{Error, ErrorCode, Result},
+	memory::MemoryInfo,
 	ortsys,
 	tensor::{PrimitiveTensorElementType, TensorElementType},
+	util::element_count,
 	value::{Value, ValueType}
 };
 
@@ -52,24 +52,10 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_tensor<T: PrimitiveTensorElementType>(&self) -> Result<ndarray::ArrayViewD<'_, T>> {
-		match self.dtype() {
-			ValueType::Tensor { ty, dimensions, .. } => {
-				let mem = self.memory_info();
-				if !mem.is_cpu_accessible() {
-					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", mem.allocation_device().as_str())));
-				}
-
-				if *ty == T::into_tensor_element_type() {
-					Ok(extract_primitive_array(IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>()), self.ptr())?)
-				} else {
-					Err(Error::new_with_code(
-						ErrorCode::InvalidArgument,
-						format!("Cannot extract Tensor<{}> from Tensor<{}>", T::into_tensor_element_type(), ty)
-					))
-				}
-			}
-			t => Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot extract a Tensor<{}> from {t}", T::into_tensor_element_type())))
-		}
+		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type()).and_then(|(ptr, dimensions)| {
+			let shape = IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>());
+			Ok(unsafe { ndarray::ArrayView::from_shape_ptr(shape, data_ptr(ptr)?.cast::<T>()) })
+		})
 	}
 
 	/// Attempt to extract the scalar from a tensor of type `T`.
@@ -96,36 +82,16 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_scalar<T: PrimitiveTensorElementType + Copy>(&self) -> Result<T> {
-		match self.dtype() {
-			ValueType::Tensor { ty, dimensions, .. } => {
-				let mem = self.memory_info();
-				if !mem.is_cpu_accessible() {
-					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", mem.allocation_device().as_str())));
-				}
-
-				if *ty == T::into_tensor_element_type() {
-					if !dimensions.is_empty() {
-						return Err(Error::new_with_code(
-							ErrorCode::InvalidArgument,
-							format!("Cannot extract scalar {} from a tensor of dimensionality {}", T::into_tensor_element_type(), dimensions.len())
-						));
-					}
-
-					let mut output_array_ptr: *mut T = ptr::null_mut();
-					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
-					let output_array_ptr_ptr_void: *mut *mut c_void = output_array_ptr_ptr.cast();
-					ortsys![unsafe GetTensorMutableData(self.ptr().cast_mut(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
-
-					Ok(unsafe { *output_array_ptr })
-				} else {
-					Err(Error::new_with_code(
-						ErrorCode::InvalidArgument,
-						format!("Cannot extract scalar {} from Tensor<{}>", T::into_tensor_element_type(), ty)
-					))
-				}
+		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type()).and_then(|(ptr, dimensions)| {
+			if !dimensions.is_empty() {
+				return Err(Error::new_with_code(
+					ErrorCode::InvalidArgument,
+					format!("Cannot extract scalar {} from a tensor of dimensionality {}", T::into_tensor_element_type(), dimensions.len())
+				));
 			}
-			t => Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot extract Tensor<{}> from {t}", T::into_tensor_element_type())))
-		}
+
+			Ok(unsafe { *data_ptr(ptr)?.cast::<T>() })
+		})
 	}
 
 	/// Attempt to extract the underlying data of type `T` into a mutable read-only [`ndarray::ArrayViewMut`].
@@ -158,24 +124,10 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_tensor_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<ndarray::ArrayViewMutD<'_, T>> {
-		match self.dtype() {
-			ValueType::Tensor { ty, dimensions, .. } => {
-				let mem = self.memory_info();
-				if !mem.is_cpu_accessible() {
-					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", mem.allocation_device().as_str())));
-				}
-
-				if *ty == T::into_tensor_element_type() {
-					Ok(extract_primitive_array_mut(IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>()), self.ptr_mut())?)
-				} else {
-					Err(Error::new_with_code(
-						ErrorCode::InvalidArgument,
-						format!("Cannot extract Tensor<{}> from Tensor<{}>", T::into_tensor_element_type(), ty)
-					))
-				}
-			}
-			t => Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot extract Tensor<{}> from {t}", T::into_tensor_element_type())))
-		}
+		extract_tensor(self.ptr_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type()).and_then(|(ptr, dimensions)| {
+			let shape = IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>());
+			Ok(unsafe { ndarray::ArrayViewMut::from_shape_ptr(shape, data_ptr(ptr)?.cast::<T>()) })
+		})
 	}
 
 	/// Attempt to extract the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and an
@@ -207,30 +159,8 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_raw_tensor<T: PrimitiveTensorElementType>(&self) -> Result<(&[i64], &[T])> {
-		match self.dtype() {
-			ValueType::Tensor { ty, dimensions, .. } => {
-				let mem = self.memory_info();
-				if !mem.is_cpu_accessible() {
-					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", mem.allocation_device().as_str())));
-				}
-
-				if *ty == T::into_tensor_element_type() {
-					let mut output_array_ptr: *mut T = ptr::null_mut();
-					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
-					let output_array_ptr_ptr_void: *mut *mut c_void = output_array_ptr_ptr.cast();
-					ortsys![unsafe GetTensorMutableData(self.ptr().cast_mut(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
-
-					let len = calculate_tensor_size(dimensions);
-					Ok((dimensions, unsafe { slice::from_raw_parts(output_array_ptr, len) }))
-				} else {
-					Err(Error::new_with_code(
-						ErrorCode::InvalidArgument,
-						format!("Cannot extract Tensor<{}> from Tensor<{}>", T::into_tensor_element_type(), ty)
-					))
-				}
-			}
-			t => Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot extract Tensor<{}> from {t}", T::into_tensor_element_type())))
-		}
+		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type())
+			.and_then(|(ptr, dimensions)| Ok((dimensions.as_slice(), unsafe { slice::from_raw_parts(data_ptr(ptr)?.cast::<T>(), element_count(dimensions)) })))
 	}
 
 	/// Attempt to extract the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and a
@@ -259,31 +189,9 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_raw_tensor_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<(&[i64], &mut [T])> {
-		let dtype = self.dtype();
-		match dtype {
-			ValueType::Tensor { ty, dimensions, .. } => {
-				let mem = self.memory_info();
-				if !mem.is_cpu_accessible() {
-					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", mem.allocation_device().as_str())));
-				}
-
-				if *ty == T::into_tensor_element_type() {
-					let mut output_array_ptr: *mut T = ptr::null_mut();
-					let output_array_ptr_ptr: *mut *mut T = &mut output_array_ptr;
-					let output_array_ptr_ptr_void: *mut *mut c_void = output_array_ptr_ptr.cast();
-					ortsys![unsafe GetTensorMutableData(self.ptr().cast_mut(), output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
-
-					let len = calculate_tensor_size(dimensions);
-					Ok((dimensions, unsafe { slice::from_raw_parts_mut(output_array_ptr, len) }))
-				} else {
-					Err(Error::new_with_code(
-						ErrorCode::InvalidArgument,
-						format!("Cannot extract Tensor<{}> from Tensor<{}>", T::into_tensor_element_type(), ty)
-					))
-				}
-			}
-			t => Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot extract Tensor<{}> from {t:?}", T::into_tensor_element_type())))
-		}
+		extract_tensor(self.ptr_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type()).and_then(|(ptr, dimensions)| {
+			Ok((dimensions.as_slice(), unsafe { slice::from_raw_parts_mut(data_ptr(ptr)?.cast::<T>(), element_count(dimensions)) }))
+		})
 	}
 
 	/// Attempt to extract the underlying data into a Rust `ndarray`.
@@ -302,54 +210,11 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_string_tensor(&self) -> Result<ndarray::ArrayD<String>> {
-		match self.dtype() {
-			ValueType::Tensor { ty, dimensions, .. } => {
-				let mem = self.memory_info();
-				if !mem.is_cpu_accessible() {
-					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", mem.allocation_device().as_str())));
-				}
-
-				if *ty == TensorElementType::String {
-					let len = calculate_tensor_size(dimensions);
-
-					// Total length of string data, not including \0 suffix
-					let mut total_length = 0;
-					ortsys![unsafe GetStringTensorDataLength(self.ptr(), &mut total_length)?];
-
-					// In the JNI impl of this, tensor_element_len was included in addition to total_length,
-					// but that seems contrary to the docs of GetStringTensorDataLength, and those extra bytes
-					// don't seem to be written to in practice either.
-					// If the string data actually did go farther, it would panic below when using the offset
-					// data to get slices for each string.
-					let mut string_contents = vec![0u8; total_length];
-					// one extra slot so that the total length can go in the last one, making all per-string
-					// length calculations easy
-					let mut offsets = vec![0; len + 1];
-
-					ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len)?];
-
-					// final offset = overall length so that per-string length calculations work for the last string
-					debug_assert_eq!(0, offsets[len]);
-					offsets[len] = total_length;
-
-					let strings = offsets
-						// offsets has 1 extra offset past the end so that all windows work
-						.windows(2)
-						.map(|w| {
-							let slice = &string_contents[w[0]..w[1]];
-							String::from_utf8(slice.into())
-						})
-						.collect::<Result<Vec<String>, FromUtf8Error>>()
-						.map_err(Error::wrap)?;
-
-					Ok(ndarray::Array::from_shape_vec(IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>()), strings)
-						.expect("Shape extracted from tensor didn't match tensor contents"))
-				} else {
-					Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot extract Tensor<String> from Tensor<{ty}>")))
-				}
-			}
-			t => Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot extract Tensor<String> from {t}")))
-		}
+		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), TensorElementType::String).and_then(|(ptr, dimensions)| {
+			let strings = extract_strings(ptr, dimensions)?;
+			Ok(ndarray::Array::from_shape_vec(IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>()), strings)
+				.expect("Shape extracted from tensor didn't match tensor contents"))
+		})
 	}
 
 	/// Attempt to extract the underlying string data into a "raw" data tuple, consisting of the tensor's dimensions and
@@ -368,53 +233,10 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # }
 	/// ```
 	pub fn try_extract_raw_string_tensor(&self) -> Result<(&[i64], Vec<String>)> {
-		match self.dtype() {
-			ValueType::Tensor { ty, dimensions, .. } => {
-				let mem = self.memory_info();
-				if !mem.is_cpu_accessible() {
-					return Err(Error::new(format!("Cannot extract from value on device `{}`, which is not CPU accessible", mem.allocation_device().as_str())));
-				}
-
-				if *ty == TensorElementType::String {
-					let len = calculate_tensor_size(dimensions);
-
-					// Total length of string data, not including \0 suffix
-					let mut total_length = 0;
-					ortsys![unsafe GetStringTensorDataLength(self.ptr(), &mut total_length)?];
-
-					// In the JNI impl of this, tensor_element_len was included in addition to total_length,
-					// but that seems contrary to the docs of GetStringTensorDataLength, and those extra bytes
-					// don't seem to be written to in practice either.
-					// If the string data actually did go farther, it would panic below when using the offset
-					// data to get slices for each string.
-					let mut string_contents = vec![0u8; total_length];
-					// one extra slot so that the total length can go in the last one, making all per-string
-					// length calculations easy
-					let mut offsets = vec![0; len + 1];
-
-					ortsys![unsafe GetStringTensorContent(self.ptr(), string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len)?];
-
-					// final offset = overall length so that per-string length calculations work for the last string
-					debug_assert_eq!(0, offsets[len]);
-					offsets[len] = total_length;
-
-					let strings = offsets
-						// offsets has 1 extra offset past the end so that all windows work
-						.windows(2)
-						.map(|w| {
-							let slice = &string_contents[w[0]..w[1]];
-							String::from_utf8(slice.into())
-						})
-						.collect::<Result<Vec<String>, FromUtf8Error>>()
-						.map_err(Error::wrap)?;
-
-					Ok((dimensions, strings))
-				} else {
-					Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot extract Tensor<String> from Tensor<{ty}>")))
-				}
-			}
-			t => Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot extract Tensor<String> from {t}")))
-		}
+		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), TensorElementType::String).and_then(|(ptr, dimensions)| {
+			let strings = extract_strings(ptr, dimensions)?;
+			Ok((dimensions.as_slice(), strings))
+		})
 	}
 
 	/// Returns the shape of the tensor.
@@ -445,6 +267,72 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
 		res
 	}
+}
+
+fn extract_tensor<'t>(
+	ptr: *mut ort_sys::OrtValue,
+	dtype: &'t ValueType,
+	memory_info: &MemoryInfo,
+	expected_ty: TensorElementType
+) -> Result<(*mut ort_sys::OrtValue, &'t Vec<i64>)> {
+	match dtype {
+		ValueType::Tensor { ty, dimensions, .. } => {
+			if !memory_info.is_cpu_accessible() {
+				return Err(Error::new(format!(
+					"Cannot extract from value on device `{}`, which is not CPU accessible",
+					memory_info.allocation_device().as_str()
+				)));
+			}
+
+			if *ty == expected_ty {
+				Ok((ptr, dimensions))
+			} else {
+				Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot extract Tensor<{}> from Tensor<{}>", expected_ty, ty)))
+			}
+		}
+		t => Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot extract a Tensor<{}> from {t}", expected_ty)))
+	}
+}
+
+unsafe fn data_ptr(ptr: *mut ort_sys::OrtValue) -> Result<*mut c_void> {
+	let mut output_array_ptr: *mut c_void = ptr::null_mut();
+	ortsys![unsafe GetTensorMutableData(ptr, &mut output_array_ptr)?; nonNull(output_array_ptr)];
+	Ok(output_array_ptr)
+}
+
+fn extract_strings(ptr: *mut ort_sys::OrtValue, dimensions: &[i64]) -> Result<Vec<String>> {
+	let len = element_count(dimensions);
+
+	// Total length of string data, not including \0 suffix
+	let mut total_length = 0;
+	ortsys![unsafe GetStringTensorDataLength(ptr, &mut total_length)?];
+
+	// In the JNI impl of this, tensor_element_len was included in addition to total_length,
+	// but that seems contrary to the docs of GetStringTensorDataLength, and those extra bytes
+	// don't seem to be written to in practice either.
+	// If the string data actually did go farther, it would panic below when using the offset
+	// data to get slices for each string.
+	let mut string_contents = vec![0u8; total_length];
+	// one extra slot so that the total length can go in the last one, making all per-string
+	// length calculations easy
+	let mut offsets = vec![0; len + 1];
+
+	ortsys![unsafe GetStringTensorContent(ptr, string_contents.as_mut_ptr().cast(), total_length, offsets.as_mut_ptr(), len)?];
+
+	// final offset = overall length so that per-string length calculations work for the last string
+	debug_assert_eq!(0, offsets[len]);
+	offsets[len] = total_length;
+
+	let strings = offsets
+		// offsets has 1 extra offset past the end so that all windows work
+		.windows(2)
+		.map(|w| {
+			let slice = &string_contents[w[0]..w[1]];
+			String::from_utf8(slice.into())
+		})
+		.collect::<Result<Vec<String>, FromUtf8Error>>()
+		.map_err(Error::wrap)?;
+	Ok(strings)
 }
 
 impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {

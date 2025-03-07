@@ -10,7 +10,7 @@ use ort_sys::c_char;
 use super::{Checkpoint, Optimizer, trainsys};
 use crate::{
 	AsPointer, char_p_to_string,
-	error::{Result, assert_non_null_pointer, status_to_result},
+	error::{Result, status_to_result},
 	memory::Allocator,
 	session::{RunOptions, SessionInputValue, SessionInputs, SessionOutputs, builder::SessionBuilder},
 	tensor::IntoTensorElementType,
@@ -263,11 +263,9 @@ impl Trainer {
 		drop(
 			output_names_ptr
 				.into_iter()
-				.map(|p| {
-					assert_non_null_pointer(p, "c_char for CString")?;
-					unsafe { Ok(CString::from_raw(p.cast_mut().cast())) }
-				})
-				.collect::<Result<Vec<_>>>()?
+				// SAFETY: `str` will never have a null pointer
+				.map(|p| unsafe { CString::from_raw(p as *mut _) })
+				.collect::<Vec<_>>()
 		);
 
 		unsafe { status_to_result(res) }?;

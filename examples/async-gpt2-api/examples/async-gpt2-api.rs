@@ -12,7 +12,7 @@ use axum::{
 use futures::Stream;
 use ort::{
 	execution_providers::CUDAExecutionProvider,
-	session::{Session, builder::GraphOptimizationLevel},
+	session::{RunOptions, Session, builder::GraphOptimizationLevel},
 	value::TensorRef
 };
 use rand::Rng;
@@ -74,7 +74,8 @@ fn generate_stream(
 			let input = TensorRef::from_array_view((vec![1, 1, tokens.len() as i64], tokens.as_slice()))?;
 			let probabilities = {
 				let mut session = session.lock().await;
-				let outputs = session.run_async(ort::inputs![input])?.await?;
+				let options = RunOptions::new()?;
+				let outputs = session.run_async(ort::inputs![input], &options)?.await?;
 				let (dim, probabilities) = outputs["output1"].try_extract_raw_tensor()?;
 
 				// Collect and sort logits

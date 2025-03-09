@@ -182,7 +182,7 @@ fn static_link_prerequisites(using_pyke_libs: bool) {
 fn prefer_dynamic_linking() -> bool {
 	match env::var(ORT_ENV_PREFER_DYNAMIC_LINK) {
 		Ok(val) => val == "1" || val.to_lowercase() == "true",
-		Err(_) => cfg!(feature = "cuda") || cfg!(feature = "tensorrt")
+		Err(_) => false
 	}
 }
 

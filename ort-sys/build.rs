@@ -174,6 +174,9 @@ fn static_link_prerequisites(using_pyke_libs: bool) {
 		println!("cargo:rustc-link-lib=D3D12");
 		println!("cargo:rustc-link-lib=DirectML");
 	}
+	if cfg!(feature = "webgpu") && using_pyke_libs {
+		println!("cargo:rustc-link-lib=webgpu_dawn");
+	}
 }
 
 fn prefer_dynamic_linking() -> bool {
@@ -441,26 +444,24 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 			if cfg!(feature = "training") {
 				feature_set.push("train");
 			}
+			if cfg!(feature = "webgpu") {
+				feature_set.push("wgpu");
+			}
 			if cfg!(any(feature = "cuda", feature = "tensorrt")) {
 				feature_set.push("cu12");
-			} else if cfg!(feature = "rocm") {
+			}
+			if cfg!(feature = "rocm") {
 				feature_set.push("rocm");
 			}
+
 			let feature_set = if !feature_set.is_empty() { feature_set.join(",") } else { "none".to_owned() };
 			println!("selected feature set: {feature_set}");
-			let mut dist = find_dist(&target, &feature_set);
-			if dist.is_none() && feature_set != "none" {
-				dist = find_dist(&target, "none");
-			}
 
+			let dist = find_dist(&target, &feature_set);
 			if dist.is_none() {
 				panic!(
 					"downloaded binaries not available for target {target}{}\nyou may have to compile ONNX Runtime from source",
-					if feature_set != "none" {
-						format!(" (note: also requested features `{feature_set}`)")
-					} else {
-						String::new()
-					}
+					if feature_set != "none" { format!(" and features `{feature_set}`") } else { String::new() }
 				);
 			}
 

@@ -236,7 +236,7 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 	/// underlying buffer as well.
 	///
 	/// Mutably borrowed tensors can be created from:
-	/// - (with feature `ndarray`) an exclusive reference to an [`ndarray::Array`] (`&Array<T, D>`);
+	/// - (with feature `ndarray`) an exclusive reference to an [`ndarray::Array`] (`&mut Array<T, D>`);
 	/// - (with feature `ndarray`) an [`ndarray::ArrayViewMut`];
 	/// - a tuple of `(shape, &mut [T])`, where `shape` is one of `Vec<I>`, `[I; N]` or `&[I]`, where `I` is `i64` or
 	///   `usize`.

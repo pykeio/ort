@@ -8,12 +8,12 @@ train	x86_64-pc-windows-msvc	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/x86_64-
 train	aarch64-pc-windows-msvc	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/aarch64-pc-windows-msvc+train.tgz	7FC3D4A036FFB4B32B61B6981AF5BE60EB5FB5A4CD2427BBC6611E39F644F446
 none	x86_64-pc-windows-msvc	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/x86_64-pc-windows-msvc.tgz	28A69FE89E3B8B14AF859FFCC6345B89EB3FFEB73E793FEF2944DFE3544BE1B3
 train	aarch64-unknown-linux-gnu	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/aarch64-unknown-linux-gnu+train.tgz	C8969D1861A5D3DBE0C732E0833970CA973AF094DB59D3D5A3C3C8CC3A38EF8F
-train	aarch64-apple-darwin	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/aarch64-apple-darwin+train.tgz	1114EA0DBA81BA550B0CCF9AC6CB44A21D28B400E70A3B952A9BFD6B7B7322DA
 none	wasm32-unknown-emscripten	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/wasm32-unknown-emscripten.tgz	24A0FF471F158273E0D58917FCDE8BE121698184B0F01ECA495F716149F3A3DA
 none	aarch64-unknown-linux-gnu	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/aarch64-unknown-linux-gnu.tgz	E0DB605798F4B78ED2E93E358F2BAF19E0B3A064C51467CCE27F394FD991E30F
-train	x86_64-apple-darwin	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/x86_64-apple-darwin+train.tgz	9AB0FF168AD3F1DCC8D5C91706F4DDE48A24DE462B327599DF8432991CF354B0
 wgpu	x86_64-unknown-linux-gnu	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/x86_64-unknown-linux-gnu+wgpu.tgz	3EED887EE5D46185E313FFA72756AFFE70C78B0C93633E14193D14247D08E6F0
 train	x86_64-unknown-linux-gnu	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/x86_64-unknown-linux-gnu+train.tgz	6BB87EBE3C821EC323EE78F917E6DFC9AEAF5F485AB2526B6254A39FFF5B9109
-none	x86_64-apple-darwin	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/x86_64-apple-darwin.tgz	818F3620512A3F4F25068B496F5E583273D55F6D37A1D18B3A4906548C6C0824
-none	aarch64-apple-darwin	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/aarch64-apple-darwin.tgz	7A79E7D209B4010180306D75C4819AA12C7E378D40EEFA00D65E49E280ED8AD9
 none	x86_64-unknown-linux-gnu	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/x86_64-unknown-linux-gnu.tgz	D40DFF92B1994E57255337D36D78BA74E2DE6FB1FABB8BD7F72306EA83FE785F
+train	aarch64-apple-darwin	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/aarch64-apple-darwin+train.tgz	AD0D13CC6F6B803552D77CAC5BC419C08516E6ABE6A8CF3F28CF1420FEED854F
+train	x86_64-apple-darwin	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/x86_64-apple-darwin+train.tgz	29926DB6CB43222EDC57E23E9CE9CDFA41C372F6243EAF31A47E66CE9E9A1FCF
+none	aarch64-apple-darwin	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/aarch64-apple-darwin.tgz	DEB27935DDD908484D26262C681746DBCA453A24E648E5279D9274FC9F02F06A
+none	x86_64-apple-darwin	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.21.0/x86_64-apple-darwin.tgz	6950B414DDB10B86E8DC4C12B96EF56461E049B4A4B30119100E9A59239CBEE1

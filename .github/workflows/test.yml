@@ -39,11 +39,7 @@ jobs:
           - os: ubuntu-24.04-arm
           - os: windows-latest
           - os: macos-13
-            env:
-              RUSTFLAGS: "-Clink-arg=-fapple-link-rtlib"
           - os: macos-15
-            env:
-              RUSTFLAGS: "-Clink-arg=-fapple-link-rtlib"
     steps:
       - uses: actions/checkout@v4
       - name: Install stable Rust toolchain
@@ -55,7 +51,8 @@ jobs:
         run: |
           cargo test -p ort --verbose --features fetch-models -- --test-threads 1
         env:
-          RUSTFLAGS: ${{ matrix.platform.env.RUSTFLAGS }}
+          RUSTFLAGS: ${{ startsWith(matrix.platform.os, 'macos') && '-Clink-arg=-fapple-link-rtlib' || '' }}
+          RUSTDOCFLAGS: ${{ startsWith(matrix.platform.os, 'macos') && '-Clink-arg=-fapple-link-rtlib' || '' }}
   # Disable cross-compile until cross updates aarch64-unknown-linux-gnu to Ubuntu 22.04
   # ref https://github.com/cross-rs/cross/pull/973
   #cross-compile:

@@ -420,7 +420,7 @@ impl MemoryInfo {
 
 	// All getter functions are (at least currently) infallible - they simply just dereference the corresponding fields,
 	// and always return `nullptr` for the status; so none of these have to return `Result`s.
-	// https://github.com/microsoft/onnxruntime/blob/v1.20.2/onnxruntime/core/framework/allocator.cc#L171
+	// https://github.com/microsoft/onnxruntime/blob/v1.21.0/onnxruntime/core/framework/allocator.cc#L181
 
 	/// Returns the [`MemoryType`] described by this struct.
 	/// ```

@@ -5,11 +5,11 @@ static API_BASE: ort_sys::OrtApiBase = ort_sys::OrtApiBase {
 static API: ort_sys::OrtApi = ort_tract::api();
 
 unsafe extern "system" fn get_version_string() -> *const ort_sys::c_char {
-	c"1.20.0+tract@0.21-wrapper@0.1.0".as_ptr()
+	c"1.21.0+tract@0.21-wrapper@0.1.0".as_ptr()
 }
 
 unsafe extern "system" fn get_api(version: u32) -> *const ort_sys::OrtApi {
-	if version <= 20 { &API as *const _ } else { core::ptr::null() }
+	if version <= 21 { &API as *const _ } else { core::ptr::null() }
 }
 
 #[no_mangle]

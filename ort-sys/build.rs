@@ -457,7 +457,14 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 			let feature_set = if !feature_set.is_empty() { feature_set.join(",") } else { "none".to_owned() };
 			println!("selected feature set: {feature_set}");
 
-			let dist = find_dist(&target, &feature_set);
+			let mut dist = find_dist(&target, &feature_set);
+			if dist.is_none() && feature_set != "none" {
+				println!("full feature set {feature_set} not available, attempting to download with no features instead");
+				// i dont like this behavior at all but the only thing i like less than it is rust-analyzer breaking because it
+				// ***insists*** on enabling --all-features
+				dist = find_dist(&target, "none");
+			}
+
 			if dist.is_none() {
 				panic!(
 					"downloaded binaries not available for target {target}{}\nyou may have to compile ONNX Runtime from source",

@@ -28,7 +28,7 @@ fn main() {
 
 	// Download model.
 	{
-		let mut request = get("https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/ex_models/yolov8m.onnx").expect("Cannot request model.");
+		let mut request = get("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/yolov8m.onnx").expect("Cannot request model.");
 		let mut buf = Vec::<u8>::new();
 		request.read_to_end(&mut buf).expect("Cannot read model.");
 		let mut file = File::create("./yolov8m.onnx").expect("Cannot create model file.");

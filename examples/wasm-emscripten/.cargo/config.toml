@@ -1,0 +1,13 @@
+[unstable]
+build-std = ["std"]
+
+[build]
+target = "wasm32-unknown-emscripten"
+rustflags = [
+    "-Clink-args=-fno-rtti -pthread -msimd128 -msse4.2 -sEXPORT_ALL -sSTACK_SIZE=5MB -sUSE_PTHREADS -sDEFAULT_PTHREAD_STACK_SIZE=2MB -sPTHREAD_POOL_SIZE=20 -sINITIAL_MEMORY=1GB -sEXPORT_ES6 --no-entry",
+    "-Ctarget-feature=+atomics,+bulk-memory,+mutable-globals"
+]
+
+# Debug build might benefit from further flags, but one cannot yet set debug-only rustflags.
+# See: https://github.com/rust-lang/cargo/issues/10271
+# -fexceptions, -gsource-map, -sASSERTIONS, -sNO_DISABLE_EXCEPTION_CATCHING

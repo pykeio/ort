@@ -52,12 +52,12 @@ strip = true
 codegen-units = 1
 
 [package.metadata.docs.rs]
-features = [ "std", "ndarray", "half", "training", "fetch-models", "load-dynamic", "copy-dylibs" ]
+features = [ "std", "ndarray", "half", "num-complex", "training", "fetch-models", "load-dynamic", "copy-dylibs" ]
 targets = ["x86_64-unknown-linux-gnu"]
 rustdoc-args = [ "--cfg", "docsrs" ]
 
 [features]
-default = [ "std", "ndarray", "half", "tracing", "download-binaries", "copy-dylibs" ]
+default = [ "std", "ndarray", "tracing", "download-binaries", "copy-dylibs" ]
 
 std = [ "ort-sys/std", "ndarray/std", "tracing?/std" ]
 training = [ "ort-sys/training" ]

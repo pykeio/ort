@@ -174,7 +174,7 @@ fn static_link_prerequisites(using_pyke_libs: bool) {
 		println!("cargo:rustc-link-lib=D3D12");
 		println!("cargo:rustc-link-lib=DirectML");
 	}
-	if cfg!(feature = "webgpu") && using_pyke_libs {
+	if cfg!(feature = "webgpu") && !target_triple.contains("wasm32") && using_pyke_libs {
 		println!("cargo:rustc-link-lib=webgpu_dawn");
 	}
 }

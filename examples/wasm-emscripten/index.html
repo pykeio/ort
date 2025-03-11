@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Ort in the Web</title>
+    <script type="module">
+        import example from "./wasm_example.js";
+        window.addEventListener("DOMContentLoaded", () => {
+            example().then(instance => {
+                // Get elements from page.
+                const canvas = document.getElementById("canvas");
+                const select = document.getElementById("select");
+                const button = document.getElementById("button");
+                const ctx = canvas.getContext("2d");
+
+                if (select !== undefined && button !== undefined && ctx !== undefined) {
+                    // Paint the picture into the canvas.
+                    const updateCanvas = () => {
+                        const image = new Image();
+                        image.src = select.value;
+                        image.onload = () => {
+                            canvas.width = image.naturalWidth;
+                            canvas.height = image.naturalHeight;
+                            ctx.drawImage(image, 0, 0);
+                        };
+                    };
+                    select.addEventListener("change", (event) => {
+                        updateCanvas();
+                    });
+                    updateCanvas(); // Initial call.
+
+                    // Classify the objects in the canvas.
+                    button.addEventListener("click", () => {
+                        const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const buffer = new Uint8Array(data.data.buffer);
+                        const byteCount = canvas.width * canvas.height * 4;
+                        let pointer = instance._alloc(byteCount);
+                        for (let i = 0; i < byteCount; i++) {
+                            instance.HEAPU8[pointer + i] = buffer[i]; // Inefficient copying.
+                        }
+                        instance._detect_objects(pointer, canvas.width, canvas.height);
+                        instance._dealloc(pointer, byteCount);
+                    });
+
+                    console.log("Ready to classify. Classification results will be printed here.")
+                };
+            });
+        });
+
+
+    </script>
+</head>
+
+<body>
+    <h1>Example using the ort-crate in the Web</h1>
+    <div>
+        <canvas id="canvas" style="width: 512px; background: gray;"></canvas>
+    </div>
+    <div>
+        <select id="select">
+            <option value="pictures/banana.jpg">Banana</option>
+            <option value="pictures/rat.jpg">Rat</option>
+            <option value="pictures/bicycle.jpg">Bicycle</option>
+            <option value="pictures/baseball.jpg">Baseball</option>
+        </select>
+        <button id="button">
+            Classify objects!
+        </button>
+    </div>
+    <div>
+        See the developer console for classification results.
+    </div>
+</body>
+
+</html>

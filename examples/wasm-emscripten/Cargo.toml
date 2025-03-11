@@ -1,0 +1,18 @@
+[package]
+publish = false
+name = "example-wasm-emscripten"
+version = "0.0.0"
+edition = "2021"
+
+[[bin]]
+path = "src/main.rs"
+name = "wasm_example"
+
+[dependencies]
+ort = { path = "../../", default-features = false, features = ["ndarray", "webgpu", "download-binaries"] }
+ndarray = "0.16"
+image = "0.25"
+
+[build-dependencies]
+glob = "0.3"
+reqwest = { version = "0.12", features = ["blocking"] }

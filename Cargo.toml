@@ -24,7 +24,8 @@ default-members = [
 exclude = [
 	'backends/candle',
 	'backends/tract',
-	'examples/cudarc'
+	'examples/cudarc',
+	'examples/wasm-emscripten'
 ]
 
 [package]

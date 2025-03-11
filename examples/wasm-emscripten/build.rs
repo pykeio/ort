@@ -38,9 +38,9 @@ fn main() {
 	// Copy index.html and pictures to target directory.
 	{
 		println!("cargo:rerun-if-changed=index.html");
-		std::fs::copy("index.html", format!("../../target/wasm32-unknown-emscripten/{mode}/index.html")).expect("Cannot copy index.html.");
+		std::fs::copy("index.html", format!("./target/wasm32-unknown-emscripten/{mode}/index.html")).expect("Cannot copy index.html.");
 
 		println!("cargo:rerun-if-changed=pictures/*");
-		copy_dir_all("pictures", format!("../../target/wasm32-unknown-emscripten/{mode}/pictures")).expect("Cannot copy pictures.");
+		copy_dir_all("pictures", format!("./target/wasm32-unknown-emscripten/{mode}/pictures")).expect("Cannot copy pictures.");
 	}
 }

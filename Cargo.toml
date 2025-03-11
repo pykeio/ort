@@ -9,8 +9,7 @@ members = [
 	'examples/phi-3-vision',
 	'examples/modnet',
 	'examples/sentence-transformers',
-	'examples/training',
-	'examples/wasm-emscripten',
+	'examples/training'
 ]
 default-members = [
 	'.',
@@ -25,7 +24,8 @@ default-members = [
 exclude = [
 	'backends/candle',
 	'backends/tract',
-	'examples/cudarc'
+	'examples/cudarc',
+	'examples/wasm-emscripten'
 ]
 
 [package]

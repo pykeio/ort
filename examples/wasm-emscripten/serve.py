@@ -22,7 +22,7 @@ class CORSRequestHandler (SimpleHTTPRequestHandler):
         SimpleHTTPRequestHandler.end_headers(self)
 
 # Serve index.html.
-chdir(path.join(path.dirname(__file__), f"../../target/wasm32-unknown-emscripten/{mode}"))
+chdir(path.join(path.dirname(__file__), f"target/wasm32-unknown-emscripten/{mode}"))
 httpd = HTTPServer(("localhost", 5555), CORSRequestHandler)
 print(f"Serving {mode} build at: http://localhost:5555")
 httpd.serve_forever()

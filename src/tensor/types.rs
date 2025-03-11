@@ -208,6 +208,12 @@ impl_type_trait!(u64, Uint64);
 #[cfg(feature = "half")]
 #[cfg_attr(docsrs, doc(cfg(feature = "half")))]
 impl_type_trait!(half::bf16, Bfloat16);
+#[cfg(feature = "num-complex")]
+#[cfg_attr(docsrs, doc(cfg(feature = "num-complex")))]
+impl_type_trait!(num_complex::Complex32, Complex64);
+#[cfg(feature = "num-complex")]
+#[cfg_attr(docsrs, doc(cfg(feature = "num-complex")))]
+impl_type_trait!(num_complex::Complex64, Complex128);
 
 impl IntoTensorElementType for String {
 	fn into_tensor_element_type() -> TensorElementType {

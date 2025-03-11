@@ -64,6 +64,7 @@ training = [ "ort-sys/training" ]
 
 ndarray = [ "dep:ndarray" ]
 half = [ "dep:half" ]
+num-complex = [ "dep:num-complex" ]
 tracing = [ "dep:tracing" ]
 
 fetch-models = [ "std", "dep:ureq", "dep:sha2" ]
@@ -102,6 +103,7 @@ ureq = { version = "3", optional = true, default-features = false, features = [ 
 sha2 = { version = "0.10", optional = true }
 tracing = { version = "0.1", optional = true, default-features = false }
 half = { version = "2.1", default-features = false, optional = true }
+num-complex = { version = "0.4", default-features = false, optional = true }
 
 [dev-dependencies]
 anyhow = "1.0"

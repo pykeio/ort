@@ -121,9 +121,7 @@ impl IoBinding {
 	/// [`IoBinding::clear_inputs`] or [`IoBinding::clear`]).
 	///
 	/// The data is only copied upon invocation of this function. Any changes to the given value afterwards will not
-	/// affect the data seen by the session until the value is re-bound. Subsequent re-binds, or calls to
-	/// [`IoBinding::synchronize_inputs`] will copy the data again, hence why [`IoBinding`] is really only suitable when
-	/// one or more inputs do not change between runs.
+	/// affect the data seen by the session until the value is re-bound.
 	pub fn bind_input<T: ValueTypeMarker, S: AsRef<str>>(&mut self, name: S, ort_value: &Value<T>) -> Result<()> {
 		let name = name.as_ref();
 		let cname = CString::new(name)?;
@@ -179,15 +177,12 @@ impl IoBinding {
 	// on the C side - all they do is iterate through all nodes' EPs and call their device synchronize function
 	// (cudaDeviceSynchronize/hipDeviceSynchronize), which I assume would be thread-safe
 
-	/// Synchronize all bound inputs.
-	///
-	/// Each input previously bound via [`IoBinding::bind_input`] will have its data re-copied to the session device
-	/// immediately. Unlike [`IoBinding::bind_input`], this is a **synchronous** operation.
+	/// Synchronize all bound inputs, ensuring any pending asynchronous transfers are completed.
 	pub fn synchronize_inputs(&self) -> Result<()> {
 		ortsys![unsafe SynchronizeBoundInputs(self.ptr().cast_mut())?];
 		Ok(())
 	}
-	/// Synchronize all bound outputs.
+	/// Synchronize all bound outputs, ensuring any pending asynchronous transfers are completed.
 	pub fn synchronize_outputs(&self) -> Result<()> {
 		ortsys![unsafe SynchronizeBoundOutputs(self.ptr().cast_mut())?];
 		Ok(())

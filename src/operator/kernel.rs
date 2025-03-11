@@ -2,7 +2,6 @@ use alloc::{boxed::Box, ffi::CString, string::String, vec, vec::Vec};
 use core::{
 	ffi::{c_char, c_void},
 	mem::size_of,
-	ops::{Deref, DerefMut},
 	ptr::{self, NonNull},
 	slice
 };

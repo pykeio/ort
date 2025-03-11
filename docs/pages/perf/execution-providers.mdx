@@ -11,12 +11,11 @@ ONNX Runtime must be compiled from source with support for each execution provid
 
 * 🔷 - Supported by `ort`.
 * ✅ - Static binaries provided by pyke.
-* 🟢 - Dynamic binaries provided by pyke.
 
 | EP | Cargo feature | Supported | Binaries |
 |:-------- |:------- |:-------:|:------:|
-| [NVIDIA CUDA](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html) | `cuda` | 🔷 | 🟢 |
-| [NVIDIA TensorRT](https://onnxruntime.ai/docs/execution-providers/TensorRT-ExecutionProvider.html) | `tensorrt` | 🔷 | 🟢 |
+| [NVIDIA CUDA](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html) | `cuda` | 🔷 | ✅ |
+| [NVIDIA TensorRT](https://onnxruntime.ai/docs/execution-providers/TensorRT-ExecutionProvider.html) | `tensorrt` | 🔷 | ✅ |
 | [Microsoft DirectML](https://onnxruntime.ai/docs/execution-providers/DirectML-ExecutionProvider.html) | `directml` | 🔷 | ✅ |
 | [Apple CoreML](https://onnxruntime.ai/docs/execution-providers/CoreML-ExecutionProvider.html) | `coreml` | 🔷 | ✅ |
 | [AMD ROCm](https://onnxruntime.ai/docs/execution-providers/ROCm-ExecutionProvider.html) | `rocm` | 🔷 | ❌ |
@@ -32,16 +31,8 @@ ONNX Runtime must be compiled from source with support for each execution provid
 | [AMD MIGraphX](https://onnxruntime.ai/docs/execution-providers/MIGraphX-ExecutionProvider.html) | `migraphx` | 🔷 | ❌ |
 | [AMD Vitis AI](https://onnxruntime.ai/docs/execution-providers/Vitis-AI-ExecutionProvider.html) | `vitis` | 🔷 | ❌ |
 | [Rockchip RKNPU](https://onnxruntime.ai/docs/execution-providers/community-maintained/RKNPU-ExecutionProvider.html) | `rknpu` | 🔷 | ❌ |
-| WebGPU | `webgpu` | 🔷 | ✅<sup>\*</sup> |
+| WebGPU | `webgpu` | 🔷 | ✅ |
 | [Microsoft Azure](https://onnxruntime.ai/docs/execution-providers/Azure-ExecutionProvider.html) | `azure` | 🔷 | ❌ |
-
-<div style={{ opacity: 0.5, display: 'flex', flexDirection: 'column', fontSize: '0.75rem' }}>
-<p>\* WebGPU binaries are currently only available for <code>wasm32-unknown-emscripten</code>.</p>
-</div>
-
-<Callout type='default'>
-    Note that a few execution providers (notably CUDA, TensorRT, and ROCm) are only available with **dynamic linking**. Dynamic linking may require additional setup to get working; see [Linking > Dynamic linking](/setup/linking#dynamic-linking).
-</Callout>
 
 ## Registering execution providers
 <Callout type='info'>
@@ -213,11 +204,18 @@ If it seems like the execution provider is not registering properly, or you are 
 
 ## Notes
 
+### Dynamically-linked EP requirements
+Certain EPs like CUDA and TensorRT use a separate interface that require them to be compiled as dynamic libraries which are loaded at runtime when the EP is registered. The DirectML and WebGPU EP do not use this interface, but do require helper dylibs.
+
+Due to the quirks of dynamic library loading, you may encounter issues with builds including these EPs due to ONNX Runtime failing to find the dylibs at runtime. `ort`'s `copy-dylibs` Cargo feature (which is enabled by default) tries to alleviate this issue by symlinking these dylibs into your `target` folder so they can be found by your application when in development. On Windows platforms that don't have [Developer Mode](https://learn.microsoft.com/en-us/windows/uwp/get-started/enable-your-device-for-development) enabled, a copy is instead performed (excluding examples and tests). On other platforms, additional setup is required to get the application to load dylibs from its parent folder.
+
+See [Runtime dylib loading](/setup/linking#runtime-dylib-loading) for more information.
+
 ### CUDA
 `ort` provides binaries for CUDA 12 with cuDNN 9.x only. Make sure the correct version of CUDA & cuDNN are installed and available on the `PATH`.
 
 ### CoreML
-Statically linking to CoreML (the default behavior when using downloaded binaries + the `coreml` Cargo feature) requires an additional Rust flag in order to link properly. You'll need to provide the flag `-C link-arg=-fapple-link-rtlib` to `rustc`. You can do this via a build script, an entry in [`.cargo/config.toml`](https://doc.rust-lang.org/cargo/reference/config.html), or an environment variable.
+Statically linking to CoreML (the default behavior when using downloaded binaries) requires an additional Rust flag in order to link properly. You'll need to provide the flag `-C link-arg=-fapple-link-rtlib` to `rustc`. You can do this via a build script, an entry in [`.cargo/config.toml`](https://doc.rust-lang.org/cargo/reference/config.html), or an environment variable.
 
 <Tabs items={['Build script', 'Cargo config', 'Environment variable']}>
     <Tabs.Tab title="Build script">
@@ -249,3 +247,8 @@ Statically linking to CoreML (the default behavior when using downloaded binarie
         ```
     </Tabs.Tab>
 </Tabs>
+
+### WebGPU
+The WebGPU EP is **experimental** and may produce incorrect results/crashes; these issues should be reported upstream as there's unfortunately nothing we can do aobut them.
+
+WebGPU binaries are provided for Windows & Linux. On Windows, the build supports running on DirectX 12 or DirectX 11. On Linux, it supports Vulkan & OpenGL/GLES.

@@ -1,7 +1,7 @@
 mod create;
 mod extract;
 
-use alloc::{sync::Arc, vec};
+use alloc::{string::String, sync::Arc, vec};
 use core::{
 	fmt::{self, Debug},
 	marker::PhantomData,

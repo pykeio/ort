@@ -127,7 +127,7 @@ impl DynTensor {
 				dtype: ValueType::Tensor {
 					ty: data_type,
 					dimensions: shape,
-					dimension_symbols: vec![None; shape_len]
+					dimension_symbols: vec![String::default(); shape_len]
 				},
 				drop: true,
 				memory_info: MemoryInfo::from_value(value_ptr),
@@ -351,7 +351,7 @@ mod tests {
 		assert_eq!(value.dtype(), &ValueType::Tensor {
 			ty: TensorElementType::Float32,
 			dimensions: vec![v.len() as i64],
-			dimension_symbols: vec![None]
+			dimension_symbols: vec![String::default()]
 		});
 
 		let (shape, data) = value.extract_raw_tensor();

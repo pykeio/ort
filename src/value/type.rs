@@ -1,6 +1,5 @@
 use alloc::{
 	boxed::Box,
-	ffi::CString,
 	string::{String, ToString},
 	vec,
 	vec::Vec
@@ -10,7 +9,7 @@ use core::{
 	fmt, ptr
 };
 
-use crate::{ortsys, tensor::TensorElementType};
+use crate::{ortsys, tensor::TensorElementType, util::with_cstr_ptr_array};
 
 /// The type of a [`Value`][super::Value], or a session input/output.
 ///
@@ -26,12 +25,7 @@ use crate::{ortsys, tensor::TensorElementType};
 /// 	// Our model has 3 dynamic dimensions, represented by -1
 /// 	dimensions: vec![-1, -1, -1, 3],
 /// 	// Dynamic dimensions may also have names.
-/// 	dimension_symbols: vec![
-/// 		Some("unk__31".to_string()),
-/// 		Some("unk__32".to_string()),
-/// 		Some("unk__33".to_string()),
-/// 		None
-/// 	]
+/// 	dimension_symbols: vec!["unk__31".to_string(), "unk__32".to_string(), "unk__33".to_string(), String::default()]
 /// });
 ///
 /// // ...or by `Value`s created in Rust or output by a session.
@@ -39,7 +33,7 @@ use crate::{ortsys, tensor::TensorElementType};
 /// assert_eq!(value.dtype(), &ValueType::Tensor {
 /// 	ty: TensorElementType::Int64,
 /// 	dimensions: vec![5],
-/// 	dimension_symbols: vec![None]
+/// 	dimension_symbols: vec![String::default()]
 /// });
 /// # 	Ok(())
 /// # }
@@ -58,7 +52,7 @@ pub enum ValueType {
 		/// [`Input`]: crate::session::Input
 		/// [`Output`]: crate::session::Output
 		dimensions: Vec<i64>,
-		dimension_symbols: Vec<Option<String>>
+		dimension_symbols: Vec<String>
 	},
 	/// A sequence (vector) of other `Value`s.
 	///
@@ -147,18 +141,11 @@ impl ValueType {
 				ortsys![unsafe CreateTensorTypeAndShapeInfo(&mut info_ptr).expect("infallible")];
 				ortsys![unsafe SetTensorElementType(info_ptr, (*ty).into()).expect("infallible")];
 				ortsys![unsafe SetDimensions(info_ptr, dimensions.as_ptr(), dimensions.len()).expect("infallible")];
-				let dimension_symbols: Vec<*const c_char> = dimension_symbols
-					.iter()
-					.cloned()
-					.map(|s| CString::new(s.unwrap_or_default()))
-					.map(|s| s.map_or(ptr::null(), |s| s.into_raw().cast_const()))
-					.collect();
-				ortsys![unsafe SetSymbolicDimensions(info_ptr, dimension_symbols.as_ptr().cast_mut(), dimension_symbols.len()).expect("infallible")];
-				for p in dimension_symbols {
-					if !p.is_null() {
-						drop(unsafe { CString::from_raw(p.cast_mut().cast()) });
-					}
-				}
+				with_cstr_ptr_array(dimension_symbols, &|ptrs| {
+					ortsys![unsafe SetSymbolicDimensions(info_ptr, ptrs.as_ptr().cast_mut(), dimension_symbols.len()).expect("infallible")];
+					Ok(())
+				})
+				.expect("invalid dimension symbols");
 				Some(info_ptr)
 			}
 			_ => None
@@ -227,20 +214,24 @@ impl fmt::Display for ValueType {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
 			ValueType::Tensor { ty, dimensions, dimension_symbols } => {
-				write!(
-					f,
-					"Tensor<{ty}>({})",
-					dimensions
-						.iter()
-						.enumerate()
-						.map(|(i, c)| if *c == -1 {
-							dimension_symbols[i].clone().unwrap_or_else(|| String::from("dyn"))
+				write!(f, "Tensor<{ty}>(")?;
+				for (i, dimension) in dimensions.iter().copied().enumerate() {
+					if dimension == -1 {
+						let sym = &dimension_symbols[i];
+						if sym.is_empty() {
+							f.write_str("dyn")?;
 						} else {
-							c.to_string()
-						})
-						.collect::<Vec<_>>()
-						.join(", ")
-				)
+							f.write_str(sym)?;
+						}
+					} else {
+						dimension.fmt(f)?;
+					}
+					if i != dimensions.len() - 1 {
+						f.write_str(", ")?;
+					}
+				}
+				f.write_str(")")?;
+				Ok(())
 			}
 			ValueType::Map { key, value } => write!(f, "Map<{key}, {value}>"),
 			ValueType::Sequence(inner) => write!(f, "Sequence<{inner}>"),
@@ -265,13 +256,7 @@ pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys
 
 	let dimension_symbols = symbolic_dims
 		.into_iter()
-		.map(|c| {
-			if !c.is_null() && unsafe { *c } != 0 {
-				unsafe { CStr::from_ptr(c) }.to_str().ok().map(str::to_string)
-			} else {
-				None
-			}
-		})
+		.map(|c| unsafe { CStr::from_ptr(c) }.to_str().map_or_else(|_| String::new(), str::to_string))
 		.collect();
 
 	ValueType::Tensor {
@@ -310,7 +295,7 @@ mod tests {
 		let ty = ValueType::Tensor {
 			ty: TensorElementType::Float32,
 			dimensions: vec![-1, 32, 4, 32],
-			dimension_symbols: vec![Some("d1".to_string()), None, None, None]
+			dimension_symbols: vec!["d1".to_string(), String::default(), String::default(), String::default()]
 		};
 		let ty_ptr = ty.to_tensor_type_info().expect("");
 		let ty_d = unsafe { super::extract_data_type_from_tensor_info(ty_ptr) };

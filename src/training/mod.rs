@@ -1,9 +1,6 @@
 //! Provides [`Trainer`], a simple interface for on-device training/fine-tuning.
 
-use alloc::{
-	ffi::CString,
-	string::{String, ToString}
-};
+use alloc::string::{String, ToString};
 use core::{
 	ffi::{CStr, c_char},
 	marker::PhantomData,
@@ -16,6 +13,7 @@ use crate::{
 	memory::Allocator,
 	ortsys,
 	session::{NoSelectedOutputs, RunOptions},
+	util::with_cstr,
 	value::{DynTensor, Value, ValueType, ValueTypeMarker, r#type::extract_data_type_from_tensor_info}
 };
 
@@ -129,36 +127,40 @@ impl Checkpoint {
 	}
 
 	pub fn add_property(&mut self, name: impl AsRef<str>, property: impl Into<Property>) -> Result<()> {
-		let name = CString::new(name.as_ref())?;
-		match property.into() {
-			Property::Int(value) => {
-				trainsys![unsafe AddProperty(self.ptr.as_ptr(), name.as_ptr(), ort_sys::OrtPropertyType::OrtIntProperty, (&value as *const i64).cast())?]
+		let property = property.into();
+		with_cstr(name.as_ref().as_bytes(), &|name| {
+			match &property {
+				Property::Int(value) => {
+					trainsys![unsafe AddProperty(self.ptr.as_ptr(), name.as_ptr(), ort_sys::OrtPropertyType::OrtIntProperty, (value as *const i64).cast())?];
+				}
+				Property::Float(value) => {
+					trainsys![unsafe AddProperty(self.ptr.as_ptr(), name.as_ptr(), ort_sys::OrtPropertyType::OrtFloatProperty, (value as *const f32).cast())?];
+				}
+				Property::String(value) => with_cstr(value.as_bytes(), &|value| {
+					trainsys![unsafe AddProperty(self.ptr.as_ptr(), name.as_ptr(), ort_sys::OrtPropertyType::OrtStringProperty, value.as_ptr().cast())?];
+					Ok(())
+				})?
 			}
-			Property::Float(value) => {
-				trainsys![unsafe AddProperty(self.ptr.as_ptr(), name.as_ptr(), ort_sys::OrtPropertyType::OrtFloatProperty, (&value as *const f32).cast())?]
-			}
-			Property::String(value) => {
-				let value = CString::new(value)?;
-				trainsys![unsafe AddProperty(self.ptr.as_ptr(), name.as_ptr(), ort_sys::OrtPropertyType::OrtStringProperty, value.as_ptr().cast())?]
-			}
-		}
-		Ok(())
+			Ok(())
+		})
 	}
 
 	pub fn get_property(&self, name: impl AsRef<str>) -> Option<Property> {
-		let name = CString::new(name.as_ref()).ok()?;
-		let mut allocator = Allocator::default();
-		let mut property_type: ort_sys::OrtPropertyType = ort_sys::OrtPropertyType::OrtIntProperty;
-		let mut property_value: *const () = ptr::null();
+		let allocator = Allocator::default();
 
-		let status = trainsys![unsafe GetProperty(
-			self.ptr.as_ptr(),
-			name.as_ptr(),
-			allocator.ptr_mut(),
-			&mut property_type,
-			&mut property_value
-		)];
-		unsafe { crate::error::status_to_result(status) }.ok()?;
+		let (property_type, property_value) = with_cstr(name.as_ref().as_bytes(), &|name| {
+			let mut property_type: ort_sys::OrtPropertyType = ort_sys::OrtPropertyType::OrtIntProperty;
+			let mut property_value: *const () = ptr::null();
+			trainsys![unsafe GetProperty(
+				self.ptr.as_ptr(),
+				name.as_ptr(),
+				allocator.ptr().cast_mut(),
+				&mut property_type,
+				&mut property_value
+			)?];
+			Ok((property_type, property_value))
+		})
+		.ok()?;
 
 		Some(match property_type {
 			ort_sys::OrtPropertyType::OrtIntProperty => Property::Int(unsafe { *property_value.cast::<i64>() }),
@@ -172,24 +174,27 @@ impl Checkpoint {
 	}
 
 	pub fn get_parameter(&self, name: impl AsRef<str>, allocator: &Allocator) -> Result<DynTensor> {
-		let name = CString::new(name.as_ref())?;
-
-		let mut value_ptr = ptr::null_mut();
-		trainsys![unsafe GetParameter(self.ptr.as_ptr(), name.as_ptr(), allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
+		let value_ptr = with_cstr(name.as_ref().as_bytes(), &|name| {
+			let mut value_ptr = ptr::null_mut();
+			trainsys![unsafe GetParameter(self.ptr.as_ptr(), name.as_ptr(), allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
+			Ok(value_ptr)
+		})?;
 		Ok(unsafe { DynTensor::from_ptr(NonNull::new_unchecked(value_ptr), None) })
 	}
 
 	pub fn update_parameter<T: ValueTypeMarker>(&mut self, name: impl AsRef<str>, value: &Value<T>) -> Result<()> {
-		let name = CString::new(name.as_ref())?;
-		trainsys![unsafe UpdateParameter(self.ptr.as_ptr(), name.as_ptr(), value.ptr().cast_mut())?];
-		Ok(())
+		with_cstr(name.as_ref().as_bytes(), &|name| {
+			trainsys![unsafe UpdateParameter(self.ptr.as_ptr(), name.as_ptr(), value.ptr().cast_mut())?];
+			Ok(())
+		})
 	}
 
 	pub fn get_parameter_type(&self, name: impl AsRef<str>) -> Result<ValueType> {
-		let name = CString::new(name.as_ref())?;
-
-		let mut shape_info = ptr::null_mut();
-		trainsys![unsafe GetParameterTypeAndShape(self.ptr.as_ptr(), name.as_ptr(), &mut shape_info)?; nonNull(shape_info)];
+		let shape_info = with_cstr(name.as_ref().as_bytes(), &|name| {
+			let mut shape_info = ptr::null_mut();
+			trainsys![unsafe GetParameterTypeAndShape(self.ptr.as_ptr(), name.as_ptr(), &mut shape_info)?; nonNull(shape_info)];
+			Ok(shape_info)
+		})?;
 		let value_type = unsafe { extract_data_type_from_tensor_info(shape_info) };
 		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(shape_info)];
 		Ok(value_type)

@@ -1,10 +1,10 @@
-use alloc::{borrow::Cow, ffi::CString, rc::Rc, sync::Arc, vec::Vec};
+use alloc::{borrow::Cow, rc::Rc, sync::Arc, vec::Vec};
 use core::{
 	any::Any,
 	ptr::{self, NonNull}
 };
 
-use crate::{AsPointer, error::Result, memory::MemoryInfo, operator::OperatorDomain, ortsys, value::DynValue};
+use crate::{AsPointer, error::Result, memory::MemoryInfo, operator::OperatorDomain, ortsys, util::with_cstr, value::DynValue};
 
 mod impl_commit;
 mod impl_config_keys;
@@ -98,10 +98,13 @@ impl SessionBuilder {
 	}
 
 	pub(crate) fn add_config_entry(&mut self, key: &str, value: &str) -> Result<()> {
-		let key = CString::new(key)?;
-		let value = CString::new(value)?;
-		ortsys![unsafe AddSessionConfigEntry(self.ptr_mut(), key.as_ptr(), value.as_ptr())?];
-		Ok(())
+		let ptr = self.ptr_mut();
+		with_cstr(key.as_bytes(), &|key| {
+			with_cstr(value.as_bytes(), &|value| {
+				ortsys![unsafe AddSessionConfigEntry(ptr, key.as_ptr(), value.as_ptr())?];
+				Ok(())
+			})
+		})
 	}
 
 	/// Adds a custom configuration entry to the session.

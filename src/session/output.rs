@@ -1,4 +1,4 @@
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
 use core::{
 	ffi::c_void,
 	iter::FusedIterator,
@@ -7,8 +7,11 @@ use core::{
 	ptr
 };
 
+use smallvec::SmallVec;
+
 use crate::{
 	memory::Allocator,
+	util::STACK_SESSION_OUTPUTS,
 	value::{DynValue, ValueRef, ValueRefMut}
 };
 
@@ -34,8 +37,8 @@ use crate::{
 /// [`Session`]: crate::session::Session
 #[derive(Debug)]
 pub struct SessionOutputs<'r, 's> {
-	keys: Vec<&'r str>,
-	values: Vec<DynValue>,
+	keys: SmallVec<&'r str, { STACK_SESSION_OUTPUTS }>,
+	values: SmallVec<DynValue, { STACK_SESSION_OUTPUTS }>,
 	effective_len: usize,
 	backing_ptr: Option<(&'s Allocator, *mut c_void)>
 }
@@ -43,7 +46,7 @@ pub struct SessionOutputs<'r, 's> {
 unsafe impl Send for SessionOutputs<'_, '_> {}
 
 impl<'r, 's> SessionOutputs<'r, 's> {
-	pub(crate) fn new(output_names: Vec<&'r str>, output_values: Vec<DynValue>) -> Self {
+	pub(crate) fn new(output_names: SmallVec<&'r str, { STACK_SESSION_OUTPUTS }>, output_values: SmallVec<DynValue, { STACK_SESSION_OUTPUTS }>) -> Self {
 		debug_assert_eq!(output_names.len(), output_values.len());
 		Self {
 			effective_len: output_names.len(),
@@ -53,7 +56,12 @@ impl<'r, 's> SessionOutputs<'r, 's> {
 		}
 	}
 
-	pub(crate) fn new_backed(output_names: Vec<&'r str>, output_values: Vec<DynValue>, allocator: &'s Allocator, backing_ptr: *mut c_void) -> Self {
+	pub(crate) fn new_backed(
+		output_names: SmallVec<&'r str, { STACK_SESSION_OUTPUTS }>,
+		output_values: SmallVec<DynValue, { STACK_SESSION_OUTPUTS }>,
+		allocator: &'s Allocator,
+		backing_ptr: *mut c_void
+	) -> Self {
 		debug_assert_eq!(output_names.len(), output_values.len());
 		Self {
 			effective_len: output_names.len(),
@@ -66,8 +74,8 @@ impl<'r, 's> SessionOutputs<'r, 's> {
 	pub(crate) fn new_empty() -> Self {
 		Self {
 			effective_len: 0,
-			keys: Vec::new(),
-			values: Vec::new(),
+			keys: SmallVec::new(),
+			values: SmallVec::new(),
 			backing_ptr: None
 		}
 	}
@@ -402,8 +410,8 @@ impl ExactSizeIterator for IterMut<'_, '_> {}
 impl FusedIterator for IterMut<'_, '_> {}
 
 pub struct IntoIter<'r, 's> {
-	keys: alloc::vec::IntoIter<&'r str>,
-	values: alloc::vec::IntoIter<DynValue>,
+	keys: smallvec::IntoIter<&'r str, { STACK_SESSION_OUTPUTS }>,
+	values: smallvec::IntoIter<DynValue, { STACK_SESSION_OUTPUTS }>,
 	effective_len: usize,
 	backing_ptr: Option<(&'s Allocator, *mut c_void)>
 }

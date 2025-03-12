@@ -1,4 +1,4 @@
-use alloc::{ffi::CString, string::String, vec::Vec};
+use alloc::{string::String, vec::Vec};
 use core::{
 	ffi::c_char,
 	marker::PhantomData,
@@ -6,7 +6,7 @@ use core::{
 	slice
 };
 
-use crate::{AsPointer, char_p_to_string, error::Result, memory::Allocator, ortsys};
+use crate::{AsPointer, char_p_to_string, error::Result, memory::Allocator, ortsys, util::with_cstr};
 
 /// Container for model metadata, including name & producer information.
 pub struct ModelMetadata<'s> {
@@ -113,9 +113,11 @@ impl ModelMetadata<'_> {
 
 	/// Fetch the value of a custom metadata key. Returns `Ok(None)` if the key is not found.
 	pub fn custom(&self, key: &str) -> Result<Option<String>> {
-		let mut str_bytes: *mut c_char = ptr::null_mut();
-		let key_str = CString::new(key)?;
-		ortsys![unsafe ModelMetadataLookupCustomMetadataMap(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), key_str.as_ptr(), &mut str_bytes)?];
+		let str_bytes = with_cstr(key.as_bytes(), &|key| {
+			let mut str_bytes: *mut c_char = ptr::null_mut();
+			ortsys![unsafe ModelMetadataLookupCustomMetadataMap(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), key.as_ptr(), &mut str_bytes)?];
+			Ok(str_bytes)
+		})?;
 		if !str_bytes.is_null() {
 			let value = match char_p_to_string(str_bytes) {
 				Ok(value) => value,

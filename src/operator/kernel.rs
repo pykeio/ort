@@ -6,12 +6,15 @@ use core::{
 	slice
 };
 
+use smallvec::SmallVec;
+
 use crate::{
 	AsPointer,
-	error::{Error, Result, status_to_result},
+	error::{Error, Result},
 	memory::{Allocator, MemoryInfo, MemoryType},
 	ortsys,
 	session::{Input, Output},
+	util::with_cstr,
 	value::{DowncastableTarget, DynValue, Value, ValueRef, ValueRefMut, ValueType}
 };
 
@@ -39,8 +42,7 @@ impl KernelAttributes {
 	}
 
 	pub fn get<'s, T: GetKernelAttribute<'s>>(&'s self, name: impl AsRef<str>) -> Option<T> {
-		let name = CString::new(name.as_ref()).ok()?;
-		unsafe { T::get_from(self.ptr.as_ptr(), name.as_ptr()) }
+		with_cstr(name.as_ref().as_bytes(), &|name| unsafe { T::get_from(self.ptr.as_ptr(), name.as_ptr()) }).ok()
 	}
 
 	pub fn inputs(&self) -> Result<Vec<Input>> {
@@ -153,7 +155,7 @@ pub trait GetKernelAttribute<'s> {
 		Err(Error::new("not implemented"))
 	}
 
-	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
+	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized;
 }
@@ -173,14 +175,13 @@ impl GetKernelAttribute<'_> for f32 {
 		Ok(out)
 	}
 
-	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
+	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
 	{
 		let mut value = Self::default();
-		let res = ortsys![unsafe KernelInfoGetAttribute_float(info, name, &mut value)];
-		unsafe { status_to_result(res) }.ok()?;
-		Some(value)
+		ortsys![unsafe KernelInfoGetAttribute_float(info, name, &mut value)?];
+		Ok(value)
 	}
 }
 
@@ -199,14 +200,13 @@ impl GetKernelAttribute<'_> for i64 {
 		Ok(out)
 	}
 
-	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
+	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
 	{
 		let mut value = Self::default();
-		let res = ortsys![unsafe KernelInfoGetAttribute_int64(info, name, &mut value)];
-		unsafe { status_to_result(res) }.ok()?;
-		Some(value)
+		ortsys![unsafe KernelInfoGetAttribute_int64(info, name, &mut value)?];
+		Ok(value)
 	}
 }
 
@@ -227,17 +227,16 @@ impl GetKernelAttribute<'_> for String {
 			.and_then(|f| f.into_string().map_err(|_| Error::new("invalid string")))
 	}
 
-	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
+	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
 	{
 		let mut size = 0;
-		let res = ortsys![unsafe KernelInfoGetAttribute_string(info, name, ptr::null_mut(), &mut size)];
-		unsafe { status_to_result(res) }.ok()?;
+		ortsys![unsafe KernelInfoGetAttribute_string(info, name, ptr::null_mut(), &mut size)?];
 		let mut out = vec![0u8; size];
-		let res = ortsys![unsafe KernelInfoGetAttribute_string(info, name, out.as_mut_ptr().cast::<c_char>(), &mut size)];
-		unsafe { status_to_result(res) }.ok()?;
-		CString::from_vec_with_nul(out).ok().and_then(|c| c.into_string().ok())
+		ortsys![unsafe KernelInfoGetAttribute_string(info, name, out.as_mut_ptr().cast::<c_char>(), &mut size)?];
+		let string = CString::from_vec_with_nul(out)?;
+		Ok(string.into_string()?)
 	}
 }
 
@@ -256,17 +255,15 @@ impl GetKernelAttribute<'_> for Vec<f32> {
 		Ok(out)
 	}
 
-	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
+	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
 	{
 		let mut size = 0;
-		let res = ortsys![unsafe KernelInfoGetAttributeArray_float(info, name, ptr::null_mut(), &mut size)];
-		unsafe { status_to_result(res) }.ok()?;
+		ortsys![unsafe KernelInfoGetAttributeArray_float(info, name, ptr::null_mut(), &mut size)?];
 		let mut out = vec![0f32; size];
-		let res = ortsys![unsafe KernelInfoGetAttributeArray_float(info, name, out.as_mut_ptr(), &mut size)];
-		unsafe { status_to_result(res) }.ok()?;
-		Some(out)
+		ortsys![unsafe KernelInfoGetAttributeArray_float(info, name, out.as_mut_ptr(), &mut size)?];
+		Ok(out)
 	}
 }
 
@@ -285,22 +282,20 @@ impl GetKernelAttribute<'_> for Vec<i64> {
 		Ok(out)
 	}
 
-	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
+	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
 	{
 		let mut size = 0;
-		let res = ortsys![unsafe KernelInfoGetAttributeArray_int64(info, name, ptr::null_mut(), &mut size)];
-		unsafe { status_to_result(res) }.ok()?;
+		ortsys![unsafe KernelInfoGetAttributeArray_int64(info, name, ptr::null_mut(), &mut size)?];
 		let mut out = vec![0i64; size];
-		let res = ortsys![unsafe KernelInfoGetAttributeArray_int64(info, name, out.as_mut_ptr(), &mut size)];
-		unsafe { status_to_result(res) }.ok()?;
-		Some(out)
+		ortsys![unsafe KernelInfoGetAttributeArray_int64(info, name, out.as_mut_ptr(), &mut size)?];
+		Ok(out)
 	}
 }
 
 impl<'s, T: DowncastableTarget> GetKernelAttribute<'s> for ValueRef<'s, T> {
-	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Option<Self>
+	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
 	{
@@ -309,11 +304,8 @@ impl<'s, T: DowncastableTarget> GetKernelAttribute<'s> for ValueRef<'s, T> {
 		let allocator = Allocator::default();
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
-		let res = ortsys![unsafe KernelInfoGetAttribute_tensor(info, name, allocator.ptr().cast_mut(), &mut value_ptr)];
-		unsafe { status_to_result(res) }.ok()?;
-		unsafe { ValueRef::new(DynValue::from_ptr(NonNull::new(value_ptr)?, None)) }
-			.downcast()
-			.ok()
+		ortsys![unsafe KernelInfoGetAttribute_tensor(info, name, allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
+		unsafe { ValueRef::new(DynValue::from_ptr(NonNull::new_unchecked(value_ptr), None)) }.downcast()
 	}
 }
 
@@ -360,7 +352,7 @@ impl KernelContext {
 
 	pub fn output(&self, idx: usize, shape: impl IntoIterator<Item = i64>) -> Result<Option<ValueRefMut<'_>>> {
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
-		let shape = shape.into_iter().collect::<Vec<i64>>();
+		let shape = shape.into_iter().collect::<SmallVec<i64, 4>>();
 		ortsys![unsafe KernelContext_GetOutput(self.ptr.as_ptr(), idx, shape.as_ptr(), shape.len(), &mut value_ptr)?];
 		Ok(NonNull::new(value_ptr).map(|c| ValueRefMut::new(unsafe { Value::from_ptr_nodrop(c, None) })))
 	}

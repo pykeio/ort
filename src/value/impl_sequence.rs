@@ -121,7 +121,7 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized + 'static> Value<Se
 	/// let value = Sequence::new([tensor1, tensor2])?;
 	///
 	/// for tensor in value.extract_sequence(&allocator) {
-	/// 	println!("{:?}", tensor.shape()?);
+	/// 	println!("{:?}", tensor.shape());
 	/// }
 	/// # 	Ok(())
 	/// # }

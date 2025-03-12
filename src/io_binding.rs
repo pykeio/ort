@@ -1,7 +1,6 @@
 //! Enables binding of session inputs and/or outputs to pre-allocated memory.
 
 use alloc::{
-	ffi::CString,
 	string::{String, ToString},
 	sync::Arc
 };
@@ -16,7 +15,7 @@ use crate::{
 	memory::MemoryInfo,
 	ortsys,
 	session::{Session, SharedSessionInner},
-	util::MiniMap,
+	util::{MiniMap, with_cstr},
 	value::{DynValue, Value, ValueInner, ValueTypeMarker}
 };
 
@@ -122,11 +121,14 @@ impl IoBinding {
 	///
 	/// The data is only copied upon invocation of this function. Any changes to the given value afterwards will not
 	/// affect the data seen by the session until the value is re-bound.
-	pub fn bind_input<T: ValueTypeMarker, S: AsRef<str>>(&mut self, name: S, ort_value: &Value<T>) -> Result<()> {
-		let name = name.as_ref();
-		let cname = CString::new(name)?;
-		ortsys![unsafe BindInput(self.ptr_mut(), cname.as_ptr(), ort_value.ptr())?];
-		self.held_inputs.insert(name.to_string(), Arc::clone(&ort_value.inner));
+	pub fn bind_input<T: ValueTypeMarker, S: Into<String>>(&mut self, name: S, ort_value: &Value<T>) -> Result<()> {
+		let name = name.into();
+		let ptr = self.ptr_mut();
+		with_cstr(name.as_bytes(), &|name| {
+			ortsys![unsafe BindInput(ptr, name.as_ptr(), ort_value.ptr())?];
+			Ok(())
+		})?;
+		self.held_inputs.insert(name, Arc::clone(&ort_value.inner));
 		Ok(())
 	}
 
@@ -139,19 +141,25 @@ impl IoBinding {
 	/// The output will be accessible in the value returned by [`IoBinding::run`], under the name specified by `name`.
 	///
 	/// [`Tensor::new`]: crate::value::Tensor::new
-	pub fn bind_output<T: ValueTypeMarker, S: AsRef<str>>(&mut self, name: S, ort_value: Value<T>) -> Result<()> {
-		let name = name.as_ref();
-		let cname = CString::new(name)?;
-		ortsys![unsafe BindOutput(self.ptr_mut(), cname.as_ptr(), ort_value.ptr())?];
+	pub fn bind_output<T: ValueTypeMarker, S: Into<String>>(&mut self, name: S, ort_value: Value<T>) -> Result<()> {
+		let name = name.into();
+		let ptr = self.ptr_mut();
+		with_cstr(name.as_bytes(), &|name| {
+			ortsys![unsafe BindOutput(ptr, name.as_ptr(), ort_value.ptr())?];
+			Ok(())
+		})?;
 		self.output_values.insert(name.to_string(), Some(ort_value.into_dyn()));
 		Ok(())
 	}
 
 	/// Bind a session output to a device which is specified by `mem_info`.
-	pub fn bind_output_to_device<S: AsRef<str>>(&mut self, name: S, mem_info: &MemoryInfo) -> Result<()> {
-		let name = name.as_ref();
-		let cname = CString::new(name)?;
-		ortsys![unsafe BindOutputToDevice(self.ptr_mut(), cname.as_ptr(), mem_info.ptr())?];
+	pub fn bind_output_to_device<S: Into<String>>(&mut self, name: S, mem_info: &MemoryInfo) -> Result<()> {
+		let name = name.into();
+		let ptr = self.ptr_mut();
+		with_cstr(name.as_bytes(), &|name| {
+			ortsys![unsafe BindOutputToDevice(ptr, name.as_ptr(), mem_info.ptr())?];
+			Ok(())
+		})?;
 		self.output_values.insert(name.to_string(), None);
 		Ok(())
 	}

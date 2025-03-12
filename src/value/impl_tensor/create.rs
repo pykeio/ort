@@ -79,7 +79,7 @@ impl Tensor<String> {
 				dtype: ValueType::Tensor {
 					ty: TensorElementType::String,
 					dimensions: shape,
-					dimension_symbols: vec![None; shape_len]
+					dimension_symbols: vec![String::default(); shape_len]
 				},
 				memory_info: MemoryInfo::from_value(value_ptr),
 				drop: true,
@@ -176,7 +176,7 @@ fn tensor_from_array(
 			ptr: unsafe { NonNull::new_unchecked(value_ptr) },
 			dtype: ValueType::Tensor {
 				ty: element_type,
-				dimension_symbols: vec![None; shape.len()],
+				dimension_symbols: vec![String::default(); shape.len()],
 				dimensions: shape
 			},
 			drop: true,

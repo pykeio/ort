@@ -1,4 +1,4 @@
-use alloc::{borrow::Cow, ffi::CString, rc::Rc, sync::Arc, vec::Vec};
+use alloc::{borrow::Cow, rc::Rc, sync::Arc};
 use core::{
 	any::Any,
 	ffi::{c_char, c_void},
@@ -18,6 +18,7 @@ use crate::{
 	memory::MemoryInfo,
 	operator::OperatorDomain,
 	ortsys,
+	util::with_cstr,
 	value::DynValue
 };
 
@@ -34,8 +35,8 @@ impl SessionBuilder {
 	/// - **Indiscriminate use of [`SessionBuilder::with_execution_providers`] in a library** (e.g. always enabling
 	///   `CUDAExecutionProvider`) **is discouraged** unless you allow the user to configure the execution providers by
 	///   providing a `Vec` of [`ExecutionProviderDispatch`]es.
-	pub fn with_execution_providers(mut self, execution_providers: impl IntoIterator<Item = ExecutionProviderDispatch>) -> Result<Self> {
-		apply_execution_providers(&mut self, execution_providers.into_iter())?;
+	pub fn with_execution_providers(mut self, execution_providers: impl AsRef<[ExecutionProviderDispatch]>) -> Result<Self> {
+		apply_execution_providers(&mut self, execution_providers.as_ref(), "session options")?;
 		Ok(self)
 	}
 
@@ -159,28 +160,20 @@ impl SessionBuilder {
 	}
 
 	pub fn with_external_initializer(mut self, name: impl AsRef<str>, value: DynValue) -> Result<Self> {
-		let name = CString::new(name.as_ref())?;
+		let ptr = self.ptr_mut();
 		let value = Rc::new(value);
-		ortsys![unsafe AddExternalInitializers(self.ptr_mut(), &name.as_ptr(), &value.ptr(), 1)?];
+		with_cstr(name.as_ref().as_bytes(), &|name| {
+			ortsys![unsafe AddExternalInitializers(ptr, &name.as_ptr(), &value.ptr(), 1)?];
+			Ok(())
+		})?;
 		self.external_initializers.push(value);
 		Ok(self)
 	}
 
-	pub fn with_external_initializer_file_in_memory(mut self, file_name: impl AsRef<str>, buffer: Cow<'static, [u8]>) -> Result<Self> {
-		// We need to hold onto `buffer` until the session is actually committed. This means `buffer` must outlive 'self (if
-		// SessionBuilder were to have a lifetime). Adding a lifetime to SessionBuilder would be breaking, so right now we
-		// either accept a &'static [u8] or Vec<u8> via Cow<'static, [u8]>, which still allows users to use include_bytes!.
-
-		#[cfg(target_family = "windows")]
-		let file_name: Vec<u16> = file_name.as_ref().encode_utf16().chain(core::iter::once(0)).collect();
-		#[cfg(not(target_family = "windows"))]
-		let file_name: Vec<core::ffi::c_char> = file_name
-			.as_ref()
-			.as_bytes()
-			.into_iter()
-			.map(|c| *c as _)
-			.chain(core::iter::once(0))
-			.collect();
+	#[cfg(feature = "std")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+	pub fn with_external_initializer_file_in_memory(mut self, file_name: impl AsRef<Path>, buffer: Cow<'static, [u8]>) -> Result<Self> {
+		let file_name = path_to_os_char(file_name);
 		let sizes = [buffer.len()];
 		ortsys![unsafe AddExternalInitializersFromMemory(self.ptr_mut(), &file_name.as_ptr(), &buffer.as_ptr().cast::<c_char>().cast_mut(), sizes.as_ptr(), 1)?];
 		self.external_initializer_buffers.push(buffer);
@@ -188,20 +181,29 @@ impl SessionBuilder {
 	}
 
 	pub fn with_log_id(mut self, id: impl AsRef<str>) -> Result<Self> {
-		let id = CString::new(id.as_ref())?;
-		ortsys![unsafe SetSessionLogId(self.ptr_mut(), id.as_ptr())?];
+		let ptr = self.ptr_mut();
+		with_cstr(id.as_ref().as_bytes(), &|id| {
+			ortsys![unsafe SetSessionLogId(ptr, id.as_ptr())?];
+			Ok(())
+		})?;
 		Ok(self)
 	}
 
 	pub fn with_dimension_override(mut self, name: impl AsRef<str>, size: i64) -> Result<Self> {
-		let name = CString::new(name.as_ref())?;
-		ortsys![unsafe AddFreeDimensionOverrideByName(self.ptr_mut(), name.as_ptr(), size)?];
+		let ptr = self.ptr_mut();
+		with_cstr(name.as_ref().as_bytes(), &|name| {
+			ortsys![unsafe AddFreeDimensionOverrideByName(ptr, name.as_ptr(), size)?];
+			Ok(())
+		})?;
 		Ok(self)
 	}
 
 	pub fn with_dimension_override_by_denotation(mut self, denotation: impl AsRef<str>, size: i64) -> Result<Self> {
-		let denotation = CString::new(denotation.as_ref())?;
-		ortsys![unsafe AddFreeDimensionOverride(self.ptr_mut(), denotation.as_ptr(), size)?];
+		let ptr = self.ptr_mut();
+		with_cstr(denotation.as_ref().as_bytes(), &|denotation| {
+			ortsys![unsafe AddFreeDimensionOverride(ptr, denotation.as_ptr(), size)?];
+			Ok(())
+		})?;
 		Ok(self)
 	}
 

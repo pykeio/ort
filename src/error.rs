@@ -1,11 +1,10 @@
 use alloc::{
-	ffi::CString,
 	format,
 	string::{String, ToString}
 };
 use core::{convert::Infallible, ffi::c_char, fmt, ptr};
 
-use crate::{char_p_to_string, ortsys};
+use crate::{char_p_to_string, ortsys, util::with_cstr};
 
 /// Type alias for the Result type returned by ORT functions.
 pub type Result<T, E = Error> = core::result::Result<T, E>;
@@ -18,11 +17,9 @@ impl<T> IntoStatus for Result<T, Error> {
 	fn into_status(self) -> ort_sys::OrtStatusPtr {
 		let (code, message) = match &self {
 			Ok(_) => return ort_sys::OrtStatusPtr(ptr::null_mut()),
-			Err(e) => (ort_sys::OrtErrorCode::ORT_FAIL, Some(e.to_string()))
+			Err(e) => (ort_sys::OrtErrorCode::ORT_FAIL, e.to_string())
 		};
-		let message = message.map(|c| CString::new(c).unwrap_or_else(|_| unreachable!()));
-		// message will be copied, so this shouldn't leak
-		ortsys![unsafe CreateStatus(code, message.map(|c| c.as_ptr()).unwrap_or_else(ptr::null))]
+		with_cstr(message.as_bytes(), &|message| Ok(ortsys![unsafe CreateStatus(code, message.as_ptr())])).expect("invalid error message")
 	}
 }
 
@@ -108,6 +105,30 @@ impl From<Infallible> for Error {
 impl From<alloc::ffi::NulError> for Error {
 	fn from(e: alloc::ffi::NulError) -> Self {
 		Error::new(format!("Attempted to pass invalid string to C: {e}"))
+	}
+}
+
+impl From<core::ffi::FromBytesWithNulError> for Error {
+	fn from(e: core::ffi::FromBytesWithNulError) -> Self {
+		Error::new(format!("Attempted to pass invalid string to C: {e}"))
+	}
+}
+
+impl From<core::str::Utf8Error> for Error {
+	fn from(e: core::str::Utf8Error) -> Self {
+		Error::new(format!("C returned invalid string: {e}"))
+	}
+}
+
+impl From<alloc::ffi::FromVecWithNulError> for Error {
+	fn from(e: alloc::ffi::FromVecWithNulError) -> Self {
+		Error::new(format!("C returned invalid string: {e}"))
+	}
+}
+
+impl From<alloc::ffi::IntoStringError> for Error {
+	fn from(e: alloc::ffi::IntoStringError) -> Self {
+		Error::new(format!("C returned invalid string: {e}"))
 	}
 }
 

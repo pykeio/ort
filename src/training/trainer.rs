@@ -1,4 +1,4 @@
-use alloc::{borrow::Cow, ffi::CString};
+use alloc::borrow::Cow;
 use core::{
 	fmt,
 	ptr::{self, NonNull}
@@ -14,6 +14,7 @@ use crate::{
 	memory::Allocator,
 	session::{RunOptions, SessionInputValue, SessionInputs, SessionOutputs, builder::SessionBuilder},
 	tensor::IntoTensorElementType,
+	util::with_cstr_ptr_array,
 	value::{Tensor, Value}
 };
 
@@ -174,7 +175,7 @@ impl Trainer {
 
 		trainsys![unsafe TrainStep(self.ptr.as_ptr(), run_options_ptr, input_ort_values.len(), input_ort_values.as_ptr(), output_tensor_ptrs.len(), output_tensor_ptrs.as_mut_ptr())?];
 
-		let outputs: Vec<Value> = output_tensor_ptrs
+		let outputs = output_tensor_ptrs
 			.into_iter()
 			.map(|tensor_ptr| unsafe {
 				// TODO: `Value` should absolutely be refactored to accept a different backing pointer than `SharedSessionInner`.
@@ -235,7 +236,7 @@ impl Trainer {
 
 		trainsys![unsafe EvalStep(self.ptr.as_ptr(), run_options_ptr, input_ort_values.len(), input_ort_values.as_ptr(), output_tensor_ptrs.len(), output_tensor_ptrs.as_mut_ptr())?];
 
-		let outputs: Vec<Value> = output_tensor_ptrs
+		let outputs = output_tensor_ptrs
 			.into_iter()
 			.map(|tensor_ptr| unsafe {
 				// TODO: `Value` should absolutely be refactored to accept a different backing pointer than `SharedSessionInner`.
@@ -249,27 +250,10 @@ impl Trainer {
 
 	pub fn export<O: AsRef<str>>(&self, out_path: impl AsRef<Path>, output_names: impl AsRef<[O]>) -> Result<()> {
 		let out_path = crate::util::path_to_os_char(out_path);
-
-		let output_names_ptr: Vec<*const c_char> = output_names
-			.as_ref()
-			.iter()
-			.map(|output| CString::new(output.as_ref()).unwrap_or_else(|_| unreachable!()))
-			.map(|n| n.into_raw().cast_const())
-			.collect();
-
-		let res = trainsys![unsafe ExportModelForInferencing(self.ptr.as_ptr(), out_path.as_ptr(), output_names_ptr.len(), output_names_ptr.as_ptr())];
-
-		// Reconvert name ptrs to CString so drop impl is called and memory is freed
-		drop(
-			output_names_ptr
-				.into_iter()
-				// SAFETY: `str` will never have a null pointer
-				.map(|p| unsafe { CString::from_raw(p as *mut _) })
-				.collect::<Vec<_>>()
-		);
-
-		unsafe { status_to_result(res) }?;
-
+		with_cstr_ptr_array(output_names.as_ref(), &|output_name_ptrs| {
+			trainsys![unsafe ExportModelForInferencing(self.ptr.as_ptr(), out_path.as_ptr(), output_name_ptrs.len(), output_name_ptrs.as_ptr())?];
+			Ok(())
+		})?;
 		Ok(())
 	}
 

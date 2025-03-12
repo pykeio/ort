@@ -6,9 +6,6 @@ use alloc::{
 };
 use core::{ffi::c_void, fmt::Debug, ptr, slice};
 
-#[cfg(feature = "ndarray")]
-use ndarray::IxDyn;
-
 use super::{Tensor, TensorValueTypeMarker};
 use crate::{
 	AsPointer,
@@ -52,8 +49,9 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_tensor<T: PrimitiveTensorElementType>(&self) -> Result<ndarray::ArrayViewD<'_, T>> {
+		use ndarray::IntoDimension;
 		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type()).and_then(|(ptr, dimensions)| {
-			let shape = IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>());
+			let shape = dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>().into_dimension();
 			Ok(unsafe { ndarray::ArrayView::from_shape_ptr(shape, data_ptr(ptr)?.cast::<T>()) })
 		})
 	}
@@ -124,8 +122,9 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_tensor_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<ndarray::ArrayViewMutD<'_, T>> {
+		use ndarray::IntoDimension;
 		extract_tensor(self.ptr_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type()).and_then(|(ptr, dimensions)| {
-			let shape = IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>());
+			let shape = dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>().into_dimension();
 			Ok(unsafe { ndarray::ArrayViewMut::from_shape_ptr(shape, data_ptr(ptr)?.cast::<T>()) })
 		})
 	}
@@ -160,7 +159,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_raw_tensor<T: PrimitiveTensorElementType>(&self) -> Result<(&[i64], &[T])> {
 		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type())
-			.and_then(|(ptr, dimensions)| Ok((dimensions.as_slice(), unsafe { slice::from_raw_parts(data_ptr(ptr)?.cast::<T>(), element_count(dimensions)) })))
+			.and_then(|(ptr, dimensions)| Ok((dimensions, unsafe { slice::from_raw_parts(data_ptr(ptr)?.cast::<T>(), element_count(dimensions)) })))
 	}
 
 	/// Attempt to extract the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and a
@@ -189,9 +188,8 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_raw_tensor_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<(&[i64], &mut [T])> {
-		extract_tensor(self.ptr_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type()).and_then(|(ptr, dimensions)| {
-			Ok((dimensions.as_slice(), unsafe { slice::from_raw_parts_mut(data_ptr(ptr)?.cast::<T>(), element_count(dimensions)) }))
-		})
+		extract_tensor(self.ptr_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type())
+			.and_then(|(ptr, dimensions)| Ok((dimensions, unsafe { slice::from_raw_parts_mut(data_ptr(ptr)?.cast::<T>(), element_count(dimensions)) })))
 	}
 
 	/// Attempt to extract the underlying data into a Rust `ndarray`.
@@ -210,9 +208,10 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_string_tensor(&self) -> Result<ndarray::ArrayD<String>> {
+		use ndarray::IntoDimension;
 		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), TensorElementType::String).and_then(|(ptr, dimensions)| {
 			let strings = extract_strings(ptr, dimensions)?;
-			Ok(ndarray::Array::from_shape_vec(IxDyn(&dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>()), strings)
+			Ok(ndarray::Array::from_shape_vec(dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>().into_dimension(), strings)
 				.expect("Shape extracted from tensor didn't match tensor contents"))
 		})
 	}
@@ -235,7 +234,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	pub fn try_extract_raw_string_tensor(&self) -> Result<(&[i64], Vec<String>)> {
 		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), TensorElementType::String).and_then(|(ptr, dimensions)| {
 			let strings = extract_strings(ptr, dimensions)?;
-			Ok((dimensions.as_slice(), strings))
+			Ok((dimensions, strings))
 		})
 	}
 
@@ -247,25 +246,15 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # 	let allocator = Allocator::default();
 	/// let tensor = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
 	///
-	/// assert_eq!(tensor.shape()?, &[1, 128, 128, 3]);
+	/// assert_eq!(tensor.shape(), [1, 128, 128, 3]);
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn shape(&self) -> Result<Vec<i64>> {
-		let mut tensor_info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = ptr::null_mut();
-		ortsys![unsafe GetTensorTypeAndShape(self.ptr(), &mut tensor_info_ptr)?];
-
-		let res = {
-			let mut num_dims = 0;
-			ortsys![unsafe GetDimensionsCount(tensor_info_ptr, &mut num_dims)?];
-
-			let mut node_dims: Vec<i64> = vec![0; num_dims];
-			ortsys![unsafe GetDimensions(tensor_info_ptr, node_dims.as_mut_ptr(), num_dims)?];
-
-			Ok(node_dims)
-		};
-		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_info_ptr)];
-		res
+	pub fn shape(&self) -> &[i64] {
+		match self.dtype() {
+			ValueType::Tensor { dimensions, .. } => dimensions,
+			_ => unreachable!()
+		}
 	}
 }
 
@@ -274,7 +263,7 @@ fn extract_tensor<'t>(
 	dtype: &'t ValueType,
 	memory_info: &MemoryInfo,
 	expected_ty: TensorElementType
-) -> Result<(*mut ort_sys::OrtValue, &'t Vec<i64>)> {
+) -> Result<(*mut ort_sys::OrtValue, &'t [i64])> {
 	match dtype {
 		ValueType::Tensor { ty, dimensions, .. } => {
 			if !memory_info.is_cpu_accessible() {

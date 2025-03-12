@@ -1,4 +1,4 @@
-use alloc::{ffi::CString, string::String, sync::Arc, vec::Vec};
+use alloc::{string::String, sync::Arc, vec::Vec};
 use core::{
 	ffi::{CStr, c_char},
 	marker::PhantomData,
@@ -6,13 +6,15 @@ use core::{
 	ptr::{self, NonNull}
 };
 
+use smallvec::SmallVec;
+
 use crate::{
 	AsPointer,
 	adapter::{Adapter, AdapterInner},
 	error::Result,
 	ortsys,
 	session::Output,
-	util::MiniMap,
+	util::{MiniMap, STACK_SESSION_OUTPUTS, with_cstr},
 	value::{DynValue, Value, ValueTypeMarker}
 };
 
@@ -118,7 +120,10 @@ impl OutputSelector {
 		self
 	}
 
-	pub(crate) fn resolve_outputs<'a, 's: 'a>(&'a self, outputs: &'s [Output]) -> (Vec<&'a str>, Vec<Option<DynValue>>) {
+	pub(crate) fn resolve_outputs<'a, 's: 'a>(
+		&'a self,
+		outputs: &'s [Output]
+	) -> (SmallVec<&'a str, { STACK_SESSION_OUTPUTS }>, SmallVec<Option<DynValue>, { STACK_SESSION_OUTPUTS }>) {
 		if self.use_defaults { outputs.iter() } else { [].iter() }
 			.map(|o| &o.name)
 			.filter(|n| !self.default_blocklist.contains(n))
@@ -244,19 +249,16 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 
 	/// Sets a tag to identify this run in logs.
 	pub fn set_tag(&mut self, tag: impl AsRef<str>) -> Result<()> {
-		let tag = CString::new(tag.as_ref())?;
-		ortsys![unsafe RunOptionsSetRunTag(self.inner.ptr.as_ptr(), tag.as_ptr())?];
-		Ok(())
+		with_cstr(tag.as_ref().as_bytes(), &|tag| {
+			ortsys![unsafe RunOptionsSetRunTag(self.inner.ptr.as_ptr(), tag.as_ptr())?];
+			Ok(())
+		})
 	}
 
-	pub fn tag(&self) -> Result<String> {
+	pub fn tag(&self) -> Result<&str> {
 		let mut tag_ptr: *const c_char = ptr::null();
 		ortsys![unsafe RunOptionsGetRunTag(self.inner.ptr.as_ptr(), &mut tag_ptr)?];
-		if tag_ptr.is_null() {
-			Ok(String::default())
-		} else {
-			Ok(unsafe { CStr::from_ptr(tag_ptr) }.to_string_lossy().into())
-		}
+		Ok(unsafe { CStr::from_ptr(tag_ptr) }.to_str()?)
 	}
 
 	/// Sets the termination flag for the runs associated with this [`RunOptions`].
@@ -332,10 +334,12 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// # }
 	/// ```
 	pub fn add_config_entry(&mut self, key: impl AsRef<str>, value: impl AsRef<str>) -> Result<()> {
-		let key = CString::new(key.as_ref())?;
-		let value = CString::new(value.as_ref())?;
-		ortsys![unsafe AddRunConfigEntry(self.inner.ptr.as_ptr(), key.as_ptr(), value.as_ptr())?];
-		Ok(())
+		with_cstr(key.as_ref().as_bytes(), &|key| {
+			with_cstr(value.as_ref().as_bytes(), &|value| {
+				ortsys![unsafe AddRunConfigEntry(self.inner.ptr.as_ptr(), key.as_ptr(), value.as_ptr())?];
+				Ok(())
+			})
+		})
 	}
 
 	pub fn add_adapter(&mut self, adapter: &Adapter) -> Result<()> {

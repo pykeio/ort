@@ -273,36 +273,39 @@ macro_rules! get_ep_register {
 #[allow(unused)]
 pub(crate) use get_ep_register;
 
-pub(crate) fn apply_execution_providers(
-	session_builder: &mut SessionBuilder,
-	execution_providers: impl Iterator<Item = ExecutionProviderDispatch>
-) -> Result<()> {
-	let execution_providers: Vec<_> = execution_providers.collect();
-	let mut fallback_to_cpu = !execution_providers.is_empty();
-	for ex in execution_providers {
-		if let Err(e) = ex.inner.register(session_builder) {
-			if ex.error_on_failure {
+pub(crate) fn apply_execution_providers(session_builder: &mut SessionBuilder, eps: &[ExecutionProviderDispatch], source: &'static str) -> Result<()> {
+	fn register_inner(session_builder: &mut SessionBuilder, ep: &ExecutionProviderDispatch, source: &'static str) -> Result<bool> {
+		if let Err(e) = ep.inner.register(session_builder) {
+			if ep.error_on_failure {
 				return Err(e);
 			}
 
 			if e.message()
 				.ends_with("was not registered because its corresponding Cargo feature is not enabled.")
 			{
-				if ex.inner.supported_by_platform() {
-					crate::warn!("{e}");
+				if ep.inner.supported_by_platform() {
+					crate::warn!(%source, "{e}");
 				} else {
-					crate::debug!("{e} (note: additionally, `{}` is not supported on this platform)", ex.inner.as_str());
+					crate::debug!(%source, "{e} (note: additionally, `{}` may not be supported on this platform)", ep.inner.as_str());
 				}
 			} else {
-				crate::error!("An error occurred when attempting to register `{}`: {e}", ex.inner.as_str());
+				crate::error!(%source, "An error occurred when attempting to register `{}`: {e}", ep.inner.as_str());
 			}
+			Ok(false)
 		} else {
-			crate::info!("Successfully registered `{}`", ex.inner.as_str());
+			crate::info!(%source, "Successfully registered `{}`", ep.inner.as_str());
+			Ok(true)
+		}
+	}
+
+	let mut fallback_to_cpu = !eps.is_empty();
+	for ep in eps {
+		if register_inner(session_builder, ep, source)? {
 			fallback_to_cpu = false;
 		}
 	}
 	if fallback_to_cpu {
-		crate::warn!("No execution providers registered successfully. Falling back to CPU.");
+		crate::warn!("No execution providers from {source} registered successfully; may fall back to CPU.");
 	}
 	Ok(())
 }

@@ -21,6 +21,8 @@ use core::{
 	slice
 };
 
+use smallvec::SmallVec;
+
 use crate::{
 	AsPointer, char_p_to_string,
 	error::{Error, ErrorCode, Result, status_to_result},
@@ -28,6 +30,7 @@ use crate::{
 	memory::Allocator,
 	metadata::ModelMetadata,
 	ortsys,
+	util::{STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS, with_cstr_ptr_array},
 	value::{DynValue, Value, ValueType}
 };
 
@@ -58,7 +61,7 @@ pub struct SharedSessionInner {
 	pub(crate) allocator: Allocator,
 	/// Additional things we may need to hold onto for the duration of this session, like `OperatorDomain`s and
 	/// DLL handles for operator libraries.
-	_extras: Vec<Box<dyn Any>>
+	_extras: SmallVec<Box<dyn Any>, 4>
 }
 
 unsafe impl Send for SharedSessionInner {}
@@ -202,10 +205,14 @@ impl Session {
 	/// ```
 	pub fn run<'s, 'i, 'v: 'i, const N: usize>(&'s mut self, input_values: impl Into<SessionInputs<'i, 'v, N>>) -> Result<SessionOutputs<'s, 's>> {
 		match input_values.into() {
-			SessionInputs::ValueSlice(input_values) => self.run_inner(&mut self.inputs.iter().map(|input| input.name.as_str()), &mut input_values.iter(), None),
-			SessionInputs::ValueArray(input_values) => self.run_inner(&mut self.inputs.iter().map(|input| input.name.as_str()), &mut input_values.iter(), None),
+			SessionInputs::ValueSlice(input_values) => {
+				self.run_inner(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), None)
+			}
+			SessionInputs::ValueArray(input_values) => {
+				self.run_inner(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), None)
+			}
 			SessionInputs::ValueMap(input_values) => {
-				self.run_inner(&mut input_values.iter().map(|(k, _)| k.as_ref()), &mut input_values.iter().map(|(_, v)| v), None)
+				self.run_inner(input_values.iter().map(|(k, _)| k.as_ref()).collect(), input_values.iter().map(|(_, v)| v).collect(), None)
 			}
 		}
 	}
@@ -243,21 +250,21 @@ impl Session {
 	) -> Result<SessionOutputs<'r, 's>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
-				self.run_inner(&mut self.inputs.iter().map(|input| input.name.as_str()), &mut input_values.iter(), Some(&run_options.inner))
+				self.run_inner(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), Some(&run_options.inner))
 			}
 			SessionInputs::ValueArray(input_values) => {
-				self.run_inner(&mut self.inputs.iter().map(|input| input.name.as_str()), &mut input_values.iter(), Some(&run_options.inner))
+				self.run_inner(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), Some(&run_options.inner))
 			}
 			SessionInputs::ValueMap(input_values) => {
-				self.run_inner(&mut input_values.iter().map(|(k, _)| k.as_ref()), &mut input_values.iter().map(|(_, v)| v), Some(&run_options.inner))
+				self.run_inner(input_values.iter().map(|(k, _)| k.as_ref()).collect(), input_values.iter().map(|(_, v)| v).collect(), Some(&run_options.inner))
 			}
 		}
 	}
 
 	fn run_inner<'i, 'r, 's: 'r, 'v: 'i>(
 		&'s self,
-		input_names: &mut dyn ExactIterator<&str>,
-		input_values: &mut dyn ExactIterator<&'i SessionInputValue<'v>>,
+		input_names: SmallVec<&str, { STACK_SESSION_INPUTS }>,
+		input_values: SmallVec<&'i SessionInputValue<'v>, { STACK_SESSION_INPUTS }>,
 		run_options: Option<&'r UntypedRunOptions>
 	) -> Result<SessionOutputs<'r, 's>> {
 		if input_values.len() > input_names.len() {
@@ -271,69 +278,52 @@ impl Session {
 			));
 		}
 
-		let mut input_name_ptrs = Vec::with_capacity(input_names.len());
-		#[allow(clippy::while_let_on_iterator)]
-		while let Some(name) = input_names.next() {
-			let name = CString::new(name.as_bytes())?;
-			input_name_ptrs.push(name.into_raw().cast_const());
-		}
-
 		let (output_names, mut output_tensors) = match run_options {
 			Some(r) => r.outputs.resolve_outputs(&self.outputs),
 			None => (self.outputs.iter().map(|o| o.name.as_str()).collect(), iter::repeat_with(|| None).take(self.outputs.len()).collect())
 		};
-		let output_names_ptr: Vec<*const c_char> = output_names
-			.iter()
-			.map(|n| CString::new(*n).unwrap_or_else(|_| unreachable!()))
-			.map(|n| n.into_raw().cast_const())
-			.collect();
-		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = output_tensors
+		let output_value_ptrs: SmallVec<*mut ort_sys::OrtValue, { STACK_SESSION_OUTPUTS }> = output_tensors
 			.iter_mut()
 			.map(|c| match c {
 				Some(v) => v.ptr_mut(),
 				None => ptr::null_mut()
 			})
 			.collect();
-
-		let mut input_ort_values = Vec::with_capacity(input_values.len());
-		#[allow(clippy::while_let_on_iterator)]
-		while let Some(input) = input_values.next() {
-			input_ort_values.push(input.ptr());
-		}
+		let input_value_ptrs: SmallVec<*const ort_sys::OrtValue, { STACK_SESSION_INPUTS }> = input_values.iter().map(|c| c.ptr()).collect();
 
 		let run_options_ptr = if let Some(run_options) = &run_options { run_options.ptr.as_ptr() } else { ptr::null() };
 
-		ortsys![
-			unsafe Run(
-				self.inner.session_ptr.as_ptr(),
-				run_options_ptr,
-				input_name_ptrs.as_ptr(),
-				input_ort_values.as_ptr(),
-				input_ort_values.len(),
-				output_names_ptr.as_ptr(),
-				output_names_ptr.len(),
-				output_tensor_ptrs.as_mut_ptr()
-			)?
-		];
+		with_cstr_ptr_array(&input_names, &|input_name_ptrs| {
+			with_cstr_ptr_array(&output_names, &|output_name_ptrs| {
+				ortsys![
+					unsafe Run(
+						self.inner.session_ptr.as_ptr(),
+						run_options_ptr,
+						input_name_ptrs.as_ptr(),
+						input_value_ptrs.as_ptr(),
+						input_value_ptrs.len(),
+						output_name_ptrs.as_ptr(),
+						output_name_ptrs.len(),
+						output_value_ptrs.as_ptr().cast_mut()
+					)?
+				];
+				Ok(())
+			})
+		})?;
 
-		let outputs: Vec<Value> = output_tensors
+		let outputs = output_tensors
 			.into_iter()
 			.enumerate()
 			.map(|(i, v)| match v {
 				Some(value) => value,
 				None => unsafe {
 					Value::from_ptr(
-						NonNull::new(output_tensor_ptrs[i]).expect("OrtValue ptr returned from session Run should not be null"),
+						NonNull::new(output_value_ptrs[i]).expect("OrtValue ptr returned from session Run should not be null"),
 						Some(Arc::clone(&self.inner))
 					)
 				}
 			})
 			.collect();
-
-		// Reconvert name ptrs to CString so drop impl is called and memory is freed
-		for p in input_name_ptrs.into_iter().chain(output_names_ptr.into_iter()) {
-			drop(unsafe { CString::from_raw(p.cast_mut().cast()) });
-		}
 
 		Ok(SessionOutputs::new(output_names, outputs))
 	}
@@ -373,7 +363,7 @@ impl Session {
 						DynValue::from_ptr(NonNull::new(ptr).expect("OrtValue ptrs returned by GetBoundOutputValues should not be null"), Some(self.inner()))
 					}
 				})
-				.collect::<Vec<_>>();
+				.collect();
 
 			// output values will be freed when the `Value`s in `SessionOutputs` drop
 
@@ -416,44 +406,44 @@ impl Session {
 		run_options: &'r RunOptions<O>
 	) -> Result<InferenceFut<'s, 'r, 'v>> {
 		match input_values.into() {
-			SessionInputs::ValueSlice(_) => unimplemented!("slices cannot be used in `run_async`"),
+			SessionInputs::ValueSlice(input_values) => {
+				self.run_inner_async(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), &run_options.inner)
+			}
 			SessionInputs::ValueArray(input_values) => {
-				self.run_inner_async(&mut self.inputs.iter().map(|input| input.name.as_str()), &mut input_values.iter(), &run_options.inner)
+				self.run_inner_async(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), &run_options.inner)
 			}
 			SessionInputs::ValueMap(input_values) => {
-				self.run_inner_async(&mut input_values.iter().map(|(k, _)| k.as_ref()), &mut input_values.iter().map(|(_, v)| v), &run_options.inner)
+				self.run_inner_async(input_values.iter().map(|(k, _)| k.as_ref()).collect(), input_values.iter().map(|(_, v)| v).collect(), &run_options.inner)
 			}
 		}
 	}
 
 	#[cfg(feature = "std")]
-	fn run_inner_async<'r, 's: 'r, 'v: 's>(
+	fn run_inner_async<'i, 'r, 's: 'r, 'v: 'i + 's>(
 		&'s self,
-		input_names: &mut dyn ExactIterator<&str>,
-		input_values: &mut dyn ExactIterator<&SessionInputValue<'v>>,
+		input_names: SmallVec<&str, { STACK_SESSION_INPUTS }>,
+		input_values: SmallVec<&SessionInputValue<'v>, { STACK_SESSION_INPUTS }>,
 		run_options: &'r UntypedRunOptions
 	) -> Result<InferenceFut<'s, 'r, 'v>> {
-		let mut input_name_ptrs = Vec::with_capacity(input_names.len());
-		#[allow(clippy::while_let_on_iterator)]
-		while let Some(name) = input_names.next() {
-			let name = CString::new(name.as_bytes())?;
-			input_name_ptrs.push(name.into_raw().cast_const());
-		}
-		let mut input_inner_holders = Vec::with_capacity(input_values.len());
-		let mut input_ort_values = Vec::with_capacity(input_values.len());
-		#[allow(clippy::while_let_on_iterator)]
-		while let Some(input) = input_values.next() {
+		let input_name_ptrs = input_names
+			.into_iter()
+			.map(|name| CString::new(name.as_bytes()).map(|s| s.into_raw().cast_const()))
+			.collect::<Result<SmallVec<*const c_char, { STACK_SESSION_INPUTS }>, _>>()?;
+
+		let mut input_inner_holders = SmallVec::with_capacity(input_values.len());
+		let mut input_ort_values = SmallVec::with_capacity(input_values.len());
+		for input in input_values {
 			input_ort_values.push(input.ptr());
 			input_inner_holders.push(Arc::clone(input.inner()));
 		}
 
 		let (output_names, mut output_tensors) = run_options.outputs.resolve_outputs(&self.outputs);
-		let output_name_ptrs: Vec<*const c_char> = output_names
+		let output_name_ptrs = output_names
 			.iter()
 			.map(|n| CString::new(*n).unwrap_or_else(|_| unreachable!()))
 			.map(|n| n.into_raw().cast_const())
 			.collect();
-		let output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = output_tensors
+		let output_tensor_ptrs = output_tensors
 			.iter_mut()
 			.map(|c| match c {
 				Some(v) => v.ptr_mut(),
@@ -463,6 +453,8 @@ impl Session {
 
 		let async_inner = Arc::new(InferenceFutInner::new());
 
+		// AsyncInferenceContext can get pretty huge so we should see if we can bump MSRV to 1.82 and use `Box::new_uninit()`
+		// if it causes problems
 		let ctx = Box::leak(Box::new(AsyncInferenceContext {
 			inner: Arc::clone(&async_inner),
 			// everything allocated within `run_inner_async` needs to be kept alive until we are certain inference has completed and ONNX Runtime no longer
@@ -547,10 +539,6 @@ impl Session {
 		Ok(())
 	}
 }
-
-trait ExactIterator<T>: Iterator<Item = T> + ExactSizeIterator {}
-
-impl<T, I> ExactIterator<T> for I where I: Iterator<Item = T> + ExactSizeIterator {}
 
 /// Workload type, used to signal to execution providers whether to prioritize performance or efficiency.
 ///

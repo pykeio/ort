@@ -96,10 +96,11 @@ webgpu = [ "ort-sys/webgpu" ]
 azure = [ "ort-sys/azure" ]
 
 [dependencies]
-ndarray = { version = "0.16", default-features = false, optional = true }
 ort-sys = { version = "=2.0.0-rc.9", path = "ort-sys", default-features = false }
-libloading = { version = "0.8", optional = true }
+smallvec = { version = "=2.0.0-alpha.10", default-features = false }
 
+ndarray = { version = "0.16", default-features = false, optional = true }
+libloading = { version = "0.8", optional = true }
 ureq = { version = "3", optional = true, default-features = false, features = [ "rustls" ] }
 sha2 = { version = "0.10", optional = true }
 tracing = { version = "0.1", optional = true, default-features = false }

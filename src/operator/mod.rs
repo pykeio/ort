@@ -18,6 +18,7 @@ use crate::{
 	AsPointer, Error,
 	error::Result,
 	ortsys,
+	util::with_cstr,
 	value::{ValueType, r#type::extract_data_type_from_tensor_info}
 };
 
@@ -87,9 +88,11 @@ impl ShapeInferenceContext {
 			return Err(Error::new("type is not supported as a ShapeInferenceContext attribute"));
 		};
 
-		let mut attr = ptr::null();
-		let name = CString::new(name.as_ref())?;
-		ortsys![unsafe ShapeInferContext_GetAttribute(self.ptr(), name.as_ptr(), &mut attr)?];
+		let attr = with_cstr(name.as_ref().as_bytes(), &|name| {
+			let mut attr = ptr::null();
+			ortsys![unsafe ShapeInferContext_GetAttribute(self.ptr(), name.as_ptr(), &mut attr)?];
+			Ok(attr)
+		})?;
 
 		let mut len = 0;
 		let _ = ortsys![unsafe ReadOpAttr(attr, attr_type, ptr::null_mut(), 0, &mut len)];

@@ -11,16 +11,24 @@
 //! # }
 //! ```
 
-use alloc::{boxed::Box, ffi::CString, string::String, vec::Vec};
+use alloc::{boxed::Box, string::String};
 use core::{
 	any::Any,
 	ffi::c_void,
 	ptr::{self, NonNull}
 };
 
+use smallvec::SmallVec;
+
 #[cfg(feature = "load-dynamic")]
 use crate::G_ORT_DYLIB_PATH;
-use crate::{AsPointer, error::Result, execution_providers::ExecutionProviderDispatch, ortsys, util::OnceLock};
+use crate::{
+	AsPointer,
+	error::Result,
+	execution_providers::ExecutionProviderDispatch,
+	ortsys,
+	util::{OnceLock, STACK_EXECUTION_PROVIDERS, with_cstr}
+};
 
 static G_ENV: OnceLock<Environment> = OnceLock::new();
 
@@ -35,7 +43,7 @@ static G_ENV: OnceLock<Environment> = OnceLock::new();
 /// environment if one is not configured via [`init`] (or [`init_from`]).
 #[derive(Debug)]
 pub struct Environment {
-	pub(crate) execution_providers: Vec<ExecutionProviderDispatch>,
+	pub(crate) execution_providers: SmallVec<ExecutionProviderDispatch, { STACK_EXECUTION_PROVIDERS }>,
 	ptr: NonNull<ort_sys::OrtEnv>,
 	pub(crate) has_global_threadpool: bool,
 	_thread_manager: Option<Box<dyn Any>>
@@ -99,8 +107,11 @@ impl GlobalThreadPoolOptions {
 	}
 
 	pub fn with_intra_affinity(mut self, affinity: impl AsRef<str>) -> Result<Self> {
-		let affinity = CString::new(affinity.as_ref())?;
-		ortsys![unsafe SetGlobalIntraOpThreadAffinity(self.ptr_mut(), affinity.as_ptr())?];
+		let ptr = self.ptr_mut();
+		with_cstr(affinity.as_ref().as_bytes(), &|affinity| {
+			ortsys![unsafe SetGlobalIntraOpThreadAffinity(ptr, affinity.as_ptr())?];
+			Ok(())
+		})?;
 		Ok(self)
 	}
 
@@ -201,7 +212,7 @@ pub(crate) unsafe extern "system" fn thread_join<T: ThreadManager + Any>(ort_cus
 pub struct EnvironmentBuilder {
 	name: String,
 	telemetry: bool,
-	execution_providers: Vec<ExecutionProviderDispatch>,
+	execution_providers: SmallVec<ExecutionProviderDispatch, { STACK_EXECUTION_PROVIDERS }>,
 	global_thread_pool_options: Option<GlobalThreadPoolOptions>
 }
 
@@ -210,7 +221,7 @@ impl EnvironmentBuilder {
 		EnvironmentBuilder {
 			name: String::from("default"),
 			telemetry: true,
-			execution_providers: Vec::new(),
+			execution_providers: SmallVec::new(),
 			global_thread_pool_options: None
 		}
 	}
@@ -253,7 +264,7 @@ impl EnvironmentBuilder {
 	/// [`SessionBuilder::with_execution_providers`]: crate::session::builder::SessionBuilder::with_execution_providers
 	#[must_use = "commit() must be called in order for the environment to take effect"]
 	pub fn with_execution_providers(mut self, execution_providers: impl AsRef<[ExecutionProviderDispatch]>) -> Self {
-		self.execution_providers = execution_providers.as_ref().to_vec();
+		self.execution_providers = execution_providers.as_ref().into();
 		self
 	}
 
@@ -266,58 +277,60 @@ impl EnvironmentBuilder {
 
 	pub(crate) fn commit_internal(self) -> Result<Environment> {
 		let (env_ptr, thread_manager, has_global_threadpool) = if let Some(mut thread_pool_options) = self.global_thread_pool_options {
-			let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
-			let cname = CString::new(self.name.clone()).unwrap_or_else(|_| unreachable!());
-
-			#[cfg(feature = "tracing")]
-			ortsys![
-				unsafe CreateEnvWithCustomLoggerAndGlobalThreadPools(
-					Some(crate::logging::custom_logger),
-					ptr::null_mut(),
-					ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
-					cname.as_ptr(),
-					thread_pool_options.ptr(),
-					&mut env_ptr
-				)?;
-				nonNull(env_ptr)
-			];
-			#[cfg(not(feature = "tracing"))]
-			ortsys![
-				unsafe CreateEnvWithGlobalThreadPools(
-					crate::logging::default_log_level(),
-					cname.as_ptr(),
-					thread_pool_options.ptr(),
-					&mut env_ptr
-				)?;
-				nonNull(env_ptr)
-			];
+			let env_ptr = with_cstr(self.name.as_bytes(), &|name| {
+				let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
+				#[cfg(feature = "tracing")]
+				ortsys![
+					unsafe CreateEnvWithCustomLoggerAndGlobalThreadPools(
+						Some(crate::logging::custom_logger),
+						ptr::null_mut(),
+						ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
+						name.as_ptr(),
+						thread_pool_options.ptr(),
+						&mut env_ptr
+					)?;
+					nonNull(env_ptr)
+				];
+				#[cfg(not(feature = "tracing"))]
+				ortsys![
+					unsafe CreateEnvWithGlobalThreadPools(
+						crate::logging::default_log_level(),
+						name.as_ptr(),
+						thread_pool_options.ptr(),
+						&mut env_ptr
+					)?;
+					nonNull(env_ptr)
+				];
+				Ok(env_ptr)
+			})?;
 
 			let thread_manager = thread_pool_options.thread_manager.take();
 			(env_ptr, thread_manager, true)
 		} else {
-			let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
-			let cname = CString::new(self.name.clone()).unwrap_or_else(|_| unreachable!());
-
-			#[cfg(feature = "tracing")]
-			ortsys![
-				unsafe CreateEnvWithCustomLogger(
-					Some(crate::logging::custom_logger),
-					ptr::null_mut(),
-					ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
-					cname.as_ptr(),
-					&mut env_ptr
-				)?;
-				nonNull(env_ptr)
-			];
-			#[cfg(not(feature = "tracing"))]
-			ortsys![
-				unsafe CreateEnv(
-					crate::logging::default_log_level(),
-					cname.as_ptr(),
-					&mut env_ptr
-				)?;
-				nonNull(env_ptr)
-			];
+			let env_ptr = with_cstr(self.name.as_bytes(), &|name| {
+				let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
+				#[cfg(feature = "tracing")]
+				ortsys![
+					unsafe CreateEnvWithCustomLogger(
+						Some(crate::logging::custom_logger),
+						ptr::null_mut(),
+						ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
+						name.as_ptr(),
+						&mut env_ptr
+					)?;
+					nonNull(env_ptr)
+				];
+				#[cfg(not(feature = "tracing"))]
+				ortsys![
+					unsafe CreateEnv(
+						crate::logging::default_log_level(),
+						name.as_ptr(),
+						&mut env_ptr
+					)?;
+					nonNull(env_ptr)
+				];
+				Ok(env_ptr)
+			})?;
 
 			(env_ptr, None, false)
 		};

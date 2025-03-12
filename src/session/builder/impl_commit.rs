@@ -12,6 +12,8 @@ use std::path::Path;
 #[cfg(feature = "fetch-models")]
 use std::path::PathBuf;
 
+use smallvec::SmallVec;
+
 use super::SessionBuilder;
 #[cfg(feature = "std")]
 use crate::error::{Error, ErrorCode};
@@ -110,7 +112,7 @@ impl SessionBuilder {
 		let model_path = crate::util::path_to_os_char(model_filepath);
 
 		let env = get_environment()?;
-		apply_execution_providers(&mut self, env.execution_providers.iter().cloned())?;
+		apply_execution_providers(&mut self, &env.execution_providers, "environment")?;
 
 		if env.has_global_threadpool && !self.no_global_thread_pool {
 			ortsys![unsafe DisablePerSessionThreads(self.ptr_mut())?];
@@ -144,7 +146,7 @@ impl SessionBuilder {
 			.map(|i| dangerous::extract_output(session_ptr, &allocator, i))
 			.collect::<Result<Vec<Output>>>()?;
 
-		let mut extras: Vec<Box<dyn Any>> = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>).collect();
+		let mut extras: SmallVec<Box<dyn Any>, 4> = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>).collect();
 		if let Some(prepacked_weights) = self.prepacked_weights.take() {
 			extras.push(Box::new(prepacked_weights) as Box<dyn Any>);
 		}
@@ -183,7 +185,7 @@ impl SessionBuilder {
 		let mut session_ptr: *mut ort_sys::OrtSession = ptr::null_mut();
 
 		let env = get_environment()?;
-		apply_execution_providers(&mut self, env.execution_providers.iter().cloned())?;
+		apply_execution_providers(&mut self, &env.execution_providers, "environment")?;
 
 		if env.has_global_threadpool && !self.no_global_thread_pool {
 			ortsys![unsafe DisablePerSessionThreads(self.ptr_mut())?];
@@ -221,10 +223,10 @@ impl SessionBuilder {
 			.map(|i| dangerous::extract_input(session_ptr, &allocator, i))
 			.collect::<Result<Vec<Input>>>()?;
 		let outputs = (0..num_output_nodes)
-			.map(|i| dangerous::extract_output(session_ptr, &allocator, i))
+			.map(|i: usize| dangerous::extract_output(session_ptr, &allocator, i))
 			.collect::<Result<Vec<Output>>>()?;
 
-		let mut extras: Vec<Box<dyn Any>> = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>).collect();
+		let mut extras: SmallVec<Box<dyn Any>, 4> = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>).collect();
 		if let Some(prepacked_weights) = self.prepacked_weights.take() {
 			extras.push(Box::new(prepacked_weights) as Box<dyn Any>);
 		}

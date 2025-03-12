@@ -586,7 +586,7 @@ unsafe extern "system" fn GetSymbolicDimensions(
 	dim_params_length: usize
 ) -> OrtStatusPtr {
 	for i in 0..dim_params_length {
-		*dim_params.add(i) = ptr::null();
+		*dim_params.add(i) = c"".as_ptr();
 	}
 	OrtStatusPtr::default()
 }

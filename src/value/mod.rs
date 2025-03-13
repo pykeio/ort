@@ -323,10 +323,9 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 
 	/// Construct a [`Value`] from a C++ [`ort_sys::OrtValue`] pointer.
 	///
-	/// If the value belongs to a session (i.e. if it is returned from [`Session::run`](crate::session::Session::run) or
-	/// [`IoBinding::run`](crate::io_binding::IoBinding::run)), you must provide the [`SharedSessionInner`] (acquired
-	/// from [`Session::inner`](crate::session::Session::inner)). This ensures the session is not dropped until any
-	/// values owned by it is.
+	/// If the value belongs to a session (i.e. if it is the result of an inference run), you must provide the
+	/// [`SharedSessionInner`] (acquired from [`Session::inner`](crate::session::Session::inner)). This ensures the
+	/// session is not dropped until any values owned by it is.
 	///
 	/// # Safety
 	///

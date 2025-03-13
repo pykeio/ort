@@ -174,15 +174,14 @@ unsafe impl Send for UntypedRunOptions {}
 ///   to use the same memory across runs.
 ///
 /// [`RunOptions`] can be passed to most places where a session can be inferred, e.g.
-/// [`Session::run_with_options`], [`Session::run_async_with_options`],
-/// [`IoBinding::run_with_options`]. Some of these patterns (notably `IoBinding`) do not accept
+/// [`Session::run_with_options`], [`Session::run_async`],
+/// [`Session::run_binding_with_options`]. Some of these patterns (notably `IoBinding`) do not accept
 /// [`OutputSelector`], hence [`RunOptions`] contains an additional type parameter that marks whether or not outputs
 /// have been selected.
 ///
 /// [`Session::run_async`]: crate::session::Session::run_async
-/// [`Session::run_async_with_options`]: crate::session::Session::run_async_with_options
 /// [`Session::run_with_options`]: crate::session::Session::run_with_options
-/// [`IoBinding::run_with_options`]: crate::io_binding::IoBinding::run_with_options
+/// [`Session::run_binding_with_options`]: crate::session::Session::run_binding_with_options
 #[derive(Debug)]
 pub struct RunOptions<O: SelectedOutputMarker = NoSelectedOutputs> {
 	pub(crate) inner: UntypedRunOptions,

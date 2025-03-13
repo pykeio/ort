@@ -74,8 +74,8 @@ pub enum CuDNNConvAlgorithmSearch {
 	/// > search algorithm is actually [`Exhaustive`].
 	///
 	/// [fwdalgo]: https://docs.nvidia.com/deeplearning/cudnn/api/index.html#cudnnConvolutionFwdAlgo_t
-	/// [`Exhaustive`]: CUDAExecutionProviderCuDNNConvAlgoSearch::Exhaustive
-	/// [`Heuristic`]: CUDAExecutionProviderCuDNNConvAlgoSearch::Heuristic
+	/// [`Exhaustive`]: CuDNNConvAlgorithmSearch::Exhaustive
+	/// [`Heuristic`]: CuDNNConvAlgorithmSearch::Heuristic
 	Default
 }
 
@@ -118,7 +118,7 @@ impl CUDAExecutionProvider {
 	/// ORT leverages cuDNN for convolution operations and the first step in this process is to determine an
 	/// “optimal” convolution algorithm to use while performing the convolution operation for the given input
 	/// configuration (input shape, filter shape, etc.) in each `Conv` node. This option controlls the type of search
-	/// done for cuDNN convolution algorithms. See [`CUDAExecutionProviderCuDNNConvAlgoSearch`] for more info.
+	/// done for cuDNN convolution algorithms. See [`CuDNNConvAlgorithmSearch`] for more info.
 	#[must_use]
 	pub fn with_conv_algorithm_search(mut self, search: CuDNNConvAlgorithmSearch) -> Self {
 		self.options.set("cudnn_conv_algo_search", match search {

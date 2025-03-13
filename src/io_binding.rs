@@ -115,7 +115,7 @@ impl IoBinding {
 	/// Bind a [`Value`] to a session input.
 	///
 	/// Upon invocation, the value's data will be queued to be copied to the device the session is allocated on. The
-	/// copied data will be used as an input (specified by `name`) in all future invocations of [`IoBinding::run`]
+	/// copied data will be used as an input (specified by `name`) in all future invocations of [`Session::run_binding`]
 	/// until the input is overridden (by calling [`IoBinding::bind_input`] again) or until all inputs are cleared (via
 	/// [`IoBinding::clear_inputs`] or [`IoBinding::clear`]).
 	///
@@ -135,10 +135,11 @@ impl IoBinding {
 	/// Bind a session output to a pre-allocated [`Value`].
 	///
 	/// This allows for the pre-allocation and reuse of memory in the session output (see [`Tensor::new`]). Any
-	/// subsequent runs via [`IoBinding::run`] will reuse the same tensor to store the output instead of creating a new
-	/// one each time.
+	/// subsequent runs via [`Session::run_binding`] will reuse the same tensor to store the output instead of creating
+	/// a new one each time.
 	///
-	/// The output will be accessible in the value returned by [`IoBinding::run`], under the name specified by `name`.
+	/// The output will be accessible in the value returned by [`Session::run_binding`], under the name specified by
+	/// `name`.
 	///
 	/// [`Tensor::new`]: crate::value::Tensor::new
 	pub fn bind_output<T: ValueTypeMarker, S: Into<String>>(&mut self, name: S, ort_value: Value<T>) -> Result<()> {

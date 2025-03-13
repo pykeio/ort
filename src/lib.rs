@@ -131,6 +131,7 @@ static G_ORT_API: OnceLock<ApiPointer> = OnceLock::new();
 ///
 /// # Panics
 /// May panic if:
+/// - The `alternative-backend` feature is enabled and [`set_api`] was not yet called.
 /// - Getting the `OrtApi` struct fails, due to `ort` loading an unsupported version of ONNX Runtime.
 /// - Loading the ONNX Runtime dynamic library fails if the `load-dynamic` feature is enabled.
 pub fn api() -> &'static ort_sys::OrtApi {
@@ -188,6 +189,13 @@ pub fn api() -> &'static ort_sys::OrtApi {
 	unsafe { ptr.as_ref() }
 }
 
+/// Sets the global [`ort_sys::OrtApi`] interface used by `ort` in order to use alternative backends, or a custom
+/// loading scheme.
+///
+/// When using `alternative-backend`, this must be called before using any other `ort` API.
+///
+/// Returns `true` if successful (i.e. no API has been set up to this point). This function will not override the API if
+/// one was already set.
 pub fn set_api(api: ort_sys::OrtApi) -> bool {
 	G_ORT_API.try_insert(ApiPointer(unsafe { NonNull::new_unchecked(Box::leak(Box::new(api))) }))
 }

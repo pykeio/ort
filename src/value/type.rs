@@ -1,39 +1,45 @@
 use alloc::{
 	boxed::Box,
-	string::{String, ToString},
-	vec,
-	vec::Vec
+	string::{String, ToString}
 };
-use core::{
-	ffi::{CStr, c_char},
-	fmt, ptr
-};
+use core::{ffi::CStr, fmt, ptr};
 
-use crate::{ortsys, tensor::TensorElementType, util::with_cstr_ptr_array};
+use smallvec::{SmallVec, smallvec};
+
+use crate::{
+	ortsys,
+	tensor::{Shape, SymbolicDimensions, TensorElementType},
+	util::with_cstr_ptr_array
+};
 
 /// The type of a [`Value`][super::Value], or a session input/output.
 ///
 /// ```
 /// # use std::sync::Arc;
-/// # use ort::{session::Session, value::{ValueType, Tensor}, tensor::TensorElementType};
+/// # use ort::{session::Session, tensor::{Shape, SymbolicDimensions}, value::{ValueType, Tensor}, tensor::TensorElementType};
 /// # fn main() -> ort::Result<()> {
 /// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// // `ValueType`s can be obtained from session inputs/outputs:
 /// let input = &session.inputs[0];
 /// assert_eq!(input.input_type, ValueType::Tensor {
 /// 	ty: TensorElementType::Float32,
-/// 	// Our model has 3 dynamic dimensions, represented by -1
-/// 	dimensions: vec![-1, -1, -1, 3],
+/// 	// Our model's input has 3 dynamic dimensions, represented by -1
+/// 	shape: Shape::new([-1, -1, -1, 3]),
 /// 	// Dynamic dimensions may also have names.
-/// 	dimension_symbols: vec!["unk__31".to_string(), "unk__32".to_string(), "unk__33".to_string(), String::default()]
+/// 	dimension_symbols: SymbolicDimensions::new([
+/// 		"unk__31".to_string(),
+/// 		"unk__32".to_string(),
+/// 		"unk__33".to_string(),
+/// 		String::default()
+/// 	])
 /// });
 ///
 /// // ...or by `Value`s created in Rust or output by a session.
 /// let value = Tensor::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
 /// assert_eq!(value.dtype(), &ValueType::Tensor {
 /// 	ty: TensorElementType::Int64,
-/// 	dimensions: vec![5],
-/// 	dimension_symbols: vec![String::default()]
+/// 	shape: Shape::new([5]),
+/// 	dimension_symbols: SymbolicDimensions::new([String::default()])
 /// });
 /// # 	Ok(())
 /// # }
@@ -44,15 +50,16 @@ pub enum ValueType {
 	Tensor {
 		/// Element type of the tensor.
 		ty: TensorElementType,
-		/// Dimensions of the tensor. If an exact dimension is not known (i.e. a dynamic dimension as part of an
+		/// Shape of the tensor. If an exact dimension is not known (i.e. a dynamic dimension as part of an
 		/// [`Input`]/[`Output`]), the dimension will be `-1`.
 		///
-		/// Actual tensor values, which have a known dimension, will always have positive (>1) dimensions.
+		/// Actual tensor values (i.e. not [`Input`] or [`Output`] definitions), which have a known dimension, will
+		/// always have non-negative dimensions.
 		///
 		/// [`Input`]: crate::session::Input
 		/// [`Output`]: crate::session::Output
-		dimensions: Vec<i64>,
-		dimension_symbols: Vec<String>
+		shape: Shape,
+		dimension_symbols: SymbolicDimensions
 	},
 	/// A sequence (vector) of other `Value`s.
 	///
@@ -136,11 +143,11 @@ impl ValueType {
 
 	pub(crate) fn to_tensor_type_info(&self) -> Option<*mut ort_sys::OrtTensorTypeAndShapeInfo> {
 		match self {
-			Self::Tensor { ty, dimensions, dimension_symbols } => {
+			Self::Tensor { ty, shape, dimension_symbols } => {
 				let mut info_ptr = ptr::null_mut();
 				ortsys![unsafe CreateTensorTypeAndShapeInfo(&mut info_ptr).expect("infallible")];
 				ortsys![unsafe SetTensorElementType(info_ptr, (*ty).into()).expect("infallible")];
-				ortsys![unsafe SetDimensions(info_ptr, dimensions.as_ptr(), dimensions.len()).expect("infallible")];
+				ortsys![unsafe SetDimensions(info_ptr, shape.as_ptr(), shape.len()).expect("infallible")];
 				with_cstr_ptr_array(dimension_symbols, &|ptrs| {
 					ortsys![unsafe SetSymbolicDimensions(info_ptr, ptrs.as_ptr().cast_mut(), dimension_symbols.len()).expect("infallible")];
 					Ok(())
@@ -152,20 +159,22 @@ impl ValueType {
 		}
 	}
 
-	/// Returns the dimensions of this value type if it is a tensor, or `None` if it is a sequence or map.
+	/// Returns the shape of this value type if it is a tensor, or `None` if it is a sequence or map.
 	///
 	/// ```
-	/// # use ort::value::Tensor;
+	/// # use ort::value::{Tensor, DynValue};
 	/// # fn main() -> ort::Result<()> {
-	/// let value = Tensor::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
-	/// assert_eq!(value.dtype().tensor_dimensions(), Some(&vec![5]));
+	/// let value: DynValue = Tensor::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?.into_dyn();
+	///
+	/// let shape = value.dtype().tensor_shape().unwrap();
+	/// assert_eq!(**shape, [5]);
 	/// # 	Ok(())
 	/// # }
 	/// ```
 	#[must_use]
-	pub fn tensor_dimensions(&self) -> Option<&Vec<i64>> {
+	pub fn tensor_shape(&self) -> Option<&Shape> {
 		match self {
-			ValueType::Tensor { dimensions, .. } => Some(dimensions),
+			ValueType::Tensor { shape, .. } => Some(shape),
 			_ => None
 		}
 	}
@@ -213,9 +222,9 @@ impl ValueType {
 impl fmt::Display for ValueType {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
-			ValueType::Tensor { ty, dimensions, dimension_symbols } => {
+			ValueType::Tensor { ty, shape, dimension_symbols } => {
 				write!(f, "Tensor<{ty}>(")?;
-				for (i, dimension) in dimensions.iter().copied().enumerate() {
+				for (i, dimension) in shape.iter().copied().enumerate() {
 					if dimension == -1 {
 						let sym = &dimension_symbols[i];
 						if sym.is_empty() {
@@ -226,7 +235,7 @@ impl fmt::Display for ValueType {
 					} else {
 						dimension.fmt(f)?;
 					}
-					if i != dimensions.len() - 1 {
+					if i != shape.len() - 1 {
 						f.write_str(", ")?;
 					}
 				}
@@ -248,10 +257,10 @@ pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys
 	let mut num_dims = 0;
 	ortsys![unsafe GetDimensionsCount(info_ptr, &mut num_dims).expect("infallible")];
 
-	let mut node_dims: Vec<i64> = vec![0; num_dims];
+	let mut node_dims = Shape::empty(num_dims);
 	ortsys![unsafe GetDimensions(info_ptr, node_dims.as_mut_ptr(), num_dims).expect("infallible")];
 
-	let mut symbolic_dims: Vec<*const c_char> = vec![ptr::null(); num_dims];
+	let mut symbolic_dims: SmallVec<_, 4> = smallvec![ptr::null(); num_dims];
 	ortsys![unsafe GetSymbolicDimensions(info_ptr, symbolic_dims.as_mut_ptr(), num_dims).expect("infallible")];
 
 	let dimension_symbols = symbolic_dims
@@ -261,7 +270,7 @@ pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys
 
 	ValueType::Tensor {
 		ty: type_sys.into(),
-		dimensions: node_dims,
+		shape: node_dims,
 		dimension_symbols
 	}
 }
@@ -288,14 +297,17 @@ unsafe fn extract_data_type_from_map_info(info_ptr: *const ort_sys::OrtMapTypeIn
 #[cfg(test)]
 mod tests {
 	use super::ValueType;
-	use crate::{ortsys, tensor::TensorElementType};
+	use crate::{
+		ortsys,
+		tensor::{Shape, SymbolicDimensions, TensorElementType}
+	};
 
 	#[test]
 	fn test_to_from_tensor_info() -> crate::Result<()> {
 		let ty = ValueType::Tensor {
 			ty: TensorElementType::Float32,
-			dimensions: vec![-1, 32, 4, 32],
-			dimension_symbols: vec!["d1".to_string(), String::default(), String::default(), String::default()]
+			shape: Shape::new([-1, 32, 4, 32]),
+			dimension_symbols: SymbolicDimensions::new(["d1".to_string(), String::default(), String::default(), String::default()])
 		};
 		let ty_ptr = ty.to_tensor_type_info().expect("");
 		let ty_d = unsafe { super::extract_data_type_from_tensor_info(ty_ptr) };

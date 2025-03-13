@@ -12,8 +12,7 @@ use crate::{
 	error::{Error, ErrorCode, Result},
 	memory::MemoryInfo,
 	ortsys,
-	tensor::{PrimitiveTensorElementType, TensorElementType},
-	util::element_count,
+	tensor::{PrimitiveTensorElementType, Shape, TensorElementType},
 	value::{Value, ValueType}
 };
 
@@ -49,11 +48,8 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_tensor<T: PrimitiveTensorElementType>(&self) -> Result<ndarray::ArrayViewD<'_, T>> {
-		use ndarray::IntoDimension;
-		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type()).and_then(|(ptr, dimensions)| {
-			let shape = dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>().into_dimension();
-			Ok(unsafe { ndarray::ArrayView::from_shape_ptr(shape, data_ptr(ptr)?.cast::<T>()) })
-		})
+		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type())
+			.and_then(|(ptr, shape)| Ok(unsafe { ndarray::ArrayView::from_shape_ptr(shape.to_ixdyn(), data_ptr(ptr)?.cast::<T>()) }))
 	}
 
 	/// Attempt to extract the scalar from a tensor of type `T`.
@@ -80,11 +76,11 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_scalar<T: PrimitiveTensorElementType + Copy>(&self) -> Result<T> {
-		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type()).and_then(|(ptr, dimensions)| {
-			if !dimensions.is_empty() {
+		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type()).and_then(|(ptr, shape)| {
+			if !shape.is_empty() {
 				return Err(Error::new_with_code(
 					ErrorCode::InvalidArgument,
-					format!("Cannot extract scalar {} from a tensor of dimensionality {}", T::into_tensor_element_type(), dimensions.len())
+					format!("Cannot extract scalar {} from a tensor of dimensionality {}", T::into_tensor_element_type(), shape.len())
 				));
 			}
 
@@ -122,14 +118,11 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_tensor_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<ndarray::ArrayViewMutD<'_, T>> {
-		use ndarray::IntoDimension;
-		extract_tensor(self.ptr_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type()).and_then(|(ptr, dimensions)| {
-			let shape = dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>().into_dimension();
-			Ok(unsafe { ndarray::ArrayViewMut::from_shape_ptr(shape, data_ptr(ptr)?.cast::<T>()) })
-		})
+		extract_tensor(self.ptr_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type())
+			.and_then(|(ptr, shape)| Ok(unsafe { ndarray::ArrayViewMut::from_shape_ptr(shape.to_ixdyn(), data_ptr(ptr)?.cast::<T>()) }))
 	}
 
-	/// Attempt to extract the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and an
+	/// Attempt to extract the underlying data into a "raw" view tuple, consisting of the tensor's shape and an
 	/// immutable view into its data.
 	///
 	/// See also:
@@ -145,7 +138,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// let (extracted_shape, extracted_data) = value.try_extract_raw_tensor::<i64>()?;
 	/// assert_eq!(extracted_data, &array);
-	/// assert_eq!(extracted_shape, [5]);
+	/// assert_eq!(**extracted_shape, [5]);
 	/// # 	Ok(())
 	/// # }
 	/// ```
@@ -157,12 +150,12 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// - The provided type `T` does not match the tensor's element type.
 	///
 	/// [`DynValue`]: crate::value::DynValue
-	pub fn try_extract_raw_tensor<T: PrimitiveTensorElementType>(&self) -> Result<(&[i64], &[T])> {
+	pub fn try_extract_raw_tensor<T: PrimitiveTensorElementType>(&self) -> Result<(&Shape, &[T])> {
 		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type())
-			.and_then(|(ptr, dimensions)| Ok((dimensions, unsafe { slice::from_raw_parts(data_ptr(ptr)?.cast::<T>(), element_count(dimensions)) })))
+			.and_then(|(ptr, shape)| Ok((shape, unsafe { slice::from_raw_parts(data_ptr(ptr)?.cast::<T>(), shape.num_elements()) })))
 	}
 
-	/// Attempt to extract the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and a
+	/// Attempt to extract the underlying data into a "raw" view tuple, consisting of the tensor's shape and a
 	/// mutable view into its data.
 	///
 	/// See also the infallible counterpart, [`Tensor::extract_raw_tensor_mut`], for typed [`Tensor<T>`]s.
@@ -175,7 +168,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// let (extracted_shape, extracted_data) = value.try_extract_raw_tensor_mut::<i64>()?;
 	/// assert_eq!(extracted_data, &array);
-	/// assert_eq!(extracted_shape, [5]);
+	/// assert_eq!(**extracted_shape, [5]);
 	/// # 	Ok(())
 	/// # }
 	/// ```
@@ -187,9 +180,9 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// - The provided type `T` does not match the tensor's element type.
 	///
 	/// [`DynValue`]: crate::value::DynValue
-	pub fn try_extract_raw_tensor_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<(&[i64], &mut [T])> {
+	pub fn try_extract_raw_tensor_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<(&Shape, &mut [T])> {
 		extract_tensor(self.ptr_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type())
-			.and_then(|(ptr, dimensions)| Ok((dimensions, unsafe { slice::from_raw_parts_mut(data_ptr(ptr)?.cast::<T>(), element_count(dimensions)) })))
+			.and_then(|(ptr, shape)| Ok((shape, unsafe { slice::from_raw_parts_mut(data_ptr(ptr)?.cast::<T>(), shape.num_elements()) })))
 	}
 
 	/// Attempt to extract the underlying data into a Rust `ndarray`.
@@ -208,15 +201,13 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_string_tensor(&self) -> Result<ndarray::ArrayD<String>> {
-		use ndarray::IntoDimension;
-		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), TensorElementType::String).and_then(|(ptr, dimensions)| {
-			let strings = extract_strings(ptr, dimensions)?;
-			Ok(ndarray::Array::from_shape_vec(dimensions.iter().map(|&n| n as usize).collect::<Vec<_>>().into_dimension(), strings)
-				.expect("Shape extracted from tensor didn't match tensor contents"))
+		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), TensorElementType::String).and_then(|(ptr, shape)| {
+			let strings = extract_strings(ptr, shape)?;
+			Ok(ndarray::Array::from_shape_vec(shape.to_ixdyn(), strings).expect("Shape extracted from tensor didn't match tensor contents"))
 		})
 	}
 
-	/// Attempt to extract the underlying string data into a "raw" data tuple, consisting of the tensor's dimensions and
+	/// Attempt to extract the underlying string data into a "raw" data tuple, consisting of the tensor's shape and
 	/// an owned `Vec` of its data.
 	///
 	/// ```
@@ -227,14 +218,14 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// let (extracted_shape, extracted_data) = tensor.try_extract_raw_string_tensor()?;
 	/// assert_eq!(extracted_data, array);
-	/// assert_eq!(extracted_shape, [2]);
+	/// assert_eq!(**extracted_shape, [2]);
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn try_extract_raw_string_tensor(&self) -> Result<(&[i64], Vec<String>)> {
-		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), TensorElementType::String).and_then(|(ptr, dimensions)| {
-			let strings = extract_strings(ptr, dimensions)?;
-			Ok((dimensions, strings))
+	pub fn try_extract_raw_string_tensor(&self) -> Result<(&Shape, Vec<String>)> {
+		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), TensorElementType::String).and_then(|(ptr, shape)| {
+			let strings = extract_strings(ptr, shape)?;
+			Ok((shape, strings))
 		})
 	}
 
@@ -246,13 +237,13 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # 	let allocator = Allocator::default();
 	/// let tensor = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
 	///
-	/// assert_eq!(tensor.shape(), [1, 128, 128, 3]);
+	/// assert_eq!(**tensor.shape(), [1, 128, 128, 3]);
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn shape(&self) -> &[i64] {
+	pub fn shape(&self) -> &Shape {
 		match self.dtype() {
-			ValueType::Tensor { dimensions, .. } => dimensions,
+			ValueType::Tensor { shape, .. } => shape,
 			_ => unreachable!()
 		}
 	}
@@ -263,9 +254,9 @@ fn extract_tensor<'t>(
 	dtype: &'t ValueType,
 	memory_info: &MemoryInfo,
 	expected_ty: TensorElementType
-) -> Result<(*mut ort_sys::OrtValue, &'t [i64])> {
+) -> Result<(*mut ort_sys::OrtValue, &'t Shape)> {
 	match dtype {
-		ValueType::Tensor { ty, dimensions, .. } => {
+		ValueType::Tensor { ty, shape, .. } => {
 			if !memory_info.is_cpu_accessible() {
 				return Err(Error::new(format!(
 					"Cannot extract from value on device `{}`, which is not CPU accessible",
@@ -274,7 +265,7 @@ fn extract_tensor<'t>(
 			}
 
 			if *ty == expected_ty {
-				Ok((ptr, dimensions))
+				Ok((ptr, shape))
 			} else {
 				Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot extract Tensor<{}> from Tensor<{}>", expected_ty, ty)))
 			}
@@ -289,9 +280,8 @@ unsafe fn data_ptr(ptr: *mut ort_sys::OrtValue) -> Result<*mut c_void> {
 	Ok(output_array_ptr)
 }
 
-fn extract_strings(ptr: *mut ort_sys::OrtValue, dimensions: &[i64]) -> Result<Vec<String>> {
-	let len = element_count(dimensions);
-
+fn extract_strings(ptr: *mut ort_sys::OrtValue, shape: &Shape) -> Result<Vec<String>> {
+	let len = shape.num_elements();
 	// Total length of string data, not including \0 suffix
 	let mut total_length = 0;
 	ortsys![unsafe GetStringTensorDataLength(ptr, &mut total_length)?];
@@ -368,7 +358,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 		self.try_extract_tensor_mut().expect("Failed to extract tensor")
 	}
 
-	/// Extracts the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and an immutable
+	/// Extracts the underlying data into a "raw" view tuple, consisting of the tensor's shapes and an immutable
 	/// view into its data.
 	///
 	/// ```
@@ -379,15 +369,15 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	///
 	/// let (extracted_shape, extracted_data) = tensor.extract_raw_tensor();
 	/// assert_eq!(extracted_data, &array);
-	/// assert_eq!(extracted_shape, [5]);
+	/// assert_eq!(**extracted_shape, [5]);
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn extract_raw_tensor(&self) -> (&[i64], &[T]) {
+	pub fn extract_raw_tensor(&self) -> (&Shape, &[T]) {
 		self.try_extract_raw_tensor().expect("Failed to extract tensor")
 	}
 
-	/// Extracts the underlying data into a "raw" view tuple, consisting of the tensor's dimensions and a mutable view
+	/// Extracts the underlying data into a "raw" view tuple, consisting of the tensor's shapes and a mutable view
 	/// into its data.
 	///
 	/// ```
@@ -403,7 +393,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn extract_raw_tensor_mut(&mut self) -> (&[i64], &mut [T]) {
+	pub fn extract_raw_tensor_mut(&mut self) -> (&Shape, &mut [T]) {
 		self.try_extract_raw_tensor_mut().expect("Failed to extract tensor")
 	}
 }

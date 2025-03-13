@@ -6,14 +6,13 @@ use core::{
 	slice
 };
 
-use smallvec::SmallVec;
-
 use crate::{
 	AsPointer,
 	error::{Error, Result},
 	memory::{Allocator, MemoryInfo, MemoryType},
 	ortsys,
 	session::{Input, Output},
+	tensor::Shape,
 	util::with_cstr,
 	value::{DowncastableTarget, DynValue, Value, ValueRef, ValueRefMut, ValueType}
 };
@@ -350,9 +349,9 @@ impl KernelContext {
 		Ok(NonNull::new(value_ptr.cast_mut()).map(|c| ValueRef::new(unsafe { Value::from_ptr_nodrop(c, None) })))
 	}
 
-	pub fn output(&self, idx: usize, shape: impl IntoIterator<Item = i64>) -> Result<Option<ValueRefMut<'_>>> {
+	pub fn output(&self, idx: usize, shape: impl Into<Shape>) -> Result<Option<ValueRefMut<'_>>> {
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
-		let shape = shape.into_iter().collect::<SmallVec<i64, 4>>();
+		let shape = shape.into();
 		ortsys![unsafe KernelContext_GetOutput(self.ptr.as_ptr(), idx, shape.as_ptr(), shape.len(), &mut value_ptr)?];
 		Ok(NonNull::new(value_ptr).map(|c| ValueRefMut::new(unsafe { Value::from_ptr_nodrop(c, None) })))
 	}

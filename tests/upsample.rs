@@ -63,8 +63,8 @@ fn upsample() -> ort::Result<()> {
 		assert_eq!(metadata.name()?, "tf2onnx");
 		assert_eq!(metadata.producer()?, "tf2onnx");
 
-		assert_eq!(session.inputs[0].input_type.tensor_dimensions().expect("input0 to be a tensor type"), &[-1, -1, -1, 3]);
-		assert_eq!(session.outputs[0].output_type.tensor_dimensions().expect("output0 to be a tensor type"), &[-1, -1, -1, 3]);
+		assert_eq!(&**session.inputs[0].input_type.tensor_shape().expect("input0 to be a tensor type"), [-1, -1, -1, 3]);
+		assert_eq!(&**session.outputs[0].output_type.tensor_shape().expect("output0 to be a tensor type"), [-1, -1, -1, 3]);
 	}
 
 	// Load image, converting to RGB format
@@ -101,8 +101,8 @@ fn upsample_with_ort_model() -> ort::Result<()> {
 		.commit_from_memory_directly(&session_data) // Zero-copy.
 		.expect("Could not read model from memory");
 
-	assert_eq!(session.inputs[0].input_type.tensor_dimensions().expect("input0 to be a tensor type"), &[-1, -1, -1, 3]);
-	assert_eq!(session.outputs[0].output_type.tensor_dimensions().expect("output0 to be a tensor type"), &[-1, -1, -1, 3]);
+	assert_eq!(&**session.inputs[0].input_type.tensor_shape().expect("input0 to be a tensor type"), [-1, -1, -1, 3]);
+	assert_eq!(&**session.outputs[0].output_type.tensor_shape().expect("output0 to be a tensor type"), [-1, -1, -1, 3]);
 
 	// Load image, converting to RGB format
 	let image_buffer = load_input_image(IMAGE_TO_LOAD);

@@ -1,7 +1,7 @@
 mod create;
 mod extract;
 
-use alloc::{string::String, sync::Arc, vec};
+use alloc::sync::Arc;
 use core::{
 	fmt::{self, Debug},
 	marker::PhantomData,
@@ -16,8 +16,7 @@ use crate::{
 	error::Result,
 	memory::{Allocator, MemoryInfo},
 	ortsys,
-	tensor::{IntoTensorElementType, TensorElementType},
-	util::element_count
+	tensor::{IntoTensorElementType, Shape, SymbolicDimensions, TensorElementType}
 };
 
 pub trait TensorValueTypeMarker: ValueTypeMarker {
@@ -93,10 +92,13 @@ impl DynTensor {
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub fn new(allocator: &Allocator, data_type: TensorElementType, shape: impl ToDimensions) -> Result<DynTensor> {
+	pub fn new(allocator: &Allocator, data_type: TensorElementType, shape: impl Into<Shape>) -> Result<DynTensor> {
+		Self::new_inner(allocator, data_type, shape.into())
+	}
+
+	fn new_inner(allocator: &Allocator, data_type: TensorElementType, shape: Shape) -> Result<DynTensor> {
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 
-		let shape = shape.to_dimensions(None)?;
 		let shape_ptr: *const i64 = shape.as_ptr();
 		let shape_len = shape.len();
 
@@ -118,7 +120,7 @@ impl DynTensor {
 			let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
 			ortsys![unsafe GetTensorMutableData(value_ptr, &mut buffer_ptr)?; nonNull(buffer_ptr)];
 
-			unsafe { buffer_ptr.write_bytes(0, data_type.byte_size(element_count(&shape))) };
+			unsafe { buffer_ptr.write_bytes(0, data_type.byte_size(shape.num_elements())) };
 		}
 
 		Ok(Value {
@@ -126,8 +128,8 @@ impl DynTensor {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
 				dtype: ValueType::Tensor {
 					ty: data_type,
-					dimensions: shape,
-					dimension_symbols: vec![String::default(); shape_len]
+					shape,
+					dimension_symbols: SymbolicDimensions::empty(shape_len)
 				},
 				drop: true,
 				memory_info: MemoryInfo::from_value(value_ptr),
@@ -338,7 +340,7 @@ mod tests {
 	use super::Tensor;
 	use crate::{
 		memory::Allocator,
-		tensor::TensorElementType,
+		tensor::{Shape, SymbolicDimensions, TensorElementType},
 		value::{TensorRef, ValueType}
 	};
 
@@ -350,12 +352,12 @@ mod tests {
 		assert_eq!(value.dtype().tensor_type(), Some(TensorElementType::Float32));
 		assert_eq!(value.dtype(), &ValueType::Tensor {
 			ty: TensorElementType::Float32,
-			dimensions: vec![v.len() as i64],
-			dimension_symbols: vec![String::default()]
+			shape: Shape::new([v.len() as i64]),
+			dimension_symbols: SymbolicDimensions::empty(1)
 		});
 
 		let (shape, data) = value.extract_raw_tensor();
-		assert_eq!(shape, vec![v.len() as i64]);
+		assert_eq!(&**shape, [v.len() as i64]);
 		assert_eq!(data, &v);
 
 		Ok(())
@@ -411,7 +413,7 @@ mod tests {
 
 		let value = Tensor::from_string_array((vec![v.len() as i64], &*v))?;
 		let (extracted_shape, extracted_view) = value.try_extract_raw_string_tensor()?;
-		assert_eq!(extracted_shape, [v.len() as i64]);
+		assert_eq!(&**extracted_shape, [v.len() as i64]);
 		assert_eq!(extracted_view, v);
 
 		Ok(())
@@ -437,7 +439,7 @@ mod tests {
 
 	#[test]
 	fn test_tensor_index() -> crate::Result<()> {
-		let mut tensor = Tensor::new(&Allocator::default(), [1, 3, 224, 224])?;
+		let mut tensor = Tensor::new(&Allocator::default(), Shape::new([1, 3, 224, 224]))?;
 
 		tensor[[0, 2, 42, 42]] = 1.0;
 		assert_eq!(tensor[[0, 2, 42, 42]], 1.0);

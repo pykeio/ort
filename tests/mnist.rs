@@ -26,11 +26,11 @@ fn mnist_5() -> ort::Result<()> {
 		assert_eq!(metadata.name()?, "CNTKGraph");
 		assert_eq!(metadata.producer()?, "CNTK");
 
-		let input0_shape: &Vec<i64> = session.inputs[0].input_type.tensor_dimensions().expect("input0 to be a tensor type");
-		let output0_shape: &Vec<i64> = session.outputs[0].output_type.tensor_dimensions().expect("output0 to be a tensor type");
+		let input0_shape = session.inputs[0].input_type.tensor_shape().expect("input0 to be a tensor type");
+		let output0_shape = session.outputs[0].output_type.tensor_shape().expect("output0 to be a tensor type");
 
-		assert_eq!(input0_shape, &[1, 1, 28, 28]);
-		assert_eq!(output0_shape, &[1, 10]);
+		assert_eq!(&**input0_shape, &[1, 1, 28, 28]);
+		assert_eq!(&**output0_shape, &[1, 10]);
 
 		input0_shape
 	};

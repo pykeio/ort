@@ -20,8 +20,7 @@ use crate::{
 	error::{Error, Result},
 	memory::Allocator,
 	ortsys,
-	tensor::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType},
-	util::element_count
+	tensor::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType}
 };
 
 pub trait MapValueTypeMarker: ValueTypeMarker {
@@ -109,7 +108,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 				if K::into_tensor_element_type() != TensorElementType::String {
 					let dtype = key_value.dtype();
 					let (key_tensor_shape, key_tensor) = match dtype {
-						ValueType::Tensor { ty, dimensions, .. } => {
+						ValueType::Tensor { ty, shape, .. } => {
 							let mem = key_value.memory_info();
 							if !mem.is_cpu_accessible() {
 								return Err(Error::new(format!(
@@ -124,8 +123,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 								let output_array_ptr_ptr_void: *mut *mut c_void = output_array_ptr_ptr.cast();
 								ortsys![unsafe GetTensorMutableData(key_tensor_ptr, output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
 
-								let len = element_count(dimensions);
-								(dimensions, unsafe { slice::from_raw_parts(output_array_ptr, len) })
+								(shape, unsafe { slice::from_raw_parts(output_array_ptr, shape.num_elements()) })
 							} else {
 								return Err(Error::new_with_code(
 									ErrorCode::InvalidArgument,

@@ -303,17 +303,6 @@ impl<T> Drop for OnceLock<T> {
 #[doc(hidden)]
 pub fn cold() {}
 
-pub fn element_count(shape: &[i64]) -> usize {
-	let mut size = 1usize;
-	for dim in shape {
-		if *dim < 0 {
-			return 0;
-		}
-		size *= *dim as usize;
-	}
-	size
-}
-
 #[inline]
 pub(crate) fn with_cstr<T>(bytes: &[u8], f: &dyn Fn(&CStr) -> Result<T>) -> Result<T> {
 	fn run_with_heap_cstr<T>(bytes: &[u8], f: &dyn Fn(&CStr) -> Result<T>) -> Result<T> {

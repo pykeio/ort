@@ -49,7 +49,7 @@ fn main() -> ort::Result<()> {
 	stdout.flush().unwrap();
 
 	for _ in 0..GEN_TOKENS {
-		// Raw tensor construction takes a tuple of (dimensions, data).
+		// Raw tensor construction takes a tuple of (shape, data).
 		// The model expects our input to have shape [B, _, S]
 		let input = TensorRef::from_array_view((vec![1, 1, tokens.len() as i64], tokens.as_slice()))?;
 		let outputs = session.run(inputs![input])?;

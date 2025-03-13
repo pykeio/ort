@@ -38,6 +38,7 @@ pub mod tensor;
 #[cfg(feature = "training")]
 #[cfg_attr(docsrs, doc(cfg(feature = "training")))]
 pub mod training;
+#[doc(hidden)]
 pub mod util;
 pub mod value;
 

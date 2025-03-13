@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, ffi::CString, format, string::String, sync::Arc, vec, vec::Vec};
+use alloc::{boxed::Box, ffi::CString, format, string::String, sync::Arc, vec::Vec};
 use core::{
 	any::Any,
 	ffi::c_void,
@@ -17,8 +17,7 @@ use crate::{
 	error::{Error, ErrorCode, Result},
 	memory::{Allocator, MemoryInfo},
 	ortsys,
-	tensor::{PrimitiveTensorElementType, TensorElementType, Utf8Data},
-	util::element_count,
+	tensor::{PrimitiveTensorElementType, Shape, SymbolicDimensions, TensorElementType, Utf8Data},
 	value::{Value, ValueInner, ValueType}
 };
 
@@ -78,8 +77,8 @@ impl Tensor<String> {
 				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
 				dtype: ValueType::Tensor {
 					ty: TensorElementType::String,
-					dimensions: shape,
-					dimension_symbols: vec![String::default(); shape_len]
+					shape,
+					dimension_symbols: SymbolicDimensions::empty(shape_len)
 				},
 				memory_info: MemoryInfo::from_value(value_ptr),
 				drop: true,
@@ -109,7 +108,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub fn new(allocator: &Allocator, shape: impl ToDimensions) -> Result<Tensor<T>> {
+	pub fn new(allocator: &Allocator, shape: impl Into<Shape>) -> Result<Tensor<T>> {
 		let tensor = DynTensor::new(allocator, T::into_tensor_element_type(), shape)?;
 		Ok(unsafe { tensor.transmute_type() })
 	}
@@ -141,17 +140,16 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	///
 	/// Creating string tensors requires a separate method; see [`Tensor::from_string_array`].
 	pub fn from_array(input: impl OwnedTensorArrayData<T>) -> Result<Tensor<T>> {
-		let TensorArrayDataParts { shape, ptr, num_elements, guard } = input.into_parts()?;
-		tensor_from_array(MemoryInfo::default(), shape, ptr.as_ptr().cast(), num_elements, size_of::<T>(), T::into_tensor_element_type(), guard)
+		let TensorArrayDataParts { shape, ptr, guard } = input.into_parts()?;
+		tensor_from_array(MemoryInfo::default(), shape, ptr.as_ptr().cast(), size_of::<T>(), T::into_tensor_element_type(), guard)
 			.map(|tensor| unsafe { tensor.transmute_type() })
 	}
 }
 
 fn tensor_from_array(
 	memory_info: MemoryInfo,
-	shape: Vec<i64>,
+	shape: Shape,
 	data: *mut c_void,
-	num_elements: usize,
 	element_size: usize,
 	element_type: TensorElementType,
 	guard: Option<Box<dyn Any>>
@@ -162,7 +160,7 @@ fn tensor_from_array(
 		unsafe CreateTensorWithDataAsOrtValue(
 			memory_info.ptr(),
 			data,
-			num_elements * element_size,
+			shape.num_elements() * element_size,
 			shape.as_ptr(),
 			shape.len(),
 			element_type.into(),
@@ -176,8 +174,8 @@ fn tensor_from_array(
 			ptr: unsafe { NonNull::new_unchecked(value_ptr) },
 			dtype: ValueType::Tensor {
 				ty: element_type,
-				dimension_symbols: vec![String::default(); shape.len()],
-				dimensions: shape
+				dimension_symbols: SymbolicDimensions::empty(shape.len()),
+				shape
 			},
 			drop: true,
 			memory_info: Some(memory_info),
@@ -219,15 +217,11 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRef<'a, T> {
 	/// returned. See [`ndarray::ArrayBase::as_standard_layout`] to convert an array to a contiguous layout.
 	pub fn from_array_view(input: impl TensorArrayData<T> + 'a) -> Result<TensorRef<'a, T>> {
 		let (shape, data, guard) = input.ref_parts()?;
-		let num_elements = element_count(&shape);
-
-		tensor_from_array(MemoryInfo::default(), shape, data.as_ptr() as *mut _, num_elements, size_of::<T>(), T::into_tensor_element_type(), guard).map(
-			|tensor| {
-				let mut tensor: TensorRef<'_, T> = TensorRef::new(unsafe { tensor.transmute_type() });
-				tensor.upgradable = false;
-				tensor
-			}
-		)
+		tensor_from_array(MemoryInfo::default(), shape, data.as_ptr() as *mut _, size_of::<T>(), T::into_tensor_element_type(), guard).map(|tensor| {
+			let mut tensor: TensorRef<'_, T> = TensorRef::new(unsafe { tensor.transmute_type() });
+			tensor.upgradable = false;
+			tensor
+		})
 	}
 }
 
@@ -262,21 +256,17 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 	/// returned. See [`ndarray::ArrayBase::as_standard_layout`] to convert an array to a contiguous layout.
 	pub fn from_array_view_mut(mut input: impl TensorArrayDataMut<T>) -> Result<TensorRefMut<'a, T>> {
 		let (shape, data, guard) = input.ref_parts_mut()?;
-		let num_elements = element_count(&shape);
-
-		tensor_from_array(MemoryInfo::default(), shape, data.as_ptr() as *mut _, num_elements, size_of::<T>(), T::into_tensor_element_type(), guard).map(
-			|tensor| {
-				let mut tensor: TensorRefMut<'_, T> = TensorRefMut::new(unsafe { tensor.transmute_type() });
-				tensor.upgradable = false;
-				tensor
-			}
-		)
+		tensor_from_array(MemoryInfo::default(), shape, data.as_ptr() as *mut _, size_of::<T>(), T::into_tensor_element_type(), guard).map(|tensor| {
+			let mut tensor: TensorRefMut<'_, T> = TensorRefMut::new(unsafe { tensor.transmute_type() });
+			tensor.upgradable = false;
+			tensor
+		})
 	}
 
 	/// Create a mutable tensor view from a raw pointer and shape.
 	///
 	/// The length of data is determined by `T` and the given shape, so the given buffer must be at least
-	/// `shape.iter().product() * size_of::<T>()` bytes.
+	/// `shape.num_elements() * size_of::<T>()` bytes.
 	///
 	/// This function can be used to create data from raw device memory, e.g. to directly provide data to an execution
 	/// provider. For instance, to create a tensor from a raw CUDA buffer using [`cudarc`](https://docs.rs/cudarc):
@@ -288,7 +278,7 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 	/// 	TensorRefMut::from_raw(
 	/// 		MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?,
 	/// 		(*device_data.device_ptr() as usize as *mut ()).cast(),
-	/// 		vec![1, 3, 512, 512]
+	/// 		Shape::new([1, 3, 512, 512])
 	/// 	)?
 	/// };
 	/// ```
@@ -296,9 +286,8 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 	/// # Safety
 	/// - The pointer must be valid for the device description provided by `MemoryInfo`.
 	/// - The returned tensor must outlive the data described by the data pointer.
-	pub unsafe fn from_raw(info: MemoryInfo, data: *mut ort_sys::c_void, shape: Vec<i64>) -> Result<TensorRefMut<'a, T>> {
-		let num_elements = element_count(&shape);
-		tensor_from_array(info, shape, data, num_elements, size_of::<T>(), T::into_tensor_element_type(), None).map(|tensor| {
+	pub unsafe fn from_raw(info: MemoryInfo, data: *mut ort_sys::c_void, shape: Shape) -> Result<TensorRefMut<'a, T>> {
+		tensor_from_array(info, shape, data, size_of::<T>(), T::into_tensor_element_type(), None).map(|tensor| {
 			let mut tensor: TensorRefMut<'_, T> = TensorRefMut::new(unsafe { tensor.transmute_type() });
 			tensor.upgradable = false;
 			tensor
@@ -308,14 +297,14 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 
 pub trait TensorArrayData<I> {
 	#[allow(clippy::type_complexity)]
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[I], Option<Box<dyn Any>>)>;
+	fn ref_parts(&self) -> Result<(Shape, &[I], Option<Box<dyn Any>>)>;
 
 	private_trait!();
 }
 
 pub trait TensorArrayDataMut<I>: TensorArrayData<I> {
 	#[allow(clippy::type_complexity)]
-	fn ref_parts_mut(&mut self) -> Result<(Vec<i64>, &mut [I], Option<Box<dyn Any>>)>;
+	fn ref_parts_mut(&mut self) -> Result<(Shape, &mut [I], Option<Box<dyn Any>>)>;
 
 	private_trait!();
 }
@@ -327,20 +316,19 @@ pub trait OwnedTensorArrayData<I> {
 }
 
 pub struct TensorArrayDataParts<I> {
-	pub shape: Vec<i64>,
+	pub shape: Shape,
 	pub ptr: NonNull<I>,
-	pub num_elements: usize,
 	pub guard: Option<Box<dyn Any>>
 }
 
 pub trait ToDimensions {
-	fn to_dimensions(&self, expected_size: Option<usize>) -> Result<Vec<i64>>;
+	fn to_dimensions(&self, expected_size: Option<usize>) -> Result<Shape>;
 }
 
 macro_rules! impl_to_dimensions {
 	(@inner) => {
-		fn to_dimensions(&self, expected_size: Option<usize>) -> Result<Vec<i64>> {
-			let v: Vec<i64> = self
+		fn to_dimensions(&self, expected_size: Option<usize>) -> Result<Shape> {
+			let v = self
 				.iter()
 				.enumerate()
 				.map(|(i, c)| {
@@ -353,13 +341,17 @@ macro_rules! impl_to_dimensions {
 						))
 					}
 				})
-				.collect::<Result<_>>()?;
-			let sum = element_count(&v);
+				.collect::<Result<Shape>>()?;
 			if let Some(expected_size) = expected_size {
-				if sum != expected_size {
+				if v.num_elements() != expected_size {
 					Err(Error::new_with_code(
 						ErrorCode::InvalidArgument,
-						format!("Cannot create a tensor from raw data; shape {:?} ({} elements) is larger than the length of the data provided ({} elements)", v, sum, expected_size)
+						format!(
+							"Cannot create a tensor from raw data; shape {:?} ({} elements) is larger than the length of the data provided ({} elements)",
+							v,
+							v.num_elements(),
+							expected_size
+						)
 					))
 				} else {
 					Ok(v)
@@ -382,21 +374,21 @@ macro_rules! impl_to_dimensions {
 }
 
 impl ToDimensions for () {
-	fn to_dimensions(&self, expected_size: Option<usize>) -> Result<Vec<i64>> {
+	fn to_dimensions(&self, expected_size: Option<usize>) -> Result<Shape> {
 		match expected_size {
-			Some(1) | None => Ok(vec![]),
+			Some(1) | None => Ok(Shape::default()),
 			Some(_) => Err(Error::new_with_code(ErrorCode::InvalidArgument, "Expected data to have a length of exactly 1 for scalar shape"))
 		}
 	}
 }
-impl_to_dimensions!(for &[usize], for &[i32], for &[i64], for Vec<usize>, for Vec<i32>, for Vec<i64>);
+impl_to_dimensions!(for Shape, for &[usize], for &[i32], for &[i64], for Vec<usize>, for Vec<i32>, for Vec<i64>);
 impl_to_dimensions!(<N> for [usize; N], for [i32; N], for [i64; N]);
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for &CowArray<'_, T, D> {
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[T], Option<Box<dyn Any>>)> {
-		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
+	fn ref_parts(&self) -> Result<(Shape, &[T], Option<Box<dyn Any>>)> {
+		let shape = self.shape().iter().map(|d| *d as i64).collect();
 		let data = self
 			.as_slice()
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
@@ -409,8 +401,8 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for &CowArra
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for ArcArray<T, D> {
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[T], Option<Box<dyn Any>>)> {
-		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
+	fn ref_parts(&self) -> Result<(Shape, &[T], Option<Box<dyn Any>>)> {
+		let shape = self.shape().iter().map(|d| *d as i64).collect();
 		let data = self
 			.as_slice()
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
@@ -423,8 +415,8 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for ArcArray
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for &Array<T, D> {
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[T], Option<Box<dyn Any>>)> {
-		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
+	fn ref_parts(&self) -> Result<(Shape, &[T], Option<Box<dyn Any>>)> {
+		let shape = self.shape().iter().map(|d| *d as i64).collect();
 		let data = self
 			.as_slice()
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
@@ -437,8 +429,8 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for &Array<T
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for &mut Array<T, D> {
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[T], Option<Box<dyn Any>>)> {
-		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
+	fn ref_parts(&self) -> Result<(Shape, &[T], Option<Box<dyn Any>>)> {
+		let shape = self.shape().iter().map(|d| *d as i64).collect();
 		let data = self
 			.as_slice()
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
@@ -455,27 +447,21 @@ impl<T: Clone + 'static, D: Dimension + 'static> OwnedTensorArrayData<T> for Arr
 		if self.is_standard_layout() {
 			// We can avoid the copy here and use the data as is
 			let mut this = Box::new(self);
-			let shape: Vec<i64> = this.shape().iter().map(|d| *d as i64).collect();
+			let shape: Shape = this.shape().iter().map(|d| *d as i64).collect();
 			// SAFETY: ndarrays internally store their pointer as NonNull
 			let ptr = unsafe { NonNull::new_unchecked(this.as_mut_ptr()) };
-			let num_elements = this.len();
-			Ok(TensorArrayDataParts {
-				shape,
-				ptr,
-				num_elements,
-				guard: Some(this)
-			})
+			assert_eq!(this.len(), shape.num_elements());
+			Ok(TensorArrayDataParts { shape, ptr, guard: Some(this) })
 		} else {
 			// Need to do a copy here to get data in to standard layout
 			let mut contiguous_array = self.as_standard_layout().into_owned();
-			let shape: Vec<i64> = contiguous_array.shape().iter().map(|d| *d as i64).collect();
+			let shape: Shape = contiguous_array.shape().iter().map(|d| *d as i64).collect();
 			// SAFETY: ndarrays internally store their pointer as NonNull
 			let ptr = unsafe { NonNull::new_unchecked(contiguous_array.as_mut_ptr()) };
-			let num_elements: usize = contiguous_array.len();
+			assert_eq!(contiguous_array.len(), shape.num_elements());
 			Ok(TensorArrayDataParts {
 				shape,
 				ptr,
-				num_elements,
 				guard: Some(Box::new(contiguous_array))
 			})
 		}
@@ -487,8 +473,8 @@ impl<T: Clone + 'static, D: Dimension + 'static> OwnedTensorArrayData<T> for Arr
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for ArrayView<'_, T, D> {
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[T], Option<Box<dyn Any>>)> {
-		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
+	fn ref_parts(&self) -> Result<(Shape, &[T], Option<Box<dyn Any>>)> {
+		let shape = self.shape().iter().map(|d| *d as i64).collect();
 		let data = self
 			.as_slice()
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
@@ -501,8 +487,8 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for ArrayVie
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for ArrayViewMut<'_, T, D> {
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[T], Option<Box<dyn Any>>)> {
-		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
+	fn ref_parts(&self) -> Result<(Shape, &[T], Option<Box<dyn Any>>)> {
+		let shape = self.shape().iter().map(|d| *d as i64).collect();
 		let data = self
 			.as_slice()
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
@@ -515,8 +501,8 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayData<T> for ArrayVie
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayDataMut<T> for ArrayViewMut<'_, T, D> {
-	fn ref_parts_mut(&mut self) -> Result<(Vec<i64>, &mut [T], Option<Box<dyn Any>>)> {
-		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
+	fn ref_parts_mut(&mut self) -> Result<(Shape, &mut [T], Option<Box<dyn Any>>)> {
+		let shape = self.shape().iter().map(|d| *d as i64).collect();
 		let data = self
 			.as_slice_mut()
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
@@ -529,8 +515,8 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayDataMut<T> for Array
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayDataMut<T> for &mut Array<T, D> {
-	fn ref_parts_mut(&mut self) -> Result<(Vec<i64>, &mut [T], Option<Box<dyn Any>>)> {
-		let shape: Vec<i64> = self.shape().iter().map(|d| *d as i64).collect();
+	fn ref_parts_mut(&mut self) -> Result<(Shape, &mut [T], Option<Box<dyn Any>>)> {
+		let shape = self.shape().iter().map(|d| *d as i64).collect();
 		let data = self
 			.as_slice_mut()
 			.ok_or_else(|| Error::new("Array has a non-contiguous layout and cannot be used to construct a Tensor"))?;
@@ -541,7 +527,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayDataMut<T> for &mut 
 }
 
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, &[T]) {
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[T], Option<Box<dyn Any>>)> {
+	fn ref_parts(&self) -> Result<(Shape, &[T], Option<Box<dyn Any>>)> {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		Ok((shape, self.1, None))
 	}
@@ -550,7 +536,7 @@ impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, &[T]) {
 }
 
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, &mut [T]) {
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[T], Option<Box<dyn Any>>)> {
+	fn ref_parts(&self) -> Result<(Shape, &[T], Option<Box<dyn Any>>)> {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		Ok((shape, self.1, None))
 	}
@@ -559,7 +545,7 @@ impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, &mut [T]) {
 }
 
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayDataMut<T> for (D, &mut [T]) {
-	fn ref_parts_mut(&mut self) -> Result<(Vec<i64>, &mut [T], Option<Box<dyn Any>>)> {
+	fn ref_parts_mut(&mut self) -> Result<(Shape, &mut [T], Option<Box<dyn Any>>)> {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		Ok((shape, self.1, None))
 	}
@@ -572,11 +558,10 @@ impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Vec<T>
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		// SAFETY: A `Vec` always has a non-null pointer.
 		let ptr = unsafe { NonNull::new_unchecked(self.1.as_mut_ptr()) };
-		let num_elements: usize = self.1.len();
+		assert_eq!(shape.num_elements(), self.1.len());
 		Ok(TensorArrayDataParts {
 			shape,
 			ptr,
-			num_elements,
 			guard: Some(Box::new(self.1))
 		})
 	}
@@ -589,11 +574,10 @@ impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Box<[T
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		// SAFETY: A `Box` always has a non-null pointer.
 		let ptr = unsafe { NonNull::new_unchecked(self.1.as_mut_ptr()) };
-		let num_elements: usize = self.1.len();
+		assert_eq!(shape.num_elements(), self.1.len());
 		Ok(TensorArrayDataParts {
 			shape,
 			ptr,
-			num_elements,
 			guard: Some(Box::new(self.1))
 		})
 	}
@@ -602,7 +586,7 @@ impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Box<[T
 }
 
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<[T]>) {
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[T], Option<Box<dyn Any>>)> {
+	fn ref_parts(&self) -> Result<(Shape, &[T], Option<Box<dyn Any>>)> {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		let data = &*self.1;
 		Ok((shape, data, Some(Box::new(self.1.clone()))))
@@ -612,7 +596,7 @@ impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<[T]>) {
 }
 
 impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<Box<[T]>>) {
-	fn ref_parts(&self) -> Result<(Vec<i64>, &[T], Option<Box<dyn Any>>)> {
+	fn ref_parts(&self) -> Result<(Shape, &[T], Option<Box<dyn Any>>)> {
 		let shape = self.0.to_dimensions(Some(self.1.len()))?;
 		let data = &*self.1;
 		Ok((shape, data, Some(Box::new(self.1.clone()))))

@@ -8,7 +8,6 @@ use ort::{
 	session::{Session, builder::GraphOptimizationLevel},
 	value::Tensor
 };
-use test_log::test;
 
 #[test]
 fn vectorizer() -> ort::Result<()> {

@@ -39,7 +39,6 @@ where
 #[cfg(test)]
 mod tests {
 	use ndarray::{arr1, arr2, arr3};
-	use test_log::test;
 
 	use super::*;
 

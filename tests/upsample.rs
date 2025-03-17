@@ -7,7 +7,6 @@ use ort::{
 	session::{Session, builder::GraphOptimizationLevel},
 	value::TensorRef
 };
-use test_log::test;
 
 fn load_input_image<P: AsRef<Path>>(name: P) -> RgbImage {
 	// Load image, converting to RGB format

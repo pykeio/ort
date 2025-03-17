@@ -7,7 +7,6 @@ use ort::{
 	tensor::ArrayExtensions,
 	value::TensorRef
 };
-use test_log::test;
 
 #[test]
 fn mnist_5() -> ort::Result<()> {

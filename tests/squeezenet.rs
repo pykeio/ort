@@ -12,7 +12,6 @@ use ort::{
 	tensor::ArrayExtensions,
 	value::TensorRef
 };
-use test_log::test;
 
 #[test]
 fn squeezenet_mushroom() -> ort::Result<()> {

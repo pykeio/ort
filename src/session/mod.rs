@@ -390,7 +390,7 @@ impl Session {
 	/// ```
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef}, tensor::TensorElementType};
-	/// # fn main() -> ort::Result<()> { tokio_test::block_on(async {
+	/// # fn main() -> ort::Result<()> { tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
 	/// let mut session = Session::builder()?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 	/// let options = RunOptions::new()?;

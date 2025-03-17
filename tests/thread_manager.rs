@@ -7,7 +7,6 @@ use std::{
 };
 
 use ort::environment::{GlobalThreadPoolOptions, ThreadManager, ThreadWorker};
-use test_log::test;
 
 struct ThreadStats {
 	active_threads: AtomicUsize

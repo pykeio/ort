@@ -1,3 +1,5 @@
+#![allow(clippy::tabs_in_doc_comments)]
+
 use std::path::Path;
 
 use image::RgbImage;

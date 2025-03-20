@@ -54,10 +54,7 @@ impl KernelAttributes {
 			ortsys![unsafe KernelInfo_GetInputName(self.ptr.as_ptr(), idx, ptr::null_mut(), &mut name_len)?];
 			let mut name = vec![0u8; name_len];
 			ortsys![unsafe KernelInfo_GetInputName(self.ptr.as_ptr(), idx, name.as_mut_ptr().cast::<c_char>(), &mut name_len)?];
-			let name = CString::from_vec_with_nul(name)
-				.map_err(Error::wrap)?
-				.into_string()
-				.map_err(Error::wrap)?;
+			let name = CString::from_vec_with_nul(name)?.into_string()?;
 			let mut type_info = ptr::null_mut();
 			ortsys![unsafe KernelInfo_GetInputTypeInfo(self.ptr.as_ptr(), idx, &mut type_info)?; nonNull(type_info)];
 			let input_type = ValueType::from_type_info(type_info);
@@ -76,10 +73,7 @@ impl KernelAttributes {
 			ortsys![unsafe KernelInfo_GetOutputName(self.ptr.as_ptr(), idx, ptr::null_mut(), &mut name_len)?];
 			let mut name = vec![0u8; name_len];
 			ortsys![unsafe KernelInfo_GetOutputName(self.ptr.as_ptr(), idx, name.as_mut_ptr().cast::<c_char>(), &mut name_len)?];
-			let name = CString::from_vec_with_nul(name)
-				.map_err(Error::wrap)?
-				.into_string()
-				.map_err(Error::wrap)?;
+			let name = CString::from_vec_with_nul(name)?.into_string()?;
 			let mut type_info = ptr::null_mut();
 			ortsys![unsafe KernelInfo_GetOutputTypeInfo(self.ptr.as_ptr(), idx, &mut type_info)?; nonNull(type_info)];
 			let output_type = ValueType::from_type_info(type_info);
@@ -104,7 +98,7 @@ impl KernelAttributes {
 		ortsys![unsafe KernelInfo_GetNodeName(self.ptr.as_ptr(), ptr::null_mut(), &mut name_len)?];
 		let mut name = vec![0u8; name_len];
 		ortsys![unsafe KernelInfo_GetNodeName(self.ptr.as_ptr(), name.as_mut_ptr().cast::<c_char>(), &mut name_len)?];
-		CString::from_vec_with_nul(name).map_err(Error::wrap)?.into_string().map_err(Error::wrap)
+		Ok(CString::from_vec_with_nul(name)?.into_string()?)
 	}
 
 	pub fn allocator(&self, mem_type: MemoryType) -> Result<Allocator> {

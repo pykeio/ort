@@ -65,8 +65,7 @@ impl Tensor<String> {
 				let slice = elt.as_utf8_bytes();
 				CString::new(slice)
 			})
-			.collect::<Result<Vec<_>, _>>()
-			.map_err(Error::wrap)?;
+			.collect::<Result<Vec<_>, _>>()?;
 
 		let string_pointers = null_terminated_copies.iter().map(|cstring| cstring.as_ptr()).collect::<Vec<_>>();
 

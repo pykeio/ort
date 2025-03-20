@@ -96,10 +96,6 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 		}
 	}
 
-	pub(crate) fn inner(&self) -> &Arc<ValueInner> {
-		&self.inner.inner
-	}
-
 	/// Attempts to downcast a temporary dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed
 	/// variant, like [`TensorRef<T>`].
 	#[inline]
@@ -151,10 +147,6 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 			inner,
 			lifetime: PhantomData
 		}
-	}
-
-	pub(crate) fn inner(&self) -> &Arc<ValueInner> {
-		&self.inner.inner
 	}
 
 	/// Attempts to downcast a temporary mutable dynamic value (like [`DynValue`] or [`DynTensor`]) to a more
@@ -312,10 +304,6 @@ unsafe impl<Type: ValueTypeMarker + ?Sized> Send for Value<Type> {}
 unsafe impl<Type: ValueTypeMarker + ?Sized> Sync for Value<Type> {}
 
 impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
-	pub(crate) fn inner(&self) -> &Arc<ValueInner> {
-		&self.inner
-	}
-
 	/// Returns the data type of this [`Value`].
 	pub fn dtype(&self) -> &ValueType {
 		&self.inner.dtype

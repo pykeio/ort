@@ -274,7 +274,7 @@ macro_rules! get_ep_register {
 pub(crate) use get_ep_register;
 
 pub(crate) fn apply_execution_providers(session_builder: &mut SessionBuilder, eps: &[ExecutionProviderDispatch], source: &'static str) -> Result<()> {
-	fn register_inner(session_builder: &mut SessionBuilder, ep: &ExecutionProviderDispatch, source: &'static str) -> Result<bool> {
+	fn register_inner(session_builder: &mut SessionBuilder, ep: &ExecutionProviderDispatch, #[allow(unused)] source: &'static str) -> Result<bool> {
 		if let Err(e) = ep.inner.register(session_builder) {
 			if ep.error_on_failure {
 				return Err(e);

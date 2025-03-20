@@ -1,22 +1,12 @@
-use alloc::{borrow::Cow, sync::Arc, vec::Vec};
+use alloc::{borrow::Cow, vec::Vec};
 use core::ops::Deref;
 
-use crate::value::{DynValueTypeMarker, Value, ValueInner, ValueRef, ValueRefMut, ValueTypeMarker};
+use crate::value::{DynValueTypeMarker, Value, ValueRef, ValueRefMut, ValueTypeMarker};
 
 pub enum SessionInputValue<'v> {
 	ViewMut(ValueRefMut<'v, DynValueTypeMarker>),
 	View(ValueRef<'v, DynValueTypeMarker>),
 	Owned(Value<DynValueTypeMarker>)
-}
-
-impl SessionInputValue<'_> {
-	pub(crate) fn inner(&self) -> &Arc<ValueInner> {
-		match self {
-			Self::ViewMut(v) => v.inner(),
-			Self::View(v) => v.inner(),
-			Self::Owned(v) => v.inner()
-		}
-	}
 }
 
 impl Deref for SessionInputValue<'_> {

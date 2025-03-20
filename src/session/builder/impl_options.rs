@@ -1,11 +1,7 @@
-use alloc::{borrow::Cow, rc::Rc, sync::Arc};
-use core::{
-	any::Any,
-	ffi::{c_char, c_void},
-	ptr
-};
+use alloc::{rc::Rc, sync::Arc};
+use core::{any::Any, ffi::c_void, ptr};
 #[cfg(feature = "std")]
-use std::path::Path;
+use std::{borrow::Cow, path::Path};
 
 use super::SessionBuilder;
 #[cfg(feature = "std")]
@@ -175,7 +171,7 @@ impl SessionBuilder {
 	pub fn with_external_initializer_file_in_memory(mut self, file_name: impl AsRef<Path>, buffer: Cow<'static, [u8]>) -> Result<Self> {
 		let file_name = path_to_os_char(file_name);
 		let sizes = [buffer.len()];
-		ortsys![unsafe AddExternalInitializersFromMemory(self.ptr_mut(), &file_name.as_ptr(), &buffer.as_ptr().cast::<c_char>().cast_mut(), sizes.as_ptr(), 1)?];
+		ortsys![unsafe AddExternalInitializersFromMemory(self.ptr_mut(), &file_name.as_ptr(), &buffer.as_ptr().cast::<core::ffi::c_char>().cast_mut(), sizes.as_ptr(), 1)?];
 		self.external_initializer_buffers.push(buffer);
 		Ok(self)
 	}

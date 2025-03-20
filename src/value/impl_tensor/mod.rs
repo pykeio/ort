@@ -158,7 +158,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// 	*ptr.add(3) = 42;
 	/// };
 	///
-	/// let (_, extracted) = tensor.extract_raw_tensor();
+	/// let (_, extracted) = tensor.extract_tensor();
 	/// assert_eq!(&extracted, &[0, 1, 2, 42, 4]);
 	/// # Ok(())
 	/// # }
@@ -226,8 +226,8 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// # fn main() -> ort::Result<()> {
 	/// let tensor = Tensor::<f32>::new(&Allocator::default(), [1, 3, 224, 224])?;
 	/// let tensor_dyn = tensor.upcast();
-	/// assert!(tensor_dyn.try_extract_raw_tensor::<f32>().is_ok());
-	/// assert!(tensor_dyn.try_extract_raw_tensor::<i64>().is_err());
+	/// assert!(tensor_dyn.try_extract_tensor::<f32>().is_ok());
+	/// assert!(tensor_dyn.try_extract_tensor::<i64>().is_err());
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -244,8 +244,8 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// let tensor = Tensor::<f32>::new(&Allocator::default(), [1, 3, 224, 224])?;
 	/// let tensor_dyn = tensor.upcast_ref();
 	///
-	/// let (_, original_extract) = tensor.extract_raw_tensor();
-	/// let (_, ref_extract) = tensor_dyn.try_extract_raw_tensor::<f32>()?;
+	/// let (_, original_extract) = tensor.extract_tensor();
+	/// let (_, ref_extract) = tensor_dyn.try_extract_tensor::<f32>()?;
 	/// assert_eq!(original_extract, ref_extract);
 	/// # Ok(())
 	/// # }
@@ -266,10 +266,10 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// let mut tensor = Tensor::<i64>::from_array((vec![5], vec![1, 2, 3, 4, 5]))?;
 	/// let mut tensor_dyn = tensor.upcast_mut();
 	///
-	/// let (_, mut_view) = tensor_dyn.try_extract_raw_tensor_mut::<i64>()?;
+	/// let (_, mut_view) = tensor_dyn.try_extract_tensor_mut::<i64>()?;
 	/// mut_view[3] = 0;
 	///
-	/// let (_, original_view) = tensor.extract_raw_tensor();
+	/// let (_, original_view) = tensor.extract_tensor();
 	/// assert_eq!(original_view, &[1, 2, 3, 0, 5]);
 	/// # Ok(())
 	/// # }
@@ -356,7 +356,7 @@ mod tests {
 			dimension_symbols: SymbolicDimensions::empty(1)
 		});
 
-		let (shape, data) = value.extract_raw_tensor();
+		let (shape, data) = value.extract_tensor();
 		assert_eq!(&**shape, [v.len() as i64]);
 		assert_eq!(data, &v);
 
@@ -373,11 +373,11 @@ mod tests {
 		let value = TensorRef::from_array_view(arc2.clone())?;
 		drop((arc1, arc2));
 
-		assert_eq!(value.extract_raw_tensor().1, &v);
+		assert_eq!(value.extract_tensor().1, &v);
 
 		let cow = CowArray::from(Array1::from_vec(v.clone()));
 		let value = TensorRef::from_array_view(&cow)?;
-		assert_eq!(value.extract_raw_tensor().1, &v);
+		assert_eq!(value.extract_tensor().1, &v);
 
 		Ok(())
 	}
@@ -390,7 +390,7 @@ mod tests {
 		let shape = vec![v.len() as i64];
 		let value = TensorRef::from_array_view((shape, Arc::clone(&arc)))?;
 		drop(arc);
-		assert_eq!(value.try_extract_raw_tensor::<f32>()?.1, &v);
+		assert_eq!(value.try_extract_tensor::<f32>()?.1, &v);
 
 		Ok(())
 	}
@@ -401,7 +401,7 @@ mod tests {
 		let v = Array1::from_vec(vec!["hello world".to_string(), "こんにちは世界".to_string()]);
 
 		let value = Tensor::from_string_array(v.view())?;
-		let extracted = value.try_extract_string_tensor()?;
+		let extracted = value.try_extract_string_array()?;
 		assert_eq!(extracted, v.into_dyn());
 
 		Ok(())
@@ -412,7 +412,7 @@ mod tests {
 		let v = vec!["hello world".to_string(), "こんにちは世界".to_string()];
 
 		let value = Tensor::from_string_array((vec![v.len() as i64], &*v))?;
-		let (extracted_shape, extracted_view) = value.try_extract_raw_string_tensor()?;
+		let (extracted_shape, extracted_view) = value.try_extract_strings()?;
 		assert_eq!(&**extracted_shape, [v.len() as i64]);
 		assert_eq!(extracted_view, v);
 
@@ -429,10 +429,10 @@ mod tests {
 		let value_vec = Tensor::from_array((shape, v.clone()))?;
 		let value_slice = TensorRef::from_array_view((shape, &v[..]))?;
 
-		assert_eq!(value_arc_box.extract_raw_tensor().1, &v);
-		assert_eq!(value_box.extract_raw_tensor().1, &v);
-		assert_eq!(value_vec.extract_raw_tensor().1, &v);
-		assert_eq!(value_slice.extract_raw_tensor().1, &v);
+		assert_eq!(value_arc_box.extract_tensor().1, &v);
+		assert_eq!(value_box.extract_tensor().1, &v);
+		assert_eq!(value_vec.extract_tensor().1, &v);
+		assert_eq!(value_slice.extract_tensor().1, &v);
 
 		Ok(())
 	}

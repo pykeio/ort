@@ -38,7 +38,7 @@ fn get_image_embedding(vision_model: &mut Session, img: &Option<DynamicImage>) -
 			"pixel_values" => Tensor::from_array(result.pixel_values)?,
 			"image_sizes" => Tensor::from_array(result.image_sizes)?,
 		])?;
-		let predictions_view: ArrayView<f32, _> = outputs["visual_features"].try_extract_tensor::<f32>()?;
+		let predictions_view: ArrayView<f32, _> = outputs["visual_features"].try_extract_array::<f32>()?;
 		predictions_view.into_dimensionality::<Ix3>()?.to_owned()
 	} else {
 		Array::zeros((1, 0, 0))
@@ -50,7 +50,7 @@ fn get_text_embedding(text_embedding_model: &mut Session, input_ids: &Array2<i64
 	let outputs = text_embedding_model.run(ort::inputs![
 		"input_ids" => TensorRef::from_array_view(input_ids)?,
 	])?;
-	let inputs_embeds_view: ArrayView<f32, _> = outputs["inputs_embeds"].try_extract_tensor::<f32>()?;
+	let inputs_embeds_view: ArrayView<f32, _> = outputs["inputs_embeds"].try_extract_array::<f32>()?;
 	let inputs_embeds = inputs_embeds_view.into_dimensionality::<Ix3>()?.to_owned();
 	Ok(inputs_embeds)
 }
@@ -169,7 +169,7 @@ pub async fn generate_text(
 		// current version.
 		//
 		// The selected token ID will be in the range [0, VOCAB_SIZE - 1].
-		let logits: ArrayView<f32, _> = model_outputs["logits"].try_extract_tensor::<f32>()?.into_dimensionality::<Ix3>()?;
+		let logits: ArrayView<f32, _> = model_outputs["logits"].try_extract_array::<f32>()?.into_dimensionality::<Ix3>()?;
 		let next_token_id = logits
 			.slice(s![0, -1, ..VOCAB_SIZE])
 			.iter()
@@ -194,11 +194,11 @@ pub async fn generate_text(
 		attention_mask = Array2::ones((1, attention_mask.shape()[1] + 1));
 		for i in 0..32 {
 			past_key_values[i * 2] = model_outputs[format!("present.{}.key", i)]
-				.try_extract_tensor::<f32>()?
+				.try_extract_array::<f32>()?
 				.into_dimensionality::<Ix4>()?
 				.to_owned();
 			past_key_values[i * 2 + 1] = model_outputs[format!("present.{}.value", i)]
-				.try_extract_tensor::<f32>()?
+				.try_extract_array::<f32>()?
 				.into_dimensionality::<Ix4>()?
 				.to_owned();
 		}

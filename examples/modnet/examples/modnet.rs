@@ -33,7 +33,7 @@ fn main() -> ort::Result<()> {
 
 	let outputs = session.run(inputs!["input" => TensorRef::from_array_view(input.view())?])?;
 
-	let output = outputs["output"].try_extract_tensor::<f32>()?;
+	let output = outputs["output"].try_extract_array::<f32>()?;
 
 	// convert to 8-bit
 	let output = output.mul(255.0).map(|x| *x as u8);

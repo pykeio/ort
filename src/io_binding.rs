@@ -81,8 +81,8 @@ use crate::{
 /// 	io_binding.bind_input("latents", &latents)?;
 /// 	let noise_pred = unet.run_binding(&io_binding)?.remove("noise_pred").unwrap();
 ///
-/// 	let mut latents = latents.extract_tensor_mut();
-/// 	latents += &noise_pred.try_extract_tensor::<f32>()?;
+/// 	let mut latents = latents.extract_array_mut();
+/// 	latents += &noise_pred.try_extract_array::<f32>()?;
 /// }
 /// # Ok(())
 /// # }
@@ -251,7 +251,7 @@ mod tests {
 	#[cfg(feature = "ndarray")]
 	fn extract_probabilities<T: TensorValueTypeMarker>(output: &Value<T>) -> Result<Vec<(usize, f32)>> {
 		let mut probabilities: Vec<(usize, f32)> = output
-			.try_extract_tensor()?
+			.try_extract_array()?
 			.softmax(Axis(1))
 			.iter()
 			.copied()

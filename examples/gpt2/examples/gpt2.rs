@@ -53,7 +53,7 @@ fn main() -> ort::Result<()> {
 		// The model expects our input to have shape [B, _, S]
 		let input = TensorRef::from_array_view((vec![1, 1, tokens.len() as i64], tokens.as_slice()))?;
 		let outputs = session.run(inputs![input])?;
-		let (dim, mut probabilities) = outputs["output1"].try_extract_raw_tensor()?;
+		let (dim, mut probabilities) = outputs["output1"].try_extract_tensor()?;
 
 		// The output tensor will have shape [B, _, S, V]
 		// We want only the probabilities for the last token in this sequence, which will be the next most likely token

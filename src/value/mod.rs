@@ -227,13 +227,13 @@ impl<Type: ValueTypeMarker + ?Sized> DerefMut for ValueRefMut<'_, Type> {
 /// You can also use [`DynValue::downcast`] to attempt to convert from a [`DynValue`] to a more strongly typed value.
 ///
 /// For dynamic values, where the type is not known at compile time, see the `try_extract_*` methods:
-/// - [`Tensor::try_extract_tensor`], [`Tensor::try_extract_raw_tensor`]
+/// - [`Tensor::try_extract_tensor`], [`Tensor::try_extract_array`]
 /// - [`Sequence::try_extract_sequence`]
 /// - [`Map::try_extract_map`]
 ///
 /// If the type was created from Rust (via a method like [`Tensor::from_array`] or via downcasting), you can directly
 /// extract the data using the infallible extract methods:
-/// - [`Tensor::extract_tensor`], [`Tensor::extract_raw_tensor`]
+/// - [`Tensor::extract_tensor`], [`Tensor::extract_array`]
 ///
 /// [`Session`]: crate::session::Session
 #[derive(Debug)]
@@ -471,23 +471,23 @@ mod tests {
 		{
 			let dyn_tensor_ref = tensor.view().into_dyn();
 			let tensor_ref: TensorRef<i32> = dyn_tensor_ref.downcast()?;
-			assert_eq!(tensor_ref.extract_raw_tensor(), tensor.extract_raw_tensor());
+			assert_eq!(tensor_ref.extract_tensor(), tensor.extract_tensor());
 		}
 		{
 			let dyn_tensor_ref = tensor.view().into_dyn();
 			let tensor_ref: TensorRef<i32> = dyn_tensor_ref.downcast_ref()?;
-			assert_eq!(tensor_ref.extract_raw_tensor(), tensor.extract_raw_tensor());
+			assert_eq!(tensor_ref.extract_tensor(), tensor.extract_tensor());
 		}
 
 		// Ensure mutating a TensorRefMut mutates the original tensor.
 		{
 			let mut dyn_tensor_ref = tensor.view_mut().into_dyn();
 			let mut tensor_ref: TensorRefMut<i32> = dyn_tensor_ref.downcast_mut()?;
-			let (_, data) = tensor_ref.extract_raw_tensor_mut();
+			let (_, data) = tensor_ref.extract_tensor_mut();
 			data[2] = 42;
 		}
 		{
-			let (_, data) = tensor.extract_raw_tensor_mut();
+			let (_, data) = tensor.extract_tensor_mut();
 			assert_eq!(data[2], 42);
 		}
 
@@ -502,7 +502,7 @@ mod tests {
 				.into_dyn();
 			let tensor = tensor.view();
 			let tensor = tensor.downcast_ref::<TensorValueType<i32>>()?;
-			let (_, data) = tensor.extract_raw_tensor();
+			let (_, data) = tensor.extract_tensor();
 			assert_eq!(data, [1, 2, 42, 4, 5]);
 		}
 
@@ -515,7 +515,7 @@ mod tests {
 		let value = Sequence::new([Map::<String, f32>::new(map_contents)?])?;
 
 		for map in value.extract_sequence(&Allocator::default()) {
-			let map = map.extract_raw_map().into_iter().collect::<std::collections::HashMap<_, _>>();
+			let map = map.extract_key_values().into_iter().collect::<std::collections::HashMap<_, _>>();
 			assert_eq!(map["meaning"], 42.0);
 			assert_eq!(map["pi"], core::f32::consts::PI);
 		}

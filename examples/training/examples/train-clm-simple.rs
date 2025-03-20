@@ -120,7 +120,7 @@ fn main() -> ort::Result<()> {
 	for _ in 0..50 {
 		let input = TensorRef::from_array_view((vec![1, 1, tokens.len() as i64], tokens.as_slice()))?;
 		let outputs = session.run(ort::inputs![input])?;
-		let (dim, probabilities) = outputs["probs"].try_extract_raw_tensor()?;
+		let (dim, probabilities) = outputs["probs"].try_extract_tensor()?;
 
 		let (seq_len, vocab_size) = (dim[2] as usize, dim[3] as usize);
 		let mut probabilities: Vec<(usize, f32)> = probabilities[(seq_len - 1) * vocab_size..].iter().copied().enumerate().collect();

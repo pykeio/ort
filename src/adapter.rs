@@ -178,7 +178,7 @@ mod tests {
 			.remove("output")
 			.expect("")
 			.downcast()?;
-		let (_, output) = output.extract_raw_tensor();
+		let (_, output) = output.extract_tensor();
 		assert_eq!(output[0], 154.0);
 		assert_eq!(output[1], 176.0);
 		assert_eq!(output[2], 198.0);
@@ -204,7 +204,7 @@ mod tests {
 			.remove("output")
 			.expect("")
 			.downcast()?;
-		let (_, output) = output.extract_raw_tensor();
+		let (_, output) = output.extract_tensor();
 		assert_eq!(output[0], 154.0);
 		assert_eq!(output[1], 176.0);
 		assert_eq!(output[2], 198.0);

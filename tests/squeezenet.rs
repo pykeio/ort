@@ -78,7 +78,7 @@ fn squeezenet_mushroom() -> ort::Result<()> {
 	// Downloaded model does not have a softmax as final layer; call softmax on second axis
 	// and iterate on resulting probabilities, creating an index to later access labels.
 	let mut probabilities: Vec<(usize, f32)> = outputs[0]
-		.try_extract_tensor()?
+		.try_extract_array()?
 		.softmax(ndarray::Axis(1))
 		.iter()
 		.copied()

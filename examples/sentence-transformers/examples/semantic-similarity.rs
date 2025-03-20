@@ -53,7 +53,7 @@ fn main() -> ort::Result<()> {
 	let outputs = session.run(ort::inputs![a_ids, a_mask])?;
 
 	// Extract our embeddings tensor and convert it to a strongly-typed 2-dimensional array.
-	let embeddings = outputs[1].try_extract_tensor::<f32>()?.into_dimensionality::<Ix2>().unwrap();
+	let embeddings = outputs[1].try_extract_array::<f32>()?.into_dimensionality::<Ix2>().unwrap();
 
 	println!("Similarity for '{}'", inputs[0]);
 	let query = embeddings.index_axis(Axis(0), 0);

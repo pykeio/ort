@@ -76,7 +76,7 @@ fn generate_stream(
 				let mut session = session.lock().await;
 				let options = RunOptions::new()?;
 				let outputs = session.run_async(ort::inputs![input], &options)?.await?;
-				let (dim, probabilities) = outputs["output1"].try_extract_raw_tensor()?;
+				let (dim, probabilities) = outputs["output1"].try_extract_tensor()?;
 
 				// Collect and sort logits
 				let (seq_len, vocab_size) = (dim[2] as usize, dim[3] as usize);

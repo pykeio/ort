@@ -28,7 +28,7 @@ fn vectorizer() -> ort::Result<()> {
 	let array = ndarray::CowArray::from(ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap());
 
 	let outputs = session.run(inputs![Tensor::from_string_array(&array)?])?;
-	assert_eq!(outputs[0].try_extract_tensor::<f32>()?, ArrayD::from_shape_vec(IxDyn(&[1, 9]), vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]).unwrap());
+	assert_eq!(outputs[0].try_extract_array::<f32>()?, ArrayD::from_shape_vec(IxDyn(&[1, 9]), vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]).unwrap());
 
 	Ok(())
 }

@@ -29,11 +29,11 @@ impl Operator for CustomOpOne {
 		Ok(Box::new(|ctx: &KernelContext| {
 			let x = ctx.input(0)?.ok_or_else(|| crate::Error::new("missing input"))?;
 			let y = ctx.input(1)?.ok_or_else(|| crate::Error::new("missing input"))?;
-			let (x_shape, x) = x.try_extract_raw_tensor::<f32>()?;
-			let (y_shape, y) = y.try_extract_raw_tensor::<f32>()?;
+			let (x_shape, x) = x.try_extract_tensor::<f32>()?;
+			let (y_shape, y) = y.try_extract_tensor::<f32>()?;
 
 			let mut z = ctx.output(0, x_shape.to_vec())?.ok_or_else(|| crate::Error::new("missing input"))?;
-			let (_, z_ref) = z.try_extract_raw_tensor_mut::<f32>()?;
+			let (_, z_ref) = z.try_extract_tensor_mut::<f32>()?;
 			for i in 0..y_shape.iter().copied().reduce(|acc, e| acc * e).unwrap_or(0) as usize {
 				if i % 2 == 0 {
 					z_ref[i] = x[i];
@@ -64,9 +64,9 @@ impl Operator for CustomOpTwo {
 	fn create_kernel(&self, _: &KernelAttributes) -> crate::Result<Box<dyn Kernel>> {
 		Ok(Box::new(|ctx: &KernelContext| {
 			let x = ctx.input(0)?.ok_or_else(|| crate::Error::new("missing input"))?;
-			let (x_shape, x) = x.try_extract_raw_tensor::<f32>()?;
+			let (x_shape, x) = x.try_extract_tensor::<f32>()?;
 			let mut z = ctx.output(0, x_shape.to_vec())?.ok_or_else(|| crate::Error::new("missing input"))?;
-			let (_, z_ref) = z.try_extract_raw_tensor_mut::<i32>()?;
+			let (_, z_ref) = z.try_extract_tensor_mut::<i32>()?;
 			for i in 0..x_shape.iter().copied().reduce(|acc, e| acc * e).unwrap_or(0) as usize {
 				z_ref[i] = (x[i] * i as f32) as i32;
 			}
@@ -85,20 +85,20 @@ fn test_custom_ops() -> crate::Result<()> {
 	let allocator = session.allocator();
 	let mut value1 = Tensor::<f32>::new(allocator, [3, 5])?;
 	{
-		let (_, data) = value1.extract_raw_tensor_mut();
+		let (_, data) = value1.extract_tensor_mut();
 		for datum in data {
 			*datum = 0.;
 		}
 	}
 	let mut value2 = Tensor::<f32>::new(allocator, [3, 5])?;
 	{
-		let (_, data) = value2.extract_raw_tensor_mut();
+		let (_, data) = value2.extract_tensor_mut();
 		for datum in data {
 			*datum = 1.;
 		}
 	}
 	let values = session.run(crate::inputs![&value1, &value2])?;
-	assert_eq!(values[0].try_extract_raw_tensor::<i32>()?.1, [0, 1, 0, 3, 0, 5, 0, 7, 0, 9, 0, 11, 0, 13, 0]);
+	assert_eq!(values[0].try_extract_tensor::<i32>()?.1, [0, 1, 0, 3, 0, 5, 0, 7, 0, 9, 0, 11, 0, 13, 0]);
 
 	Ok(())
 }

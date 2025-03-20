@@ -21,7 +21,7 @@ The `Value` struct has been refactored into multiple strongly-typed structs: `Te
 
 Values returned by session inference are now `DynValue`s, which behave exactly the same as `Value` in previous versions.
 
-Tensors created from Rust, like via the new `Tensor::new` function, can be directly and infallibly extracted into its underlying data via `extract_tensor` (no `try_`):
+Tensors created from Rust, like via the new `Tensor::new` function, can be directly and infallibly extracted into its underlying data via `extract_array` (no `try_`):
 ```rust
 let allocator = Allocator::new(&session, MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?)?;
 let tensor = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
@@ -32,7 +32,7 @@ let array = tensor.extract_array();
 
 You can still extract tensors, maps, or sequence values normally from a `DynValue` using `try_extract_*`:
 ```rust
-let generated_tokens: ArrayViewD<f32> = outputs["output1"].try_extract_tensor()?;
+let generated_tokens: ArrayViewD<f32> = outputs["output1"].try_extract_array()?;
 ```
 
 `DynValue` can be `downcast()`ed to the more specialized types, like `DynMap` or `Tensor<T>`:
@@ -48,11 +48,11 @@ let dyn_value: DynValue = tensor.into_dyn();
 ```
 
 ### Tensor extraction directly returns an `ArrayView`
-The new `extract_tensor` and `try_extract_tensor` functions return an `ndarray::ArrayView` directly, instead of putting it behind the old `ort::value::Tensor<T>` type (not to be confused with the new specialized value type). This means you don't have to `.view()` on the result:
+The new `extract_array` and `try_extract_array` functions return an `ndarray::ArrayView` directly, instead of putting it behind the old `ort::value::Tensor<T>` type (not to be confused with the new specialized value type). This means you don't have to `.view()` on the result:
 ```diff
 -let generated_tokens: Tensor<f32> = outputs["output1"].try_extract()?;
 -let generated_tokens = generated_tokens.view();
-+let generated_tokens: ArrayViewD<f32> = outputs["output1"].try_extract_tensor()?;
++let generated_tokens: ArrayViewD<f32> = outputs["output1"].try_extract_array()?;
 ```
 
 ### Full support for sequence & map values
@@ -64,7 +64,7 @@ You can now obtain a view of any `Value` via the new `view()` and `view_mut()` f
 ### Mutable tensor extraction
 You can extract a mutable `ArrayViewMut` or `&mut [T]` from a mutable reference to a tensor.
 ```rust
-let (raw_shape, raw_data) = tensor.extract_raw_tensor_mut();
+let (raw_shape, raw_data) = tensor.extract_tensor_mut();
 ```
 
 ### Device-allocated tensors
@@ -140,7 +140,7 @@ To use string tensors with `ort::inputs!`, you must create a `Tensor` using `Ten
 ```rust
 let array = ndarray::Array::from_shape_vec((1,), vec![document]).unwrap();
 let outputs = session.run(ort::inputs![
-    "input" => Tensor::from_string_array(session.allocator(), array)?
+    "input" => Tensor::from_string_array(array.view())?
 ])?;
 ```
 
@@ -150,7 +150,7 @@ let outputs = session.run(ort::inputs![
 Just like how inputs can now be specified by name, you can now retrieve session outputs by name.
 
 ```rust
-let l = outputs["latents"].try_extract_tensor::<f32>()?;
+let l = outputs["latents"].try_extract_array::<f32>()?;
 ```
 
 ## Execution providers

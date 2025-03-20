@@ -47,7 +47,7 @@ fn main() -> anyhow::Result<()> {
 	};
 	let outputs = session.run(ort::inputs![tensor])?;
 
-	let output = outputs["output"].try_extract_tensor::<f32>()?;
+	let output = outputs["output"].try_extract_array::<f32>()?;
 
 	// convert to 8-bit
 	let output = output.mul(255.0).map(|x| *x as u8);

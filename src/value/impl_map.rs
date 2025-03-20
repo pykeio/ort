@@ -85,7 +85,7 @@ pub type MapRef<'v, K, V> = ValueRef<'v, MapValueType<K, V>>;
 pub type MapRefMut<'v, K, V> = ValueRefMut<'v, MapValueType<K, V>>;
 
 impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
-	pub fn try_extract_raw_map<K: IntoTensorElementType + Clone + Hash + Eq, V: PrimitiveTensorElementType + Clone>(&self) -> Result<Vec<(K, V)>> {
+	pub fn try_extract_key_values<K: IntoTensorElementType + Clone + Hash + Eq, V: PrimitiveTensorElementType + Clone>(&self) -> Result<Vec<(K, V)>> {
 		match self.dtype() {
 			ValueType::Map { key, value } => {
 				let k_type = K::into_tensor_element_type();
@@ -143,7 +143,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 					let mut value_tensor_ptr = ptr::null_mut();
 					ortsys![unsafe GetValue(self.ptr(), 1, allocator.ptr().cast_mut(), &mut value_tensor_ptr)?; nonNull(value_tensor_ptr)];
 					let value_value: DynTensor = unsafe { Value::from_ptr(NonNull::new_unchecked(value_tensor_ptr), None) };
-					let (value_tensor_shape, value_tensor) = value_value.try_extract_raw_tensor::<V>()?;
+					let (value_tensor_shape, value_tensor) = value_value.try_extract_tensor::<V>()?;
 
 					assert_eq!(key_tensor_shape.len(), 1);
 					assert_eq!(value_tensor_shape.len(), 1);
@@ -155,7 +155,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 					}
 					Ok(vec)
 				} else {
-					let (key_tensor_shape, key_tensor) = key_value.try_extract_raw_string_tensor()?;
+					let (key_tensor_shape, key_tensor) = key_value.try_extract_strings()?;
 					// SAFETY: `IntoTensorElementType` is a private trait, and we only map the `String` type to `TensorElementType::String`,
 					// so at this point, `K` is **always** the `String` type, and this transmute really does nothing but please the type
 					// checker.
@@ -164,7 +164,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 					let mut value_tensor_ptr = ptr::null_mut();
 					ortsys![unsafe GetValue(self.ptr(), 1, allocator.ptr().cast_mut(), &mut value_tensor_ptr)?; nonNull(value_tensor_ptr)];
 					let value_value: DynTensor = unsafe { Value::from_ptr(NonNull::new_unchecked(value_tensor_ptr), None) };
-					let (value_tensor_shape, value_tensor) = value_value.try_extract_raw_tensor::<V>()?;
+					let (value_tensor_shape, value_tensor) = value_value.try_extract_tensor::<V>()?;
 
 					assert_eq!(key_tensor_shape.len(), 1);
 					assert_eq!(value_tensor_shape.len(), 1);
@@ -187,7 +187,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "std")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn try_extract_map<K: IntoTensorElementType + Clone + Hash + Eq, V: PrimitiveTensorElementType + Clone>(&self) -> Result<HashMap<K, V>> {
-		self.try_extract_raw_map().map(|c| c.into_iter().collect())
+		self.try_extract_key_values().map(|c| c.into_iter().collect())
 	}
 }
 
@@ -280,8 +280,8 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq + 'static, V: IntoTens
 }
 
 impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: PrimitiveTensorElementType + Debug + Clone> Value<MapValueType<K, V>> {
-	pub fn extract_raw_map(&self) -> Vec<(K, V)> {
-		self.try_extract_raw_map().expect("Failed to extract map")
+	pub fn extract_key_values(&self) -> Vec<(K, V)> {
+		self.try_extract_key_values().expect("Failed to extract map")
 	}
 
 	#[cfg(feature = "std")]

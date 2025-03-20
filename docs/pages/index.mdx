@@ -64,7 +64,7 @@ Preprocess your inputs, then `run()` the session to perform inference.
 
 ```rust
 let outputs = model.run(ort::inputs!["image" => image]?)?;
-let predictions = outputs["output0"].try_extract_tensor::<f32>()?;
+let predictions = outputs["output0"].try_extract_array::<f32>()?;
 ...
 ```
 

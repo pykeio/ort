@@ -10,7 +10,7 @@ fn test_tensors() -> ort::Result<()> {
 		*ptr.add(3) = 42;
 	};
 
-	let (_, extracted) = tensor.extract_raw_tensor();
+	let (_, extracted) = tensor.extract_tensor();
 	assert_eq!(&extracted, &[0, 1, 2, 42, 4]);
 
 	Ok(())

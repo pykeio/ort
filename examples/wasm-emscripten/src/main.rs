@@ -78,7 +78,7 @@ pub extern "C" fn detect_objects(ptr: *const u8, width: u32, height: u32) {
 			.unwrap();
 
 	let outputs: ort::session::SessionOutputs = session.run(ort::inputs!["images" => tensor]).unwrap();
-	let output = outputs["output0"].try_extract_tensor::<f32>().unwrap().t().into_owned();
+	let output = outputs["output0"].try_extract_array::<f32>().unwrap().t().into_owned();
 
 	let mut boxes = Vec::new();
 	let output = output.slice(ndarray::s![.., .., 0]);

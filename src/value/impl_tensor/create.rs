@@ -225,7 +225,7 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRef<'a, T> {
 }
 
 impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
-	/// Construct a tensor from mutably borrowed data. Modifying data with [`Value::extract_tensor_mut`] will modify the
+	/// Construct a mutable tensor view from borrowed data. Modifying data through this view will modify the
 	/// underlying buffer as well.
 	///
 	/// Mutably borrowed tensors can be created from:

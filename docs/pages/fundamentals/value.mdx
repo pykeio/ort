@@ -71,21 +71,21 @@ let outputs = session.run(ort::inputs![
 ### Extracting data
 To access the underlying data of a value directly, the data must first be **extracted**.
 
-`Tensor`s can either [extract to an `ArrayView`](https://docs.rs/ort/2.0.0-rc.9/ort/value/type.Tensor.html#method.extract_tensor), or [extract to a tuple](https://docs.rs/ort/2.0.0-rc.9/ort/value/type.Tensor.html#method.extract_raw_tensor) of `(&[i64], &[T])`, where the first element is the shape of the tensor, and the second is the slice of data contained within the tensor.
+`Tensor`s can either extract to an `ndarray::ArrayView` [via `extract_array`](https://docs.rs/ort/2.0.0-rc.10/ort/value/type.Tensor.html#method.extract_array) when the [`ndarray` feature is enabled](/setup/cargo-features), or extract to a tuple [via `extract_tensor`](https://docs.rs/ort/2.0.0-rc.10/ort/value/type.Tensor.html#method.extract_tensor) of `(&Shape, &[T])` (where the second element is the slice of data contained within the tensor).
 ```rs
 let array = ndarray::Array4::<f32>::ones((1, 16, 16, 3));
 let tensor = TensorRef::from_array_view(&array)?;
 
-let extracted: ArrayViewD<'_, f32> = tensor.extract_tensor();
-let (tensor_shape, extracted_data): (&[i64], &[f32]) = tensor.extract_raw_tensor();
+let extracted: ArrayViewD<'_, f32> = tensor.extract_array();
+let (tensor_shape, extracted_data): (&Shape, &[f32]) = tensor.extract_tensor();
 ```
 
-`Tensor`s and `TensorRefMut`s with non-string elements can also be mutably extracted with `extract_tensor_mut` and `extract_raw_tensor_mut`. Mutating the returned types will directly update the data contained within the tensor.
+`Tensor`s and `TensorRefMut`s with non-string elements can also be mutably extracted with `extract_array_mut` and `extract_tensor_mut`. Mutating the returned types will directly update the data contained within the tensor.
 ```rs
 let mut original_array = vec![1_i64, 2, 3, 4, 5];
 {
 	let mut tensor = TensorRefMut::from_array_view_mut(([original_array.len()], &mut *original_array))?;
-	let (extracted_shape, extracted_data) = tensor.extract_raw_tensor_mut();
+	let (extracted_shape, extracted_data) = tensor.extract_tensor_mut();
 	extracted_data[2] = 42;
 }
 assert_eq!(original_array, [1, 2, 42, 4, 5]);
@@ -97,7 +97,7 @@ Session outputs return `DynValue`s, which are values whose [type is not known at
 ```rs
 let outputs = session.run(ort::inputs![TensorRef::from_array_view(&input)?])?;
 
-let Ok(tensor_output): ort::Result<ndarray::ArrayViewD<f32>> = outputs[0].try_extract_tensor() else {
+let Ok(tensor_output): ort::Result<ndarray::ArrayViewD<f32>> = outputs[0].try_extract_array() else {
     panic!("First output was not a Tensor<f32>!");
 }
 ```
@@ -117,7 +117,7 @@ let my_tensor: ort::value::Tensor<f32> = Tensor::new(...)?;
 let tensor_view: ort::value::TensorRef<'_, f32> = my_tensor.view();
 ```
 
-Views act identically to a borrow of their type - `TensorRef` supports `extract_tensor`, `TensorRefMut` supports `extract_tensor_mut`. The same is true for sequences & maps.
+Views act identically to a borrow of their type - `TensorRef` supports `extract_tensor`, `TensorRefMut` supports `extract_tensor` and `extract_tensor_mut`. The same is true for sequences & maps.
 
 ### Creating views of external data
 You can create `TensorRef`s and `TensorRefMut`s from views of external data, like an `ndarray` array, or a raw slice of data. These types act almost identically to a `Tensor` - you can extract them and pass them as session inputs - but as they do not take ownership of the data, they are bound to the input's lifetime.
@@ -133,7 +133,7 @@ let tensor_view_mut = TensorRefMut::from_array_view_mut(([1, 3, 64, 64], &mut *o
 ## Dynamic values
 Sessions in `ort` return a map of `DynValue`s. These are values whose exact type is not known at compile time. You can determine a value's [type](https://docs.rs/ort/2.0.0-rc.9/ort/value/enum.ValueType.html) via its `.dtype()` method.
 
-You can also use fallible methods to extract data from this value - for example, [`DynValue::try_extract_tensor`](https://docs.rs/ort/2.0.0-rc.9/ort/value/type.DynValue.html#method.try_extract_tensor), which fails if the value is not a tensor. Often times though, you'll want to reuse the same value which you are certain is a tensor - in which case, you can **downcast** the value.
+You can also use fallible methods to extract data from this value - for example, [`DynValue::try_extract_tensor`](https://docs.rs/ort/2.0.0-rc.10/ort/value/type.DynValue.html#method.try_extract_tensor), which fails if the value is not a tensor. Often times though, you'll want to reuse the same value which you are certain is a tensor - in which case, you can **downcast** the value.
 
 ### Downcasting
 **Downcasting** means to convert a dyn type like `DynValue` to stronger type like `DynTensor`. Downcasting can be performed using the `.downcast()` function on `DynValue`:
@@ -160,11 +160,11 @@ If `value` is not a tensor, **or** if the element type of the value does not mat
 Stronger typed values have infallible variants of the `.try_extract_*` methods:
 ```rs
 // We could try to extract a tensor directly from a `DynValue`...
-let f32_array: ArrayViewD<f32> = dyn_value.try_extract_tensor()?;
+let f32_array: ArrayViewD<f32> = dyn_value.try_extract_array()?;
 
 // Or, we can first onvert it to a tensor, and then extract afterwards:
 let tensor: ort::value::Tensor<f32> = dyn_value.downcast()?;
-let f32_array = tensor.extract_tensor(); // no `?` required, this will never fail!
+let f32_array = tensor.extract_array(); // no `?` required, this will never fail!
 ```
 
 ### Upcasting

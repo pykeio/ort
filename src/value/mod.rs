@@ -38,7 +38,7 @@ pub use self::{
 	},
 	impl_tensor::{
 		DynTensor, DynTensorRef, DynTensorRefMut, DynTensorValueType, OwnedTensorArrayData, Tensor, TensorArrayData, TensorArrayDataMut, TensorArrayDataParts,
-		TensorRef, TensorRefMut, TensorValueType, TensorValueTypeMarker, ToDimensions
+		TensorRef, TensorRefMut, TensorValueType, TensorValueTypeMarker, ToShape
 	},
 	r#type::ValueType
 };

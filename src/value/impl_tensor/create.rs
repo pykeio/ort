@@ -320,13 +320,13 @@ pub struct TensorArrayDataParts<I> {
 	pub guard: Option<Box<dyn Any>>
 }
 
-pub trait ToDimensions {
-	fn to_dimensions(&self, expected_size: Option<usize>) -> Result<Shape>;
+pub trait ToShape {
+	fn to_shape(&self, expected_size: Option<usize>) -> Result<Shape>;
 }
 
-macro_rules! impl_to_dimensions {
+macro_rules! impl_to_shape {
 	(@inner) => {
-		fn to_dimensions(&self, expected_size: Option<usize>) -> Result<Shape> {
+		fn to_shape(&self, expected_size: Option<usize>) -> Result<Shape> {
 			let v = self
 				.iter()
 				.enumerate()
@@ -361,27 +361,28 @@ macro_rules! impl_to_dimensions {
 		}
 	};
 	($(for $t:ty),+) => {
-		$(impl ToDimensions for $t {
-			impl_to_dimensions!(@inner);
+		$(impl ToShape for $t {
+			impl_to_shape!(@inner);
 		})+
 	};
 	(<N> $(for $t:ty),+) => {
-		$(impl<const N: usize> ToDimensions for $t {
-			impl_to_dimensions!(@inner);
+		$(impl<const N: usize> ToShape for $t {
+			impl_to_shape!(@inner);
 		})+
 	};
 }
 
-impl ToDimensions for () {
-	fn to_dimensions(&self, expected_size: Option<usize>) -> Result<Shape> {
+impl ToShape for () {
+	fn to_shape(&self, expected_size: Option<usize>) -> Result<Shape> {
 		match expected_size {
 			Some(1) | None => Ok(Shape::default()),
 			Some(_) => Err(Error::new_with_code(ErrorCode::InvalidArgument, "Expected data to have a length of exactly 1 for scalar shape"))
 		}
 	}
 }
-impl_to_dimensions!(for Shape, for &[usize], for &[i32], for &[i64], for Vec<usize>, for Vec<i32>, for Vec<i64>);
-impl_to_dimensions!(<N> for [usize; N], for [i32; N], for [i64; N]);
+
+impl_to_shape!(for Shape, for &[usize], for &[i32], for &[i64], for Vec<usize>, for Vec<i32>, for Vec<i64>);
+impl_to_shape!(<N> for [usize; N], for [i32; N], for [i64; N]);
 
 #[cfg(feature = "ndarray")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
@@ -525,36 +526,36 @@ impl<T: Clone + 'static, D: Dimension + 'static> TensorArrayDataMut<T> for &mut 
 	private_impl!();
 }
 
-impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, &[T]) {
+impl<T: Clone + 'static, D: ToShape> TensorArrayData<T> for (D, &[T]) {
 	fn ref_parts(&self) -> Result<(Shape, &[T], Option<Box<dyn Any>>)> {
-		let shape = self.0.to_dimensions(Some(self.1.len()))?;
+		let shape = self.0.to_shape(Some(self.1.len()))?;
 		Ok((shape, self.1, None))
 	}
 
 	private_impl!();
 }
 
-impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, &mut [T]) {
+impl<T: Clone + 'static, D: ToShape> TensorArrayData<T> for (D, &mut [T]) {
 	fn ref_parts(&self) -> Result<(Shape, &[T], Option<Box<dyn Any>>)> {
-		let shape = self.0.to_dimensions(Some(self.1.len()))?;
+		let shape = self.0.to_shape(Some(self.1.len()))?;
 		Ok((shape, self.1, None))
 	}
 
 	private_impl!();
 }
 
-impl<T: Clone + 'static, D: ToDimensions> TensorArrayDataMut<T> for (D, &mut [T]) {
+impl<T: Clone + 'static, D: ToShape> TensorArrayDataMut<T> for (D, &mut [T]) {
 	fn ref_parts_mut(&mut self) -> Result<(Shape, &mut [T], Option<Box<dyn Any>>)> {
-		let shape = self.0.to_dimensions(Some(self.1.len()))?;
+		let shape = self.0.to_shape(Some(self.1.len()))?;
 		Ok((shape, self.1, None))
 	}
 
 	private_impl!();
 }
 
-impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Vec<T>) {
+impl<T: Clone + 'static, D: ToShape> OwnedTensorArrayData<T> for (D, Vec<T>) {
 	fn into_parts(mut self) -> Result<TensorArrayDataParts<T>> {
-		let shape = self.0.to_dimensions(Some(self.1.len()))?;
+		let shape = self.0.to_shape(Some(self.1.len()))?;
 		// SAFETY: A `Vec` always has a non-null pointer.
 		let ptr = unsafe { NonNull::new_unchecked(self.1.as_mut_ptr()) };
 		assert_eq!(shape.num_elements(), self.1.len());
@@ -568,9 +569,9 @@ impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Vec<T>
 	private_impl!();
 }
 
-impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Box<[T]>) {
+impl<T: Clone + 'static, D: ToShape> OwnedTensorArrayData<T> for (D, Box<[T]>) {
 	fn into_parts(mut self) -> Result<TensorArrayDataParts<T>> {
-		let shape = self.0.to_dimensions(Some(self.1.len()))?;
+		let shape = self.0.to_shape(Some(self.1.len()))?;
 		// SAFETY: A `Box` always has a non-null pointer.
 		let ptr = unsafe { NonNull::new_unchecked(self.1.as_mut_ptr()) };
 		assert_eq!(shape.num_elements(), self.1.len());
@@ -584,9 +585,9 @@ impl<T: Clone + 'static, D: ToDimensions> OwnedTensorArrayData<T> for (D, Box<[T
 	private_impl!();
 }
 
-impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<[T]>) {
+impl<T: Clone + 'static, D: ToShape> TensorArrayData<T> for (D, Arc<[T]>) {
 	fn ref_parts(&self) -> Result<(Shape, &[T], Option<Box<dyn Any>>)> {
-		let shape = self.0.to_dimensions(Some(self.1.len()))?;
+		let shape = self.0.to_shape(Some(self.1.len()))?;
 		let data = &*self.1;
 		Ok((shape, data, Some(Box::new(self.1.clone()))))
 	}
@@ -594,9 +595,9 @@ impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<[T]>) {
 	private_impl!();
 }
 
-impl<T: Clone + 'static, D: ToDimensions> TensorArrayData<T> for (D, Arc<Box<[T]>>) {
+impl<T: Clone + 'static, D: ToShape> TensorArrayData<T> for (D, Arc<Box<[T]>>) {
 	fn ref_parts(&self) -> Result<(Shape, &[T], Option<Box<dyn Any>>)> {
-		let shape = self.0.to_dimensions(Some(self.1.len()))?;
+		let shape = self.0.to_shape(Some(self.1.len()))?;
 		let data = &*self.1;
 		Ok((shape, data, Some(Box::new(self.1.clone()))))
 	}

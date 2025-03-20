@@ -23,8 +23,7 @@ const OPENAI_CLIP_STD: [f32; 3] = [0.26862954, 0.2613026, 0.2757771];
 pub struct Phi3VImageProcessor {
 	num_crops: usize,
 	image_mean: Vec<f32>,
-	image_std: Vec<f32>,
-	do_convert_rgb: bool
+	image_std: Vec<f32>
 }
 
 impl Phi3VImageProcessor {
@@ -32,8 +31,7 @@ impl Phi3VImageProcessor {
 		Self {
 			num_crops: NUM_CROPS,
 			image_mean: OPENAI_CLIP_MEAN.to_vec(),
-			image_std: OPENAI_CLIP_STD.to_vec(),
-			do_convert_rgb: true
+			image_std: OPENAI_CLIP_STD.to_vec()
 		}
 	}
 
@@ -49,8 +47,7 @@ impl Phi3VImageProcessor {
 	}
 
 	pub fn preprocess(&self, image: &DynamicImage) -> Result<BatchFeature> {
-		let rgb_image = if self.do_convert_rgb { image.to_rgb8() } else { image.to_rgb8() };
-		let rgb_image = DynamicImage::ImageRgb8(rgb_image);
+		let rgb_image = DynamicImage::ImageRgb8(image.to_rgb8());
 
 		let transformed = self.hd_transform(&rgb_image);
 		let (width, height) = transformed.dimensions();

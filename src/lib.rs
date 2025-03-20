@@ -21,6 +21,8 @@ pub mod __private {
 	pub extern crate alloc;
 	pub extern crate core;
 }
+#[macro_use]
+pub(crate) mod private;
 
 pub mod adapter;
 pub mod environment;
@@ -31,8 +33,6 @@ pub(crate) mod logging;
 pub mod memory;
 pub mod metadata;
 pub mod operator;
-#[macro_use]
-pub(crate) mod private;
 pub mod session;
 pub mod tensor;
 #[cfg(feature = "training")]

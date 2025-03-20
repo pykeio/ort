@@ -40,8 +40,8 @@ impl KernelAttributes {
 		Self { ptr, should_release }
 	}
 
-	pub fn get<'s, T: GetKernelAttribute<'s>>(&'s self, name: impl AsRef<str>) -> Option<T> {
-		with_cstr(name.as_ref().as_bytes(), &|name| unsafe { T::get_from(self.ptr.as_ptr(), name.as_ptr()) }).ok()
+	pub fn get<'s, T: FromKernelAttributes<'s>>(&'s self, name: impl AsRef<str>) -> Option<T> {
+		with_cstr(name.as_ref().as_bytes(), &|name| unsafe { T::from_info(self.ptr.as_ptr(), name.as_ptr()) }).ok()
 	}
 
 	pub fn inputs(&self) -> Result<Vec<Input>> {
@@ -135,30 +135,48 @@ impl Drop for KernelAttributes {
 	}
 }
 
-pub trait GetKernelAttribute<'s> {
-	fn attr_type() -> Option<ort_sys::OrtOpAttrType> {
-		None
-	}
+pub trait FromKernelAttributes<'s> {
+	/// Reads the value of the attribute from an [`ort_sys::OrtKernelInfo`] given its C name.
+	#[doc(hidden)]
+	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
+	where
+		Self: Sized;
 
-	unsafe fn from_read_op(attr: *const ort_sys::OrtOpAttr, len: usize) -> Result<Self>
+	private_trait!();
+}
+
+pub trait FromOpAttr {
+	#[doc(hidden)]
+	fn attr_type() -> ort_sys::OrtOpAttrType;
+
+	/// Reads the value of the attribute via [`ort_sys::OrtApi::ReadOpAttr`] using the known `len`gth of the value.
+	#[doc(hidden)]
+	unsafe fn from_op_attr(attr: *const ort_sys::OrtOpAttr, len: usize) -> Result<Self>
+	where
+		Self: Sized;
+
+	private_trait!();
+}
+
+impl FromKernelAttributes<'_> for f32 {
+	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
 	{
-		let _ = (attr, len);
-		Err(Error::new("not implemented"))
+		let mut value = Self::default();
+		ortsys![unsafe KernelInfoGetAttribute_float(info, name, &mut value)?];
+		Ok(value)
 	}
 
-	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
-	where
-		Self: Sized;
+	private_impl!();
 }
 
-impl GetKernelAttribute<'_> for f32 {
-	fn attr_type() -> Option<ort_sys::OrtOpAttrType> {
-		Some(ort_sys::OrtOpAttrType::ORT_OP_ATTR_FLOAT)
+impl FromOpAttr for f32 {
+	fn attr_type() -> ort_sys::OrtOpAttrType {
+		ort_sys::OrtOpAttrType::ORT_OP_ATTR_FLOAT
 	}
 
-	unsafe fn from_read_op(attr: *const ort_sys::OrtOpAttr, mut len: usize) -> Result<Self>
+	unsafe fn from_op_attr(attr: *const ort_sys::OrtOpAttr, mut len: usize) -> Result<Self>
 	where
 		Self: Sized
 	{
@@ -168,22 +186,28 @@ impl GetKernelAttribute<'_> for f32 {
 		Ok(out)
 	}
 
-	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
+	private_impl!();
+}
+
+impl FromKernelAttributes<'_> for i64 {
+	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
 	{
 		let mut value = Self::default();
-		ortsys![unsafe KernelInfoGetAttribute_float(info, name, &mut value)?];
+		ortsys![unsafe KernelInfoGetAttribute_int64(info, name, &mut value)?];
 		Ok(value)
 	}
+
+	private_impl!();
 }
 
-impl GetKernelAttribute<'_> for i64 {
-	fn attr_type() -> Option<ort_sys::OrtOpAttrType> {
-		Some(ort_sys::OrtOpAttrType::ORT_OP_ATTR_INT)
+impl FromOpAttr for i64 {
+	fn attr_type() -> ort_sys::OrtOpAttrType {
+		ort_sys::OrtOpAttrType::ORT_OP_ATTR_INT
 	}
 
-	unsafe fn from_read_op(attr: *const ort_sys::OrtOpAttr, mut len: usize) -> Result<Self>
+	unsafe fn from_op_attr(attr: *const ort_sys::OrtOpAttr, mut len: usize) -> Result<Self>
 	where
 		Self: Sized
 	{
@@ -193,22 +217,31 @@ impl GetKernelAttribute<'_> for i64 {
 		Ok(out)
 	}
 
-	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
+	private_impl!();
+}
+
+impl FromKernelAttributes<'_> for String {
+	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
 	{
-		let mut value = Self::default();
-		ortsys![unsafe KernelInfoGetAttribute_int64(info, name, &mut value)?];
-		Ok(value)
+		let mut size = 0;
+		ortsys![unsafe KernelInfoGetAttribute_string(info, name, ptr::null_mut(), &mut size)?];
+		let mut out = vec![0u8; size];
+		ortsys![unsafe KernelInfoGetAttribute_string(info, name, out.as_mut_ptr().cast::<c_char>(), &mut size)?];
+		let string = CString::from_vec_with_nul(out)?;
+		Ok(string.into_string()?)
 	}
+
+	private_impl!();
 }
 
-impl GetKernelAttribute<'_> for String {
-	fn attr_type() -> Option<ort_sys::OrtOpAttrType> {
-		Some(ort_sys::OrtOpAttrType::ORT_OP_ATTR_STRING)
+impl FromOpAttr for String {
+	fn attr_type() -> ort_sys::OrtOpAttrType {
+		ort_sys::OrtOpAttrType::ORT_OP_ATTR_STRING
 	}
 
-	unsafe fn from_read_op(attr: *const ort_sys::OrtOpAttr, mut len: usize) -> Result<Self>
+	unsafe fn from_op_attr(attr: *const ort_sys::OrtOpAttr, mut len: usize) -> Result<Self>
 	where
 		Self: Sized
 	{
@@ -220,35 +253,11 @@ impl GetKernelAttribute<'_> for String {
 			.and_then(|f| f.into_string().map_err(|_| Error::new("invalid string")))
 	}
 
-	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
-	where
-		Self: Sized
-	{
-		let mut size = 0;
-		ortsys![unsafe KernelInfoGetAttribute_string(info, name, ptr::null_mut(), &mut size)?];
-		let mut out = vec![0u8; size];
-		ortsys![unsafe KernelInfoGetAttribute_string(info, name, out.as_mut_ptr().cast::<c_char>(), &mut size)?];
-		let string = CString::from_vec_with_nul(out)?;
-		Ok(string.into_string()?)
-	}
+	private_impl!();
 }
 
-impl GetKernelAttribute<'_> for Vec<f32> {
-	fn attr_type() -> Option<ort_sys::OrtOpAttrType> {
-		Some(ort_sys::OrtOpAttrType::ORT_OP_ATTR_FLOATS)
-	}
-
-	unsafe fn from_read_op(attr: *const ort_sys::OrtOpAttr, mut len: usize) -> Result<Self>
-	where
-		Self: Sized
-	{
-		let mut out = vec![0.0_f32; len / size_of::<f32>()];
-		ortsys![unsafe ReadOpAttr(attr, ort_sys::OrtOpAttrType::ORT_OP_ATTR_FLOATS, out.as_mut_ptr().cast(), len, &mut len)?];
-		assert_eq!(out.len(), len / size_of::<f32>());
-		Ok(out)
-	}
-
-	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
+impl FromKernelAttributes<'_> for Vec<f32> {
+	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
 	{
@@ -258,24 +267,30 @@ impl GetKernelAttribute<'_> for Vec<f32> {
 		ortsys![unsafe KernelInfoGetAttributeArray_float(info, name, out.as_mut_ptr(), &mut size)?];
 		Ok(out)
 	}
+
+	private_impl!();
 }
 
-impl GetKernelAttribute<'_> for Vec<i64> {
-	fn attr_type() -> Option<ort_sys::OrtOpAttrType> {
-		Some(ort_sys::OrtOpAttrType::ORT_OP_ATTR_INTS)
+impl FromOpAttr for Vec<f32> {
+	fn attr_type() -> ort_sys::OrtOpAttrType {
+		ort_sys::OrtOpAttrType::ORT_OP_ATTR_FLOATS
 	}
 
-	unsafe fn from_read_op(attr: *const ort_sys::OrtOpAttr, mut len: usize) -> Result<Self>
+	unsafe fn from_op_attr(attr: *const ort_sys::OrtOpAttr, mut len: usize) -> Result<Self>
 	where
 		Self: Sized
 	{
-		let mut out = vec![0_i64; len / size_of::<i64>()];
-		ortsys![unsafe ReadOpAttr(attr, ort_sys::OrtOpAttrType::ORT_OP_ATTR_INTS, out.as_mut_ptr().cast(), len, &mut len)?];
-		assert_eq!(out.len(), len / size_of::<i64>());
+		let mut out = vec![0.0_f32; len / size_of::<f32>()];
+		ortsys![unsafe ReadOpAttr(attr, ort_sys::OrtOpAttrType::ORT_OP_ATTR_FLOATS, out.as_mut_ptr().cast(), len, &mut len)?];
+		assert_eq!(out.len(), len / size_of::<f32>());
 		Ok(out)
 	}
 
-	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
+	private_impl!();
+}
+
+impl FromKernelAttributes<'_> for Vec<i64> {
+	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
 	{
@@ -285,10 +300,30 @@ impl GetKernelAttribute<'_> for Vec<i64> {
 		ortsys![unsafe KernelInfoGetAttributeArray_int64(info, name, out.as_mut_ptr(), &mut size)?];
 		Ok(out)
 	}
+
+	private_impl!();
 }
 
-impl<'s, T: DowncastableTarget> GetKernelAttribute<'s> for ValueRef<'s, T> {
-	unsafe fn get_from(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
+impl FromOpAttr for Vec<i64> {
+	fn attr_type() -> ort_sys::OrtOpAttrType {
+		ort_sys::OrtOpAttrType::ORT_OP_ATTR_INTS
+	}
+
+	unsafe fn from_op_attr(attr: *const ort_sys::OrtOpAttr, mut len: usize) -> Result<Self>
+	where
+		Self: Sized
+	{
+		let mut out = vec![0_i64; len / size_of::<i64>()];
+		ortsys![unsafe ReadOpAttr(attr, ort_sys::OrtOpAttrType::ORT_OP_ATTR_INTS, out.as_mut_ptr().cast(), len, &mut len)?];
+		assert_eq!(out.len(), len / size_of::<i64>());
+		Ok(out)
+	}
+
+	private_impl!();
+}
+
+impl<'s, T: DowncastableTarget> FromKernelAttributes<'s> for ValueRef<'s, T> {
+	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
 	{
@@ -300,6 +335,8 @@ impl<'s, T: DowncastableTarget> GetKernelAttribute<'s> for ValueRef<'s, T> {
 		ortsys![unsafe KernelInfoGetAttribute_tensor(info, name, allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
 		unsafe { ValueRef::new(DynValue::from_ptr(NonNull::new_unchecked(value_ptr), None)) }.downcast()
 	}
+
+	private_impl!();
 }
 
 pub struct ScratchBuffer<T> {
@@ -309,12 +346,20 @@ pub struct ScratchBuffer<T> {
 }
 
 impl<T> ScratchBuffer<T> {
-	pub unsafe fn as_slice(&self) -> &[T] {
-		unsafe { slice::from_raw_parts(self.buffer.cast_const(), self.size) }
+	pub fn as_slice(&self) -> Option<&[T]> {
+		if self.allocator.memory_info().is_cpu_accessible() {
+			Some(unsafe { slice::from_raw_parts(self.buffer.cast_const(), self.size) })
+		} else {
+			None
+		}
 	}
 
-	pub unsafe fn as_mut_slice(&mut self) -> &mut [T] {
-		unsafe { slice::from_raw_parts_mut(self.buffer, self.size) }
+	pub fn as_mut_slice(&mut self) -> Option<&mut [T]> {
+		if self.allocator.memory_info().is_cpu_accessible() {
+			Some(unsafe { slice::from_raw_parts_mut(self.buffer, self.size) })
+		} else {
+			None
+		}
 	}
 }
 

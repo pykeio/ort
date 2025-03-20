@@ -12,7 +12,7 @@ mod tests;
 use self::{
 	bound::BoundOperator,
 	io::{OperatorInput, OperatorOutput},
-	kernel::{GetKernelAttribute, Kernel, KernelAttributes}
+	kernel::{FromOpAttr, Kernel, KernelAttributes}
 };
 use crate::{
 	AsPointer, Error,
@@ -83,11 +83,7 @@ impl ShapeInferenceContext {
 		tys
 	}
 
-	pub fn attr<'s, T: GetKernelAttribute<'s>>(&'s self, name: impl AsRef<str>) -> Result<T> {
-		let Some(attr_type) = T::attr_type() else {
-			return Err(Error::new("type is not supported as a ShapeInferenceContext attribute"));
-		};
-
+	pub fn attr<T: FromOpAttr>(&self, name: impl AsRef<str>) -> Result<T> {
 		let attr = with_cstr(name.as_ref().as_bytes(), &|name| {
 			let mut attr = ptr::null();
 			ortsys![unsafe ShapeInferContext_GetAttribute(self.ptr(), name.as_ptr(), &mut attr)?];
@@ -95,9 +91,9 @@ impl ShapeInferenceContext {
 		})?;
 
 		let mut len = 0;
-		let _ = ortsys![unsafe ReadOpAttr(attr, attr_type, ptr::null_mut(), 0, &mut len)];
+		let _ = ortsys![unsafe ReadOpAttr(attr, T::attr_type(), ptr::null_mut(), 0, &mut len)];
 
-		unsafe { T::from_read_op(attr, len) }
+		unsafe { T::from_op_attr(attr, len) }
 	}
 
 	pub fn set_output(&mut self, idx: usize, ty: &ValueType) -> Result<()> {

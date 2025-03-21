@@ -1,19 +1,12 @@
 [package]
 publish = false
 name = "example-yolov8"
-version = "0.0.0"
-edition = "2021"
+version = "0.1.0"
+edition = "2024"
 
 [dependencies]
-ort = { path = "../../", features = [ "fetch-models" ] }
-ndarray = "0.16"
-tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
+ort = "=2.0.0-rc.9"
 image = "0.25"
-show-image = { version = "0.14", features = [ "image", "raqote" ] }
-raqote = { version = "0.8", default-features = false }
-ureq = "2.1"
-tracing = "0.1"
-
-[features]
-load-dynamic = [ "ort/load-dynamic" ]
-cuda = [ "ort/cuda" ]
+show-image = "0.14"
+ndarray = "0.16"
+raqote = "0.8"

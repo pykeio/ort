@@ -7,8 +7,7 @@ use ndarray::{Array, Axis, s};
 use ort::{
 	execution_providers::CUDAExecutionProvider,
 	inputs,
-	session::{Session, SessionOutputs},
-	value::TensorRef
+	session::{Session, SessionOutputs, builder::GraphOptimizationLevel}
 };
 use raqote::{DrawOptions, DrawTarget, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle};
 use show_image::{AsImageView, WindowOptions, event};
@@ -53,22 +52,28 @@ fn main() -> ort::Result<()> {
 
 	let original_img = image::open(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("baseball.jpg")).unwrap();
 	let (img_width, img_height) = (original_img.width(), original_img.height());
-	let img = original_img.resize_exact(640, 640, FilterType::CatmullRom);
-	let mut input = Array::zeros((1, 3, 640, 640));
-	for pixel in img.pixels() {
-		let x = pixel.0 as _;
-		let y = pixel.1 as _;
-		let [r, g, b, _] = pixel.2.0;
-		input[[0, 0, y, x]] = (r as f32) / 255.;
-		input[[0, 1, y, x]] = (g as f32) / 255.;
-		input[[0, 2, y, x]] = (b as f32) / 255.;
-	}
+	let img_resized = original_img.resize_exact(640, 640, FilterType::CatmullRom);
+	let img_f32 = img_resized.to_rgb32f().into_raw();
+	let input = Array::from_shape_vec((1, 3, 112, 112), img_f32).unwrap();
 
-	let mut model = Session::builder()?.commit_from_url(YOLOV8M_URL)?;
+	// let mut input = Array::zeros((1, 3, 640, 640));
+	// for pixel in img.pixels() {
+	// 	let x = pixel.0 as _;
+	// 	let y = pixel.1 as _;
+	// 	let [r, g, b, _] = pixel.2.0;
+	// 	input[[0, 0, y, x]] = (r as f32) / 255.;
+	// 	input[[0, 1, y, x]] = (g as f32) / 255.;
+	// 	input[[0, 2, y, x]] = (b as f32) / 255.;
+	// }
+
+	let model = Session::builder()?
+		.with_optimization_level(GraphOptimizationLevel::Level3)?
+		.with_intra_threads(4)?
+		.commit_from_file("../checkpoints/yolov8m.onnx")?;
 
 	// Run YOLOv8 inference
-	let outputs: SessionOutputs = model.run(inputs!["images" => TensorRef::from_array_view(&input)?])?;
-	let output = outputs["output0"].try_extract_array::<f32>()?.t().into_owned();
+	let outputs: SessionOutputs = model.run(inputs!["images" => input]?)?;
+	let output = outputs["output0"].try_extract_tensor::<f32>()?.t().into_owned();
 
 	let mut boxes = Vec::new();
 	let output = output.slice(s![.., .., 0]);
@@ -142,10 +147,13 @@ fn main() -> ort::Result<()> {
 	let window = show_image::context()
 		.run_function_wait(move |context| -> Result<_, String> {
 			let mut window = context
-				.create_window("ort + YOLOv8", WindowOptions {
-					size: Some([img_width, img_height]),
-					..WindowOptions::default()
-				})
+				.create_window(
+					"ort + YOLOv8",
+					WindowOptions {
+						size: Some([img_width, img_height]),
+						..WindowOptions::default()
+					}
+				)
 				.map_err(|e| e.to_string())?;
 			window.set_image("baseball", &original_img.as_image_view().map_err(|e| e.to_string())?);
 			window.set_overlay("yolo", &overlay.as_image_view().map_err(|e| e.to_string())?, true);

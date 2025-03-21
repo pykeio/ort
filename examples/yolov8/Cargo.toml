@@ -7,6 +7,7 @@ edition = "2024"
 [dependencies]
 ort = "=2.0.0-rc.9"
 image = "0.25"
-show-image = "0.14"
+show-image = "=0.14.0"  # Currently need to pin version according to https://github.com/robohouse-delft/show-image-rs/issues/54
 ndarray = "0.16"
 raqote = "0.8"
+tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }

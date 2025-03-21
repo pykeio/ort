@@ -54,7 +54,7 @@ fn main() -> ort::Result<()> {
 	let (img_width, img_height) = (original_img.width(), original_img.height());
 	let img_resized = original_img.resize_exact(640, 640, FilterType::CatmullRom);
 	let img_f32 = img_resized.to_rgb32f().into_raw();
-	let input = Array::from_shape_vec((1, 3, 112, 112), img_f32).unwrap();
+	let input = Array::from_shape_vec((1, 3, 640, 640), img_f32).unwrap();
 
 	// let mut input = Array::zeros((1, 3, 640, 640));
 	// for pixel in img.pixels() {

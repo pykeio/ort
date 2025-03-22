@@ -6,14 +6,23 @@ use image::{GenericImageView, ImageBuffer, Rgba, imageops::FilterType};
 use ndarray::Array;
 use ort::{execution_providers::CUDAExecutionProvider, inputs, session::Session, value::TensorRef};
 use show_image::{AsImageView, WindowOptions, event};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+// Include common code for `ort` examples that allows using the various feature flags to enable different EPs and
+// backends.
+#[path = "../common/mod.rs"]
+mod common;
 
 #[show_image::main]
 fn main() -> ort::Result<()> {
-	tracing_subscriber::fmt::init();
+	// Initialize tracing to receive debug messages from `ort`
+	tracing_subscriber::registry()
+		.with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,ort=debug".into()))
+		.with(tracing_subscriber::fmt::layer())
+		.init();
 
-	ort::init()
-		.with_execution_providers([CUDAExecutionProvider::default().build()])
-		.commit()?;
+	// Register EPs based on feature flags - this isn't crucial for usage and can be removed.
+	common::init()?;
 
 	let mut session =
 		Session::builder()?.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/modnet_photographic_portrait_matting.onnx")?;

@@ -4,13 +4,18 @@ use std::{
 };
 
 use ort::{
-	execution_providers::CUDAExecutionProvider,
 	inputs,
 	session::{Session, builder::GraphOptimizationLevel},
 	value::TensorRef
 };
 use rand::Rng;
 use tokenizers::Tokenizer;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+// Include common code for `ort` examples that allows using the various feature flags to enable different EPs and
+// backends.
+#[path = "../common/mod.rs"]
+mod common;
 
 const PROMPT: &str = "The corsac fox (Vulpes corsac), also known simply as a corsac, is a medium-sized fox found in";
 /// Max tokens to generate
@@ -18,21 +23,18 @@ const GEN_TOKENS: i32 = 90;
 /// Top_K -> Sample from the k most likely next tokens at each step. Lower k focuses on higher probability tokens.
 const TOP_K: usize = 5;
 
-/// GPT-2 Text Generation
-///
-/// This Rust program demonstrates text generation using the GPT-2 language model with `ort`.
 fn main() -> ort::Result<()> {
 	// Initialize tracing to receive debug messages from `ort`
-	tracing_subscriber::fmt::init();
+	tracing_subscriber::registry()
+		.with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,ort=debug".into()))
+		.with(tracing_subscriber::fmt::layer())
+		.init();
 
-	// Create the ONNX Runtime environment, enabling CUDA execution providers for all sessions created in this process.
-	ort::init()
-		.with_name("GPT-2")
-		.with_execution_providers([CUDAExecutionProvider::default().build()])
-		.commit()?;
+	// Register EPs based on feature flags - this isn't crucial for usage and can be removed.
+	common::init()?;
 
 	let mut stdout: io::Stdout = io::stdout();
-	let mut rng = rand::thread_rng();
+	let mut rng = rand::rng();
 
 	// Load our model
 	let mut session = Session::builder()?
@@ -66,7 +68,7 @@ fn main() -> ort::Result<()> {
 		probabilities.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Less));
 
 		// Sample using top-k sampling
-		let token = probabilities[rng.gen_range(0..=TOP_K)].0 as i64;
+		let token = probabilities[rng.random_range(0..=TOP_K)].0 as i64;
 
 		// Add our generated token to the input sequence
 		tokens.push(token);

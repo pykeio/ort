@@ -1,4 +1,3 @@
-mod image_process;
 use std::{path::Path, time::Instant};
 
 use anyhow::Result;
@@ -9,6 +8,7 @@ use ort::{
 	value::{Tensor, TensorRef}
 };
 use tokenizers::Tokenizer;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 const VISION_MODEL_NAME: &str = "phi-3-v-128k-instruct-vision.onnx";
 const TEXT_EMBEDDING_MODEL_NAME: &str = "phi-3-v-128k-instruct-text-embedding.onnx";
@@ -18,6 +18,12 @@ const MAX_LENGTH: usize = 1000; // max length of the generated text
 const EOS_TOKEN_ID: i64 = 32007; // <|end|>
 const USER_TOKEN_ID: i64 = 32010; // <|user|>
 const VOCAB_SIZE: usize = 32064;
+
+mod image_process;
+// Include common code for `ort` examples that allows using the various feature flags to enable different EPs and
+// backends.
+#[path = "../../common/mod.rs"]
+mod common;
 
 #[allow(dead_code)]
 fn get_current_time() -> Instant {
@@ -209,7 +215,14 @@ pub async fn generate_text(
 
 #[tokio::main]
 async fn main() -> Result<()> {
-	tracing_subscriber::fmt().init(); // set up default subscriber with log level `INFO`
+	// Initialize tracing to receive debug messages from `ort`
+	tracing_subscriber::registry()
+		.with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,ort=debug".into()))
+		.with(tracing_subscriber::fmt::layer())
+		.init();
+
+	// Register EPs based on feature flags - this isn't crucial for usage and can be removed.
+	common::init()?;
 
 	let data_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("data");
 	let tokenizer = Tokenizer::from_file(data_dir.join("tokenizer.json")).map_err(|e| anyhow::anyhow!("Error loading tokenizer: {:?}", e))?;

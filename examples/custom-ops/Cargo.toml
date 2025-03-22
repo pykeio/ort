@@ -3,10 +3,14 @@ publish = false
 name = "example-custom-ops"
 version = "0.0.0"
 edition = "2021"
+build = "../build.rs"
 
 [dependencies]
-ort = { path = "../../", features = [ "fetch-models" ] }
+ort = { path = "../../" }
 
 [features]
 load-dynamic = [ "ort/load-dynamic" ]
-cuda = [ "ort/cuda" ]
+
+[[example]]
+name = "custom-ops"
+path = "custom-ops.rs"

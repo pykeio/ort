@@ -1,22 +1,49 @@
 [package]
 publish = false
-name = "phi-3-vision"
+name = "example-phi-3-vision"
 version = "0.0.0"
 edition = "2021"
+build = "../build.rs"
 
 [dependencies]
-anyhow = "1.0.89"
+ort = { path = "../../" }
+anyhow = "1.0"
 image = "0.25"
 ndarray = "0.16"
-ort = { path = "../../", features = ["fetch-models"] }
-tokio = { version = "1.40.0", features = ["full"] }
-tokenizers = "0.20"
-tracing-subscriber = { version = "0.3", default-features = false, features = [
-    "env-filter",
-    "fmt",
-] }
+tokio = { version = "1", features = ["full"] }
+tokenizers = { version = "0.21", default-features = false, features = [ "onig" ] }
+tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
 tracing = "0.1"
 
+ort-candle = { path = "../../backends/candle", optional = true }
+ort-tract = { path = "../../backends/tract", optional = true }
+
 [features]
-load-dynamic = ["ort/load-dynamic"]
-cuda = ["ort/cuda"]
+load-dynamic = [ "ort/load-dynamic" ]
+
+cuda = [ "ort/cuda" ]
+tensorrt = [ "ort/tensorrt" ]
+openvino = [ "ort/openvino" ]
+onednn = [ "ort/onednn" ]
+directml = [ "ort/directml" ]
+nnapi = [ "ort/nnapi" ]
+coreml = [ "ort/coreml" ]
+xnnpack = [ "ort/xnnpack" ]
+rocm = [ "ort/rocm" ]
+acl = [ "ort/acl" ]
+armnn = [ "ort/armnn" ]
+tvm = [ "ort/tvm" ]
+migraphx = [ "ort/migraphx" ]
+rknpu = [ "ort/rknpu" ]
+vitis = [ "ort/vitis" ]
+cann = [ "ort/cann" ]
+qnn = [ "ort/qnn" ]
+webgpu = [ "ort/webgpu" ]
+azure = [ "ort/azure" ]
+
+backend-candle = [ "ort/alternative-backend", "dep:ort-candle" ]
+backend-tract = [ "ort/alternative-backend", "dep:ort-tract" ]
+
+[[example]]
+name = "gpt2"
+path = "gpt2.rs"

@@ -7,16 +7,28 @@ use ort::{
 	execution_providers::{CUDAExecutionProvider, ExecutionProvider},
 	memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
 	session::Session,
+	tensor::Shape,
 	value::TensorRefMut
 };
 use show_image::{AsImageView, WindowOptions, event};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[show_image::main]
 fn main() -> anyhow::Result<()> {
-	tracing_subscriber::fmt::init();
+	// Initialize tracing to receive debug messages from `ort`
+	tracing_subscriber::registry()
+		.with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,ort=debug".into()))
+		.with(tracing_subscriber::fmt::layer())
+		.init();
 
+	#[rustfmt::skip]
 	ort::init()
-		.with_execution_providers([CUDAExecutionProvider::default().build().error_on_failure()])
+		.with_execution_providers([
+			CUDAExecutionProvider::default()
+				.build()
+				// exit the program with an error if the CUDA EP fails to register
+				.error_on_failure()
+		])
 		.commit()?;
 
 	let mut session =
@@ -41,7 +53,7 @@ fn main() -> anyhow::Result<()> {
 		TensorRefMut::from_raw(
 			MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?,
 			(*device_data.device_ptr() as usize as *mut ()).cast(),
-			vec![1, 3, 512, 512]
+			Shape::from([1, 3, 512, 512])
 		)
 		.unwrap()
 	};

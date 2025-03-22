@@ -5,13 +5,18 @@ use std::path::Path;
 use image::{GenericImageView, imageops::FilterType};
 use ndarray::{Array, Axis, s};
 use ort::{
-	execution_providers::CUDAExecutionProvider,
 	inputs,
 	session::{Session, SessionOutputs},
 	value::TensorRef
 };
 use raqote::{DrawOptions, DrawTarget, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle};
 use show_image::{AsImageView, WindowOptions, event};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+// Include common code for `ort` examples that allows using the various feature flags to enable different EPs and
+// backends.
+#[path = "../common/mod.rs"]
+mod common;
 
 #[derive(Debug, Clone, Copy)]
 struct BoundingBox {
@@ -45,11 +50,14 @@ const YOLOV8_CLASS_LABELS: [&str; 80] = [
 
 #[show_image::main]
 fn main() -> ort::Result<()> {
-	tracing_subscriber::fmt::init();
+	// Initialize tracing to receive debug messages from `ort`
+	tracing_subscriber::registry()
+		.with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,ort=debug".into()))
+		.with(tracing_subscriber::fmt::layer())
+		.init();
 
-	ort::init()
-		.with_execution_providers([CUDAExecutionProvider::default().build()])
-		.commit()?;
+	// Register EPs based on feature flags - this isn't crucial for usage and can be removed.
+	common::init()?;
 
 	let original_img = image::open(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("baseball.jpg")).unwrap();
 	let (img_width, img_height) = (original_img.width(), original_img.height());

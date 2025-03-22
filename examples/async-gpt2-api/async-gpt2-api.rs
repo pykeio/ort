@@ -11,7 +11,6 @@ use axum::{
 };
 use futures::Stream;
 use ort::{
-	execution_providers::CUDAExecutionProvider,
 	session::{RunOptions, Session, builder::GraphOptimizationLevel},
 	value::TensorRef
 };
@@ -19,6 +18,11 @@ use rand::Rng;
 use tokenizers::Tokenizer;
 use tokio::{net::TcpListener, sync::Mutex};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+// Include common code for `ort` examples that allows using the various feature flags to enable different EPs and
+// backends.
+#[path = "../common/mod.rs"]
+mod common;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -28,11 +32,8 @@ async fn main() -> anyhow::Result<()> {
 		.with(tracing_subscriber::fmt::layer())
 		.init();
 
-	// Create the ONNX Runtime environment, enabling CUDA execution providers for all sessions created in this process.
-	ort::init()
-		.with_name("GPT-2")
-		.with_execution_providers([CUDAExecutionProvider::default().build()])
-		.commit()?;
+	// Register EPs based on feature flags - this isn't crucial for usage and can be removed.
+	common::init()?;
 
 	// Load our model
 	let session = Session::builder()?
@@ -41,7 +42,15 @@ async fn main() -> anyhow::Result<()> {
 		.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/gpt2.onnx")?;
 
 	// Load the tokenizer and encode the prompt into a sequence of tokens.
-	let tokenizer = Tokenizer::from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("tokenizer.json")).unwrap();
+	let tokenizer = Tokenizer::from_file(
+		Path::new(env!("CARGO_MANIFEST_DIR"))
+			.parent()
+			.unwrap()
+			.join("gpt2")
+			.join("data")
+			.join("tokenizer.json")
+	)
+	.unwrap();
 
 	let app_state = AppState {
 		session: Arc::new(Mutex::new(session)),
@@ -87,8 +96,8 @@ fn generate_stream(
 
 			// Sample using top-k sampling
 			let token = {
-				let mut rng = rand::thread_rng();
-				probabilities[rng.gen_range(0..=5)].0 as i64
+				let mut rng = rand::rng();
+				probabilities[rng.random_range(0..=5)].0 as i64
 			};
 			tokens.push(token);
 

@@ -3,9 +3,20 @@ publish = false
 name = "example-model-info"
 version = "0.0.0"
 edition = "2021"
+build = "../build.rs"
 
 [dependencies]
 ort = { path = "../../" }
 
+ort-candle = { path = "../../backends/candle", optional = true }
+ort-tract = { path = "../../backends/tract", optional = true }
+
 [features]
 load-dynamic = [ "ort/load-dynamic" ]
+
+backend-candle = [ "ort/alternative-backend", "dep:ort-candle" ]
+backend-tract = [ "ort/alternative-backend", "dep:ort-tract" ]
+
+[[example]]
+name = "model-info"
+path = "model-info.rs"

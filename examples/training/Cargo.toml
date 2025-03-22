@@ -3,15 +3,48 @@ publish = false
 name = "example-training"
 version = "0.0.0"
 edition = "2021"
+build = "../build.rs"
 
 [dependencies]
 ort = { path = "../../", features = [ "training" ] }
-tokenizers = { version = ">=0.13.4", default-features = false, features = [ "onig" ] }
-rand = "0.8"
-simd-json = "0.13"
-kdam = "0.5"
+tokenizers = { version = "0.21", default-features = false, features = [ "onig" ] }
+rand = "0.9"
+simd-json = "0.14"
+kdam = "0.6"
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
 
 [features]
 load-dynamic = [ "ort/load-dynamic" ]
+
 cuda = [ "ort/cuda" ]
+tensorrt = [ "ort/tensorrt" ]
+openvino = [ "ort/openvino" ]
+onednn = [ "ort/onednn" ]
+directml = [ "ort/directml" ]
+nnapi = [ "ort/nnapi" ]
+coreml = [ "ort/coreml" ]
+xnnpack = [ "ort/xnnpack" ]
+rocm = [ "ort/rocm" ]
+acl = [ "ort/acl" ]
+armnn = [ "ort/armnn" ]
+tvm = [ "ort/tvm" ]
+migraphx = [ "ort/migraphx" ]
+rknpu = [ "ort/rknpu" ]
+vitis = [ "ort/vitis" ]
+cann = [ "ort/cann" ]
+qnn = [ "ort/qnn" ]
+webgpu = [ "ort/webgpu" ]
+azure = [ "ort/azure" ]
+
+[[bin]]
+name = "pretokenize"
+path = "misc/pretokenize.rs"
+[[example]]
+name = "train-clm"
+path = "train-clm.rs"
+[[example]]
+name = "train-clm-simple"
+path = "train-clm-simple.rs"
+
+[lints.rust.unexpected_cfgs]
+level = "allow"

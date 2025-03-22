@@ -2,7 +2,15 @@ use std::{env, process};
 
 use ort::session::Session;
 
+// Include common code for `ort` examples that allows using the various feature flags to enable different EPs and
+// backends.
+#[path = "../common/mod.rs"]
+mod common;
+
 fn main() -> ort::Result<()> {
+	// Register backends based on feature flags - this isn't crucial for usage and can be removed.
+	common::init()?;
+
 	let Some(path) = env::args().nth(1) else {
 		eprintln!("usage: ./model-info <model>.onnx");
 		process::exit(0);

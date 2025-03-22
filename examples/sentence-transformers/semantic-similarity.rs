@@ -3,11 +3,16 @@ use std::path::Path;
 use ndarray::{Axis, Ix2};
 use ort::{
 	Error,
-	execution_providers::CUDAExecutionProvider,
 	session::{Session, builder::GraphOptimizationLevel},
 	value::TensorRef
 };
 use tokenizers::Tokenizer;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+// Include common code for `ort` examples that allows using the various feature flags to enable different EPs and
+// backends.
+#[path = "../common/mod.rs"]
+mod common;
 
 /// Example usage of a text embedding model like Sentence Transformers' `all-mini-lm-l6` model for semantic textual
 /// similarity.
@@ -16,13 +21,13 @@ use tokenizers::Tokenizer;
 /// tasks like clustering or semantic search.
 fn main() -> ort::Result<()> {
 	// Initialize tracing to receive debug messages from `ort`
-	tracing_subscriber::fmt::init();
+	tracing_subscriber::registry()
+		.with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,ort=debug".into()))
+		.with(tracing_subscriber::fmt::layer())
+		.init();
 
-	// Create the ONNX Runtime environment, enabling CUDA execution providers for all sessions created in this process.
-	ort::init()
-		.with_name("sbert")
-		.with_execution_providers([CUDAExecutionProvider::default().build()])
-		.commit()?;
+	// Register EPs based on feature flags - this isn't crucial for usage and can be removed.
+	common::init()?;
 
 	// Load our model
 	let mut session = Session::builder()?

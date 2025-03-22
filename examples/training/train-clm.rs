@@ -14,14 +14,25 @@ use ort::{
 };
 use rand::RngCore;
 use tokenizers::Tokenizer;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 const BATCH_SIZE: usize = 16;
 const SEQUENCE_LENGTH: usize = 256;
 
-fn main() -> ort::Result<()> {
-	tracing_subscriber::fmt::init();
+// Include common code for `ort` examples that allows using the various feature flags to enable different EPs and
+// backends.
+#[path = "../common/mod.rs"]
+mod common;
 
-	ort::init().commit()?;
+fn main() -> ort::Result<()> {
+	// Initialize tracing to receive log messages from `ort`
+	tracing_subscriber::registry()
+		.with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "warn".into()))
+		.with(tracing_subscriber::fmt::layer())
+		.init();
+
+	// Register EPs based on feature flags - this isn't crucial for usage and can be removed.
+	common::init()?;
 
 	kdam::term::init(true);
 	let _ = kdam::term::hide_cursor();
@@ -51,7 +62,7 @@ fn main() -> ort::Result<()> {
 	let mut dataset = File::open("train-clm-dataset.bin").unwrap();
 	let file_size = dataset.metadata().unwrap().len();
 	let num_tokens = (file_size / 2) as usize; // 16-bit tokens
-	let mut rng = rand::thread_rng();
+	let mut rng = rand::rng();
 
 	let mut input_buffer = vec![0u16; SEQUENCE_LENGTH * BATCH_SIZE];
 	let mut label_buffer = vec![0u16; SEQUENCE_LENGTH * BATCH_SIZE];

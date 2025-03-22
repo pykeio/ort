@@ -35,7 +35,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - name: Run test
         run: |
-          ORT_LIB_LOCATION="$(pwd)/onnxruntime/build/Linux/Release" cargo run --example custom-ops
+          ORT_LIB_LOCATION="$(pwd)/onnxruntime/build/Linux/Release" cargo example-custom-ops
   minimal-build:
     name: Minimal build
     runs-on: ubuntu-latest
@@ -54,4 +54,4 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - name: Test linking
         run: |
-          ORT_LIB_LOCATION="$(pwd)/onnxruntime/build/Linux/Release" cargo build --example gpt2
+          ORT_LIB_LOCATION="$(pwd)/onnxruntime/build/Linux/Release" cargo example-custom-ops

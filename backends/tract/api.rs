@@ -88,7 +88,6 @@ unsafe extern "system" fn CreateSession(
 
 	match Session::from_buffer(env, options, &buf) {
 		Ok(session) => {
-			println!("out");
 			*out = (Box::leak(Box::new(session)) as *mut Session).cast();
 			OrtStatusPtr::default()
 		}

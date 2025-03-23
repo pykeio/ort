@@ -1,0 +1,12 @@
+[package]
+publish = false
+name = "leak-check"
+version = "0.0.0"
+edition = "2021"
+
+[[bin]]
+name = "leak-check"
+path = "main.rs"
+
+[dependencies]
+ort = { path = "../../", features = [] }

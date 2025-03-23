@@ -11,3 +11,4 @@ example-train-pretokenize = ["run", "--manifest-path", "examples/training/Cargo.
 example-train-clm = ["run", "--manifest-path", "examples/training/Cargo.toml", "--example", "train-clm", "--target-dir", "target"]
 example-train-clm-simple = ["run", "--manifest-path", "examples/training/Cargo.toml", "--example", "train-clm-simple", "--target-dir", "target"]
 example-yolov8 = ["run", "--manifest-path", "examples/yolov8/Cargo.toml", "--example", "yolov8", "--target-dir", "target"]
+leak-check = ["valgrind", "run", "--manifest-path", "tests/leak-check/Cargo.toml", "--target-dir", "target"]

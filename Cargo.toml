@@ -14,7 +14,8 @@ exclude = [
 	'examples/sentence-transformers',
 	'examples/training',
 	'examples/wasm-emscripten',
-	'examples/yolov8'
+	'examples/yolov8',
+	'tests/leak-check'
 ]
 
 [package]

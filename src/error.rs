@@ -189,10 +189,14 @@ impl From<ErrorCode> for ort_sys::OrtErrorCode {
 	}
 }
 
-/// Converts an [`ort_sys::OrtStatus`] to a [`Result`].
+/// Converts an [`ort_sys::OrtStatusPtr`] to a [`Result`].
 ///
-/// Note that this frees `status`!
-pub(crate) unsafe fn status_to_result(status: ort_sys::OrtStatusPtr) -> Result<(), Error> {
+/// **Note that this frees `status`!**
+///
+/// # Safety
+/// The value contained in `status` must be a valid [`ort_sys::OrtStatus`] pointer, or a null pointer (in which case the
+/// result will be `Ok`).
+pub unsafe fn status_to_result(status: ort_sys::OrtStatusPtr) -> Result<(), Error> {
 	let status = status.0;
 	if status.is_null() {
 		Ok(())

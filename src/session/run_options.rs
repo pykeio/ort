@@ -25,7 +25,7 @@ use crate::{
 /// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
 /// # fn main() -> ort::Result<()> {
 /// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
-/// let input = Tensor::<f32>::new(&Allocator::default(), [1, 64, 64, 3])?;
+/// let input = Tensor::<f32>::new(&Allocator::default(), [1_usize, 64, 64, 3])?;
 ///
 /// let output0 = session.outputs[0].name.as_str();
 /// let options = RunOptions::new()?.with_outputs(
@@ -34,7 +34,7 @@ use crate::{
 /// 		// except for the first one...
 /// 		.with(output0)
 /// 		// and since this is a 2x upsampler model, pre-allocate the output to be twice as large.
-/// 		.preallocate(output0, Tensor::<f32>::new(&Allocator::default(), [1, 128, 128, 3])?)
+/// 		.preallocate(output0, Tensor::<f32>::new(&Allocator::default(), [1_usize, 128, 128, 3])?)
 /// );
 ///
 /// // `outputs[0]` will be the tensor we just pre-allocated.
@@ -104,11 +104,12 @@ impl OutputSelector {
 	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
-	/// let input = Tensor::<f32>::new(&Allocator::default(), [1, 64, 64, 3])?;
+	/// let input = Tensor::<f32>::new(&Allocator::default(), [1_usize, 64, 64, 3])?;
 	///
 	/// let output0 = session.outputs[0].name.as_str();
 	/// let options = RunOptions::new()?.with_outputs(
-	/// 	OutputSelector::default().preallocate(output0, Tensor::<f32>::new(&Allocator::default(), [1, 128, 128, 3])?)
+	/// 	OutputSelector::default()
+	/// 		.preallocate(output0, Tensor::<f32>::new(&Allocator::default(), [1_usize, 128, 128, 3])?)
 	/// );
 	///
 	/// let outputs = session.run_with_options(ort::inputs![input], &options)?;
@@ -219,7 +220,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
-	/// let input = Tensor::<f32>::new(&Allocator::default(), [1, 64, 64, 3])?;
+	/// let input = Tensor::<f32>::new(&Allocator::default(), [1_usize, 64, 64, 3])?;
 	///
 	/// let output0 = session.outputs[0].name.as_str();
 	/// let options = RunOptions::new()?.with_outputs(
@@ -228,7 +229,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// 		// except for the first one...
 	/// 		.with(output0)
 	/// 		// and since this is a 2x upsampler model, pre-allocate the output to be twice as large.
-	/// 		.preallocate(output0, Tensor::<f32>::new(&Allocator::default(), [1, 128, 128, 3])?)
+	/// 		.preallocate(output0, Tensor::<f32>::new(&Allocator::default(), [1_usize, 128, 128, 3])?)
 	/// );
 	///
 	/// // `outputs[0]` will be the tensor we just pre-allocated.

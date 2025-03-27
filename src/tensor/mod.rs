@@ -62,9 +62,21 @@ impl fmt::Display for Shape {
 	}
 }
 
+impl From<Vec<usize>> for Shape {
+	fn from(value: Vec<usize>) -> Self {
+		Shape::new(value.into_iter().map(|x| x as i64))
+	}
+}
+
 impl From<Vec<i64>> for Shape {
 	fn from(value: Vec<i64>) -> Self {
 		Self { inner: SmallVec::from(value) }
+	}
+}
+
+impl From<&[usize]> for Shape {
+	fn from(value: &[usize]) -> Self {
+		Shape::new(value.iter().map(|x| *x as i64))
 	}
 }
 
@@ -74,9 +86,23 @@ impl From<&[i64]> for Shape {
 	}
 }
 
+impl<const N: usize> From<[usize; N]> for Shape {
+	fn from(value: [usize; N]) -> Self {
+		Shape::new(value.into_iter().map(|x| x as i64))
+	}
+}
+
 impl<const N: usize> From<[i64; N]> for Shape {
 	fn from(value: [i64; N]) -> Self {
 		Self { inner: SmallVec::from(value) }
+	}
+}
+
+impl FromIterator<usize> for Shape {
+	fn from_iter<T: IntoIterator<Item = usize>>(iter: T) -> Self {
+		Self {
+			inner: iter.into_iter().map(|x| x as i64).collect()
+		}
 	}
 }
 

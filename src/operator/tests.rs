@@ -83,14 +83,14 @@ fn test_custom_ops() -> crate::Result<()> {
 		.commit_from_memory(&model)?;
 
 	let allocator = session.allocator();
-	let mut value1 = Tensor::<f32>::new(allocator, [3, 5])?;
+	let mut value1 = Tensor::<f32>::new(allocator, [3_usize, 5])?;
 	{
 		let (_, data) = value1.extract_tensor_mut();
 		for datum in data {
 			*datum = 0.;
 		}
 	}
-	let mut value2 = Tensor::<f32>::new(allocator, [3, 5])?;
+	let mut value2 = Tensor::<f32>::new(allocator, [3_usize, 5])?;
 	{
 		let (_, data) = value2.extract_tensor_mut();
 		for datum in data {

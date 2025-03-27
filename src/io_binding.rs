@@ -66,7 +66,7 @@ use crate::{
 /// 	&unet,
 /// 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
 /// )?;
-/// let mut latents = Tensor::<f32>::new(&input_allocator, [1, 4, 64, 64])?;
+/// let mut latents = Tensor::<f32>::new(&input_allocator, [1_usize, 4, 64, 64])?;
 ///
 /// let mut io_binding = unet.create_binding()?;
 /// io_binding.bind_input("condition", &text_condition)?;
@@ -75,7 +75,7 @@ use crate::{
 /// 	&unet,
 /// 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUOutput)?
 /// )?;
-/// io_binding.bind_output("noise_pred", Tensor::<f32>::new(&output_allocator, [1, 4, 64, 64])?)?;
+/// io_binding.bind_output("noise_pred", Tensor::<f32>::new(&output_allocator, [1_usize, 4, 64, 64])?)?;
 ///
 /// for _ in 0..20 {
 /// 	io_binding.bind_input("latents", &latents)?;

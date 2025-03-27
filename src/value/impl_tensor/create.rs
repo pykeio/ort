@@ -103,7 +103,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
 	/// )?;
 	///
-	/// let mut img_input = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
+	/// let mut img_input = Tensor::<f32>::new(&allocator, [1_usize, 128, 128, 3])?;
 	/// # Ok(())
 	/// # }
 	/// ```

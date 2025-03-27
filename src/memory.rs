@@ -29,7 +29,7 @@ use crate::{
 /// 	MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?
 /// )?;
 ///
-/// let mut tensor = Tensor::<f32>::new(&allocator, [1, 3, 224, 224])?;
+/// let mut tensor = Tensor::<f32>::new(&allocator, [1_usize, 3, 224, 224])?;
 /// // Here, `data_ptr` is a pointer to **device memory** inaccessible to the CPU; we'll need another crate, like
 /// // `cudarc`, to access it.
 /// let data_ptr = tensor.data_ptr_mut()?;
@@ -59,7 +59,7 @@ use crate::{
 /// )?;
 ///
 /// // Create a tensor with our pinned allocator.
-/// let mut tensor = Tensor::<f32>::new(&allocator, [1, 3, 224, 224])?;
+/// let mut tensor = Tensor::<f32>::new(&allocator, [1_usize, 3, 224, 224])?;
 /// let data = tensor.extract_tensor_mut();
 /// // ...fill `data` with data...
 /// # Ok(())
@@ -385,7 +385,7 @@ impl MemoryInfo {
 	/// 	MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?
 	/// )?;
 	///
-	/// let mut tensor = Tensor::<f32>::new(&allocator, [1, 3, 224, 224])?;
+	/// let mut tensor = Tensor::<f32>::new(&allocator, [1_usize, 3, 224, 224])?;
 	/// # Ok(())
 	/// # }
 	/// ```

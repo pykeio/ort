@@ -234,7 +234,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # use ort::{memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let allocator = Allocator::default();
-	/// let tensor = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
+	/// let tensor = Tensor::<f32>::new(&allocator, [1_usize, 128, 128, 3])?;
 	///
 	/// assert_eq!(**tensor.shape(), [1, 128, 128, 3]);
 	/// # 	Ok(())

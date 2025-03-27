@@ -116,8 +116,8 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized + 'static> Value<Se
 	/// # use ort::{memory::Allocator, value::{Sequence, Tensor}};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let allocator = Allocator::default();
-	/// let tensor1 = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
-	/// let tensor2 = Tensor::<f32>::new(&allocator, [1, 224, 224, 3])?;
+	/// let tensor1 = Tensor::<f32>::new(&allocator, [1_usize, 128, 128, 3])?;
+	/// let tensor2 = Tensor::<f32>::new(&allocator, [1_usize, 224, 224, 3])?;
 	/// let value = Sequence::new([tensor1, tensor2])?;
 	///
 	/// for tensor in value.extract_sequence(&allocator) {

@@ -88,7 +88,7 @@ impl DynTensor {
 	/// 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
 	/// )?;
 	///
-	/// let mut img_input = DynTensor::new(&allocator, TensorElementType::Float32, [1, 128, 128, 3])?;
+	/// let mut img_input = DynTensor::new(&allocator, TensorElementType::Float32, [1_usize, 128, 128, 3])?;
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -197,7 +197,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	/// # use ort::{memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType}, session::Session, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
-	/// let tensor = Tensor::<f32>::new(&Allocator::default(), [1, 3, 224, 224])?;
+	/// let tensor = Tensor::<f32>::new(&Allocator::default(), [1_usize, 3, 224, 224])?;
 	/// // Tensors are allocated on CPU by default.
 	/// assert_eq!(tensor.memory_info().allocation_device(), AllocationDevice::CPU);
 	///
@@ -207,7 +207,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// 	&session,
 	/// 	MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?
 	/// )?;
-	/// let tensor = Tensor::<f32>::new(&cuda_allocator, [1, 3, 224, 224])?;
+	/// let tensor = Tensor::<f32>::new(&cuda_allocator, [1_usize, 3, 224, 224])?;
 	/// assert_eq!(tensor.memory_info().allocation_device(), AllocationDevice::CUDA);
 	/// # }
 	/// # Ok(())
@@ -224,7 +224,7 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// ```
 	/// # use ort::{memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
-	/// let tensor = Tensor::<f32>::new(&Allocator::default(), [1, 3, 224, 224])?;
+	/// let tensor = Tensor::<f32>::new(&Allocator::default(), [1_usize, 3, 224, 224])?;
 	/// let tensor_dyn = tensor.upcast();
 	/// assert!(tensor_dyn.try_extract_tensor::<f32>().is_ok());
 	/// assert!(tensor_dyn.try_extract_tensor::<i64>().is_err());
@@ -241,7 +241,7 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// ```
 	/// # use ort::{memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
-	/// let tensor = Tensor::<f32>::new(&Allocator::default(), [1, 3, 224, 224])?;
+	/// let tensor = Tensor::<f32>::new(&Allocator::default(), [1_usize, 3, 224, 224])?;
 	/// let tensor_dyn = tensor.upcast_ref();
 	///
 	/// let (_, original_extract) = tensor.extract_tensor();

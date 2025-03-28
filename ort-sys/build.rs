@@ -304,8 +304,8 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 						optional_link_lib(vcpkg_lib_dir.as_ref().unwrap(), "nsync_cpp");
 					}
 
+					add_search_dir(transform_dep(external_lib_dir.join("pytorch_cpuinfo-build"), &profile));
 					if !has_vcpkg_link {
-						add_search_dir(transform_dep(external_lib_dir.join("pytorch_cpuinfo-build"), &profile));
 						// clog isn't built when not building unit tests, or when compiling for android
 						for potential_clog_path in [
 							transform_dep(external_lib_dir.join("pytorch_cpuinfo-build").join("deps").join("clog"), &profile),

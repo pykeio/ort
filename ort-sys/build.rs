@@ -32,7 +32,12 @@ fn fetch_file(source_url: &str) -> Vec<u8> {
 			.proxy(ureq::Proxy::try_from_env())
 			.max_redirects(0)
 			.https_only(true)
-			.tls_config(ureq::tls::TlsConfig::builder().provider(ureq::tls::TlsProvider::NativeTls).root_certs(ureq::tls::RootCerts::PlatformVerifier).build())
+			.tls_config(
+				ureq::tls::TlsConfig::builder()
+					.provider(ureq::tls::TlsProvider::NativeTls)
+					.root_certs(ureq::tls::RootCerts::PlatformVerifier)
+					.build()
+			)
 			.user_agent(format!(
 				"{}/{} (host {}; for {})",
 				env!("CARGO_PKG_NAME"),

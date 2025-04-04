@@ -54,4 +54,4 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - name: Test linking
         run: |
-          ORT_LIB_LOCATION="$(pwd)/onnxruntime/build/Linux/Release" cargo example-custom-ops
+          ORT_LIB_LOCATION="$(pwd)/onnxruntime/build/Linux/Release" cargo build --manifest-path examples/custom-ops/Cargo.toml --example custom-ops --target-dir target

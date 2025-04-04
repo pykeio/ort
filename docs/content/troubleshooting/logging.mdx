@@ -1,3 +1,9 @@
+---
+title: 'Troubleshooting: Logging'
+---
+
+# Troubleshooting: Logging
+
 import { Tabs, Steps } from 'nextra/components';
 
 `ort` hooks into ONNX Runtime to route its logging messages through the [`tracing`](https://crates.io/crates/tracing) crate. These logging messages can often provide more helpful information about specific failure modes than `ort`'s error messages alone.

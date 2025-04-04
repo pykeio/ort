@@ -3,6 +3,8 @@ title: Linking
 description: Here's how `ort` links to ONNX Runtime, and how to configure its behavior.
 ---
 
+# Linking
+
 import { Callout, Tabs, Steps } from 'nextra/components';
 
 `ort` provides its own builds of ONNX Runtime to make your experience as painless as possible, but in some cases, you'll want to use a custom build of ONNX Runtime with `ort`. Luckily, we make this very easy by handling all of the linking configuration automagically. Just point `ort` to the output of ONNX Runtime's build pipeline and it'll Just Work™.

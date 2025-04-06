@@ -32,6 +32,7 @@
 - **[Ahnlich](https://github.com/deven96/ahnlich)** uses `ort` to power their AI proxy for semantic search applications.
 - **[Spacedrive](https://github.com/spacedriveapp/spacedrive)** is a cross-platform file manager with AI features powered by `ort`.
 - **[BoquilaHUB](https://github.com/boquila/boquilahub/)** uses `ort` for local AI deployment in biodiversity conservation efforts.
+- **[`FastEmbed-rs`](https://github.com/Anush008/fastembed-rs)** uses `ort` for generating vector embeddings, reranking locally.
 
 ## 🌠 Sponsor `ort`
 <a href="https://opencollective.com/pyke-osai">

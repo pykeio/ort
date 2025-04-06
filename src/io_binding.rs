@@ -1,9 +1,6 @@
 //! Enables binding of session inputs and/or outputs to pre-allocated memory.
 
-use alloc::{
-	string::{String, ToString},
-	sync::Arc
-};
+use alloc::{string::String, sync::Arc};
 use core::{
 	fmt::Debug,
 	ptr::{self, NonNull}
@@ -122,7 +119,7 @@ impl IoBinding {
 	/// The data is only copied upon invocation of this function. Any changes to the given value afterwards will not
 	/// affect the data seen by the session until the value is re-bound.
 	pub fn bind_input<T: ValueTypeMarker, S: Into<String>>(&mut self, name: S, ort_value: &Value<T>) -> Result<()> {
-		let name = name.into();
+		let name: String = name.into();
 		let ptr = self.ptr_mut();
 		with_cstr(name.as_bytes(), &|name| {
 			ortsys![unsafe BindInput(ptr, name.as_ptr(), ort_value.ptr())?];
@@ -143,25 +140,25 @@ impl IoBinding {
 	///
 	/// [`Tensor::new`]: crate::value::Tensor::new
 	pub fn bind_output<T: ValueTypeMarker, S: Into<String>>(&mut self, name: S, ort_value: Value<T>) -> Result<()> {
-		let name = name.into();
+		let name: String = name.into();
 		let ptr = self.ptr_mut();
 		with_cstr(name.as_bytes(), &|name| {
 			ortsys![unsafe BindOutput(ptr, name.as_ptr(), ort_value.ptr())?];
 			Ok(())
 		})?;
-		self.output_values.insert(name.to_string(), Some(ort_value.into_dyn()));
+		self.output_values.insert(name, Some(ort_value.into_dyn()));
 		Ok(())
 	}
 
 	/// Bind a session output to a device which is specified by `mem_info`.
 	pub fn bind_output_to_device<S: Into<String>>(&mut self, name: S, mem_info: &MemoryInfo) -> Result<()> {
-		let name = name.into();
+		let name: String = name.into();
 		let ptr = self.ptr_mut();
 		with_cstr(name.as_bytes(), &|name| {
 			ortsys![unsafe BindOutputToDevice(ptr, name.as_ptr(), mem_info.ptr())?];
 			Ok(())
 		})?;
-		self.output_values.insert(name.to_string(), None);
+		self.output_values.insert(name, None);
 		Ok(())
 	}
 

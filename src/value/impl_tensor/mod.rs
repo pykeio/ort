@@ -14,7 +14,7 @@ use super::{DowncastableTarget, DynValue, Value, ValueInner, ValueRef, ValueRefM
 use crate::{
 	AsPointer,
 	error::Result,
-	memory::{Allocator, MemoryInfo},
+	memory::{AllocationDevice, Allocator, MemoryInfo},
 	ortsys,
 	tensor::{IntoTensorElementType, Shape, SymbolicDimensions, TensorElementType}
 };
@@ -215,6 +215,78 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	pub fn memory_info(&self) -> &MemoryInfo {
 		unsafe { self.inner.memory_info.as_ref().unwrap_unchecked() }
+	}
+
+	#[cfg(feature = "std")]
+	pub fn to(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
+		use std::{
+			collections::{HashMap, hash_map::Entry},
+			sync::Mutex
+		};
+
+		use crate::{
+			OnceLock, execution_providers as ep,
+			io_binding::IoBinding,
+			memory::{AllocatorType, MemoryType},
+			session::{Session, builder::GraphOptimizationLevel}
+		};
+
+		type IdentitySessionKey = (AllocationDevice, i32, ort_sys::ONNXTensorElementDataType);
+		type IdentitySession = (Session, IoBinding);
+
+		static SESSIONS: OnceLock<Mutex<HashMap<IdentitySessionKey, IdentitySession>>> = OnceLock::new();
+		static IDENTITY_MODEL: &[u8] = include_bytes!("./identity.ort");
+
+		let target_memory_info = MemoryInfo::new(device, device_id, AllocatorType::Device, MemoryType::Default)?;
+		let tensor_type = ort_sys::ONNXTensorElementDataType::from(*self.data_type());
+
+		let mut sessions = SESSIONS.get_or_init(|| Mutex::new(HashMap::new())).lock().expect("poisoned lock");
+		let (session, binding) = match sessions.entry((device, device_id, tensor_type)) {
+			Entry::Occupied(entry) => entry.into_mut(),
+			Entry::Vacant(entry) => {
+				let mut model_bytes = IDENTITY_MODEL.to_vec();
+				model_bytes[544] = tensor_type as u8;
+				model_bytes[604] = tensor_type as u8;
+
+				let session = Session::builder()?
+					.with_optimization_level(GraphOptimizationLevel::Disable)?
+					.with_intra_threads(1)?
+					.with_inter_threads(1)?
+					.with_inter_op_spinning(false)?
+					.with_intra_op_spinning(false)?
+					.with_memory_pattern(false)?
+					.with_no_environment_execution_providers()?
+					.with_execution_providers([match device {
+						AllocationDevice::CPU => ep::CPUExecutionProvider::default().with_arena_allocator(false).build(),
+						AllocationDevice::CUDA => ep::CUDAExecutionProvider::default()
+							.with_device_id(device_id)
+							.with_arena_extend_strategy(ep::ArenaExtendStrategy::SameAsRequested)
+							.with_conv_max_workspace(false)
+							.with_conv_algorithm_search(ep::cuda::CuDNNConvAlgorithmSearch::Default)
+							.build(),
+						_ => panic!()
+					}])?
+					.with_allocator(MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?)?
+					.commit_from_memory(&model_bytes)?;
+				let binding = session.create_binding()?;
+				entry.insert((session, binding))
+			}
+		};
+
+		binding.bind_input("input", self)?;
+		binding.bind_output_to_device("output", &target_memory_info)?;
+
+		let output = session.run_binding(binding)?.remove("output").expect("");
+		Ok(unsafe { output.transmute_type() })
+	}
+}
+
+#[cfg(feature = "std")]
+impl<Type: TensorValueTypeMarker + ?Sized> Clone for Value<Type> {
+	fn clone(&self) -> Self {
+		let memory_info = self.memory_info();
+		self.to(memory_info.allocation_device(), memory_info.device_id())
+			.expect("Failed to clone value")
 	}
 }
 

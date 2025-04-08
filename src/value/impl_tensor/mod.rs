@@ -218,6 +218,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	}
 
 	#[cfg(feature = "std")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn to(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
 		use std::{
 			collections::{HashMap, hash_map::Entry},
@@ -258,13 +259,37 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 					.with_no_environment_execution_providers()?
 					.with_execution_providers([match device {
 						AllocationDevice::CPU => ep::CPUExecutionProvider::default().with_arena_allocator(false).build(),
-						AllocationDevice::CUDA => ep::CUDAExecutionProvider::default()
+						AllocationDevice::CUDA | AllocationDevice::CUDA_PINNED => ep::CUDAExecutionProvider::default()
 							.with_device_id(device_id)
 							.with_arena_extend_strategy(ep::ArenaExtendStrategy::SameAsRequested)
 							.with_conv_max_workspace(false)
 							.with_conv_algorithm_search(ep::cuda::CuDNNConvAlgorithmSearch::Default)
 							.build(),
-						_ => panic!()
+						AllocationDevice::DIRECTML | AllocationDevice::DIRECTML_CPU => {
+							ep::DirectMLExecutionProvider::default().with_device_id(device_id).build()
+						}
+						AllocationDevice::CANN | AllocationDevice::CANN_PINNED => ep::CANNExecutionProvider::default()
+							.with_arena_extend_strategy(ep::ArenaExtendStrategy::SameAsRequested)
+							.with_cann_graph(false)
+							.with_device_id(device_id)
+							.build(),
+						AllocationDevice::OPENVINO_CPU | AllocationDevice::OPENVINO_GPU => ep::OpenVINOExecutionProvider::default()
+							.with_num_threads(1)
+							.with_device_type(if device == AllocationDevice::OPENVINO_CPU {
+								"CPU".to_string()
+							} else {
+								format!("GPU.{device_id}")
+							})
+							.build(),
+						AllocationDevice::HIP | AllocationDevice::HIP_PINNED => ep::ROCmExecutionProvider::default()
+							.with_arena_extend_strategy(ep::ArenaExtendStrategy::SameAsRequested)
+							.with_hip_graph(false)
+							.with_exhaustive_conv_search(false)
+							.with_device_id(device_id)
+							.build(),
+						AllocationDevice::TVM => ep::TVMExecutionProvider::default().build(),
+						AllocationDevice::XNNPACK => ep::XNNPACKExecutionProvider::default().build(),
+						_ => return Err(crate::Error::new("Unsupported allocation device {device} for tensor copy target"))
 					}])?
 					.with_allocator(MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?)?
 					.commit_from_memory(&model_bytes)?;
@@ -282,6 +307,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 }
 
 #[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl<Type: TensorValueTypeMarker + ?Sized> Clone for Value<Type> {
 	fn clone(&self) -> Self {
 		let memory_info = self.memory_info();

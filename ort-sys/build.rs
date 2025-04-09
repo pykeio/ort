@@ -402,6 +402,43 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					optional_link_lib(&lib_dir, "onnxruntime_providers_qnn");
 					optional_link_lib(&lib_dir, "onnxruntime_providers_rknpu");
 					optional_link_lib(&lib_dir, "onnxruntime_providers_tvm");
+					#[cfg(feature = "webgpu")]
+					if optional_link_lib(&lib_dir, "onnxruntime_providers_webgpu") {
+						let dawn_build_dir = transform_dep(external_lib_dir.join("dawn-build/src/dawn"), &profile);
+						add_search_dir(&dawn_build_dir);
+						println!("cargo:rustc-link-lib=static=dawn_proc");
+
+						let dawn_native_build_dir = transform_dep(external_lib_dir.join("dawn-build/src/dawn/native"), &profile);
+						add_search_dir(&dawn_native_build_dir);
+						println!("cargo:rustc-link-lib=static=dawn_native");
+
+						let dawn_platform_build_dir = transform_dep(external_lib_dir.join("dawn-build/src/dawn/platform"), &profile);
+						add_search_dir(&dawn_platform_build_dir);
+						println!("cargo:rustc-link-lib=static=dawn_platform");
+
+						let dawn_common_build_dir = transform_dep(external_lib_dir.join("dawn-build/src/dawn/common"), &profile);
+						add_search_dir(&dawn_common_build_dir);
+						println!("cargo:rustc-link-lib=static=dawn_common");
+
+						let tint_build_dir = transform_dep(external_lib_dir.join("dawn-build/src/tint"), &profile);
+						add_search_dir(&tint_build_dir);
+						let pattern = format!("{}/**/lib*.a", tint_build_dir.display());
+						for entry in glob::glob(&pattern).unwrap() {
+							match entry {
+								Ok(path) => {
+									if let Some(lib_name) = path.file_name() {
+										if let Some(lib_name_str) = lib_name.to_str() {
+											let lib_name = lib_name_str.trim_start_matches("lib").trim_end_matches(".a");
+											println!("cargo:rustc-link-lib=static={}", lib_name);
+										}
+									}
+								}
+								Err(e) => eprintln!("error matching file: {}", e)
+							}
+						}
+
+						println!("cargo:rustc-link-lib=static=tint_lang_wgsl_ast_transform");
+					};
 					if optional_link_lib(&lib_dir, "onnxruntime_providers_xnnpack") {
 						let xnnpack_build_dir = transform_dep(external_lib_dir.join("googlexnnpack-build"), &profile);
 						add_search_dir(&xnnpack_build_dir);
@@ -410,6 +447,11 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 
 						add_search_dir(transform_dep(external_lib_dir.join("pthreadpool-build"), &profile));
 						println!("cargo:rustc-link-lib=static=pthreadpool");
+					}
+
+					if env::var("CARGO_CFG_TARGET_ARCH").unwrap() == "aarch64" {
+						let kleidi_build_dir = transform_dep(external_lib_dir.join("kleidiai-build"), &profile);
+						optional_link_lib(&kleidi_build_dir, "kleidiai");
 					}
 
 					needs_link = false;

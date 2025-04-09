@@ -1,9 +1,8 @@
-use glob::glob;
 #[cfg(feature = "download-binaries")]
 use std::fs;
 use std::{
 	env,
-	path::{Path, PathBuf},
+	path::{Path, PathBuf}
 };
 
 #[allow(unused)]
@@ -42,7 +41,7 @@ fn fetch_file(source_url: &str) -> Vec<u8> {
 				std::env::var("TARGET").unwrap()
 			))
 			.timeout_global(Some(std::time::Duration::from_secs(1800)))
-			.build(),
+			.build()
 	)
 	.get(source_url)
 	.call()
@@ -72,7 +71,7 @@ fn hex_str_to_bytes(c: impl AsRef<[u8]>) -> Vec<u8> {
 			b'A'..=b'F' => c - b'A' + 10,
 			b'a'..=b'f' => c - b'a' + 10,
 			b'0'..=b'9' => c - b'0',
-			_ => panic!(),
+			_ => panic!()
 		}
 	}
 
@@ -183,7 +182,7 @@ fn static_link_prerequisites(using_pyke_libs: bool) {
 fn prefer_dynamic_linking() -> bool {
 	match env::var(ORT_ENV_PREFER_DYNAMIC_LINK) {
 		Ok(val) => val == "1" || val.to_lowercase() == "true",
-		Err(_) => false,
+		Err(_) => false
 	}
 }
 
@@ -216,7 +215,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 			Ok("armv7-linux-androideabi") => Some("arm-neon-android"),
 			Ok("x86_64-linux-android") => Some("x64-android"),
 			Ok("aarch64-linux-android") => Some("arm64-android"),
-			_ => None,
+			_ => None
 		};
 
 		let mut profile = env::var(ORT_ENV_SYSTEM_LIB_PROFILE).unwrap_or_default();
@@ -310,7 +309,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 						// clog isn't built when not building unit tests, or when compiling for android
 						for potential_clog_path in [
 							transform_dep(external_lib_dir.join("pytorch_cpuinfo-build").join("deps").join("clog"), &profile),
-							transform_dep(external_lib_dir.join("pytorch_clog-build"), &profile),
+							transform_dep(external_lib_dir.join("pytorch_clog-build"), &profile)
 						] {
 							if optional_link_lib(&potential_clog_path, "clog") {
 								break;
@@ -403,6 +402,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					optional_link_lib(&lib_dir, "onnxruntime_providers_qnn");
 					optional_link_lib(&lib_dir, "onnxruntime_providers_rknpu");
 					optional_link_lib(&lib_dir, "onnxruntime_providers_tvm");
+					#[cfg(feature = "webgpu")]
 					if optional_link_lib(&lib_dir, "onnxruntime_providers_webgpu") {
 						let dawn_build_dir = transform_dep(external_lib_dir.join("dawn-build/src/dawn"), &profile);
 						add_search_dir(&dawn_build_dir);
@@ -423,7 +423,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 						let tint_build_dir = transform_dep(external_lib_dir.join("dawn-build/src/tint"), &profile);
 						add_search_dir(&tint_build_dir);
 						let pattern = format!("{}/**/lib*.a", tint_build_dir.display());
-						for entry in glob(&pattern).unwrap() {
+						for entry in glob::glob(&pattern).unwrap() {
 							match entry {
 								Ok(path) => {
 									if let Some(lib_name) = path.file_name() {
@@ -433,7 +433,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 										}
 									}
 								}
-								Err(e) => eprintln!("error matching file: {}", e),
+								Err(e) => eprintln!("error matching file: {}", e)
 							}
 						}
 
@@ -447,12 +447,11 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 
 						add_search_dir(transform_dep(external_lib_dir.join("pthreadpool-build"), &profile));
 						println!("cargo:rustc-link-lib=static=pthreadpool");
+					}
 
-						if std::env::var("CARGO_CFG_TARGET_ARCH").unwrap() == "aarch64" {
-							let kleidi_build_dir = transform_dep(external_lib_dir.join("kleidiai-build"), &profile);
-							add_search_dir(&kleidi_build_dir);
-							println!("cargo:rustc-link-lib=static=kleidiai");
-						}
+					if env::var("CARGO_CFG_TARGET_ARCH").unwrap() == "aarch64" {
+						let kleidi_build_dir = transform_dep(external_lib_dir.join("kleidiai-build"), &profile);
+						optional_link_lib(&kleidi_build_dir, "kleidiai");
 					}
 
 					needs_link = false;

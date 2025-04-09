@@ -52,10 +52,13 @@ impl CANNExecutionProvider {
 	/// Configure the strategy for extending the device's memory arena.
 	#[must_use]
 	pub fn with_arena_extend_strategy(mut self, strategy: ArenaExtendStrategy) -> Self {
-		self.options.set("arena_extend_strategy", match strategy {
-			ArenaExtendStrategy::NextPowerOfTwo => "kNextPowerOfTwo",
-			ArenaExtendStrategy::SameAsRequested => "kSameAsRequested"
-		});
+		self.options.set(
+			"arena_extend_strategy",
+			match strategy {
+				ArenaExtendStrategy::NextPowerOfTwo => "kNextPowerOfTwo",
+				ArenaExtendStrategy::SameAsRequested => "kSameAsRequested"
+			}
+		);
 		self
 	}
 
@@ -77,13 +80,16 @@ impl CANNExecutionProvider {
 	/// Set the precision mode of the operator. See [`CANNPrecisionMode`].
 	#[must_use]
 	pub fn with_precision_mode(mut self, mode: CANNPrecisionMode) -> Self {
-		self.options.set("precision_mode", match mode {
-			CANNPrecisionMode::ForceFP32 => "force_fp32",
-			CANNPrecisionMode::ForceFP16 => "force_fp16",
-			CANNPrecisionMode::AllowFP32ToFP16 => "allow_fp32_to_fp16",
-			CANNPrecisionMode::MustKeepOrigin => "must_keep_origin_dtype",
-			CANNPrecisionMode::AllowMixedPrecision => "allow_mix_precision"
-		});
+		self.options.set(
+			"precision_mode",
+			match mode {
+				CANNPrecisionMode::ForceFP32 => "force_fp32",
+				CANNPrecisionMode::ForceFP16 => "force_fp16",
+				CANNPrecisionMode::AllowFP32ToFP16 => "allow_fp32_to_fp16",
+				CANNPrecisionMode::MustKeepOrigin => "must_keep_origin_dtype",
+				CANNPrecisionMode::AllowMixedPrecision => "allow_mix_precision"
+			}
+		);
 		self
 	}
 
@@ -91,10 +97,13 @@ impl CANNExecutionProvider {
 	/// high-performance implementations.
 	#[must_use]
 	pub fn with_implementation_mode(mut self, mode: CANNImplementationMode) -> Self {
-		self.options.set("op_select_impl_mode", match mode {
-			CANNImplementationMode::HighPrecision => "high_precision",
-			CANNImplementationMode::HighPerformance => "high_performance"
-		});
+		self.options.set(
+			"op_select_impl_mode",
+			match mode {
+				CANNImplementationMode::HighPrecision => "high_precision",
+				CANNImplementationMode::HighPerformance => "high_performance"
+			}
+		);
 		self
 	}
 

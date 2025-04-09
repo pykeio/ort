@@ -108,10 +108,13 @@ impl CUDAExecutionProvider {
 	/// Confiure the strategy for extending the device's memory arena.
 	#[must_use]
 	pub fn with_arena_extend_strategy(mut self, strategy: ArenaExtendStrategy) -> Self {
-		self.options.set("arena_extend_strategy", match strategy {
-			ArenaExtendStrategy::NextPowerOfTwo => "kNextPowerOfTwo",
-			ArenaExtendStrategy::SameAsRequested => "kSameAsRequested"
-		});
+		self.options.set(
+			"arena_extend_strategy",
+			match strategy {
+				ArenaExtendStrategy::NextPowerOfTwo => "kNextPowerOfTwo",
+				ArenaExtendStrategy::SameAsRequested => "kSameAsRequested"
+			}
+		);
 		self
 	}
 
@@ -121,11 +124,14 @@ impl CUDAExecutionProvider {
 	/// done for cuDNN convolution algorithms. See [`CuDNNConvAlgorithmSearch`] for more info.
 	#[must_use]
 	pub fn with_conv_algorithm_search(mut self, search: CuDNNConvAlgorithmSearch) -> Self {
-		self.options.set("cudnn_conv_algo_search", match search {
-			CuDNNConvAlgorithmSearch::Exhaustive => "EXHAUSTIVE",
-			CuDNNConvAlgorithmSearch::Heuristic => "HEURISTIC",
-			CuDNNConvAlgorithmSearch::Default => "DEFAULT"
-		});
+		self.options.set(
+			"cudnn_conv_algo_search",
+			match search {
+				CuDNNConvAlgorithmSearch::Exhaustive => "EXHAUSTIVE",
+				CuDNNConvAlgorithmSearch::Heuristic => "HEURISTIC",
+				CuDNNConvAlgorithmSearch::Default => "DEFAULT"
+			}
+		);
 		self
 	}
 

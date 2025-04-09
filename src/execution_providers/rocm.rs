@@ -40,10 +40,13 @@ impl ROCmExecutionProvider {
 
 	#[must_use]
 	pub fn with_arena_extend_strategy(mut self, strategy: ArenaExtendStrategy) -> Self {
-		self.options.set("arena_extend_strategy", match strategy {
-			ArenaExtendStrategy::NextPowerOfTwo => "kNextPowerOfTwo",
-			ArenaExtendStrategy::SameAsRequested => "kSameAsRequested"
-		});
+		self.options.set(
+			"arena_extend_strategy",
+			match strategy {
+				ArenaExtendStrategy::NextPowerOfTwo => "kNextPowerOfTwo",
+				ArenaExtendStrategy::SameAsRequested => "kSameAsRequested"
+			}
+		);
 		self
 	}
 

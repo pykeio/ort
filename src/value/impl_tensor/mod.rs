@@ -350,11 +350,14 @@ mod tests {
 		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
 		let value = Tensor::from_array(Array1::from_vec(v.clone()))?;
 		assert_eq!(value.dtype().tensor_type(), Some(TensorElementType::Float32));
-		assert_eq!(value.dtype(), &ValueType::Tensor {
-			ty: TensorElementType::Float32,
-			shape: Shape::new([v.len() as i64]),
-			dimension_symbols: SymbolicDimensions::empty(1)
-		});
+		assert_eq!(
+			value.dtype(),
+			&ValueType::Tensor {
+				ty: TensorElementType::Float32,
+				shape: Shape::new([v.len() as i64]),
+				dimension_symbols: SymbolicDimensions::empty(1)
+			}
+		);
 
 		let (shape, data) = value.extract_tensor();
 		assert_eq!(&**shape, [v.len() as i64]);

@@ -48,7 +48,8 @@ pub enum TensorElementType {
 	/// 4-bit unsigned integer.
 	Uint4,
 	/// 4-bit signed integer.
-	Int4
+	Int4,
+	Undefined
 }
 
 impl TensorElementType {
@@ -68,7 +69,8 @@ impl TensorElementType {
 			TensorElementType::Float32 => container_capacity * 4,
 			TensorElementType::Float64 => container_capacity * 8,
 			TensorElementType::Complex64 => container_capacity * 8,
-			TensorElementType::Complex128 => container_capacity * 16
+			TensorElementType::Complex128 => container_capacity * 16,
+			TensorElementType::Undefined => 0
 		}
 	}
 }
@@ -98,7 +100,8 @@ impl fmt::Display for TensorElementType {
 			TensorElementType::Float8E4M3FN => "f8_e4m3fn",
 			TensorElementType::Float8E4M3FNUZ => "f8_e4m3fnuz",
 			TensorElementType::Float8E5M2 => "f8_e5m2",
-			TensorElementType::Float8E5M2FNUZ => "f8_e5m2fnuz"
+			TensorElementType::Float8E5M2FNUZ => "f8_e5m2fnuz",
+			TensorElementType::Undefined => "undefined"
 		})
 	}
 }
@@ -106,6 +109,7 @@ impl fmt::Display for TensorElementType {
 impl From<TensorElementType> for ort_sys::ONNXTensorElementDataType {
 	fn from(val: TensorElementType) -> Self {
 		match val {
+			TensorElementType::Undefined => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED,
 			TensorElementType::Float32 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
 			TensorElementType::Uint8 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8,
 			TensorElementType::Int8 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8,
@@ -134,7 +138,7 @@ impl From<TensorElementType> for ort_sys::ONNXTensorElementDataType {
 impl From<ort_sys::ONNXTensorElementDataType> for TensorElementType {
 	fn from(val: ort_sys::ONNXTensorElementDataType) -> Self {
 		match val {
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED => panic!("Invalid ONNX tensor element data type"),
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED => TensorElementType::Undefined,
 			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT => TensorElementType::Float32,
 			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8 => TensorElementType::Uint8,
 			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8 => TensorElementType::Int8,

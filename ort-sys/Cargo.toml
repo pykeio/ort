@@ -42,7 +42,7 @@ rknpu = []
 vitis = []
 cann = []
 qnn = []
-webgpu = []
+webgpu = [ "dep:glob" ]
 azure = []
 
 [build-dependencies]

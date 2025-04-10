@@ -436,8 +436,6 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 								Err(e) => eprintln!("error matching file: {}", e)
 							}
 						}
-
-						println!("cargo:rustc-link-lib=static=tint_lang_wgsl_ast_transform");
 					};
 					if optional_link_lib(&lib_dir, "onnxruntime_providers_xnnpack") {
 						let xnnpack_build_dir = transform_dep(external_lib_dir.join("googlexnnpack-build"), &profile);

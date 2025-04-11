@@ -246,6 +246,13 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 			_ => unreachable!()
 		}
 	}
+
+	pub fn data_type(&self) -> &TensorElementType {
+		match self.dtype() {
+			ValueType::Tensor { ty, .. } => ty,
+			_ => unreachable!()
+		}
+	}
 }
 
 fn extract_tensor<'t>(

@@ -215,6 +215,11 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
+	pub fn with_no_environment_execution_providers(mut self) -> Result<Self> {
+		self.no_env_eps = true;
+		Ok(self)
+	}
+
 	pub fn with_thread_manager<T: ThreadManager + Any + 'static>(mut self, manager: T) -> Result<Self> {
 		let manager = Rc::new(manager);
 		ortsys![unsafe SessionOptionsSetCustomThreadCreationOptions(self.ptr_mut(), (&*manager as *const T) as *mut c_void)?];

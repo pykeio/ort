@@ -6,6 +6,7 @@ Cargo.lock
 **/*.ort
 tools/train-data/**/checkpoint
 !tests/data/**/*
+!src/value/impl_tensor/identity.ort
 
 .venv*
 docs/.next

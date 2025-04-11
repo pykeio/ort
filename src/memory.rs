@@ -244,7 +244,7 @@ impl Drop for AllocatedBlock<'_> {
 }
 
 /// Represents possible devices that have their own device allocator.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 // &'static str should be valid here since they're only ever defined in C++ with `const char *` literals
 pub struct AllocationDevice(&'static str);
 

@@ -1,5 +1,3 @@
-#[cfg(feature = "download-binaries")]
-use std::fs;
 use std::{
 	env,
 	path::{Path, PathBuf}
@@ -112,7 +110,7 @@ fn copy_libraries(lib_dir: &Path, out_dir: &Path) {
 			let lib_name = lib_path.file_name().unwrap();
 			let out_path = out_dir.join(lib_name);
 			if out_path.is_symlink() {
-				fs::remove_file(&out_path).unwrap();
+				std::fs::remove_file(&out_path).unwrap();
 			}
 			if !out_path.exists() {
 				#[cfg(windows)]
@@ -530,7 +528,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 					.unwrap()
 					.join(format!("tmp.{}_{prebuilt_hash}", self::internal::random_identifier()));
 				let mut should_rename = true;
-				if fs::create_dir_all(&temp_extract_dir).is_err() {
+				if std::fs::create_dir_all(&temp_extract_dir).is_err() {
 					temp_extract_dir = env::var("OUT_DIR").unwrap().into();
 					should_rename = false;
 				}
@@ -540,7 +538,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 						Ok(()) => {}
 						Err(e) => {
 							if bin_extract_dir.exists() {
-								let _ = fs::remove_dir_all(temp_extract_dir);
+								let _ = std::fs::remove_dir_all(temp_extract_dir);
 							} else {
 								panic!("failed to extract downloaded binaries: {e}");
 							}

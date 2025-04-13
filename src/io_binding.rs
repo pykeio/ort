@@ -121,7 +121,7 @@ impl IoBinding {
 	///
 	/// The data is only copied upon invocation of this function. Any changes to the given value afterwards will not
 	/// affect the data seen by the session until the value is re-bound.
-	pub fn bind_input<T: ValueTypeMarker, S: Into<String>>(&mut self, name: S, ort_value: &Value<T>) -> Result<()> {
+	pub fn bind_input<T: ValueTypeMarker + ?Sized, S: Into<String>>(&mut self, name: S, ort_value: &Value<T>) -> Result<()> {
 		let name: String = name.into();
 		let ptr = self.ptr_mut();
 		with_cstr(name.as_bytes(), &|name| {
@@ -142,7 +142,7 @@ impl IoBinding {
 	/// `name`.
 	///
 	/// [`Tensor::new`]: crate::value::Tensor::new
-	pub fn bind_output<T: ValueTypeMarker, S: Into<String>>(&mut self, name: S, ort_value: Value<T>) -> Result<()> {
+	pub fn bind_output<T: ValueTypeMarker + ?Sized, S: Into<String>>(&mut self, name: S, ort_value: Value<T>) -> Result<()> {
 		let name: String = name.into();
 		let ptr = self.ptr_mut();
 		with_cstr(name.as_bytes(), &|name| {

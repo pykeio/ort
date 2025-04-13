@@ -112,7 +112,9 @@ impl SessionBuilder {
 		let model_path = crate::util::path_to_os_char(model_filepath);
 
 		let env = get_environment()?;
-		apply_execution_providers(&mut self, &env.execution_providers, "environment")?;
+		if !self.no_env_eps {
+			apply_execution_providers(&mut self, &env.execution_providers, "environment")?;
+		}
 
 		if env.has_global_threadpool && !self.no_global_thread_pool {
 			ortsys![unsafe DisablePerSessionThreads(self.ptr_mut())?];
@@ -185,7 +187,9 @@ impl SessionBuilder {
 		let mut session_ptr: *mut ort_sys::OrtSession = ptr::null_mut();
 
 		let env = get_environment()?;
-		apply_execution_providers(&mut self, &env.execution_providers, "environment")?;
+		if !self.no_env_eps {
+			apply_execution_providers(&mut self, &env.execution_providers, "environment")?;
+		}
 
 		if env.has_global_threadpool && !self.no_global_thread_pool {
 			ortsys![unsafe DisablePerSessionThreads(self.ptr_mut())?];

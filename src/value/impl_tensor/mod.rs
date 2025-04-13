@@ -1,7 +1,7 @@
 mod create;
 mod extract;
 
-use alloc::sync::Arc;
+use alloc::{format, string::ToString, sync::Arc};
 use core::{
 	fmt::{self, Debug},
 	marker::PhantomData,
@@ -14,7 +14,7 @@ use super::{DowncastableTarget, DynValue, Value, ValueInner, ValueRef, ValueRefM
 use crate::{
 	AsPointer,
 	error::Result,
-	memory::{Allocator, MemoryInfo},
+	memory::{AllocationDevice, Allocator, MemoryInfo},
 	ortsys,
 	tensor::{IntoTensorElementType, Shape, SymbolicDimensions, TensorElementType}
 };
@@ -215,6 +215,141 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	pub fn memory_info(&self) -> &MemoryInfo {
 		unsafe { self.inner.memory_info.as_ref().unwrap_unchecked() }
+	}
+
+	/// Copies the contents of this tensor to another device, returning the newly created tensor value.
+	///
+	/// ```
+	/// # use ort::{memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType}, session::Session, value::Tensor};
+	/// # fn main() -> ort::Result<()> {
+	/// # if false {
+	/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// let cuda_allocator = Allocator::new(
+	/// 	&session,
+	/// 	MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?
+	/// )?;
+	/// let cuda_tensor = Tensor::<f32>::new(&cuda_allocator, [1_usize, 3, 224, 224])?;
+	/// # }
+	/// # let cuda_tensor = Tensor::<f32>::new(&Allocator::default(), [1_usize, 3, 224, 224])?;
+	///
+	/// let cpu_tensor = cuda_tensor.to(AllocationDevice::CPU, 0)?;
+	/// assert_eq!(cpu_tensor.memory_info().allocation_device(), AllocationDevice::CPU);
+	/// assert_eq!(**cpu_tensor.shape(), [1, 3, 224, 224]);
+	/// # Ok(())
+	/// # }
+	/// ```
+	pub fn to(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
+		use crate::{
+			OnceLock, execution_providers as ep,
+			io_binding::IoBinding,
+			memory::{AllocatorType, MemoryType},
+			session::{Session, builder::GraphOptimizationLevel},
+			util::{MiniMap, Mutex}
+		};
+
+		type IdentitySessionKey = (AllocationDevice, i32, ort_sys::ONNXTensorElementDataType);
+		type IdentitySession = (Session, IoBinding);
+
+		static SESSIONS: OnceLock<Mutex<MiniMap<IdentitySessionKey, IdentitySession>>> = OnceLock::new();
+		static IDENTITY_MODEL: &[u8] = include_bytes!("./identity.ort");
+
+		let target_memory_info = MemoryInfo::new(device, device_id, AllocatorType::Device, MemoryType::Default)?;
+		let tensor_type = ort_sys::ONNXTensorElementDataType::from(*self.data_type());
+
+		let mut sessions = SESSIONS.get_or_init(|| Mutex::new(MiniMap::new())).lock();
+		let (session, binding) = match sessions.get_mut(&(device, device_id, tensor_type)) {
+			Some(entry) => entry,
+			None => {
+				let mut model_bytes = IDENTITY_MODEL.to_vec();
+				// Override the expected element type of the input & output nodes, respectively.
+				model_bytes[544] = tensor_type as u8;
+				model_bytes[604] = tensor_type as u8;
+
+				let session = Session::builder()?
+					.with_optimization_level(GraphOptimizationLevel::Disable)?
+					.with_intra_threads(1)?
+					.with_inter_threads(1)?
+					.with_inter_op_spinning(false)?
+					.with_intra_op_spinning(false)?
+					.with_memory_pattern(false)?
+					.with_no_environment_execution_providers()?
+					.with_execution_providers([match device {
+						AllocationDevice::CPU => ep::CPUExecutionProvider::default().with_arena_allocator(false).build(),
+						AllocationDevice::CUDA | AllocationDevice::CUDA_PINNED => ep::CUDAExecutionProvider::default()
+							.with_device_id(device_id)
+							.with_arena_extend_strategy(ep::ArenaExtendStrategy::SameAsRequested)
+							.with_conv_max_workspace(false)
+							.with_conv_algorithm_search(ep::cuda::CuDNNConvAlgorithmSearch::Default)
+							.build(),
+						AllocationDevice::DIRECTML | AllocationDevice::DIRECTML_CPU => {
+							ep::DirectMLExecutionProvider::default().with_device_id(device_id).build()
+						}
+						AllocationDevice::CANN | AllocationDevice::CANN_PINNED => ep::CANNExecutionProvider::default()
+							.with_arena_extend_strategy(ep::ArenaExtendStrategy::SameAsRequested)
+							.with_cann_graph(false)
+							.with_device_id(device_id)
+							.build(),
+						AllocationDevice::OPENVINO_CPU | AllocationDevice::OPENVINO_GPU => ep::OpenVINOExecutionProvider::default()
+							.with_num_threads(1)
+							.with_device_type(if device == AllocationDevice::OPENVINO_CPU {
+								"CPU".to_string()
+							} else {
+								format!("GPU.{device_id}")
+							})
+							.build(),
+						AllocationDevice::HIP | AllocationDevice::HIP_PINNED => ep::ROCmExecutionProvider::default()
+							.with_arena_extend_strategy(ep::ArenaExtendStrategy::SameAsRequested)
+							.with_hip_graph(false)
+							.with_exhaustive_conv_search(false)
+							.with_device_id(device_id)
+							.build(),
+						AllocationDevice::TVM => ep::TVMExecutionProvider::default().build(),
+						AllocationDevice::XNNPACK => ep::XNNPACKExecutionProvider::default().build(),
+						_ => return Err(crate::Error::new("Unsupported allocation device {device} for tensor copy target"))
+					}])?
+					.with_allocator(MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?)?
+					.commit_from_memory(&model_bytes)?;
+				let binding = session.create_binding()?;
+				sessions.insert((device, device_id, tensor_type), (session, binding));
+				sessions.get_mut(&(device, device_id, tensor_type)).expect("insert should have worked")
+			}
+		};
+
+		binding.bind_input("input", self)?;
+		binding.bind_output_to_device("output", &target_memory_info)?;
+
+		let output = session
+			.run_binding(binding)?
+			.remove("output")
+			.expect("identity model should have single output");
+		Ok(unsafe { output.transmute_type() })
+	}
+}
+
+impl<Type: TensorValueTypeMarker + ?Sized> Clone for Value<Type> {
+	/// Creates a copy of this tensor and its data on the same device it resides on.
+	///
+	/// ```
+	/// # use ort::{value::Tensor, AsPointer};
+	/// # fn main() -> ort::Result<()> {
+	/// let array = vec![1_i64, 2, 3, 4, 5];
+	/// let tensor = Tensor::from_array(([array.len()], array.into_boxed_slice()))?;
+	///
+	/// let new_tensor = tensor.clone();
+	///
+	/// // same data
+	/// assert_eq!(tensor.extract_tensor(), new_tensor.extract_tensor());
+	///
+	/// // different allocations
+	/// assert_ne!(tensor.ptr(), new_tensor.ptr());
+	/// assert_ne!(tensor.data_ptr()?, new_tensor.data_ptr()?);
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	fn clone(&self) -> Self {
+		let memory_info = self.memory_info();
+		self.to(memory_info.allocation_device(), memory_info.device_id())
+			.expect("Failed to clone tensor")
 	}
 }
 

@@ -344,7 +344,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Clone for Value<Type> {
 	///
 	/// // different allocations
 	/// assert_ne!(tensor.ptr(), new_tensor.ptr());
-	/// assert_ne!(tensor.data_ptr()?, new_tensor.data_ptr()?);
+	/// assert_ne!(tensor.data_ptr(), new_tensor.data_ptr());
 	/// # 	Ok(())
 	/// # }
 	/// ```

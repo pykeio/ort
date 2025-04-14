@@ -32,7 +32,7 @@ use crate::{
 /// let mut tensor = Tensor::<f32>::new(&allocator, [1_usize, 3, 224, 224])?;
 /// // Here, `data_ptr` is a pointer to **device memory** inaccessible to the CPU; we'll need another crate, like
 /// // `cudarc`, to access it.
-/// let data_ptr = tensor.data_ptr_mut()?;
+/// let data_ptr = tensor.data_ptr_mut();
 /// # Ok(())
 /// # }
 /// ```

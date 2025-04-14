@@ -118,9 +118,10 @@ impl DynTensor {
 		let memory_info = MemoryInfo::from_value(value_ptr).expect("CreateTensorAsOrtValue returned non-tensor");
 		if memory_info.is_cpu_accessible() && data_type != TensorElementType::String {
 			let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
-			ortsys![unsafe GetTensorMutableData(value_ptr, &mut buffer_ptr)?; nonNull(buffer_ptr)];
-
-			unsafe { buffer_ptr.write_bytes(0, data_type.byte_size(shape.num_elements())) };
+			ortsys![unsafe GetTensorMutableData(value_ptr, &mut buffer_ptr)?];
+			if !buffer_ptr.is_null() {
+				unsafe { buffer_ptr.write_bytes(0, data_type.byte_size(shape.num_elements())) };
+			}
 		}
 
 		Ok(Value {
@@ -141,7 +142,7 @@ impl DynTensor {
 }
 
 impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
-	/// Returns a mutable pointer to the tensor's data.
+	/// Returns a mutable pointer to the tensor's data. The pointer may be null in the case of zero-sized tensors.
 	///
 	/// It's important to note that the resulting pointer may not point to CPU-accessible memory. In the case of a
 	/// tensor created on a different EP device, e.g. via [`Tensor::new`], the pointer returned by this function may be
@@ -153,7 +154,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let mut tensor = Tensor::<i64>::from_array((vec![5], vec![0, 1, 2, 3, 4]))?;
-	/// let ptr = tensor.data_ptr_mut()?.cast::<i64>();
+	/// let ptr = tensor.data_ptr_mut().cast::<i64>();
 	/// unsafe {
 	/// 	*ptr.add(3) = 42;
 	/// };
@@ -163,13 +164,14 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub fn data_ptr_mut(&mut self) -> Result<*mut ort_sys::c_void> {
+	pub fn data_ptr_mut(&mut self) -> *mut ort_sys::c_void {
 		let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
-		ortsys![unsafe GetTensorMutableData(self.ptr_mut(), &mut buffer_ptr)?; nonNull(buffer_ptr)];
-		Ok(buffer_ptr)
+		ortsys![unsafe GetTensorMutableData(self.ptr_mut(), &mut buffer_ptr).expect("failed to get tensor data")]; // infallible
+		buffer_ptr
 	}
 
-	/// Returns an immutable pointer to the tensor's underlying data.
+	/// Returns an immutable pointer to the tensor's underlying data. The pointer may be null in the case of zero-sized
+	/// tensors.
 	///
 	/// It's important to note that the resulting pointer may not point to CPU-accessible memory. In the case of a
 	/// tensor created on a different EP device, e.g. via [`Tensor::new`], the pointer returned by this function may be
@@ -181,15 +183,15 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # use ort::value::Tensor;
 	/// # fn main() -> ort::Result<()> {
 	/// let tensor = Tensor::<i64>::from_array((vec![5], vec![0, 1, 2, 3, 4]))?;
-	/// let ptr = tensor.data_ptr()?.cast::<i64>();
+	/// let ptr = tensor.data_ptr().cast::<i64>();
 	/// assert_eq!(unsafe { *ptr.add(3) }, 3);
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub fn data_ptr(&self) -> Result<*const ort_sys::c_void> {
+	pub fn data_ptr(&self) -> *const ort_sys::c_void {
 		let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
-		ortsys![unsafe GetTensorMutableData(self.ptr().cast_mut(), &mut buffer_ptr)?; nonNull(buffer_ptr)];
-		Ok(buffer_ptr)
+		ortsys![unsafe GetTensorMutableData(self.ptr().cast_mut(), &mut buffer_ptr).expect("failed to get tensor data")]; // infallible
+		buffer_ptr
 	}
 
 	/// Returns information about the device this tensor is allocated on.

@@ -121,7 +121,10 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 								let mut output_array_ptr: *mut K = ptr::null_mut();
 								let output_array_ptr_ptr: *mut *mut K = &mut output_array_ptr;
 								let output_array_ptr_ptr_void: *mut *mut c_void = output_array_ptr_ptr.cast();
-								ortsys![unsafe GetTensorMutableData(key_tensor_ptr, output_array_ptr_ptr_void)?; nonNull(output_array_ptr)];
+								ortsys![unsafe GetTensorMutableData(key_tensor_ptr, output_array_ptr_ptr_void)?];
+								if output_array_ptr.is_null() {
+									output_array_ptr = NonNull::dangling().as_ptr();
+								}
 
 								(shape, unsafe { slice::from_raw_parts(output_array_ptr, shape.num_elements()) })
 							} else {

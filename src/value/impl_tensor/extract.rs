@@ -4,7 +4,12 @@ use alloc::{
 	vec,
 	vec::Vec
 };
-use core::{ffi::c_void, fmt::Debug, ptr, slice};
+use core::{
+	ffi::c_void,
+	fmt::Debug,
+	ptr::{self, NonNull},
+	slice
+};
 
 use super::{Tensor, TensorValueTypeMarker};
 use crate::{
@@ -282,7 +287,13 @@ fn extract_tensor<'t>(
 
 unsafe fn data_ptr(ptr: *mut ort_sys::OrtValue) -> Result<*mut c_void> {
 	let mut output_array_ptr: *mut c_void = ptr::null_mut();
-	ortsys![unsafe GetTensorMutableData(ptr, &mut output_array_ptr)?; nonNull(output_array_ptr)];
+	ortsys![unsafe GetTensorMutableData(ptr, &mut output_array_ptr)?];
+	// Zero-sized tensors can have a null data pointer. An empty slice with a null data pointer is invalid, but it is valid
+	// to have an empty slice with a *dangling* pointer. Note that this function is only called when the data resides on
+	// the CPU, so this won't change semantics for non-CPU data.
+	if output_array_ptr.is_null() {
+		output_array_ptr = NonNull::dangling().as_ptr();
+	}
 	Ok(output_array_ptr)
 }
 

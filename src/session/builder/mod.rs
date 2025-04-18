@@ -1,10 +1,10 @@
-use alloc::{borrow::Cow, rc::Rc, sync::Arc, vec::Vec};
+use alloc::{borrow::Cow, sync::Arc, vec::Vec};
 use core::{
 	any::Any,
 	ptr::{self, NonNull}
 };
 
-use crate::{AsPointer, error::Result, memory::MemoryInfo, operator::OperatorDomain, ortsys, util::with_cstr, value::DynValue};
+use crate::{AsPointer, error::Result, logging::LoggerFunction, memory::MemoryInfo, operator::OperatorDomain, ortsys, util::with_cstr, value::DynValue};
 
 mod impl_commit;
 mod impl_config_keys;
@@ -32,12 +32,13 @@ pub use self::impl_options::{GraphOptimizationLevel, PrepackedWeights};
 /// [`Session`]: crate::session::Session
 pub struct SessionBuilder {
 	session_options_ptr: NonNull<ort_sys::OrtSessionOptions>,
-	memory_info: Option<Rc<MemoryInfo>>,
+	memory_info: Option<Arc<MemoryInfo>>,
 	operator_domains: Vec<Arc<OperatorDomain>>,
-	external_initializers: Vec<Rc<DynValue>>,
+	external_initializers: Vec<Arc<DynValue>>,
 	external_initializer_buffers: Vec<Cow<'static, [u8]>>,
 	prepacked_weights: Option<PrepackedWeights>,
-	thread_manager: Option<Rc<dyn Any>>,
+	thread_manager: Option<Arc<dyn Any>>,
+	logger: Option<Arc<LoggerFunction>>,
 	no_global_thread_pool: bool,
 	no_env_eps: bool
 }
@@ -58,6 +59,7 @@ impl Clone for SessionBuilder {
 			external_initializer_buffers: self.external_initializer_buffers.clone(),
 			prepacked_weights: self.prepacked_weights.clone(),
 			thread_manager: self.thread_manager.clone(),
+			logger: self.logger.clone(),
 			no_global_thread_pool: self.no_global_thread_pool,
 			no_env_eps: self.no_env_eps
 		}
@@ -95,6 +97,7 @@ impl SessionBuilder {
 			external_initializer_buffers: Vec::new(),
 			prepacked_weights: None,
 			thread_manager: None,
+			logger: None,
 			no_global_thread_pool: false,
 			no_env_eps: false
 		})

@@ -1,5 +1,9 @@
-use alloc::{rc::Rc, sync::Arc};
-use core::{any::Any, ffi::c_void, ptr};
+use alloc::sync::Arc;
+use core::{
+	any::Any,
+	ffi::{c_int, c_void},
+	ptr
+};
 #[cfg(feature = "std")]
 use std::{borrow::Cow, path::Path};
 
@@ -11,6 +15,7 @@ use crate::{
 	environment::{self, ThreadManager},
 	error::Result,
 	execution_providers::{ExecutionProviderDispatch, apply_execution_providers},
+	logging::{LogLevel, LoggerFunction},
 	memory::MemoryInfo,
 	operator::OperatorDomain,
 	ortsys,
@@ -120,7 +125,7 @@ impl SessionBuilder {
 	///
 	/// If not provided, the session is created using ONNX Runtime's default device allocator.
 	pub fn with_allocator(mut self, info: MemoryInfo) -> Result<Self> {
-		self.memory_info = Some(Rc::new(info));
+		self.memory_info = Some(Arc::new(info));
 		Ok(self)
 	}
 
@@ -157,7 +162,7 @@ impl SessionBuilder {
 
 	pub fn with_external_initializer(mut self, name: impl AsRef<str>, value: DynValue) -> Result<Self> {
 		let ptr = self.ptr_mut();
-		let value = Rc::new(value);
+		let value = Arc::new(value);
 		with_cstr(name.as_ref().as_bytes(), &|name| {
 			ortsys![unsafe AddExternalInitializers(ptr, &name.as_ptr(), &value.ptr(), 1)?];
 			Ok(())
@@ -221,11 +226,53 @@ impl SessionBuilder {
 	}
 
 	pub fn with_thread_manager<T: ThreadManager + Any + 'static>(mut self, manager: T) -> Result<Self> {
-		let manager = Rc::new(manager);
+		let manager = Arc::new(manager);
 		ortsys![unsafe SessionOptionsSetCustomThreadCreationOptions(self.ptr_mut(), (&*manager as *const T) as *mut c_void)?];
 		ortsys![unsafe SessionOptionsSetCustomCreateThreadFn(self.ptr_mut(), Some(environment::thread_create::<T>))?];
 		ortsys![unsafe SessionOptionsSetCustomJoinThreadFn(self.ptr_mut(), Some(environment::thread_join::<T>))?];
-		self.thread_manager = Some(manager as Rc<dyn Any>);
+		self.thread_manager = Some(manager as Arc<dyn Any>);
+		Ok(self)
+	}
+
+	/// Configures this session to use a custom logger function.
+	///
+	/// This will be called whenever a message pertaining to this session is to be logged, overriding the default log
+	/// handler ([`tracing`] if the `tracing` feature is enabled, otherwise ONNX Runtime's stdio logger).
+	///
+	/// ```
+	/// # use ort::{session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let mut session = Session::builder()?
+	/// 	.with_logger(Box::new(
+	/// 		|level: ort::logging::LogLevel, category: &str, id: &str, code_location: &str, message: &str| {
+	/// 			// ...
+	/// 		}
+	/// 	))?
+	/// 	.commit_from_file("tests/data/upsample.onnx")?;
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	pub fn with_logger(mut self, logger: LoggerFunction) -> Result<Self> {
+		let logger = Arc::new(logger);
+		ortsys![unsafe SetUserLoggingFunction(self.ptr_mut(), crate::logging::custom_logger, Arc::as_ptr(&logger) as *mut c_void)?];
+		self.logger = Some(logger);
+		Ok(self)
+	}
+
+	/// Sets the severity level for messages logged by this session.
+	///
+	/// Note that when [`tracing`] integration is enabled via the `tracing` feature, the global log level takes
+	/// precedence, i.e. if the application was initialized with `ort`'s log level set to `warn` via the `RUST_LOG`
+	/// environment variable or similar, setting a session's log severity level to `verbose` will still have it only
+	/// log `warn` messages or higher.`
+	pub fn with_log_level(mut self, level: LogLevel) -> Result<Self> {
+		ortsys![unsafe SetSessionLogSeverityLevel(self.ptr_mut(), ort_sys::OrtLoggingLevel::from(level) as _)?];
+		Ok(self)
+	}
+
+	/// Controls the level of verbosity for messages logged under [`LogLevel::Verbose`]; higher values = more verbose.
+	pub fn with_log_verbosity(mut self, verbosity: c_int) -> Result<Self> {
+		ortsys![unsafe SetSessionLogVerbosityLevel(self.ptr_mut(), verbosity)?];
 		Ok(self)
 	}
 }

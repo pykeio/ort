@@ -281,16 +281,14 @@ pub struct OrtAllocator {
 	pub Info: Option<unsafe extern "system" fn(this_: *const OrtAllocator) -> *const OrtMemoryInfo>,
 	pub Reserve: Option<unsafe extern "system" fn(this_: *const OrtAllocator, size: usize) -> *mut core::ffi::c_void>
 }
-pub type OrtLoggingFunction = Option<
-	unsafe extern "system" fn(
-		param: *mut core::ffi::c_void,
-		severity: OrtLoggingLevel,
-		category: *const core::ffi::c_char,
-		logid: *const core::ffi::c_char,
-		code_location: *const core::ffi::c_char,
-		message: *const core::ffi::c_char
-	)
->;
+pub type OrtLoggingFunction = unsafe extern "system" fn(
+	param: *mut core::ffi::c_void,
+	severity: OrtLoggingLevel,
+	category: *const core::ffi::c_char,
+	logid: *const core::ffi::c_char,
+	code_location: *const core::ffi::c_char,
+	message: *const core::ffi::c_char
+);
 #[repr(i32)]
 #[doc = " \\brief Graph optimization level\n\n Refer to https://www.onnxruntime.ai/docs/performance/graph-optimizations.html#graph-optimization-levels\n for an in-depth understanding of the Graph Optimization Levels."]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]

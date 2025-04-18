@@ -127,44 +127,7 @@ impl SessionBuilder {
 			ortsys![unsafe CreateSession(env.ptr(), model_path.as_ptr(), self.ptr(), &mut session_ptr)?; nonNull(session_ptr)];
 		}
 
-		let session_ptr = unsafe { NonNull::new_unchecked(session_ptr) };
-
-		let allocator = match &self.memory_info {
-			Some(info) => {
-				let mut allocator_ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
-				ortsys![unsafe CreateAllocator(session_ptr.as_ptr(), info.ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
-				unsafe { Allocator::from_raw_unchecked(allocator_ptr) }
-			}
-			None => Allocator::default()
-		};
-
-		// Extract input and output properties
-		let num_input_nodes = dangerous::extract_inputs_count(session_ptr)?;
-		let num_output_nodes = dangerous::extract_outputs_count(session_ptr)?;
-		let inputs = (0..num_input_nodes)
-			.map(|i| dangerous::extract_input(session_ptr, &allocator, i))
-			.collect::<Result<Vec<Input>>>()?;
-		let outputs = (0..num_output_nodes)
-			.map(|i| dangerous::extract_output(session_ptr, &allocator, i))
-			.collect::<Result<Vec<Output>>>()?;
-
-		let mut extras: SmallVec<Box<dyn Any>, 4> = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>).collect();
-		if let Some(prepacked_weights) = self.prepacked_weights.take() {
-			extras.push(Box::new(prepacked_weights) as Box<dyn Any>);
-		}
-		if let Some(thread_manager) = self.thread_manager.take() {
-			extras.push(Box::new(thread_manager) as Box<dyn Any>);
-		}
-
-		Ok(Session {
-			inner: Arc::new(SharedSessionInner {
-				session_ptr,
-				allocator,
-				_extras: extras
-			}),
-			inputs,
-			outputs
-		})
+		self.commit_finalize(unsafe { NonNull::new_unchecked(session_ptr) })
 	}
 
 	/// Load an ONNX graph from memory and commit the session
@@ -209,25 +172,27 @@ impl SessionBuilder {
 			];
 		}
 
-		let session_ptr = unsafe { NonNull::new_unchecked(session_ptr) };
+		self.commit_finalize(unsafe { NonNull::new_unchecked(session_ptr) })
+	}
 
+	fn commit_finalize(mut self, ptr: NonNull<ort_sys::OrtSession>) -> Result<Session> {
 		let allocator = match &self.memory_info {
 			Some(info) => {
 				let mut allocator_ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
-				ortsys![unsafe CreateAllocator(session_ptr.as_ptr(), info.ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
+				ortsys![unsafe CreateAllocator(ptr.as_ptr(), info.ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
 				unsafe { Allocator::from_raw_unchecked(allocator_ptr) }
 			}
 			None => Allocator::default()
 		};
 
 		// Extract input and output properties
-		let num_input_nodes = dangerous::extract_inputs_count(session_ptr)?;
-		let num_output_nodes = dangerous::extract_outputs_count(session_ptr)?;
+		let num_input_nodes = dangerous::extract_inputs_count(ptr)?;
+		let num_output_nodes = dangerous::extract_outputs_count(ptr)?;
 		let inputs = (0..num_input_nodes)
-			.map(|i| dangerous::extract_input(session_ptr, &allocator, i))
+			.map(|i| dangerous::extract_input(ptr, &allocator, i))
 			.collect::<Result<Vec<Input>>>()?;
 		let outputs = (0..num_output_nodes)
-			.map(|i: usize| dangerous::extract_output(session_ptr, &allocator, i))
+			.map(|i| dangerous::extract_output(ptr, &allocator, i))
 			.collect::<Result<Vec<Output>>>()?;
 
 		let mut extras: SmallVec<Box<dyn Any>, 4> = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>).collect();
@@ -237,16 +202,18 @@ impl SessionBuilder {
 		if let Some(thread_manager) = self.thread_manager.take() {
 			extras.push(Box::new(thread_manager) as Box<dyn Any>);
 		}
+		if let Some(logger) = self.logger.take() {
+			extras.push(Box::new(logger) as Box<dyn Any>); // Box<Arc<Box<dyn ...>>>!
+		}
 
-		let session = Session {
+		Ok(Session {
 			inner: Arc::new(SharedSessionInner {
-				session_ptr,
+				session_ptr: ptr,
 				allocator,
 				_extras: extras
 			}),
 			inputs,
 			outputs
-		};
-		Ok(session)
+		})
 	}
 }

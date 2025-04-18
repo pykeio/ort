@@ -31,9 +31,9 @@ const STACK_CSTR_ARRAY_MAX_TOTAL: usize = 768;
 // maximum number of string ptrs to keep on stack (16 bytes per)
 const STACK_CSTR_ARRAY_MAX_ELEMENTS: usize = 12;
 
-#[cfg(all(feature = "std", target_family = "windows"))]
+#[cfg(target_family = "windows")]
 type OsCharArray = Vec<u16>;
-#[cfg(all(feature = "std", not(target_family = "windows")))]
+#[cfg(not(target_family = "windows"))]
 type OsCharArray = Vec<core::ffi::c_char>;
 
 #[cfg(feature = "std")]
@@ -45,17 +45,26 @@ pub(crate) fn path_to_os_char(path: impl AsRef<std::path::Path>) -> OsCharArray 
 	#[cfg(target_family = "windows")]
 	use std::os::windows::ffi::OsStrExt;
 
-	let model_path = std::ffi::OsString::from(path.as_ref());
+	let path = std::ffi::OsString::from(path.as_ref());
 	#[cfg(target_family = "windows")]
-	let model_path: Vec<u16> = model_path.encode_wide().chain(std::iter::once(0)).collect();
+	let path: Vec<u16> = path.encode_wide().chain(std::iter::once(0)).collect();
 	#[cfg(not(target_family = "windows"))]
-	let model_path: Vec<c_char> = model_path
+	let path: Vec<c_char> = path.as_bytes().iter().chain(std::iter::once(&b'\0')).map(|b| *b as c_char).collect();
+	path
+}
+
+pub(crate) fn str_to_os_char(string: &str) -> OsCharArray {
+	#[cfg(target_family = "windows")]
+	let os_char = string.encode_utf16().chain(core::iter::once(0)).collect();
+	#[cfg(not(target_family = "windows"))]
+	let os_char = string
 		.as_bytes()
 		.iter()
-		.chain(std::iter::once(&b'\0'))
-		.map(|b| *b as c_char)
+		.copied()
+		.chain(core::iter::once(0))
+		.map(|b| b as c_char)
 		.collect();
-	model_path
+	os_char
 }
 
 // generally as performant or faster than HashMap<K, V> for <50 items. good enough for #[no_std]

@@ -29,7 +29,7 @@ pub mod environment;
 pub mod error;
 pub mod execution_providers;
 pub mod io_binding;
-pub(crate) mod logging;
+pub mod logging;
 pub mod memory;
 pub mod metadata;
 pub mod operator;

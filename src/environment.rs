@@ -15,6 +15,7 @@ use alloc::{boxed::Box, string::String};
 use core::{
 	any::Any,
 	ffi::c_void,
+	fmt,
 	ptr::{self, NonNull}
 };
 
@@ -26,6 +27,7 @@ use crate::{
 	AsPointer,
 	error::Result,
 	execution_providers::ExecutionProviderDispatch,
+	logging::{LogLevel, LoggerFunction},
 	ortsys,
 	util::{OnceLock, STACK_EXECUTION_PROVIDERS, with_cstr}
 };
@@ -41,16 +43,30 @@ static G_ENV: OnceLock<Environment> = OnceLock::new();
 ///
 /// For ease of use, and since sessions require an environment to be created, `ort` will automatically create an
 /// environment if one is not configured via [`init`] (or [`init_from`]).
-#[derive(Debug)]
 pub struct Environment {
 	pub(crate) execution_providers: SmallVec<ExecutionProviderDispatch, { STACK_EXECUTION_PROVIDERS }>,
 	ptr: NonNull<ort_sys::OrtEnv>,
 	pub(crate) has_global_threadpool: bool,
-	_thread_manager: Option<Box<dyn Any>>
+	_thread_manager: Option<Box<dyn Any>>,
+	_logger: Option<LoggerFunction>
 }
 
 unsafe impl Send for Environment {}
 unsafe impl Sync for Environment {}
+
+impl Environment {
+	pub fn set_log_level(&self, level: LogLevel) {
+		// technically this method should take `&mut self`, but it isn't enough of an issue to warrant putting
+		// environments behind a mutex and the performance hit that comes with that
+		ortsys![unsafe UpdateEnvWithCustomLogLevel(self.ptr().cast_mut(), level.into()).expect("infallible")];
+	}
+}
+
+impl fmt::Debug for Environment {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.debug_struct("Environment").field("ptr", &self.ptr).finish_non_exhaustive()
+	}
+}
 
 impl AsPointer for Environment {
 	type Sys = ort_sys::OrtEnv;
@@ -213,7 +229,8 @@ pub struct EnvironmentBuilder {
 	name: String,
 	telemetry: bool,
 	execution_providers: SmallVec<ExecutionProviderDispatch, { STACK_EXECUTION_PROVIDERS }>,
-	global_thread_pool_options: Option<GlobalThreadPoolOptions>
+	global_thread_pool_options: Option<GlobalThreadPoolOptions>,
+	logger: Option<LoggerFunction>
 }
 
 impl EnvironmentBuilder {
@@ -222,7 +239,8 @@ impl EnvironmentBuilder {
 			name: String::from("default"),
 			telemetry: true,
 			execution_providers: SmallVec::new(),
-			global_thread_pool_options: None
+			global_thread_pool_options: None,
+			logger: None
 		}
 	}
 
@@ -275,32 +293,59 @@ impl EnvironmentBuilder {
 		self
 	}
 
+	/// Configures the environment to use a custom logger function.
+	///
+	/// ```
+	/// # fn main() -> ort::Result<()> {
+	/// ort::init()
+	/// 	.with_logger(Box::new(
+	/// 		|level: ort::logging::LogLevel, category: &str, id: &str, code_location: &str, message: &str| {
+	/// 			// ...
+	/// 		}
+	/// 	))
+	/// 	.commit()?;
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	pub fn with_logger(mut self, logger: LoggerFunction) -> Self {
+		self.logger = Some(logger);
+		self
+	}
+
 	pub(crate) fn commit_internal(self) -> Result<Environment> {
+		let logger = self
+			.logger
+			.as_ref()
+			.map(|c| (crate::logging::custom_logger as ort_sys::OrtLoggingFunction, c as *const _ as *mut c_void));
+		#[cfg(feature = "tracing")]
+		let logger = logger.or(Some((crate::logging::tracing_logger, ptr::null_mut())));
+
 		let (env_ptr, thread_manager, has_global_threadpool) = if let Some(mut thread_pool_options) = self.global_thread_pool_options {
 			let env_ptr = with_cstr(self.name.as_bytes(), &|name| {
 				let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
-				#[cfg(feature = "tracing")]
-				ortsys![
-					unsafe CreateEnvWithCustomLoggerAndGlobalThreadPools(
-						Some(crate::logging::custom_logger),
-						ptr::null_mut(),
-						ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
-						name.as_ptr(),
-						thread_pool_options.ptr(),
-						&mut env_ptr
-					)?;
-					nonNull(env_ptr)
-				];
-				#[cfg(not(feature = "tracing"))]
-				ortsys![
-					unsafe CreateEnvWithGlobalThreadPools(
-						crate::logging::default_log_level(),
-						name.as_ptr(),
-						thread_pool_options.ptr(),
-						&mut env_ptr
-					)?;
-					nonNull(env_ptr)
-				];
+				if let Some((log_fn, log_ptr)) = logger {
+					ortsys![
+						unsafe CreateEnvWithCustomLoggerAndGlobalThreadPools(
+							log_fn,
+							log_ptr,
+							ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
+							name.as_ptr(),
+							thread_pool_options.ptr(),
+							&mut env_ptr
+						)?;
+						nonNull(env_ptr)
+					];
+				} else {
+					ortsys![
+						unsafe CreateEnvWithGlobalThreadPools(
+							crate::logging::default_log_level(),
+							name.as_ptr(),
+							thread_pool_options.ptr(),
+							&mut env_ptr
+						)?;
+						nonNull(env_ptr)
+					];
+				}
 				Ok(env_ptr)
 			})?;
 
@@ -309,26 +354,27 @@ impl EnvironmentBuilder {
 		} else {
 			let env_ptr = with_cstr(self.name.as_bytes(), &|name| {
 				let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
-				#[cfg(feature = "tracing")]
-				ortsys![
-					unsafe CreateEnvWithCustomLogger(
-						Some(crate::logging::custom_logger),
-						ptr::null_mut(),
-						ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
-						name.as_ptr(),
-						&mut env_ptr
-					)?;
-					nonNull(env_ptr)
-				];
-				#[cfg(not(feature = "tracing"))]
-				ortsys![
-					unsafe CreateEnv(
-						crate::logging::default_log_level(),
-						name.as_ptr(),
-						&mut env_ptr
-					)?;
-					nonNull(env_ptr)
-				];
+				if let Some((log_fn, log_ptr)) = logger {
+					ortsys![
+						unsafe CreateEnvWithCustomLogger(
+							log_fn,
+							log_ptr,
+							ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
+							name.as_ptr(),
+							&mut env_ptr
+						)?;
+						nonNull(env_ptr)
+					];
+				} else {
+					ortsys![
+						unsafe CreateEnv(
+							crate::logging::default_log_level(),
+							name.as_ptr(),
+							&mut env_ptr
+						)?;
+						nonNull(env_ptr)
+					];
+				}
 				Ok(env_ptr)
 			})?;
 
@@ -347,7 +393,8 @@ impl EnvironmentBuilder {
 			// we already asserted the env pointer is non-null in the `CreateEnvWithCustomLogger` call
 			ptr: unsafe { NonNull::new_unchecked(env_ptr) },
 			has_global_threadpool,
-			_thread_manager: thread_manager
+			_thread_manager: thread_manager,
+			_logger: self.logger
 		})
 	}
 

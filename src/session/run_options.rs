@@ -1,6 +1,6 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
 use core::{
-	ffi::{CStr, c_char},
+	ffi::{CStr, c_char, c_int},
 	marker::PhantomData,
 	mem,
 	ptr::{self, NonNull}
@@ -12,6 +12,7 @@ use crate::{
 	AsPointer,
 	adapter::{Adapter, AdapterInner},
 	error::Result,
+	logging::LogLevel,
 	ortsys,
 	session::Output,
 	util::{MiniMap, STACK_SESSION_OUTPUTS, with_cstr},
@@ -346,6 +347,28 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 		ortsys![unsafe RunOptionsAddActiveLoraAdapter(self.inner.ptr.as_ptr(), adapter.ptr())?];
 		self.inner.adapters.push(Arc::clone(&adapter.inner));
 		Ok(())
+	}
+
+	pub fn set_log_level(&mut self, level: LogLevel) -> Result<()> {
+		ortsys![unsafe RunOptionsSetRunLogSeverityLevel(self.ptr_mut(), ort_sys::OrtLoggingLevel::from(level) as _)?];
+		Ok(())
+	}
+
+	pub fn log_level(&self) -> Result<LogLevel> {
+		let mut log_level = ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE;
+		ortsys![unsafe RunOptionsGetRunLogSeverityLevel(self.ptr(), &mut log_level as *mut ort_sys::OrtLoggingLevel as *mut _)?];
+		Ok(LogLevel::from(log_level))
+	}
+
+	pub fn set_log_verbosity(&mut self, verbosity: c_int) -> Result<()> {
+		ortsys![unsafe RunOptionsSetRunLogVerbosityLevel(self.ptr_mut(), verbosity)?];
+		Ok(())
+	}
+
+	pub fn log_verbosity(&self) -> Result<i32> {
+		let mut verbosity = 0;
+		ortsys![unsafe RunOptionsGetRunLogVerbosityLevel(self.ptr(), &mut verbosity)?];
+		Ok(verbosity)
 	}
 }
 

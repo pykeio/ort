@@ -9,6 +9,7 @@ use core::{
 use crate::{
 	AsPointer,
 	error::{Error, Result},
+	logging::Logger,
 	memory::{Allocator, MemoryInfo, MemoryType},
 	ortsys,
 	session::{Input, Output},
@@ -103,8 +104,14 @@ impl KernelAttributes {
 
 	pub fn allocator(&self, mem_type: MemoryType) -> Result<Allocator> {
 		let mut ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
-		ortsys![unsafe KernelInfoGetAllocator(self.ptr.as_ptr(), mem_type.into(), &mut ptr)?];
+		ortsys![unsafe KernelInfoGetAllocator(self.ptr.as_ptr(), mem_type.into(), &mut ptr)?; nonNull(ptr)];
 		Ok(unsafe { Allocator::from_raw_unchecked(ptr) })
+	}
+
+	pub fn logger(&self) -> Result<Logger<'_>> {
+		let mut logger: *const ort_sys::OrtLogger = ptr::null_mut();
+		ortsys![unsafe KernelInfo_GetLogger(self.ptr.as_ptr(), &mut logger)?; nonNull(logger)];
+		Ok(Logger::new(logger))
 	}
 }
 
@@ -426,6 +433,12 @@ impl KernelContext {
 		let executor = Box::new(f) as Box<dyn Fn(usize) + Sync + Send>;
 		ortsys![unsafe KernelContext_ParallelFor(self.ptr.as_ptr(), parallel_for_cb, total, max_num_batches, &executor as *const _ as *mut c_void)?];
 		Ok(())
+	}
+
+	pub fn logger(&self) -> Result<Logger<'_>> {
+		let mut logger: *const ort_sys::OrtLogger = ptr::null_mut();
+		ortsys![unsafe KernelContext_GetLogger(self.ptr.as_ptr(), &mut logger)?; nonNull(logger)];
+		Ok(Logger::new(logger))
 	}
 
 	// TODO: STATUS_ACCESS_VIOLATION inside `KernelContext_GetScratchBuffer`. gonna assume this one is just an internal ONNX

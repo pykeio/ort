@@ -145,7 +145,7 @@ impl SessionBuilder {
 	}
 
 	pub fn with_operators(mut self, domain: impl Into<Arc<OperatorDomain>>) -> Result<Self> {
-		let domain = domain.into();
+		let domain: Arc<OperatorDomain> = domain.into();
 		ortsys![unsafe AddCustomOpDomain(self.ptr_mut(), domain.ptr().cast_mut())?];
 		self.operator_domains.push(domain);
 		Ok(self)
@@ -160,14 +160,25 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
-	pub fn with_external_initializer(mut self, name: impl AsRef<str>, value: DynValue) -> Result<Self> {
+	pub fn with_initializer(mut self, name: impl AsRef<str>, value: impl Into<Arc<DynValue>>) -> Result<Self> {
 		let ptr = self.ptr_mut();
-		let value = Arc::new(value);
+		let value: Arc<DynValue> = value.into();
+		with_cstr(name.as_ref().as_bytes(), &|name| {
+			ortsys![unsafe AddInitializer(ptr, name.as_ptr(), value.ptr())?];
+			Ok(())
+		})?;
+		self.initializers.push(value);
+		Ok(self)
+	}
+
+	pub fn with_external_initializer(mut self, name: impl AsRef<str>, value: impl Into<Arc<DynValue>>) -> Result<Self> {
+		let ptr = self.ptr_mut();
+		let value: Arc<DynValue> = value.into();
 		with_cstr(name.as_ref().as_bytes(), &|name| {
 			ortsys![unsafe AddExternalInitializers(ptr, &name.as_ptr(), &value.ptr(), 1)?];
 			Ok(())
 		})?;
-		self.external_initializers.push(value);
+		self.initializers.push(value);
 		Ok(self)
 	}
 

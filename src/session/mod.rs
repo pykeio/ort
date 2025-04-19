@@ -61,6 +61,7 @@ pub use self::{
 pub struct SharedSessionInner {
 	session_ptr: NonNull<ort_sys::OrtSession>,
 	pub(crate) allocator: Allocator,
+	_initializers: SmallVec<Arc<DynValue>, 4>,
 	/// Additional things we may need to hold onto for the duration of this session, like `OperatorDomain`s and
 	/// DLL handles for operator libraries.
 	_extras: SmallVec<Box<dyn Any>, 4>

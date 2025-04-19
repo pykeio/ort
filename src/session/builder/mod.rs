@@ -1,8 +1,10 @@
-use alloc::{borrow::Cow, sync::Arc, vec::Vec};
+use alloc::{borrow::Cow, sync::Arc};
 use core::{
 	any::Any,
 	ptr::{self, NonNull}
 };
+
+use smallvec::SmallVec;
 
 use crate::{AsPointer, error::Result, logging::LoggerFunction, memory::MemoryInfo, operator::OperatorDomain, ortsys, util::with_cstr, value::DynValue};
 
@@ -33,9 +35,9 @@ pub use self::impl_options::{GraphOptimizationLevel, PrepackedWeights};
 pub struct SessionBuilder {
 	session_options_ptr: NonNull<ort_sys::OrtSessionOptions>,
 	memory_info: Option<Arc<MemoryInfo>>,
-	operator_domains: Vec<Arc<OperatorDomain>>,
-	external_initializers: Vec<Arc<DynValue>>,
-	external_initializer_buffers: Vec<Cow<'static, [u8]>>,
+	operator_domains: SmallVec<Arc<OperatorDomain>, 4>,
+	initializers: SmallVec<Arc<DynValue>, 4>,
+	external_initializer_buffers: SmallVec<Cow<'static, [u8]>, 4>,
 	prepacked_weights: Option<PrepackedWeights>,
 	thread_manager: Option<Arc<dyn Any>>,
 	logger: Option<Arc<LoggerFunction>>,
@@ -55,7 +57,7 @@ impl Clone for SessionBuilder {
 			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },
 			memory_info: self.memory_info.clone(),
 			operator_domains: self.operator_domains.clone(),
-			external_initializers: self.external_initializers.clone(),
+			initializers: self.initializers.clone(),
 			external_initializer_buffers: self.external_initializer_buffers.clone(),
 			prepacked_weights: self.prepacked_weights.clone(),
 			thread_manager: self.thread_manager.clone(),
@@ -92,9 +94,9 @@ impl SessionBuilder {
 		Ok(Self {
 			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },
 			memory_info: None,
-			operator_domains: Vec::new(),
-			external_initializers: Vec::new(),
-			external_initializer_buffers: Vec::new(),
+			operator_domains: SmallVec::new(),
+			initializers: SmallVec::new(),
+			external_initializer_buffers: SmallVec::new(),
 			prepacked_weights: None,
 			thread_manager: None,
 			logger: None,

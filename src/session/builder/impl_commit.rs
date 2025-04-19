@@ -5,6 +5,7 @@ use core::{
 	any::Any,
 	ffi::c_void,
 	marker::PhantomData,
+	mem::replace,
 	ptr::{self, NonNull}
 };
 #[cfg(feature = "std")]
@@ -210,6 +211,7 @@ impl SessionBuilder {
 			inner: Arc::new(SharedSessionInner {
 				session_ptr: ptr,
 				allocator,
+				_initializers: replace(&mut self.initializers, SmallVec::new()),
 				_extras: extras
 			}),
 			inputs,

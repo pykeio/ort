@@ -11,11 +11,10 @@ use core::{
 	slice
 };
 
-use super::{Tensor, TensorValueTypeMarker};
+use super::{DynTensor, Tensor, TensorValueTypeMarker};
 use crate::{
 	AsPointer,
 	error::{Error, ErrorCode, Result},
-	memory::MemoryInfo,
 	ortsys,
 	tensor::{PrimitiveTensorElementType, Shape, TensorElementType},
 	value::{Value, ValueType}
@@ -53,7 +52,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_array<T: PrimitiveTensorElementType>(&self) -> Result<ndarray::ArrayViewD<'_, T>> {
-		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type())
+		extract_tensor(self, T::into_tensor_element_type())
 			.and_then(|(ptr, shape)| Ok(unsafe { ndarray::ArrayView::from_shape_ptr(shape.to_ixdyn(), data_ptr(ptr)?.cast::<T>()) }))
 	}
 
@@ -80,7 +79,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_scalar<T: PrimitiveTensorElementType + Copy>(&self) -> Result<T> {
-		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type()).and_then(|(ptr, shape)| {
+		extract_tensor(self, T::into_tensor_element_type()).and_then(|(ptr, shape)| {
 			if !shape.is_empty() {
 				return Err(Error::new_with_code(
 					ErrorCode::InvalidArgument,
@@ -122,7 +121,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_array_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<ndarray::ArrayViewMutD<'_, T>> {
-		extract_tensor(self.ptr_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type())
+		extract_tensor(self, T::into_tensor_element_type())
 			.and_then(|(ptr, shape)| Ok(unsafe { ndarray::ArrayViewMut::from_shape_ptr(shape.to_ixdyn(), data_ptr(ptr)?.cast::<T>()) }))
 	}
 
@@ -155,7 +154,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_tensor<T: PrimitiveTensorElementType>(&self) -> Result<(&Shape, &[T])> {
-		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type())
+		extract_tensor(self, T::into_tensor_element_type())
 			.and_then(|(ptr, shape)| Ok((shape, unsafe { slice::from_raw_parts(data_ptr(ptr)?.cast::<T>(), shape.num_elements()) })))
 	}
 
@@ -185,7 +184,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_tensor_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<(&Shape, &mut [T])> {
-		extract_tensor(self.ptr_mut(), self.dtype(), self.memory_info(), T::into_tensor_element_type())
+		extract_tensor(self, T::into_tensor_element_type())
 			.and_then(|(ptr, shape)| Ok((shape, unsafe { slice::from_raw_parts_mut(data_ptr(ptr)?.cast::<T>(), shape.num_elements()) })))
 	}
 
@@ -205,7 +204,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg(feature = "ndarray")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_string_array(&self) -> Result<ndarray::ArrayD<String>> {
-		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), TensorElementType::String).and_then(|(ptr, shape)| {
+		extract_tensor(self, TensorElementType::String).and_then(|(ptr, shape)| {
 			let strings = extract_strings(ptr, shape)?;
 			Ok(ndarray::Array::from_shape_vec(shape.to_ixdyn(), strings).expect("Shape extracted from tensor didn't match tensor contents"))
 		})
@@ -227,7 +226,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # }
 	/// ```
 	pub fn try_extract_strings(&self) -> Result<(&Shape, Vec<String>)> {
-		extract_tensor(self.ptr().cast_mut(), self.dtype(), self.memory_info(), TensorElementType::String).and_then(|(ptr, shape)| {
+		extract_tensor(self, TensorElementType::String).and_then(|(ptr, shape)| {
 			let strings = extract_strings(ptr, shape)?;
 			Ok((shape, strings))
 		})
@@ -260,14 +259,11 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	}
 }
 
-fn extract_tensor<'t>(
-	ptr: *mut ort_sys::OrtValue,
-	dtype: &'t ValueType,
-	memory_info: &MemoryInfo,
-	expected_ty: TensorElementType
-) -> Result<(*mut ort_sys::OrtValue, &'t Shape)> {
-	match dtype {
+fn extract_tensor<Type: TensorValueTypeMarker + ?Sized>(value: &Value<Type>, expected_ty: TensorElementType) -> Result<(*mut ort_sys::OrtValue, &Shape)> {
+	match value.dtype() {
 		ValueType::Tensor { ty, shape, .. } => {
+			let value: &DynTensor = unsafe { value.transmute_type_ref() };
+			let memory_info = value.memory_info();
 			if !memory_info.is_cpu_accessible() {
 				return Err(Error::new(format!(
 					"Cannot extract from value on device `{}`, which is not CPU accessible",
@@ -276,7 +272,7 @@ fn extract_tensor<'t>(
 			}
 
 			if *ty == expected_ty {
-				Ok((ptr, shape))
+				Ok((value.ptr().cast_mut(), shape))
 			} else {
 				Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot extract Tensor<{}> from Tensor<{}>", expected_ty, ty)))
 			}

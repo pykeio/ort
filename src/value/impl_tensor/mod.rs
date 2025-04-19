@@ -22,6 +22,8 @@ use crate::{
 pub trait TensorValueTypeMarker: ValueTypeMarker {
 	private_trait!();
 }
+/// Represents a type that is either a [`DynTensor`] or [`Tensor`].
+pub trait DefiniteTensorValueTypeMarker: TensorValueTypeMarker {}
 
 #[derive(Debug)]
 pub struct DynTensorValueType;
@@ -35,6 +37,7 @@ impl ValueTypeMarker for DynTensorValueType {
 impl TensorValueTypeMarker for DynTensorValueType {
 	private_impl!();
 }
+impl DefiniteTensorValueTypeMarker for DynTensorValueType {}
 
 #[derive(Debug)]
 pub struct TensorValueType<T: IntoTensorElementType + Debug>(PhantomData<T>);
@@ -50,6 +53,7 @@ impl<T: IntoTensorElementType + Debug> ValueTypeMarker for TensorValueType<T> {
 impl<T: IntoTensorElementType + Debug> TensorValueTypeMarker for TensorValueType<T> {
 	private_impl!();
 }
+impl<T: IntoTensorElementType + Debug> DefiniteTensorValueTypeMarker for TensorValueType<T> {}
 
 /// A tensor [`Value`] whose data type is unknown.
 pub type DynTensor = Value<DynTensorValueType>;
@@ -141,7 +145,7 @@ impl DynTensor {
 	}
 }
 
-impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
+impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// Returns a mutable pointer to the tensor's data. The pointer may be null in the case of zero-sized tensors.
 	///
 	/// It's important to note that the resulting pointer may not point to CPU-accessible memory. In the case of a
@@ -328,7 +332,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	}
 }
 
-impl<Type: TensorValueTypeMarker + ?Sized> Clone for Value<Type> {
+impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Clone for Value<Type> {
 	/// Creates a copy of this tensor and its data on the same device it resides on.
 	///
 	/// ```

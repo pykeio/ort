@@ -37,8 +37,8 @@ pub use self::{
 		DynSequence, DynSequenceRef, DynSequenceRefMut, DynSequenceValueType, Sequence, SequenceRef, SequenceRefMut, SequenceValueType, SequenceValueTypeMarker
 	},
 	impl_tensor::{
-		DynTensor, DynTensorRef, DynTensorRefMut, DynTensorValueType, OwnedTensorArrayData, Tensor, TensorArrayData, TensorArrayDataMut, TensorArrayDataParts,
-		TensorRef, TensorRefMut, TensorValueType, TensorValueTypeMarker, ToShape
+		DefiniteTensorValueTypeMarker, DynTensor, DynTensorRef, DynTensorRefMut, DynTensorValueType, OwnedTensorArrayData, Tensor, TensorArrayData,
+		TensorArrayDataMut, TensorArrayDataParts, TensorRef, TensorRefMut, TensorValueType, TensorValueTypeMarker, ToShape
 	},
 	r#type::ValueType
 };
@@ -368,20 +368,6 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 		unsafe { self.transmute_type() }
 	}
 
-	#[inline(always)]
-	pub(crate) unsafe fn transmute_type<OtherType: ValueTypeMarker + ?Sized>(self) -> Value<OtherType> {
-		unsafe { transmute::<Value<Type>, Value<OtherType>>(self) }
-	}
-
-	pub(crate) fn clone_of(value: &Self) -> Self {
-		Self {
-			inner: Arc::clone(&value.inner),
-			_markers: PhantomData
-		}
-	}
-}
-
-impl Value<DynValueTypeMarker> {
 	/// Returns `true` if this value is a tensor, or `false` if it is another type (sequence, map).
 	///
 	/// ```
@@ -399,6 +385,25 @@ impl Value<DynValueTypeMarker> {
 		result == 1
 	}
 
+	#[inline(always)]
+	pub(crate) unsafe fn transmute_type<OtherType: ValueTypeMarker + ?Sized>(self) -> Value<OtherType> {
+		unsafe { transmute::<Value<Type>, Value<OtherType>>(self) }
+	}
+
+	#[inline(always)]
+	pub(crate) unsafe fn transmute_type_ref<OtherType: ValueTypeMarker + ?Sized>(&self) -> &Value<OtherType> {
+		unsafe { transmute::<&Value<Type>, &Value<OtherType>>(self) }
+	}
+
+	pub(crate) fn clone_of(value: &Self) -> Self {
+		Self {
+			inner: Arc::clone(&value.inner),
+			_markers: PhantomData
+		}
+	}
+}
+
+impl Value<DynValueTypeMarker> {
 	/// Attempts to downcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed variant,
 	/// like [`Tensor<T>`].
 	#[inline]

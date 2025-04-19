@@ -146,7 +146,7 @@ pub(crate) extern "system" fn custom_logger(
 
 /// A reference to a session's logger, typically obtained in custom operator contexts.
 ///
-/// Messages can be logged to a [`Logger`] via the [`log!`] macro.
+/// Messages can be logged to a [`Logger`] via the [`log!`](crate::log) macro.
 #[derive(Debug)]
 pub struct Logger<'a> {
 	ptr: *const ort_sys::OrtLogger,
@@ -167,7 +167,7 @@ impl<'a> Logger<'a> {
 
 	/// Logs a message to this logger with the given level and message.
 	///
-	/// For more convenient usage, see the [`log!`] macro.
+	/// For more convenient usage, see the [`log!`](crate::log) macro.
 	pub fn log(&self, level: LogLevel, message: &str, file_path: &str, line: u32, func_name: &str) {
 		let _ = with_cstr_ptr_array(&[message, func_name], &|arr| {
 			let (message, func_name) = (arr[0], arr[1]);

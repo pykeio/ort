@@ -27,7 +27,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// See also:
 	/// - the mutable counterpart of this function, [`Tensor::try_extract_array_mut`].
 	/// - the infallible counterpart, [`Tensor::extract_array`], for typed [`Tensor<T>`]s.
-	/// - the alternative function for strings, [`Tensor::try_extract_string_tensor`].
+	/// - the alternative function for strings, [`Tensor::try_extract_string_array`].
 	///
 	/// ```
 	/// # use std::sync::Arc;

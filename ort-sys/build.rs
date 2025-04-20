@@ -1,6 +1,7 @@
 use std::{
 	env,
-	path::{Path, PathBuf}
+	path::{Path, PathBuf},
+	process::Command
 };
 
 #[allow(unused)]
@@ -144,6 +145,28 @@ fn add_search_dir<P: AsRef<Path>>(base: P) {
 	}
 }
 
+fn macos_rtlib_search_dir() -> Option<String> {
+	let output = Command::new(std::env::var("CC").unwrap_or_else(|_| "clang".to_string()))
+		.arg("--print-search-dirs")
+		.output()
+		.ok()?;
+	if !output.status.success() {
+		return None;
+	}
+
+	let stdout = String::from_utf8_lossy(&output.stdout);
+	for line in stdout.lines() {
+		if line.contains("libraries: =") {
+			let path = line.split('=').nth(1)?;
+			if !path.is_empty() {
+				return Some(format!("{path}/lib/darwin"));
+			}
+		}
+	}
+
+	None
+}
+
 fn static_link_prerequisites(using_pyke_libs: bool) {
 	let target_triple = env::var("TARGET").unwrap();
 
@@ -164,6 +187,10 @@ fn static_link_prerequisites(using_pyke_libs: bool) {
 
 	if target_triple.contains("apple") {
 		println!("cargo:rustc-link-lib=framework=Foundation");
+		if let Some(dir) = macos_rtlib_search_dir() {
+			println!("cargo:rustc-link-search={dir}");
+			println!("cargo:rustc-link-lib=clang_rt.osx");
+		}
 	}
 	if target_triple.contains("windows") && using_pyke_libs {
 		println!("cargo:rustc-link-lib=dxguid");

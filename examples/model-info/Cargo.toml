@@ -3,7 +3,6 @@ publish = false
 name = "example-model-info"
 version = "0.0.0"
 edition = "2021"
-build = "../build.rs"
 
 [dependencies]
 ort = { path = "../../" }

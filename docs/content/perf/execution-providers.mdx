@@ -216,40 +216,6 @@ See [Runtime dylib loading](/setup/linking#runtime-dylib-loading) for more infor
 ### CUDA
 `ort` provides binaries for CUDA 12 with cuDNN 9.x only. Make sure the correct version of CUDA & cuDNN are installed and available on the `PATH`.
 
-### CoreML
-Statically linking to CoreML (the default behavior when using downloaded binaries) requires an additional Rust flag in order to link properly. You'll need to provide the flag `-C link-arg=-fapple-link-rtlib` to `rustc`. You can do this via a build script, an entry in [`.cargo/config.toml`](https://doc.rust-lang.org/cargo/reference/config.html), or an environment variable.
-
-<Tabs items={['Build script', 'Cargo config', 'Environment variable']}>
-    <Tabs.Tab title="Build script">
-        Add the following to the `build.rs` script of any **binary** crate that uses `ort`.
-
-        ```rust filename="build.rs" copy
-        fn main() {
-	        #[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
-            println!("cargo:rustc-link-arg=-fapple-link-rtlib");
-        }
-        ```
-
-        Library crates do not need this flag, and the usage of it in a library crate will not transitively apply to any binary crates dependent on it.
-    </Tabs.Tab>
-    <Tabs.Tab title="Cargo config">
-        See [Configuration: Hierarchical structure](https://doc.rust-lang.org/cargo/reference/config.html#hierarchical-structure) for more information on where the configuration file can be placed.
-
-        ```toml filename=".cargo/config.toml" copy
-        [target.aarch64-apple-darwin]
-        rustflags = ["-Clink-arg=-fapple-link-rtlib"]
-
-        [target.x86_64-apple-darwin]
-        rustflags = ["-Clink-arg=-fapple-link-rtlib"]
-        ```
-    </Tabs.Tab>
-    <Tabs.Tab title="Environment variable">
-        ```shell copy
-        $ RUSTFLAGS="-Clink-arg=-fapple-link-rtlib" cargo build
-        ```
-    </Tabs.Tab>
-</Tabs>
-
 ### WebGPU
 The WebGPU EP is **experimental** and may produce incorrect results/crashes; these issues should be reported upstream as there's unfortunately nothing we can do about them.
 

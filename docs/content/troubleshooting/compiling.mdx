@@ -28,8 +28,5 @@ Recent versions of `ort` require `ndarray` `0.16`, whereas older versions (and t
 
 To fix this, upgrade your `ndarray` dependency to `0.16`; the new release features no breaking changes, although `.into_shape()` is deprecated; see [`ndarray`'s release notes](https://github.com/rust-ndarray/ndarray/releases/tag/0.16.0) for more information.
 
-## Undefined symbols: `___isPlatformVersionAtLeast`, referenced from...
-If you run into this issue compiling with CoreML for macOS/iOS, you'll need to add a `rustc` flag to your crate to get it to link properly. See [Execution providers > CoreML](/perf/execution-providers#coreml) for instructions on how to do so.
-
 ## Unresolved external symbol `__std_*`
 If you encounter these errors when linking on Windows, make sure your Visual Studio 2022 installation is up to date; at least version **17.11** is required when using default pyke binaries.

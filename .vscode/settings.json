@@ -1,5 +1,5 @@
 {
-	"rust-analyzer.checkOnSave.command": "clippy",
+	"rust-analyzer.check.command": "clippy",
 	"rust-analyzer.rustfmt.extraArgs": [ "+nightly" ],
 	"[rust]": {
 		"editor.formatOnSave": true,

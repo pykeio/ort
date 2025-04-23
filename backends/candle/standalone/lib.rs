@@ -5,7 +5,7 @@ static API_BASE: ort_sys::OrtApiBase = ort_sys::OrtApiBase {
 static API: ort_sys::OrtApi = ort_candle::api();
 
 unsafe extern "system" fn get_version_string() -> *const ort_sys::c_char {
-	c"1.21.0+candle@0.8-wrapper@0.1.0".as_ptr()
+	c"1.21.1+candle@0.8-wrapper@0.1.0".as_ptr()
 }
 
 unsafe extern "system" fn get_api(version: u32) -> *const ort_sys::OrtApi {

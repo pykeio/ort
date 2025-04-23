@@ -110,7 +110,7 @@ impl CANNExecutionProvider {
 	/// Enumerate the list of operators which use the mode specified by
 	/// [`CANNExecutionProvider::with_implementation_mode`].
 	///
-	/// As of ONNX Runtime v1.16.2, the supported operators are:
+	/// As of ONNX Runtime v1.21.1, the supported operators are:
 	/// - `Pooling`
 	/// - `SoftmaxV2`
 	/// - `LRN`

@@ -1,10 +1,7 @@
-use alloc::{ffi::CString, format};
+use alloc::ffi::CString;
 
-use crate::{
-	error::{Error, Result},
-	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
-	session::builder::SessionBuilder
-};
+use super::{ExecutionProvider, RegisterError};
+use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Default, Clone)]
 pub struct MIGraphXExecutionProvider {
@@ -17,6 +14,8 @@ pub struct MIGraphXExecutionProvider {
 	load_model_path: Option<CString>,
 	exhaustive_tune: bool
 }
+
+super::impl_ep!(MIGraphXExecutionProvider);
 
 impl MIGraphXExecutionProvider {
 	#[must_use]
@@ -61,17 +60,6 @@ impl MIGraphXExecutionProvider {
 		self.exhaustive_tune = enable;
 		self
 	}
-
-	#[must_use]
-	pub fn build(self) -> ExecutionProviderDispatch {
-		self.into()
-	}
-}
-
-impl From<MIGraphXExecutionProvider> for ExecutionProviderDispatch {
-	fn from(value: MIGraphXExecutionProvider) -> Self {
-		ExecutionProviderDispatch::new(value)
-	}
 }
 
 impl ExecutionProvider for MIGraphXExecutionProvider {
@@ -84,12 +72,12 @@ impl ExecutionProvider for MIGraphXExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
 		#[cfg(any(feature = "load-dynamic", feature = "migraphx"))]
 		{
 			use core::ptr;
 
-			use crate::AsPointer;
+			use crate::{AsPointer, ortsys};
 
 			let options = ort_sys::OrtMIGraphXProviderOptions {
 				device_id: self.device_id,
@@ -103,10 +91,10 @@ impl ExecutionProvider for MIGraphXExecutionProvider {
 				migraphx_save_model_path: self.save_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null),
 				migraphx_exhaustive_tune: self.exhaustive_tune
 			};
-			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_MIGraphX(session_builder.ptr_mut(), &options)?];
+			ortsys![unsafe SessionOptionsAppendExecutionProvider_MIGraphX(session_builder.ptr_mut(), &options)?];
 			return Ok(());
 		}
 
-		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
+		Err(RegisterError::MissingFeature)
 	}
 }

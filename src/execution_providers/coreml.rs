@@ -1,11 +1,5 @@
-use alloc::{format, string::ToString};
-
-use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
-use crate::{
-	error::{Error, Result},
-	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
-	session::builder::SessionBuilder
-};
+use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
+use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CoreMLSpecializationStrategy {
@@ -66,6 +60,8 @@ pub struct CoreMLExecutionProvider {
 	options: ExecutionProviderOptions
 }
 
+super::impl_ep!(arbitrary; CoreMLExecutionProvider);
+
 impl CoreMLExecutionProvider {
 	/// Enable CoreML EP to run on a subgraph in the body of a control flow operator (i.e. a Loop, Scan or If operator).
 	#[must_use]
@@ -113,24 +109,6 @@ impl CoreMLExecutionProvider {
 		self.options.set("AllowLowPrecisionAccumulationOnGPU", if enable { "1" } else { "0" });
 		self
 	}
-
-	#[must_use]
-	pub fn build(self) -> ExecutionProviderDispatch {
-		self.into()
-	}
-}
-
-impl ArbitrarilyConfigurableExecutionProvider for CoreMLExecutionProvider {
-	fn with_arbitrary_config(mut self, key: impl ToString, value: impl ToString) -> Self {
-		self.options.set(key.to_string(), value.to_string());
-		self
-	}
-}
-
-impl From<CoreMLExecutionProvider> for ExecutionProviderDispatch {
-	fn from(value: CoreMLExecutionProvider) -> Self {
-		ExecutionProviderDispatch::new(value)
-	}
 }
 
 impl ExecutionProvider for CoreMLExecutionProvider {
@@ -143,22 +121,23 @@ impl ExecutionProvider for CoreMLExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
 		#[cfg(any(feature = "load-dynamic", feature = "coreml"))]
 		{
-			use crate::AsPointer;
+			use crate::{AsPointer, ortsys};
 
 			let ffi_options = self.options.to_ffi();
-			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider(
+			ortsys![unsafe SessionOptionsAppendExecutionProvider(
 				session_builder.ptr_mut(),
 				c"CoreML".as_ptr().cast::<core::ffi::c_char>(),
 				ffi_options.key_ptrs(),
 				ffi_options.value_ptrs(),
 				ffi_options.len(),
 			)?];
+
 			return Ok(());
 		}
 
-		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
+		Err(RegisterError::MissingFeature)
 	}
 }

@@ -1,37 +1,18 @@
-use alloc::format;
-
-use crate::{
-	error::{Error, Result},
-	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
-	session::builder::SessionBuilder
-};
-
-#[cfg(all(not(feature = "load-dynamic"), feature = "acl"))]
-extern "C" {
-	fn OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut ort_sys::OrtSessionOptions, use_arena: core::ffi::c_int) -> ort_sys::OrtStatusPtr;
-}
+use super::{ExecutionProvider, RegisterError};
+use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Default, Clone)]
 pub struct ACLExecutionProvider {
 	use_arena: bool
 }
 
+super::impl_ep!(ACLExecutionProvider);
+
 impl ACLExecutionProvider {
 	#[must_use]
 	pub fn with_arena_allocator(mut self, enable: bool) -> Self {
 		self.use_arena = enable;
 		self
-	}
-
-	#[must_use]
-	pub fn build(self) -> ExecutionProviderDispatch {
-		self.into()
-	}
-}
-
-impl From<ACLExecutionProvider> for ExecutionProviderDispatch {
-	fn from(value: ACLExecutionProvider) -> Self {
-		ExecutionProviderDispatch::new(value)
 	}
 }
 
@@ -45,15 +26,17 @@ impl ExecutionProvider for ACLExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
 		#[cfg(any(feature = "load-dynamic", feature = "acl"))]
 		{
 			use crate::AsPointer;
 
-			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut ort_sys::OrtSessionOptions, use_arena: core::ffi::c_int) -> ort_sys::OrtStatusPtr);
-			return unsafe { crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_ACL(session_builder.ptr_mut(), self.use_arena.into())) };
+			super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut ort_sys::OrtSessionOptions, use_arena: core::ffi::c_int) -> ort_sys::OrtStatusPtr);
+			return Ok(unsafe {
+				crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_ACL(session_builder.ptr_mut(), self.use_arena.into()))
+			}?);
 		}
 
-		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
+		Err(RegisterError::MissingFeature)
 	}
 }

@@ -1,15 +1,5 @@
-use alloc::format;
-
-use crate::{
-	error::{Error, Result},
-	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
-	session::builder::SessionBuilder
-};
-
-#[cfg(all(not(feature = "load-dynamic"), feature = "nnapi"))]
-extern "C" {
-	pub(crate) fn OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut ort_sys::OrtSessionOptions, flags: u32) -> ort_sys::OrtStatusPtr;
-}
+use super::{ExecutionProvider, RegisterError};
+use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Default, Clone)]
 pub struct NNAPIExecutionProvider {
@@ -18,6 +8,8 @@ pub struct NNAPIExecutionProvider {
 	disable_cpu: bool,
 	cpu_only: bool
 }
+
+super::impl_ep!(NNAPIExecutionProvider);
 
 impl NNAPIExecutionProvider {
 	/// Use fp16 relaxation in NNAPI EP. This may improve performance but can also reduce accuracy due to the lower
@@ -55,17 +47,6 @@ impl NNAPIExecutionProvider {
 		self.cpu_only = enable;
 		self
 	}
-
-	#[must_use]
-	pub fn build(self) -> ExecutionProviderDispatch {
-		self.into()
-	}
-}
-
-impl From<NNAPIExecutionProvider> for ExecutionProviderDispatch {
-	fn from(value: NNAPIExecutionProvider) -> Self {
-		ExecutionProviderDispatch::new(value)
-	}
 }
 
 impl ExecutionProvider for NNAPIExecutionProvider {
@@ -78,12 +59,12 @@ impl ExecutionProvider for NNAPIExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
 		#[cfg(any(feature = "load-dynamic", feature = "nnapi"))]
 		{
 			use crate::AsPointer;
 
-			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut ort_sys::OrtSessionOptions, flags: u32) -> ort_sys::OrtStatusPtr);
+			super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut ort_sys::OrtSessionOptions, flags: u32) -> ort_sys::OrtStatusPtr);
 			let mut flags = 0;
 			if self.use_fp16 {
 				flags |= 0x001;
@@ -97,9 +78,9 @@ impl ExecutionProvider for NNAPIExecutionProvider {
 			if self.cpu_only {
 				flags |= 0x008;
 			}
-			return unsafe { crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_Nnapi(session_builder.ptr_mut(), flags)) };
+			return Ok(unsafe { crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_Nnapi(session_builder.ptr_mut(), flags)) }?);
 		}
 
-		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
+		Err(RegisterError::MissingFeature)
 	}
 }

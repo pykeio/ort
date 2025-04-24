@@ -129,7 +129,7 @@ pub trait ExecutionProvider: Send + Sync {
 	}
 
 	/// Attempts to register this execution provider on the given session.
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()>;
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError>;
 }
 
 /// Trait used for execution providers that can have arbitrary configuration keys applied.
@@ -250,8 +250,43 @@ impl ExecutionProviderOptionsFFI {
 	}
 }
 
+#[derive(Debug)]
+pub enum RegisterError {
+	Error(crate::Error),
+	MissingFeature
+}
+
+impl From<crate::Error> for RegisterError {
+	fn from(value: crate::Error) -> Self {
+		Self::Error(value)
+	}
+}
+
+impl From<RegisterError> for crate::Error {
+	fn from(value: RegisterError) -> Self {
+		match value {
+			RegisterError::Error(e) => e,
+			RegisterError::MissingFeature => {
+				crate::Error::new("The execution provider could not be registered because its corresponding Cargo feature is not enabled.")
+			}
+		}
+	}
+}
+
+impl fmt::Display for RegisterError {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			Self::Error(e) => fmt::Display::fmt(e, f),
+			Self::MissingFeature => f.write_str("The execution provider could not be registered because its corresponding Cargo feature is not enabled.")
+		}
+	}
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for RegisterError {}
+
 #[allow(unused)]
-macro_rules! get_ep_register {
+macro_rules! define_ep_register {
 	($symbol:ident($($id:ident: $type:ty),*) -> $rt:ty) => {
 		#[cfg(feature = "load-dynamic")]
 		#[allow(non_snake_case)]
@@ -264,25 +299,55 @@ macro_rules! get_ep_register {
 			match symbol {
 				Ok(symbol) => symbol.into_raw(),
 				Err(e) => {
-					return ::core::result::Result::Err($crate::Error::new(format!("Error attempting to load symbol `{}` from dynamic library: {}", stringify!($symbol), e)));
+					return ::core::result::Result::Err($crate::Error::new(::alloc::format!("Error attempting to load symbol `{}` from dynamic library: {}", stringify!($symbol), e)))?;
 				}
 			}
 		};
+		#[cfg(not(feature = "load-dynamic"))]
+		unsafe extern "C" {
+			fn $symbol($($id: $type),*) -> $rt;
+		}
 	};
 }
 #[allow(unused)]
-pub(crate) use get_ep_register;
+pub(crate) use define_ep_register;
+
+macro_rules! impl_ep {
+	(arbitrary; $symbol:ident) => {
+		$crate::execution_providers::impl_ep!($symbol);
+
+		impl $crate::execution_providers::ArbitrarilyConfigurableExecutionProvider for $symbol {
+			fn with_arbitrary_config(mut self, key: impl ::alloc::string::ToString, value: impl ::alloc::string::ToString) -> Self {
+				self.options.set(key.to_string(), value.to_string());
+				self
+			}
+		}
+	};
+	($symbol:ident) => {
+		impl $symbol {
+			#[must_use]
+			pub fn build(self) -> $crate::execution_providers::ExecutionProviderDispatch {
+				self.into()
+			}
+		}
+
+		impl From<$symbol> for $crate::execution_providers::ExecutionProviderDispatch {
+			fn from(value: $symbol) -> Self {
+				$crate::execution_providers::ExecutionProviderDispatch::new(value)
+			}
+		}
+	};
+}
+pub(crate) use impl_ep;
 
 pub(crate) fn apply_execution_providers(session_builder: &mut SessionBuilder, eps: &[ExecutionProviderDispatch], source: &'static str) -> Result<()> {
 	fn register_inner(session_builder: &mut SessionBuilder, ep: &ExecutionProviderDispatch, #[allow(unused)] source: &'static str) -> Result<bool> {
 		if let Err(e) = ep.inner.register(session_builder) {
 			if ep.error_on_failure {
-				return Err(e);
+				return Err(e)?;
 			}
 
-			if e.message()
-				.ends_with("was not registered because its corresponding Cargo feature is not enabled.")
-			{
+			if matches!(e, RegisterError::MissingFeature) {
 				if ep.inner.supported_by_platform() {
 					crate::warn!(%source, "{e}");
 				} else {

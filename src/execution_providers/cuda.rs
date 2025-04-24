@@ -1,12 +1,8 @@
-use alloc::{format, string::ToString};
+use alloc::string::ToString;
 use core::ops::BitOr;
 
-use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
-use crate::{
-	error::{Error, Result},
-	execution_providers::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderDispatch},
-	session::builder::SessionBuilder
-};
+use super::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderOptions, RegisterError};
+use crate::{error::Result, session::builder::SessionBuilder};
 
 // https://github.com/microsoft/onnxruntime/blob/ffceed9d44f2f3efb9dd69fa75fea51163c91d91/onnxruntime/contrib_ops/cpu/bert/attention_common.h#L160-L171
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -89,6 +85,8 @@ impl Default for CuDNNConvAlgorithmSearch {
 pub struct CUDAExecutionProvider {
 	options: ExecutionProviderOptions
 }
+
+super::impl_ep!(arbitrary; CUDAExecutionProvider);
 
 impl CUDAExecutionProvider {
 	#[must_use]
@@ -243,24 +241,6 @@ impl CUDAExecutionProvider {
 
 	// https://github.com/microsoft/onnxruntime/blob/ffceed9d44f2f3efb9dd69fa75fea51163c91d91/onnxruntime/core/providers/cuda/cuda_execution_provider_info.h#L48
 	// https://github.com/microsoft/onnxruntime/blob/fe8a10caa40f64a8fbd144e7049cf5b14c65542d/onnxruntime/core/providers/cuda/cuda_execution_provider_info.cc#L17
-
-	#[must_use]
-	pub fn build(self) -> ExecutionProviderDispatch {
-		self.into()
-	}
-}
-
-impl ArbitrarilyConfigurableExecutionProvider for CUDAExecutionProvider {
-	fn with_arbitrary_config(mut self, key: impl ToString, value: impl ToString) -> Self {
-		self.options.set(key.to_string(), value.to_string());
-		self
-	}
-}
-
-impl From<CUDAExecutionProvider> for ExecutionProviderDispatch {
-	fn from(value: CUDAExecutionProvider) -> Self {
-		ExecutionProviderDispatch::new(value)
-	}
 }
 
 impl ExecutionProvider for CUDAExecutionProvider {
@@ -273,31 +253,31 @@ impl ExecutionProvider for CUDAExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
 		#[cfg(any(feature = "load-dynamic", feature = "cuda"))]
 		{
-			use crate::AsPointer;
+			use core::ptr;
 
-			let mut cuda_options: *mut ort_sys::OrtCUDAProviderOptionsV2 = core::ptr::null_mut();
-			crate::ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)?];
+			use crate::{AsPointer, ortsys, util};
+
+			let mut cuda_options: *mut ort_sys::OrtCUDAProviderOptionsV2 = ptr::null_mut();
+			ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)?];
+			let _guard = util::run_on_drop(|| {
+				ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
+			});
+
 			let ffi_options = self.options.to_ffi();
-
-			let res = crate::ortsys![unsafe UpdateCUDAProviderOptions(
+			ortsys![unsafe UpdateCUDAProviderOptions(
 				cuda_options,
 				ffi_options.key_ptrs(),
 				ffi_options.value_ptrs(),
 				ffi_options.len()
-			)];
-			if let Err(e) = unsafe { crate::error::status_to_result(res) } {
-				crate::ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
-				return Err(e);
-			}
+			)?];
 
-			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(session_builder.ptr_mut(), cuda_options)];
-			crate::ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
-			return unsafe { crate::error::status_to_result(status) };
+			ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(session_builder.ptr_mut(), cuda_options)?];
+			return Ok(());
 		}
 
-		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
+		Err(RegisterError::MissingFeature)
 	}
 }

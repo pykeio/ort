@@ -1,16 +1,14 @@
-use alloc::{format, string::ToString};
+use alloc::string::ToString;
 
-use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
-use crate::{
-	error::{Error, Result},
-	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
-	session::builder::SessionBuilder
-};
+use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
+use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Default, Clone)]
 pub struct TensorRTExecutionProvider {
 	options: ExecutionProviderOptions
 }
+
+super::impl_ep!(arbitrary; TensorRTExecutionProvider);
 
 impl TensorRTExecutionProvider {
 	#[must_use]
@@ -254,24 +252,6 @@ impl TensorRTExecutionProvider {
 		self.options.set("trt_engine_hw_compatible", if enable { "1" } else { "0" });
 		self
 	}
-
-	#[must_use]
-	pub fn build(self) -> ExecutionProviderDispatch {
-		self.into()
-	}
-}
-
-impl ArbitrarilyConfigurableExecutionProvider for TensorRTExecutionProvider {
-	fn with_arbitrary_config(mut self, key: impl ToString, value: impl ToString) -> Self {
-		self.options.set(key.to_string(), value.to_string());
-		self
-	}
-}
-
-impl From<TensorRTExecutionProvider> for ExecutionProviderDispatch {
-	fn from(value: TensorRTExecutionProvider) -> Self {
-		ExecutionProviderDispatch::new(value)
-	}
 }
 
 impl ExecutionProvider for TensorRTExecutionProvider {
@@ -284,36 +264,36 @@ impl ExecutionProvider for TensorRTExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
 		#[cfg(any(feature = "load-dynamic", feature = "tensorrt"))]
 		{
-			use crate::AsPointer;
+			use core::ptr;
+
+			use crate::{AsPointer, environment::get_environment, ortsys, util};
 
 			// The TensorRT execution provider specifically is pretty picky about requiring an environment to be initialized by the
 			// time we register it. This isn't always the case in `ort`, so if we get to this point, let's make sure we have an
 			// environment initialized.
-			let _ = crate::environment::get_environment();
+			let _ = get_environment();
 
-			let mut trt_options: *mut ort_sys::OrtTensorRTProviderOptionsV2 = core::ptr::null_mut();
-			crate::ortsys![unsafe CreateTensorRTProviderOptions(&mut trt_options)?];
+			let mut trt_options: *mut ort_sys::OrtTensorRTProviderOptionsV2 = ptr::null_mut();
+			ortsys![unsafe CreateTensorRTProviderOptions(&mut trt_options)?];
+			let _guard = util::run_on_drop(|| {
+				ortsys![unsafe ReleaseTensorRTProviderOptions(trt_options)];
+			});
+
 			let ffi_options = self.options.to_ffi();
-
-			let res = crate::ortsys![unsafe UpdateTensorRTProviderOptions(
+			ortsys![unsafe UpdateTensorRTProviderOptions(
 				trt_options,
 				ffi_options.key_ptrs(),
 				ffi_options.value_ptrs(),
 				ffi_options.len()
-			)];
-			if let Err(e) = unsafe { crate::error::status_to_result(res) } {
-				crate::ortsys![unsafe ReleaseTensorRTProviderOptions(trt_options)];
-				return Err(e);
-			}
+			)?];
 
-			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_TensorRT_V2(session_builder.ptr_mut(), trt_options)];
-			crate::ortsys![unsafe ReleaseTensorRTProviderOptions(trt_options)];
-			return unsafe { crate::error::status_to_result(status) };
+			ortsys![unsafe SessionOptionsAppendExecutionProvider_TensorRT_V2(session_builder.ptr_mut(), trt_options)?];
+			return Ok(());
 		}
 
-		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
+		Err(RegisterError::MissingFeature)
 	}
 }

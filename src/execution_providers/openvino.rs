@@ -1,11 +1,7 @@
-use alloc::{format, string::ToString};
+use alloc::string::ToString;
 
-use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
-use crate::{
-	error::{Error, Result},
-	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
-	session::builder::SessionBuilder
-};
+use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
+use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -32,8 +28,7 @@ pub struct OpenVINOExecutionProvider {
 	options: ExecutionProviderOptions
 }
 
-unsafe impl Send for OpenVINOExecutionProvider {}
-unsafe impl Sync for OpenVINOExecutionProvider {}
+super::impl_ep!(arbitrary; OpenVINOExecutionProvider);
 
 impl OpenVINOExecutionProvider {
 	/// Overrides the accelerator hardware type and precision with these values at runtime. If this option is not
@@ -98,24 +93,6 @@ impl OpenVINOExecutionProvider {
 		self.options.set("model_priority", priority.as_str());
 		self
 	}
-
-	#[must_use]
-	pub fn build(self) -> ExecutionProviderDispatch {
-		self.into()
-	}
-}
-
-impl ArbitrarilyConfigurableExecutionProvider for OpenVINOExecutionProvider {
-	fn with_arbitrary_config(mut self, key: impl ToString, value: impl ToString) -> Self {
-		self.options.set(key.to_string(), value.to_string());
-		self
-	}
-}
-
-impl From<OpenVINOExecutionProvider> for ExecutionProviderDispatch {
-	fn from(value: OpenVINOExecutionProvider) -> Self {
-		ExecutionProviderDispatch::new(value)
-	}
 }
 
 impl ExecutionProvider for OpenVINOExecutionProvider {
@@ -128,27 +105,28 @@ impl ExecutionProvider for OpenVINOExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
 		#[cfg(any(feature = "load-dynamic", feature = "openvino"))]
 		{
 			use alloc::ffi::CString;
 			use core::ffi::c_char;
 
-			use crate::AsPointer;
+			use crate::{AsPointer, environment::get_environment, ortsys};
 
 			// Like TensorRT, the OpenVINO EP is also pretty picky about needing an environment by this point.
-			let _ = crate::environment::get_environment();
+			let _ = get_environment();
 
 			let ffi_options = self.options.to_ffi();
-			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO_V2(
+			ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO_V2(
 				session_builder.ptr_mut(),
 				ffi_options.key_ptrs(),
 				ffi_options.value_ptrs(),
 				ffi_options.len()
 			)?];
+
 			return Ok(());
 		}
 
-		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
+		Err(RegisterError::MissingFeature)
 	}
 }

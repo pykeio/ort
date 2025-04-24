@@ -1,11 +1,7 @@
-use alloc::{format, string::ToString};
+use alloc::string::ToString;
 
-use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
-use crate::{
-	error::{Error, Result},
-	execution_providers::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderDispatch},
-	session::builder::SessionBuilder
-};
+use super::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderOptions, RegisterError};
+use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -33,6 +29,8 @@ pub enum CANNImplementationMode {
 pub struct CANNExecutionProvider {
 	options: ExecutionProviderOptions
 }
+
+super::impl_ep!(arbitrary; CANNExecutionProvider);
 
 impl CANNExecutionProvider {
 	#[must_use]
@@ -120,24 +118,6 @@ impl CANNExecutionProvider {
 		self.options.set("optypelist_for_impl_mode", list.to_string());
 		self
 	}
-
-	#[must_use]
-	pub fn build(self) -> ExecutionProviderDispatch {
-		self.into()
-	}
-}
-
-impl ArbitrarilyConfigurableExecutionProvider for CANNExecutionProvider {
-	fn with_arbitrary_config(mut self, key: impl ToString, value: impl ToString) -> Self {
-		self.options.set(key.to_string(), value.to_string());
-		self
-	}
-}
-
-impl From<CANNExecutionProvider> for ExecutionProviderDispatch {
-	fn from(value: CANNExecutionProvider) -> Self {
-		ExecutionProviderDispatch::new(value)
-	}
 }
 
 impl ExecutionProvider for CANNExecutionProvider {
@@ -150,31 +130,32 @@ impl ExecutionProvider for CANNExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
 		#[cfg(any(feature = "load-dynamic", feature = "cann"))]
 		{
-			use crate::AsPointer;
+			use core::ptr;
 
-			let mut cann_options: *mut ort_sys::OrtCANNProviderOptions = core::ptr::null_mut();
-			crate::ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)?];
+			use crate::{AsPointer, ortsys, util};
+
+			let mut cann_options: *mut ort_sys::OrtCANNProviderOptions = ptr::null_mut();
+			ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)?];
+			let _guard = util::run_on_drop(|| {
+				ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
+			});
+
 			let ffi_options = self.options.to_ffi();
 
-			let res = crate::ortsys![unsafe UpdateCANNProviderOptions(
+			ortsys![unsafe UpdateCANNProviderOptions(
 				cann_options,
 				ffi_options.key_ptrs(),
 				ffi_options.value_ptrs(),
 				ffi_options.len()
-			)];
-			if let Err(e) = unsafe { crate::error::status_to_result(res) } {
-				crate::ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
-				return Err(e);
-			}
+			)?];
 
-			let status = crate::ortsys![unsafe SessionOptionsAppendExecutionProvider_CANN(session_builder.ptr_mut(), cann_options)];
-			crate::ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
-			return unsafe { crate::error::status_to_result(status) };
+			ortsys![unsafe SessionOptionsAppendExecutionProvider_CANN(session_builder.ptr_mut(), cann_options)?];
+			return Ok(());
 		}
 
-		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
+		Err(RegisterError::MissingFeature)
 	}
 }

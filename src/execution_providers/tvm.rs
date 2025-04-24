@@ -1,15 +1,7 @@
-use alloc::{format, string::String};
+use alloc::string::String;
 
-use crate::{
-	error::{Error, Result},
-	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
-	session::builder::SessionBuilder
-};
-
-#[cfg(all(not(feature = "load-dynamic"), feature = "tvm"))]
-extern "C" {
-	fn OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut ort_sys::OrtSessionOptions, opt_str: *const core::ffi::c_char) -> ort_sys::OrtStatusPtr;
-}
+use super::{ExecutionProvider, RegisterError};
+use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TVMExecutorType {
@@ -50,18 +42,7 @@ pub struct TVMExecutionProvider {
 	pub input_shapes: Option<String>
 }
 
-impl TVMExecutionProvider {
-	#[must_use]
-	pub fn build(self) -> ExecutionProviderDispatch {
-		self.into()
-	}
-}
-
-impl From<TVMExecutionProvider> for ExecutionProviderDispatch {
-	fn from(value: TVMExecutionProvider) -> Self {
-		ExecutionProviderDispatch::new(value)
-	}
-}
+super::impl_ep!(TVMExecutionProvider);
 
 impl ExecutionProvider for TVMExecutionProvider {
 	fn as_str(&self) -> &'static str {
@@ -69,12 +50,14 @@ impl ExecutionProvider for TVMExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
 		#[cfg(any(feature = "load-dynamic", feature = "tvm"))]
 		{
+			use alloc::format;
+
 			use crate::AsPointer;
 
-			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut ort_sys::OrtSessionOptions, opt_str: *const core::ffi::c_char) -> ort_sys::OrtStatusPtr);
+			super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut ort_sys::OrtSessionOptions, opt_str: *const core::ffi::c_char) -> ort_sys::OrtStatusPtr);
 			let mut option_string = Vec::new();
 			if let Some(check_hash) = self.check_hash {
 				option_string.push(format!("check_hash:{}", if check_hash { "True" } else { "False" }));
@@ -116,9 +99,11 @@ impl ExecutionProvider for TVMExecutionProvider {
 				option_string.push(format!("to_nhwc:{}", if to_nhwc { "True" } else { "False" }));
 			}
 			let options_string = alloc::ffi::CString::new(option_string.join(",")).expect("invalid option string");
-			return unsafe { crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_Tvm(session_builder.ptr_mut(), options_string.as_ptr())) };
+			return Ok(unsafe {
+				crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_Tvm(session_builder.ptr_mut(), options_string.as_ptr()))
+			}?);
 		}
 
-		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
+		Err(RegisterError::MissingFeature)
 	}
 }

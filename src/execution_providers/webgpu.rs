@@ -1,14 +1,7 @@
-use alloc::{
-	format,
-	string::{String, ToString}
-};
+use alloc::string::{String, ToString};
 
-use super::{ArbitrarilyConfigurableExecutionProvider, ExecutionProviderOptions};
-use crate::{
-	error::{Error, Result},
-	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
-	session::builder::SessionBuilder
-};
+use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
+use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WebGPUPreferredLayout {
@@ -87,6 +80,8 @@ pub struct WebGPUExecutionProvider {
 	options: ExecutionProviderOptions
 }
 
+super::impl_ep!(arbitrary; WebGPUExecutionProvider);
+
 impl WebGPUExecutionProvider {
 	#[must_use]
 	pub fn with_preferred_layout(mut self, layout: WebGPUPreferredLayout) -> Self {
@@ -159,24 +154,6 @@ impl WebGPUExecutionProvider {
 		self.options.set("WebGPU:enablePIXCapture", if enable { "1" } else { "0" });
 		self
 	}
-
-	#[must_use]
-	pub fn build(self) -> ExecutionProviderDispatch {
-		self.into()
-	}
-}
-
-impl ArbitrarilyConfigurableExecutionProvider for WebGPUExecutionProvider {
-	fn with_arbitrary_config(mut self, key: impl ToString, value: impl ToString) -> Self {
-		self.options.set(key.to_string(), value.to_string());
-		self
-	}
-}
-
-impl From<WebGPUExecutionProvider> for ExecutionProviderDispatch {
-	fn from(value: WebGPUExecutionProvider) -> Self {
-		ExecutionProviderDispatch::new(value)
-	}
 }
 
 impl ExecutionProvider for WebGPUExecutionProvider {
@@ -189,13 +166,13 @@ impl ExecutionProvider for WebGPUExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
 		#[cfg(any(feature = "load-dynamic", feature = "webgpu"))]
 		{
-			use crate::AsPointer;
+			use crate::{AsPointer, ortsys};
 
 			let ffi_options = self.options.to_ffi();
-			crate::ortsys![unsafe SessionOptionsAppendExecutionProvider(
+			ortsys![unsafe SessionOptionsAppendExecutionProvider(
 				session_builder.ptr_mut(),
 				c"WebGPU".as_ptr().cast::<core::ffi::c_char>(),
 				ffi_options.key_ptrs(),
@@ -205,6 +182,6 @@ impl ExecutionProvider for WebGPUExecutionProvider {
 			return Ok(());
 		}
 
-		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
+		Err(RegisterError::MissingFeature)
 	}
 }

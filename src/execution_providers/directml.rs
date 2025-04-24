@@ -1,37 +1,18 @@
-use alloc::format;
-
-use crate::{
-	error::{Error, Result},
-	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
-	session::builder::SessionBuilder
-};
-
-#[cfg(all(not(feature = "load-dynamic"), feature = "directml"))]
-extern "C" {
-	fn OrtSessionOptionsAppendExecutionProvider_DML(options: *mut ort_sys::OrtSessionOptions, device_id: core::ffi::c_int) -> ort_sys::OrtStatusPtr;
-}
+use super::{ExecutionProvider, RegisterError};
+use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Default, Clone)]
 pub struct DirectMLExecutionProvider {
 	device_id: i32
 }
 
+super::impl_ep!(DirectMLExecutionProvider);
+
 impl DirectMLExecutionProvider {
 	#[must_use]
 	pub fn with_device_id(mut self, device_id: i32) -> Self {
 		self.device_id = device_id;
 		self
-	}
-
-	#[must_use]
-	pub fn build(self) -> ExecutionProviderDispatch {
-		self.into()
-	}
-}
-
-impl From<DirectMLExecutionProvider> for ExecutionProviderDispatch {
-	fn from(value: DirectMLExecutionProvider) -> Self {
-		ExecutionProviderDispatch::new(value)
 	}
 }
 
@@ -45,15 +26,17 @@ impl ExecutionProvider for DirectMLExecutionProvider {
 	}
 
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
 		#[cfg(any(feature = "load-dynamic", feature = "directml"))]
 		{
 			use crate::AsPointer;
 
-			super::get_ep_register!(OrtSessionOptionsAppendExecutionProvider_DML(options: *mut ort_sys::OrtSessionOptions, device_id: core::ffi::c_int) -> ort_sys::OrtStatusPtr);
-			return unsafe { crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_DML(session_builder.ptr_mut(), self.device_id as _)) };
+			super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_DML(options: *mut ort_sys::OrtSessionOptions, device_id: core::ffi::c_int) -> ort_sys::OrtStatusPtr);
+			return Ok(unsafe {
+				crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_DML(session_builder.ptr_mut(), self.device_id as _))
+			}?);
 		}
 
-		Err(Error::new(format!("`{}` was not registered because its corresponding Cargo feature is not enabled.", self.as_str())))
+		Err(RegisterError::MissingFeature)
 	}
 }

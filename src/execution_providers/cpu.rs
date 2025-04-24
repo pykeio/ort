@@ -1,32 +1,18 @@
-use crate::{
-	AsPointer,
-	error::Result,
-	execution_providers::{ExecutionProvider, ExecutionProviderDispatch},
-	ortsys,
-	session::builder::SessionBuilder
-};
+use super::{ExecutionProvider, RegisterError};
+use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 
 #[derive(Debug, Default, Clone)]
 pub struct CPUExecutionProvider {
 	use_arena: bool
 }
 
+super::impl_ep!(CPUExecutionProvider);
+
 impl CPUExecutionProvider {
 	#[must_use]
 	pub fn with_arena_allocator(mut self, enable: bool) -> Self {
 		self.use_arena = enable;
 		self
-	}
-
-	#[must_use]
-	pub fn build(self) -> ExecutionProviderDispatch {
-		self.into()
-	}
-}
-
-impl From<CPUExecutionProvider> for ExecutionProviderDispatch {
-	fn from(value: CPUExecutionProvider) -> Self {
-		ExecutionProviderDispatch::new(value)
 	}
 }
 
@@ -44,7 +30,7 @@ impl ExecutionProvider for CPUExecutionProvider {
 		true
 	}
 
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
 		if self.use_arena {
 			ortsys![unsafe EnableCpuMemArena(session_builder.ptr_mut())?];
 		} else {

@@ -10,7 +10,7 @@ use core::{
 	ffi::{CStr, c_char},
 	fmt,
 	marker::PhantomData,
-	mem::{self, MaybeUninit},
+	mem::{self, ManuallyDrop, MaybeUninit},
 	ptr, slice
 };
 
@@ -480,4 +480,22 @@ where
 	} else {
 		run_with_heap_cstr_array(strings, f)
 	}
+}
+
+#[allow(unused)]
+pub(crate) struct RunOnDrop<F: FnOnce()> {
+	runner: ManuallyDrop<F>
+}
+
+impl<F: FnOnce()> Drop for RunOnDrop<F> {
+	#[inline]
+	fn drop(&mut self) {
+		let runner = unsafe { ptr::read(&*self.runner) };
+		runner()
+	}
+}
+
+#[allow(unused)]
+pub(crate) fn run_on_drop<F: FnOnce()>(f: F) -> RunOnDrop<F> {
+	RunOnDrop { runner: ManuallyDrop::new(f) }
 }

@@ -499,7 +499,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 	} else {
 		#[cfg(feature = "download-binaries")]
 		{
-			if env::var("CARGO_NET_OFFLINE").as_deref() == Ok("true") {
+			if env::var("CARGO_NET_OFFLINE").as_deref() == Ok("true") || env::var("ORT_DOWNLOAD_BINARIES").as_deref() == Ok("false") {
 				return (PathBuf::default(), true);
 			}
 

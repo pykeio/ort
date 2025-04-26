@@ -10,6 +10,7 @@ const ONNXRUNTIME_VERSION: &str = "1.21.1";
 const ORT_ENV_SYSTEM_LIB_LOCATION: &str = "ORT_LIB_LOCATION";
 const ORT_ENV_SYSTEM_LIB_PROFILE: &str = "ORT_LIB_PROFILE";
 const ORT_ENV_PREFER_DYNAMIC_LINK: &str = "ORT_PREFER_DYNAMIC_LINK";
+const ORT_ENV_SKIP_DOWNLOAD: &str = "ORT_SKIP_DOWNLOAD";
 const ORT_ENV_CXX_STDLIB: &str = "ORT_CXX_STDLIB";
 const ENV_CXXSTDLIB: &str = "CXXSTDLIB"; // Used by the `cc` crate - we should mirror if this is set for other C++ crates
 #[cfg(feature = "download-binaries")]
@@ -206,6 +207,13 @@ fn static_link_prerequisites(using_pyke_libs: bool) {
 
 fn prefer_dynamic_linking() -> bool {
 	match env::var(ORT_ENV_PREFER_DYNAMIC_LINK) {
+		Ok(val) => val == "1" || val.to_lowercase() == "true",
+		Err(_) => false
+	}
+}
+
+fn skip_download() -> bool {
+	match env::var(ORT_ENV_SKIP_DOWNLOAD) {
 		Ok(val) => val == "1" || val.to_lowercase() == "true",
 		Err(_) => false
 	}
@@ -499,7 +507,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 	} else {
 		#[cfg(feature = "download-binaries")]
 		{
-			if env::var("CARGO_NET_OFFLINE").as_deref() == Ok("true") || env::var("ORT_DOWNLOAD_BINARIES").as_deref() == Ok("false") {
+			if env::var("CARGO_NET_OFFLINE").as_deref() == Ok("true") || skip_download() {
 				return (PathBuf::default(), true);
 			}
 
@@ -626,6 +634,7 @@ fn real_main(link: bool) {
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_SYSTEM_LIB_LOCATION);
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_SYSTEM_LIB_PROFILE);
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_PREFER_DYNAMIC_LINK);
+	println!("cargo:rerun-if-env-changed={}", ORT_ENV_SKIP_DOWNLOAD);
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_CXX_STDLIB);
 	println!("cargo:rerun-if-env-changed={}", ENV_CXXSTDLIB);
 

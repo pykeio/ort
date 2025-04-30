@@ -281,3 +281,45 @@ impl ExecutionProvider for CUDAExecutionProvider {
 		Err(RegisterError::MissingFeature)
 	}
 }
+
+#[cfg(windows)]
+pub const CUDA_DYLIBS: &[&str] = &["cublasLt64_12.dll", "cublas64_12.dll", "cufft64_11.dll", "cudart64_12.dll"];
+#[cfg(not(windows))]
+pub const CUDA_DYLIBS: &[&str] = &["libcublasLt.so.12", "libcublas.so.12", "libnvrtc.so.12", "libcurand.so.10", "libcufft.so.11", "libcudart.so.12"];
+
+#[cfg(windows)]
+pub const CUDNN_DYLIBS: &[&str] = &[
+	"cudnn_engines_runtime_compiled64_9.dll",
+	"cudnn_engines_precompiled64_9.dll",
+	"cudnn_heuristic64_9.dll",
+	"cudnn_ops64_9.dll",
+	"cudnn_adv64_9.dll",
+	"cudnn_graph64_9.dll",
+	"cudnn64_9.dll"
+];
+#[cfg(not(windows))]
+pub const CUDNN_DYLIBS: &[&str] = &[
+	"libcudnn_engines_runtime_compiled.so.9",
+	"libcudnn_engines_precompiled.so.9",
+	"libcudnn_heuristic.so.9",
+	"libcudnn_ops.so.9",
+	"libcudnn_adv.so.9",
+	"libcudnn_graph.so.9",
+	"libcudnn.so.9"
+];
+
+#[cfg(feature = "load-dynamic")]
+pub fn preload_dylibs(cuda_root_dir: Option<&std::path::Path>, cudnn_root_dir: Option<&std::path::Path>) -> Result<()> {
+	use crate::util::preload_dylib;
+	if let Some(cuda_root_dir) = cuda_root_dir {
+		for dylib in CUDA_DYLIBS {
+			preload_dylib(cuda_root_dir.join(dylib)).map_err(|e| crate::Error::new(format!("Failed to preload `{dylib}`: {e}")))?;
+		}
+	}
+	if let Some(cudnn_root_dir) = cudnn_root_dir {
+		for dylib in CUDNN_DYLIBS {
+			preload_dylib(cudnn_root_dir.join(dylib)).map_err(|e| crate::Error::new(format!("Failed to preload `{dylib}`: {e}")))?;
+		}
+	}
+	Ok(())
+}

@@ -499,3 +499,11 @@ impl<F: FnOnce()> Drop for RunOnDrop<F> {
 pub(crate) fn run_on_drop<F: FnOnce()>(f: F) -> RunOnDrop<F> {
 	RunOnDrop { runner: ManuallyDrop::new(f) }
 }
+
+#[cfg(feature = "load-dynamic")]
+pub fn preload_dylib<P: AsRef<std::ffi::OsStr>>(path: P) -> Result<(), libloading::Error> {
+	let library = unsafe { libloading::Library::new(path) }?;
+	// Do not run `FreeLibrary` so the library remains in the loaded modules list.
+	mem::forget(library);
+	Ok(())
+}

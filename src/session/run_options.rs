@@ -370,6 +370,10 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 		ortsys![unsafe RunOptionsGetRunLogVerbosityLevel(self.ptr(), &mut verbosity)?];
 		Ok(verbosity)
 	}
+
+	pub fn disable_device_sync(&mut self) -> Result<()> {
+		self.add_config_entry("disable_synchronize_execution_providers", "1")
+	}
 }
 
 impl<O: SelectedOutputMarker> AsPointer for RunOptions<O> {

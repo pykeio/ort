@@ -28,7 +28,7 @@
 - **[Supabase](https://supabase.com/)** uses `ort` to remove cold starts for their edge functions.
 - **[Lantern](https://github.com/lanterndata/lantern_extras)** uses `ort` to provide embedding model inference inside Postgres.
 - **[Magika](https://github.com/google/magika)** uses `ort` for content type detection.
-- **[`sbv2-api`](https://github.com/tuna2134/sbv2-api)** is a fast implementation of Style-BERT-VITS2 text-to-speech using `ort`.
+- **[`sbv2-api`](https://github.com/neodyland/sbv2-api)** is a fast implementation of Style-BERT-VITS2 text-to-speech using `ort`.
 - **[Ahnlich](https://github.com/deven96/ahnlich)** uses `ort` to power their AI proxy for semantic search applications.
 - **[Spacedrive](https://github.com/spacedriveapp/spacedrive)** is a cross-platform file manager with AI features powered by `ort`.
 - **[BoquilaHUB](https://github.com/boquila/boquilahub/)** uses `ort` for local AI deployment in biodiversity conservation efforts.

@@ -142,14 +142,19 @@ impl IoBinding {
 	/// `name`.
 	///
 	/// [`Tensor::new`]: crate::value::Tensor::new
-	pub fn bind_output<T: ValueTypeMarker + ?Sized, S: Into<String>>(&mut self, name: S, ort_value: Value<T>) -> Result<()> {
+	pub fn bind_output<T: ValueTypeMarker + ?Sized, S: Into<String>>(&mut self, name: S, mut ort_value: Value<T>) -> Result<()> {
 		let name: String = name.into();
+		unsafe { self.bind_output_mut(name.as_bytes(), &mut ort_value) }?;
+		self.output_values.insert(name, Some(ort_value.into_dyn()));
+		Ok(())
+	}
+
+	pub(crate) unsafe fn bind_output_mut<T: ValueTypeMarker + ?Sized, S: AsRef<[u8]>>(&mut self, name: S, ort_value: &mut Value<T>) -> Result<()> {
 		let ptr = self.ptr_mut();
-		with_cstr(name.as_bytes(), &|name| {
+		with_cstr(name.as_ref(), &|name| {
 			ortsys![unsafe BindOutput(ptr, name.as_ptr(), ort_value.ptr())?];
 			Ok(())
 		})?;
-		self.output_values.insert(name, Some(ort_value.into_dyn()));
 		Ok(())
 	}
 

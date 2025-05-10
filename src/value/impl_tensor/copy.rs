@@ -1,12 +1,16 @@
+//! ONNX Runtime doesn't (currently) expose an API for inter-device copies, so we instead use a dummy model to copy the
+//! tensor & `IoBinding` to configure where the copy ends up.
+
 use alloc::{format, string::ToString};
+use core::ops::{Deref, DerefMut};
 
 use super::DefiniteTensorValueTypeMarker;
 use crate::{
-	OnceLock, Result, execution_providers as ep,
+	Error, OnceLock, Result, execution_providers as ep,
 	io_binding::IoBinding,
 	memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
 	session::{NoSelectedOutputs, RunOptions, Session, builder::GraphOptimizationLevel},
-	util::{MiniMap, Mutex},
+	util::{MiniMap, Mutex, MutexGuard},
 	value::Value
 };
 
@@ -88,9 +92,13 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # }
 	/// ```
 	pub fn to(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
-		self.to_inner(device, device_id, |session, binding| {
-			let output = session
-				.run_binding(binding)?
+		self.copy_to_inner(device, device_id, |identity_session| {
+			let target_memory_info = MemoryInfo::new(device, device_id, AllocatorType::Device, MemoryType::Default)?;
+			identity_session.binding.bind_output_to_device("output", &target_memory_info)?;
+
+			let output = identity_session
+				.session
+				.run_binding(&identity_session.binding)?
 				.remove("output")
 				.expect("identity model should have single output");
 			Ok(unsafe { output.transmute_type() })
@@ -114,81 +122,112 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # }
 	/// ```
 	pub fn to_async(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
-		self.to_inner(device, device_id, |session, binding| {
+		self.copy_to_inner(device, device_id, |identity_session| {
+			let target_memory_info = MemoryInfo::new(device, device_id, AllocatorType::Device, MemoryType::Default)?;
+			identity_session.binding.bind_output_to_device("output", &target_memory_info)?;
+
 			let options = IDENTITY_RUN_OPTIONS.get_or_try_init(|| -> Result<RunOptions> {
 				let mut options = RunOptions::new()?;
 				options.disable_device_sync()?;
 				Ok(options)
 			})?;
-			let output = session
-				.run_binding_with_options(binding, options)?
+			let output = identity_session
+				.session
+				.run_binding_with_options(&identity_session.binding, options)?
 				.remove("output")
 				.expect("identity model should have single output");
 			Ok(unsafe { output.transmute_type() })
 		})
 	}
 
-	fn to_inner(&self, device: AllocationDevice, device_id: i32, runner: impl Fn(&mut Session, &mut IoBinding) -> Result<Value<Type>>) -> Result<Value<Type>> {
-		// ONNX Runtime doesn't (currently) expose an API for inter-device copies, so we instead use a dummy model to copy the
-		// tensor & `IoBinding` to configure where the copy ends up.
+	/// Copies the contents of this tensor to another tensor potentially residing on a separate device.
+	///
+	/// ```
+	/// # use ort::{memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType}, session::Session, value::Tensor};
+	/// # fn main() -> ort::Result<()> {
+	/// # if false {
+	/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// let cuda_allocator = Allocator::new(
+	/// 	&session,
+	/// 	MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?
+	/// )?;
+	/// let cuda_tensor = Tensor::<f32>::new(&cuda_allocator, [1_usize, 3, 224, 224])?;
+	/// # }
+	/// # let cuda_tensor = Tensor::<f32>::new(&Allocator::default(), [1_usize, 3, 224, 224])?;
+	/// let mut cpu_tensor = Tensor::<f32>::new(&Allocator::default(), [1_usize, 3, 224, 224])?;;
+	///
+	/// cuda_tensor.copy_into(&mut cpu_tensor)?;
+	/// # Ok(())
+	/// # }
+	/// ```
+	pub fn copy_into(&self, target: &mut Value<Type>) -> Result<()> {
+		if self.dtype() != target.dtype() {
+			return Err(Error::new("target data type does not match source data type"));
+		} else if self.shape() != target.shape() {
+			return Err(Error::new("target shape does not match source shape"));
+		}
 
-		let target_memory_info = MemoryInfo::new(device, device_id, AllocatorType::Device, MemoryType::Default)?;
+		let target_memory_info = target.memory_info();
+		self.copy_to_inner(target_memory_info.allocation_device(), target_memory_info.device_id(), |identity_session| {
+			unsafe { identity_session.binding.bind_output_mut("output", target) }?;
+			identity_session.session.run_binding(&identity_session.binding)?;
+			Ok(())
+		})
+	}
 
+	/// Asynchronously copies the contents of this tensor to another tensor.
+	///
+	/// Unlike [`Tensor::copy_into`][crate::value::Tensor::copy_into], the device's stream will *not* be synchronized
+	/// (like via `cudaStreamSynchronize`); thus this function is most useful for host-to-device transfers.
+	///
+	/// ```
+	/// # use ort::{memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType}, session::Session, value::Tensor};
+	/// # fn main() -> ort::Result<()> {
+	/// let cpu_tensor = Tensor::<f32>::new(&Allocator::default(), [1_usize, 3, 224, 224])?;;
+	/// # if false {
+	/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// let cuda_allocator = Allocator::new(
+	/// 	&session,
+	/// 	MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?
+	/// )?;
+	/// let mut cuda_tensor = Tensor::<f32>::new(&cuda_allocator, [1_usize, 3, 224, 224])?;
+	/// # }
+	/// # let mut cuda_tensor = Tensor::<f32>::new(&Allocator::default(), [1_usize, 3, 224, 224])?;
+	///
+	/// cpu_tensor.copy_into_async(&mut cuda_tensor)?;
+	/// # Ok(())
+	/// # }
+	/// ```
+	pub fn copy_into_async(&self, target: &mut Value<Type>) -> Result<()> {
+		if self.dtype() != target.dtype() {
+			return Err(Error::new("target data type does not match source data type"));
+		} else if self.shape() != target.shape() {
+			return Err(Error::new("target shape does not match source shape"));
+		}
+
+		let target_memory_info = target.memory_info();
+		self.copy_to_inner(target_memory_info.allocation_device(), target_memory_info.device_id(), |identity_session| {
+			unsafe { identity_session.binding.bind_output_mut("output", target) }?;
+			let options = IDENTITY_RUN_OPTIONS.get_or_try_init(|| -> Result<RunOptions> {
+				let mut options = RunOptions::new()?;
+				options.disable_device_sync()?;
+				Ok(options)
+			})?;
+			identity_session.session.run_binding_with_options(&identity_session.binding, options)?;
+			Ok(())
+		})
+	}
+
+	fn copy_to_inner<F, T>(&self, device: AllocationDevice, device_id: i32, runner: F) -> Result<T>
+	where
+		F: FnOnce(&mut IdentitySession) -> Result<T>
+	{
 		let source_memory_info = self.memory_info();
 		let tensor_type = ort_sys::ONNXTensorElementDataType::from(*self.data_type());
-		let session_key = IdentitySessionKey {
-			src_device: source_memory_info.allocation_device(),
-			src_device_id: source_memory_info.device_id(),
-			target_device: device,
-			target_device_id: device_id,
-			dtype: tensor_type
-		};
 
-		let mut sessions = SESSIONS.get_or_init(|| Mutex::new(MiniMap::new())).lock();
-		let identity_session = match sessions.get_mut(&session_key) {
-			Some(entry) => entry,
-			None => {
-				let mut model_bytes = IDENTITY_MODEL.to_vec();
-				// Override the expected element type of the input & output nodes, respectively.
-				model_bytes[544] = tensor_type as u8;
-				model_bytes[604] = tensor_type as u8;
-
-				let (source_ep, target_ep) = (
-					// We enable `.error_on_failure()` here since `IoBinding::bind_output_to_device` will silently fall back to binding to CPU if the target
-					// device doesn't have an EP registered.
-					ep_for_device(source_memory_info.allocation_device(), source_memory_info.device_id())?.error_on_failure(),
-					ep_for_device(device, device_id)?.error_on_failure()
-				);
-
-				let mut builder = Session::builder()?
-					.with_optimization_level(GraphOptimizationLevel::Disable)?
-					// since these sessions are persistent for the lifetime of the program, keep them as lean as possible
-					// by disabling threading & memory optimizations (there's only 1 operation in the graph anyway)
-					.with_intra_threads(1)?
-					.with_inter_threads(1)?
-					.with_inter_op_spinning(false)?
-					.with_intra_op_spinning(false)?
-					.with_memory_pattern(false)?
-					.with_allocator(MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?)?
-					.with_no_environment_execution_providers()?;
-				// Avoid registering the same EP twice, since that's an error.
-				if source_ep.inner.as_str() != target_ep.inner.as_str() {
-					builder = builder.with_execution_providers([source_ep, target_ep])?;
-				} else {
-					builder = builder.with_execution_providers([source_ep])?;
-				}
-
-				let session = builder.commit_from_memory(&model_bytes)?;
-				let binding = session.create_binding()?;
-				sessions.insert(session_key.clone(), IdentitySession { session, binding });
-				sessions.get_mut(&session_key).expect("insert should have worked")
-			}
-		};
-
+		let mut identity_session = IdentitySessionHandle::new(source_memory_info, device, device_id, tensor_type)?;
 		identity_session.binding.bind_input("input", self)?;
-		identity_session.binding.bind_output_to_device("output", &target_memory_info)?;
-
-		runner(&mut identity_session.session, &mut identity_session.binding)
+		runner(&mut identity_session)
 	}
 }
 
@@ -216,6 +255,86 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Clone for Value<Type> {
 		let memory_info = self.memory_info();
 		self.to(memory_info.allocation_device(), memory_info.device_id())
 			.expect("Failed to clone tensor")
+	}
+}
+
+struct IdentitySessionHandle {
+	inner: &'static mut IdentitySession,
+	_guard: MutexGuard<'static, MiniMap<IdentitySessionKey, IdentitySession>>
+}
+
+impl IdentitySessionHandle {
+	fn new(
+		source_memory_info: &MemoryInfo,
+		target_device: AllocationDevice,
+		target_device_id: i32,
+		tensor_type: ort_sys::ONNXTensorElementDataType
+	) -> Result<Self> {
+		let session_key = IdentitySessionKey {
+			src_device: source_memory_info.allocation_device(),
+			src_device_id: source_memory_info.device_id(),
+			target_device,
+			target_device_id,
+			dtype: tensor_type
+		};
+		let mut sessions = SESSIONS.get_or_init(|| Mutex::new(MiniMap::new())).lock();
+		let identity_session = match sessions.get_mut(&session_key) {
+			Some(entry) => entry,
+			None => {
+				let mut model_bytes = IDENTITY_MODEL.to_vec();
+				// Override the expected element type of the input & output nodes, respectively.
+				model_bytes[544] = tensor_type as u8;
+				model_bytes[604] = tensor_type as u8;
+
+				let (source_ep, target_ep) = (
+					// We enable `.error_on_failure()` here since `IoBinding::bind_output_to_device` will silently fall back to binding to CPU if the target
+					// device doesn't have an EP registered.
+					ep_for_device(source_memory_info.allocation_device(), source_memory_info.device_id())?.error_on_failure(),
+					ep_for_device(target_device, target_device_id)?.error_on_failure()
+				);
+
+				let mut builder = Session::builder()?
+					.with_optimization_level(GraphOptimizationLevel::Disable)?
+					// since these sessions are persistent for the lifetime of the program, keep them as lean as possible
+					// by disabling threading & memory optimizations (there's only 1 operation in the graph anyway)
+					.with_intra_threads(1)?
+					.with_inter_threads(1)?
+					.with_inter_op_spinning(false)?
+					.with_intra_op_spinning(false)?
+					.with_memory_pattern(false)?
+					.with_allocator(MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?)?
+					.with_no_environment_execution_providers()?;
+				// Avoid registering the same EP twice, since that's an error.
+				if source_ep.inner.as_str() != target_ep.inner.as_str() {
+					builder = builder.with_execution_providers([source_ep, target_ep])?;
+				} else {
+					builder = builder.with_execution_providers([source_ep])?;
+				}
+
+				let session = builder.commit_from_memory(&model_bytes)?;
+				let binding = session.create_binding()?;
+				sessions.insert(session_key.clone(), IdentitySession { session, binding });
+				sessions.get_mut(&session_key).expect("insert should have worked")
+			}
+		};
+
+		Ok(Self {
+			inner: unsafe { core::mem::transmute::<&mut IdentitySession, &'static mut IdentitySession>(identity_session) },
+			_guard: sessions
+		})
+	}
+}
+
+impl Deref for IdentitySessionHandle {
+	type Target = IdentitySession;
+	fn deref(&self) -> &Self::Target {
+		self.inner
+	}
+}
+
+impl DerefMut for IdentitySessionHandle {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		self.inner
 	}
 }
 
@@ -260,6 +379,54 @@ mod tests {
 		let tensor = Tensor::<f32>::from_array(([1, 5], vec![2.167892, 333., 1.0, -0.0, f32::EPSILON]))?;
 
 		let cuda_tensor = tensor.to_async(AllocationDevice::CUDA, 0)?;
+		let cpu_tensor = cuda_tensor.to(AllocationDevice::CPU, 0)?;
+		assert_eq!(tensor.extract_tensor(), cpu_tensor.extract_tensor());
+
+		Ok(())
+	}
+
+	#[test]
+	#[cfg(feature = "cuda")]
+	fn test_copy_into_cuda() -> crate::Result<()> {
+		use crate::{
+			execution_providers::CUDAExecutionProvider,
+			memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
+			session::Session
+		};
+
+		let dummy_session = Session::builder()?
+			.with_execution_providers([CUDAExecutionProvider::default().build()])?
+			.commit_from_file("tests/data/upsample.ort")?;
+
+		let allocator = Allocator::new(&dummy_session, MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?)?;
+		let tensor = Tensor::<f32>::from_array(([1, 5], vec![2.167892, 333., 1.0, -0.0, f32::EPSILON]))?;
+		let mut cuda_tensor = Tensor::<f32>::new(&allocator, [1_i64, 5])?;
+
+		tensor.copy_into(&mut cuda_tensor)?;
+		let cpu_tensor = cuda_tensor.to(AllocationDevice::CPU, 0)?;
+		assert_eq!(tensor.extract_tensor(), cpu_tensor.extract_tensor());
+
+		Ok(())
+	}
+
+	#[test]
+	#[cfg(feature = "cuda")]
+	fn test_copy_into_async_cuda() -> crate::Result<()> {
+		use crate::{
+			execution_providers::CUDAExecutionProvider,
+			memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
+			session::Session
+		};
+
+		let dummy_session = Session::builder()?
+			.with_execution_providers([CUDAExecutionProvider::default().build()])?
+			.commit_from_file("tests/data/upsample.ort")?;
+
+		let allocator = Allocator::new(&dummy_session, MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?)?;
+		let tensor = Tensor::<f32>::from_array(([1, 5], vec![2.167892, 333., 1.0, -0.0, f32::EPSILON]))?;
+		let mut cuda_tensor = Tensor::<f32>::new(&allocator, [1_i64, 5])?;
+
+		tensor.copy_into_async(&mut cuda_tensor)?;
 		let cpu_tensor = cuda_tensor.to(AllocationDevice::CPU, 0)?;
 		assert_eq!(tensor.extract_tensor(), cpu_tensor.extract_tensor());
 

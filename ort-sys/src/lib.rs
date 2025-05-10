@@ -10,9 +10,7 @@ extern crate core;
 #[cfg(feature = "std")]
 pub mod internal;
 
-// note to future self, 1.22 will require the values returned by GetMapValueType, GetSequenceElementType, and
-// GetOptionalContainedTypeInfo to be released with ReleaseTypeInfo
-pub const ORT_API_VERSION: u32 = 21;
+pub const ORT_API_VERSION: u32 = 22;
 
 pub use core::ffi::{c_char, c_int, c_ulong, c_ulonglong, c_ushort, c_void};
 

@@ -3,3 +3,4 @@ ignore:
   - "src/tensor/types.rs"
   - "ort-sys"
   - "backends"
+comment: false

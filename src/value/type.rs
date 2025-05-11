@@ -7,7 +7,7 @@ use core::{ffi::CStr, fmt, ptr};
 use smallvec::{SmallVec, smallvec};
 
 use crate::{
-	ortsys,
+	Result, ortsys,
 	tensor::{Shape, SymbolicDimensions, TensorElementType},
 	util::{self, with_cstr_ptr_array}
 };
@@ -162,6 +162,33 @@ impl ValueType {
 			}
 			_ => None
 		}
+	}
+
+	/// Converts this type to an [`ort_sys::OrtTypeInfo`] using the Model Editor API, so it shouldn't be used outside of
+	/// `crate::editor`
+	pub(crate) fn to_type_info(&self) -> Result<*mut ort_sys::OrtTypeInfo> {
+		let mut info_ptr: *mut ort_sys::OrtTypeInfo = ptr::null_mut();
+		match self {
+			Self::Tensor { .. } => {
+				let tensor_type_info = self.to_tensor_type_info().expect("infallible");
+				let _guard = util::run_on_drop(|| ortsys![unsafe ReleaseTensorTypeAndShapeInfo(tensor_type_info)]);
+				ortsys![@editor: unsafe CreateTensorTypeInfo(tensor_type_info, &mut info_ptr)?];
+			}
+			Self::Map { .. } => {
+				todo!();
+			}
+			Self::Sequence(ty) => {
+				let el_type = ty.to_type_info()?;
+				let _guard = util::run_on_drop(|| ortsys![unsafe ReleaseTypeInfo(el_type)]);
+				ortsys![@editor: unsafe CreateSequenceTypeInfo(el_type, &mut info_ptr)?];
+			}
+			Self::Optional(ty) => {
+				let ty = ty.to_type_info()?;
+				let _guard = util::run_on_drop(|| ortsys![unsafe ReleaseTypeInfo(ty)]);
+				ortsys![@editor: unsafe CreateOptionalTypeInfo(ty, &mut info_ptr)?];
+			}
+		}
+		Ok(info_ptr)
 	}
 
 	/// Returns the shape of this value type if it is a tensor, or `None` if it is a sequence or map.

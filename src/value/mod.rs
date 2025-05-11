@@ -69,9 +69,9 @@ impl AsPointer for ValueInner {
 
 impl Drop for ValueInner {
 	fn drop(&mut self) {
-		let ptr = self.ptr_mut();
-		crate::trace!("dropping value at {ptr:p}");
 		if self.drop {
+			let ptr = self.ptr_mut();
+			crate::trace!("dropping value at {ptr:p}");
 			ortsys![unsafe ReleaseValue(ptr)];
 		}
 	}

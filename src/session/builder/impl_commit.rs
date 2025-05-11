@@ -176,7 +176,7 @@ impl SessionBuilder {
 		self.commit_finalize(unsafe { NonNull::new_unchecked(session_ptr) })
 	}
 
-	fn commit_finalize(mut self, ptr: NonNull<ort_sys::OrtSession>) -> Result<Session> {
+	pub(crate) fn commit_finalize(mut self, ptr: NonNull<ort_sys::OrtSession>) -> Result<Session> {
 		let allocator = match &self.memory_info {
 			Some(info) => {
 				let mut allocator_ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();

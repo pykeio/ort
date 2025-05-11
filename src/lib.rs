@@ -25,6 +25,7 @@ pub mod __private {
 pub(crate) mod private;
 
 pub mod adapter;
+pub mod editor;
 pub mod environment;
 pub mod error;
 pub mod execution_providers;
@@ -40,6 +41,11 @@ pub mod tensor;
 pub mod training;
 pub mod util;
 pub mod value;
+pub mod api {
+	#[cfg(feature = "training")]
+	pub use super::training::training_api as training;
+	pub use super::{api as ort, editor::editor_api as editor};
+}
 
 #[cfg(feature = "load-dynamic")]
 use alloc::sync::Arc;
@@ -220,38 +226,39 @@ macro_rules! ortsys {
 	($method:ident) => {
 		($crate::api().$method)
 	};
-	(unsafe $method:ident($($n:expr),+ $(,)?)) => {
-		unsafe { ($crate::api().$method)($($n),+) }
+	(unsafe $method:ident($($n:expr),* $(,)?)) => {
+		ortsys![@ort: unsafe $method($($n),*)]
 	};
-	(unsafe $method:ident($($n:expr),+ $(,)?).expect($e:expr)) => {
-		unsafe { $crate::error::status_to_result(($crate::api().$method)($($n),+)) }.expect($e)
+	(unsafe $method:ident($($n:expr),* $(,)?).expect($e:expr)) => {
+		ortsys![@ort: unsafe $method($($n),*) as Result].expect($e)
 	};
-	(unsafe $method:ident($($n:expr),+ $(,)?).expect($e:expr); nonNull($($check:ident),+ $(,)?)$(;)?) => {{
-		unsafe { $crate::error::status_to_result(($crate::api().$method)($($n),+)) }.expect($e);
-		$(
-			// TODO: #[cfg(debug_assertions)]?
-			if ($check).is_null() {
-				$crate::util::cold();
-				panic!(concat!("expected `", stringify!($check), "` to not be null"));
-			}
-		)+
+	(unsafe $method:ident($($n:expr),* $(,)?).expect($e:expr); nonNull($($check:ident),+ $(,)?)$(;)?) => {{
+		ortsys![unsafe $method($($n),*).expect($e)];
+		ortsys![@nonNull_panic; $($check),+];
 	}};
-	(unsafe $method:ident($($n:expr),+ $(,)?); nonNull($($check:ident),+ $(,)?)$(;)?) => {{
-		let _x = unsafe { ($crate::api().$method)($($n),+) };
-		$(
-			// TODO: #[cfg(debug_assertions)]?
-			if ($check).is_null() {
-				$crate::util::cold();
-				panic!(concat!("expected `", stringify!($check), "` to not be null"));
-			}
-		)+
+	(unsafe $method:ident($($n:expr),* $(,)?); nonNull($($check:ident),+ $(,)?)$(;)?) => {{
+		let _x = ortsys![unsafe $method($($n),*)];
+		ortsys![@nonNull_panic; $($check),+];
 		_x
 	}};
-	(unsafe $method:ident($($n:expr),+ $(,)?)?) => {
-		unsafe { $crate::error::status_to_result(($crate::api().$method)($($n),+)) }?;
+	(unsafe $method:ident($($n:expr),* $(,)?)?) => {
+		ortsys![@ort: unsafe $method($($n),+) as Result]?;
 	};
-	(unsafe $method:ident($($n:expr),+ $(,)?)?; nonNull($($check:ident),+ $(,)?)$(;)?) => {{
-		unsafe { $crate::error::status_to_result(($crate::api().$method)($($n),+)) }?;
+	(unsafe $method:ident($($n:expr),* $(,)?)?; nonNull($($check:ident),+)$(;)?) => {{
+		ortsys![unsafe $method($($n),*)?];
+		ortsys![@nonNull?; $($check),+];
+	}};
+
+	(@nonNull_panic; $($check:ident),+) => {
+		$(
+			// TODO: #[cfg(debug_assertions)]?
+			if ($check).is_null() {
+				$crate::util::cold();
+				$crate::__private::core::panic!(concat!("expected `", stringify!($check), "` to not be null"));
+			}
+		)+
+	};
+	(@nonNull?; $($check:ident),+) => {
 		$(
 			// TODO: #[cfg(debug_assertions)]?
 			if ($check).is_null() {
@@ -259,7 +266,27 @@ macro_rules! ortsys {
 				return Err($crate::Error::new(concat!("expected `", stringify!($check), "` to not be null")));
 			}
 		)+
+	};
+
+	(@ort: unsafe $method:ident($($n:expr),*)) => {
+		unsafe { ($crate::api().$method)($($n),*) }
+	};
+	(@ort: unsafe $method:ident($($n:expr),*) as Result) => {
+		unsafe { $crate::error::status_to_result(($crate::api().$method)($($n),+)) }
+	};
+	(@$api:ident: unsafe $method:ident($($n:expr),*)) => {
+		unsafe { ($crate::api::$api().unwrap().$method)($($n),+) }
+	};
+	(@$api:ident: unsafe $method:ident($($n:expr),*)?) => {
+		$crate::api::$api().and_then(|api| unsafe { $crate::error::status_to_result((api.$method)($($n),+)) })?
+	};
+	(@$api:ident: unsafe $method:ident($($n:expr),*)?; nonNull($($check:ident),+)$(;)?) => {{
+		$crate::api::$api().and_then(|api| unsafe { $crate::error::status_to_result((api.$method)($($n),+)) })?;
+		ortsys![@nonNull?; $($check),+];
 	}};
+	(@$api:ident: unsafe $method:ident($($n:expr),*) as Result) => {
+		$crate::api::$api().and_then(|api| unsafe { $crate::error::status_to_result((api.$method)($($n),+)) })
+	};
 }
 
 pub(crate) fn char_p_to_string(raw: *const c_char) -> Result<String> {

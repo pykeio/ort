@@ -3,6 +3,7 @@
 use alloc::{boxed::Box, ffi::CString, vec::Vec};
 use core::ptr::{self, NonNull};
 
+pub mod attribute;
 pub(crate) mod bound;
 pub mod io;
 pub mod kernel;
@@ -10,9 +11,10 @@ pub mod kernel;
 mod tests;
 
 use self::{
+	attribute::FromOpAttr,
 	bound::BoundOperator,
 	io::{OperatorInput, OperatorOutput},
-	kernel::{FromOpAttr, Kernel, KernelAttributes}
+	kernel::{Kernel, KernelAttributes}
 };
 use crate::{
 	AsPointer, Error,

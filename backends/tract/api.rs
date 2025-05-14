@@ -7,13 +7,15 @@ use std::{
 };
 
 use ort_sys::{
-	ExecutionMode, GraphOptimizationLevel, ONNXTensorElementDataType, ONNXType, OrtAllocator, OrtAllocatorType, OrtApi, OrtArenaCfg, OrtCANNProviderOptions,
-	OrtCUDAProviderOptions, OrtCUDAProviderOptionsV2, OrtCustomCreateThreadFn, OrtCustomJoinThreadFn, OrtCustomOp, OrtCustomOpDomain, OrtDnnlProviderOptions,
-	OrtEnv, OrtErrorCode, OrtIoBinding, OrtKernelContext, OrtKernelInfo, OrtLanguageProjection, OrtLogger, OrtLoggingFunction, OrtLoggingLevel, OrtLoraAdapter,
-	OrtMIGraphXProviderOptions, OrtMapTypeInfo, OrtMemType, OrtMemoryInfo, OrtMemoryInfoDeviceType, OrtModelMetadata, OrtOp, OrtOpAttr, OrtOpAttrType,
-	OrtOpenVINOProviderOptions, OrtOptionalTypeInfo, OrtPrepackedWeightsContainer, OrtROCMProviderOptions, OrtRunOptions, OrtSequenceTypeInfo, OrtSession,
-	OrtSessionOptions, OrtShapeInferContext, OrtSparseFormat, OrtSparseIndicesFormat, OrtStatus, OrtStatusPtr, OrtTensorRTProviderOptions,
-	OrtTensorRTProviderOptionsV2, OrtTensorTypeAndShapeInfo, OrtThreadingOptions, OrtTrainingApi, OrtTypeInfo, OrtValue, RunAsyncCallbackFn, ortchar
+	EpSelectionDelegate, ExecutionMode, GraphOptimizationLevel, ONNXTensorElementDataType, ONNXType, OrtAllocator, OrtAllocatorType, OrtApi, OrtArenaCfg,
+	OrtCANNProviderOptions, OrtCUDAProviderOptions, OrtCUDAProviderOptionsV2, OrtCompileApi, OrtCustomCreateThreadFn, OrtCustomJoinThreadFn, OrtCustomOp,
+	OrtCustomOpDomain, OrtDnnlProviderOptions, OrtEnv, OrtEpApi, OrtEpDevice, OrtErrorCode, OrtExecutionProviderDevicePolicy, OrtGraph, OrtHardwareDevice,
+	OrtHardwareDeviceType, OrtIoBinding, OrtKernelContext, OrtKernelInfo, OrtKeyValuePairs, OrtLanguageProjection, OrtLogger, OrtLoggingFunction,
+	OrtLoggingLevel, OrtLoraAdapter, OrtMIGraphXProviderOptions, OrtMapTypeInfo, OrtMemType, OrtMemoryInfo, OrtMemoryInfoDeviceType, OrtModel,
+	OrtModelEditorApi, OrtModelMetadata, OrtNode, OrtOp, OrtOpAttr, OrtOpAttrType, OrtOpenVINOProviderOptions, OrtOptionalTypeInfo,
+	OrtPrepackedWeightsContainer, OrtROCMProviderOptions, OrtRunOptions, OrtSequenceTypeInfo, OrtSession, OrtSessionOptions, OrtShapeInferContext,
+	OrtSparseFormat, OrtSparseIndicesFormat, OrtStatus, OrtStatusPtr, OrtTensorRTProviderOptions, OrtTensorRTProviderOptionsV2, OrtTensorTypeAndShapeInfo,
+	OrtThreadingOptions, OrtTrainingApi, OrtTypeInfo, OrtValue, OrtValueInfo, RunAsyncCallbackFn, ortchar
 };
 use tract_onnx::prelude::*;
 
@@ -1900,6 +1902,155 @@ unsafe extern "system" fn SetEpDynamicOptions(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+unsafe extern "system" fn ReleaseValueInfo(input: *mut OrtValueInfo) {}
+
+unsafe extern "system" fn ReleaseNode(input: *mut OrtNode) {}
+
+unsafe extern "system" fn ReleaseGraph(input: *mut OrtGraph) {}
+
+unsafe extern "system" fn ReleaseModel(input: *mut OrtModel) {}
+
+unsafe extern "system" fn GetValueInfoName(value_info: *const OrtValueInfo, name: *mut *const ::std::os::raw::c_char) -> OrtStatusPtr {
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+unsafe extern "system" fn GetValueInfoTypeInfo(value_info: *const OrtValueInfo, type_info: *mut *const OrtTypeInfo) -> OrtStatusPtr {
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+unsafe extern "system" fn GetModelEditorApi() -> *const OrtModelEditorApi {
+	ptr::null()
+}
+
+unsafe extern "system" fn CreateTensorWithDataAndDeleterAsOrtValue(
+	deleter: *mut OrtAllocator,
+	p_data: *mut ::std::os::raw::c_void,
+	p_data_len: usize,
+	shape: *const i64,
+	shape_len: usize,
+	r#type: ONNXTensorElementDataType,
+	out: *mut *mut OrtValue
+) -> OrtStatusPtr {
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+unsafe extern "system" fn SessionOptionsSetLoadCancellationFlag(options: *mut OrtSessionOptions, cancel: bool) -> OrtStatusPtr {
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+unsafe extern "system" fn GetCompileApi() -> *const OrtCompileApi {
+	ptr::null_mut()
+}
+
+unsafe extern "system" fn CreateKeyValuePairs(out: *mut *mut OrtKeyValuePairs) {
+	unsafe { *out = ptr::null_mut() };
+}
+
+unsafe extern "system" fn AddKeyValuePair(kvps: *mut OrtKeyValuePairs, key: *const ::std::os::raw::c_char, value: *const ::std::os::raw::c_char) {}
+
+unsafe extern "system" fn GetKeyValue(kvps: *const OrtKeyValuePairs, key: *const ::std::os::raw::c_char) -> *const ::std::os::raw::c_char {
+	ptr::null()
+}
+
+unsafe extern "system" fn GetKeyValuePairs(
+	kvps: *const OrtKeyValuePairs,
+	keys: *mut *const *const ::std::os::raw::c_char,
+	values: *mut *const *const ::std::os::raw::c_char,
+	num_entries: *mut usize
+) {
+}
+
+unsafe extern "system" fn RemoveKeyValuePair(kvps: *mut OrtKeyValuePairs, key: *const ::std::os::raw::c_char) {}
+
+unsafe extern "system" fn ReleaseKeyValuePairs(input: *mut OrtKeyValuePairs) {}
+
+unsafe extern "system" fn RegisterExecutionProviderLibrary(
+	env: *mut OrtEnv,
+	registration_name: *const ::std::os::raw::c_char,
+	path: *const ortchar
+) -> OrtStatusPtr {
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+unsafe extern "system" fn UnregisterExecutionProviderLibrary(env: *mut OrtEnv, registration_name: *const ::std::os::raw::c_char) -> OrtStatusPtr {
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+unsafe extern "system" fn GetEpDevices(env: *const OrtEnv, ep_devices: *mut *const *const OrtEpDevice, num_ep_devices: *mut usize) -> OrtStatusPtr {
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+unsafe extern "system" fn SessionOptionsAppendExecutionProvider_V2(
+	session_options: *mut OrtSessionOptions,
+	env: *mut OrtEnv,
+	ep_devices: *const *const OrtEpDevice,
+	num_ep_devices: usize,
+	ep_option_keys: *const *const ::std::os::raw::c_char,
+	ep_option_vals: *const *const ::std::os::raw::c_char,
+	num_ep_options: usize
+) -> OrtStatusPtr {
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+unsafe extern "system" fn SessionOptionsSetEpSelectionPolicy(
+	session_options: *mut OrtSessionOptions,
+	policy: OrtExecutionProviderDevicePolicy
+) -> OrtStatusPtr {
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+unsafe extern "system" fn SessionOptionsSetEpSelectionPolicyDelegate(
+	session_options: *mut OrtSessionOptions,
+	delegate: EpSelectionDelegate,
+	delegate_state: *mut ::std::os::raw::c_void
+) -> OrtStatusPtr {
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+unsafe extern "system" fn HardwareDevice_Type(device: *const OrtHardwareDevice) -> OrtHardwareDeviceType {
+	OrtHardwareDeviceType::OrtHardwareDeviceType_CPU
+}
+
+unsafe extern "system" fn HardwareDevice_VendorId(device: *const OrtHardwareDevice) -> u32 {
+	0
+}
+
+unsafe extern "system" fn HardwareDevice_Vendor(device: *const OrtHardwareDevice) -> *const ::std::os::raw::c_char {
+	ptr::null()
+}
+
+unsafe extern "system" fn HardwareDevice_DeviceId(device: *const OrtHardwareDevice) -> u32 {
+	0
+}
+
+unsafe extern "system" fn HardwareDevice_Metadata(device: *const OrtHardwareDevice) -> *const OrtKeyValuePairs {
+	ptr::null()
+}
+
+unsafe extern "system" fn EpDevice_EpName(ep_device: *const OrtEpDevice) -> *const ::std::os::raw::c_char {
+	ptr::null()
+}
+
+unsafe extern "system" fn EpDevice_EpVendor(ep_device: *const OrtEpDevice) -> *const ::std::os::raw::c_char {
+	ptr::null()
+}
+
+unsafe extern "system" fn EpDevice_EpMetadata(ep_device: *const OrtEpDevice) -> *const OrtKeyValuePairs {
+	ptr::null()
+}
+
+unsafe extern "system" fn EpDevice_EpOptions(ep_device: *const OrtEpDevice) -> *const OrtKeyValuePairs {
+	ptr::null()
+}
+
+unsafe extern "system" fn EpDevice_Device(ep_device: *const OrtEpDevice) -> *const OrtHardwareDevice {
+	ptr::null()
+}
+
+unsafe extern "system" fn GetEpApi() -> *const OrtEpApi {
+	ptr::null()
+}
+
 pub const fn api() -> OrtApi {
 	OrtApi {
 		CreateStatus,
@@ -2186,6 +2337,39 @@ pub const fn api() -> OrtApi {
 		CreateLoraAdapterFromArray,
 		ReleaseLoraAdapter,
 		RunOptionsAddActiveLoraAdapter,
-		SetEpDynamicOptions
+		SetEpDynamicOptions,
+		ReleaseValueInfo,
+		ReleaseNode,
+		ReleaseGraph,
+		ReleaseModel,
+		GetValueInfoName,
+		GetValueInfoTypeInfo,
+		GetModelEditorApi,
+		CreateTensorWithDataAndDeleterAsOrtValue,
+		SessionOptionsSetLoadCancellationFlag,
+		GetCompileApi,
+		CreateKeyValuePairs,
+		AddKeyValuePair,
+		GetKeyValue,
+		GetKeyValuePairs,
+		RemoveKeyValuePair,
+		ReleaseKeyValuePairs,
+		RegisterExecutionProviderLibrary,
+		UnregisterExecutionProviderLibrary,
+		GetEpDevices,
+		SessionOptionsAppendExecutionProvider_V2,
+		SessionOptionsSetEpSelectionPolicy,
+		SessionOptionsSetEpSelectionPolicyDelegate,
+		HardwareDevice_Type,
+		HardwareDevice_VendorId,
+		HardwareDevice_Vendor,
+		HardwareDevice_DeviceId,
+		HardwareDevice_Metadata,
+		EpDevice_EpName,
+		EpDevice_EpVendor,
+		EpDevice_EpMetadata,
+		EpDevice_EpOptions,
+		EpDevice_Device,
+		GetEpApi
 	}
 }

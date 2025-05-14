@@ -1,4 +1,4 @@
-use alloc::ffi::CString;
+use alloc::{ffi::CString, string::String, vec, vec::Vec};
 use core::{
 	ffi::c_char,
 	ptr::{self, NonNull}

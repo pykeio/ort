@@ -2413,7 +2413,6 @@ pub const fn api() -> OrtApi {
 		ReleaseLoraAdapter,
 		RunOptionsAddActiveLoraAdapter,
 		SetEpDynamicOptions,
-		SetEpDynamicOptions,
 		ReleaseValueInfo,
 		ReleaseNode,
 		ReleaseGraph,

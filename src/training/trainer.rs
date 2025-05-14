@@ -7,11 +7,12 @@ use std::path::Path;
 
 use ort_sys::c_char;
 
-use super::{Checkpoint, Optimizer, trainsys};
+use super::{Checkpoint, Optimizer, training_api};
 use crate::{
 	AsPointer, char_p_to_string,
 	error::{Result, status_to_result},
 	memory::Allocator,
+	ortsys,
 	session::{RunOptions, SessionInputValue, SessionInputs, SessionOutputs, builder::SessionBuilder},
 	tensor::IntoTensorElementType,
 	util::with_cstr_ptr_array,
@@ -45,7 +46,7 @@ impl Trainer {
 		let env = crate::environment::get_environment()?;
 
 		let mut ptr: *mut ort_sys::OrtTrainingSession = ptr::null_mut();
-		trainsys![unsafe CreateTrainingSession(env.ptr(), session_options.ptr(), ckpt.ptr.as_ptr(), training_model_path.as_ptr(), eval_model_path.as_ptr(), optimizer_model_path.as_ptr(), &mut ptr)?; nonNull(ptr)];
+		ortsys![@training: unsafe CreateTrainingSession(env.ptr(), session_options.ptr(), ckpt.ptr.as_ptr(), training_model_path.as_ptr(), eval_model_path.as_ptr(), optimizer_model_path.as_ptr(), &mut ptr)?; nonNull(ptr)];
 
 		let ptr = unsafe { NonNull::new_unchecked(ptr) };
 		Self::new_inner(ptr, allocator, ckpt)
@@ -84,7 +85,7 @@ impl Trainer {
 		let env = crate::environment::get_environment()?;
 
 		let mut ptr: *mut ort_sys::OrtTrainingSession = ptr::null_mut();
-		trainsys![
+		ortsys![@training:
 			unsafe CreateTrainingSessionFromBuffer(
 				env.ptr(),
 				session_options.ptr(),
@@ -105,15 +106,13 @@ impl Trainer {
 	}
 
 	fn new_inner(ptr: NonNull<ort_sys::OrtTrainingSession>, allocator: Allocator, ckpt: Checkpoint) -> Result<Self> {
+		let api = training_api()?;
 		let train_output_names =
-			extract_io_names(ptr, &allocator, trainsys![TrainingSessionGetTrainingModelOutputCount], trainsys![TrainingSessionGetTrainingModelOutputName])?;
-		let eval_output_names =
-			extract_io_names(ptr, &allocator, trainsys![TrainingSessionGetEvalModelOutputCount], trainsys![TrainingSessionGetEvalModelOutputName])?;
+			extract_io_names(ptr, &allocator, api.TrainingSessionGetTrainingModelOutputCount, api.TrainingSessionGetTrainingModelOutputName)?;
+		let eval_output_names = extract_io_names(ptr, &allocator, api.TrainingSessionGetEvalModelOutputCount, api.TrainingSessionGetEvalModelOutputName)?;
 
-		let train_input_names =
-			extract_io_names(ptr, &allocator, trainsys![TrainingSessionGetTrainingModelInputCount], trainsys![TrainingSessionGetTrainingModelInputName])?;
-		let eval_input_names =
-			extract_io_names(ptr, &allocator, trainsys![TrainingSessionGetEvalModelInputCount], trainsys![TrainingSessionGetEvalModelInputName])?;
+		let train_input_names = extract_io_names(ptr, &allocator, api.TrainingSessionGetTrainingModelInputCount, api.TrainingSessionGetTrainingModelInputName)?;
+		let eval_input_names = extract_io_names(ptr, &allocator, api.TrainingSessionGetEvalModelInputCount, api.TrainingSessionGetEvalModelInputName)?;
 
 		Ok(Self {
 			ptr,
@@ -173,7 +172,7 @@ impl Trainer {
 
 		let run_options_ptr = if let Some(run_options) = &run_options { run_options.ptr() } else { ptr::null() };
 
-		trainsys![unsafe TrainStep(self.ptr.as_ptr(), run_options_ptr, input_ort_values.len(), input_ort_values.as_ptr(), output_tensor_ptrs.len(), output_tensor_ptrs.as_mut_ptr())?];
+		ortsys![@training: unsafe TrainStep(self.ptr.as_ptr(), run_options_ptr, input_ort_values.len(), input_ort_values.as_ptr(), output_tensor_ptrs.len(), output_tensor_ptrs.as_mut_ptr())?];
 
 		let outputs = output_tensor_ptrs
 			.into_iter()
@@ -234,7 +233,7 @@ impl Trainer {
 
 		let run_options_ptr = if let Some(run_options) = &run_options { run_options.ptr() } else { ptr::null() };
 
-		trainsys![unsafe EvalStep(self.ptr.as_ptr(), run_options_ptr, input_ort_values.len(), input_ort_values.as_ptr(), output_tensor_ptrs.len(), output_tensor_ptrs.as_mut_ptr())?];
+		ortsys![@training: unsafe EvalStep(self.ptr.as_ptr(), run_options_ptr, input_ort_values.len(), input_ort_values.as_ptr(), output_tensor_ptrs.len(), output_tensor_ptrs.as_mut_ptr())?];
 
 		let outputs = output_tensor_ptrs
 			.into_iter()
@@ -251,7 +250,7 @@ impl Trainer {
 	pub fn export<O: AsRef<str>>(&self, out_path: impl AsRef<Path>, output_names: impl AsRef<[O]>) -> Result<()> {
 		let out_path = crate::util::path_to_os_char(out_path);
 		with_cstr_ptr_array(output_names.as_ref(), &|output_name_ptrs| {
-			trainsys![unsafe ExportModelForInferencing(self.ptr.as_ptr(), out_path.as_ptr(), output_name_ptrs.len(), output_name_ptrs.as_ptr())?];
+			ortsys![@training: unsafe ExportModelForInferencing(self.ptr.as_ptr(), out_path.as_ptr(), output_name_ptrs.len(), output_name_ptrs.as_ptr())?];
 			Ok(())
 		})?;
 		Ok(())
@@ -259,17 +258,17 @@ impl Trainer {
 
 	pub fn num_params(&self, trainable_only: bool) -> Result<usize> {
 		let mut out = 0;
-		trainsys![unsafe GetParametersSize(self.ptr.as_ptr(), &mut out, trainable_only)?];
+		ortsys![@training: unsafe GetParametersSize(self.ptr.as_ptr(), &mut out, trainable_only)?];
 		Ok(out)
 	}
 
 	pub fn copy_parameters_to<T: IntoTensorElementType + fmt::Debug>(&self, value: &mut Tensor<T>, trainable_only: bool) -> Result<()> {
-		trainsys![unsafe CopyParametersToBuffer(self.ptr.as_ptr(), value.ptr_mut(), trainable_only)?];
+		ortsys![@training: unsafe CopyParametersToBuffer(self.ptr.as_ptr(), value.ptr_mut(), trainable_only)?];
 		Ok(())
 	}
 
 	pub fn copy_parameters_from<T: IntoTensorElementType + fmt::Debug>(&mut self, value: &Tensor<T>, trainable_only: bool) -> Result<()> {
-		trainsys![unsafe CopyBufferToParameters(self.ptr.as_ptr(), value.ptr().cast_mut(), trainable_only)?];
+		ortsys![@training: unsafe CopyBufferToParameters(self.ptr.as_ptr(), value.ptr().cast_mut(), trainable_only)?];
 		Ok(())
 	}
 
@@ -293,7 +292,7 @@ impl AsPointer for Trainer {
 impl Drop for Trainer {
 	fn drop(&mut self) {
 		crate::trace!("dropping trainer");
-		trainsys![unsafe ReleaseTrainingSession(self.ptr.as_ptr())];
+		ortsys![@training: unsafe ReleaseTrainingSession(self.ptr.as_ptr())];
 	}
 }
 

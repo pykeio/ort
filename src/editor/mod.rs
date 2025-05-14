@@ -1,10 +1,9 @@
-use alloc::sync::Arc;
+use alloc::{ffi::CString, sync::Arc};
 use core::{
 	ffi::c_char,
 	mem,
 	ptr::{self, NonNull}
 };
-use std::ffi::CString;
 
 use smallvec::SmallVec;
 

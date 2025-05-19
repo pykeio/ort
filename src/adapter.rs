@@ -30,7 +30,7 @@ impl Drop for AdapterInner {
 ///
 /// [`Adapter`] essentially acts as a collection of predefined inputs allocated on a specific device that can easily be
 /// swapped out between session runs via [`RunOptions::add_adapter`]. With slight modifications to the session
-/// graph, [`Adapter`] can be used as low-rank adapters (LoRAs) or as containers of style embeddings.
+/// graph, [`Adapter`]s can be used as low-rank adapters (LoRAs) or as containers of style embeddings.
 ///
 /// # Example
 /// ```
@@ -101,8 +101,8 @@ impl Adapter {
 		})
 	}
 
-	/// Loads an [`Adapter`] from memory. The adapter's values will be copied either to the CPU or the given allocator
-	/// if one is provided.
+	/// Loads an [`Adapter`] from memory. The adapter's values will be **copied**, either to the CPU or the given
+	/// allocator if one is provided.
 	///
 	/// An [`Allocator`] can be provided to specify the device on which the inputs should be allocated on.
 	/// Note that providing a CPU allocator will return an error; only device allocators are expected.

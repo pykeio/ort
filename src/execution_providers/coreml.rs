@@ -1,3 +1,5 @@
+use alloc::string::ToString;
+
 use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
 use crate::{error::Result, session::builder::SessionBuilder};
 

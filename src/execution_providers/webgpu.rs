@@ -82,73 +82,75 @@ super::impl_ep!(arbitrary; WebGPUExecutionProvider);
 impl WebGPUExecutionProvider {
 	#[must_use]
 	pub fn with_preferred_layout(mut self, layout: WebGPUPreferredLayout) -> Self {
-		self.options.set("WebGPU:preferredLayout", layout.as_str());
+		self.options.set("ep.webgpuexecutionprovider.preferredLayout", layout.as_str());
 		self
 	}
 
 	#[must_use]
 	pub fn with_enable_graph_capture(mut self, enable: bool) -> Self {
-		self.options.set("WebGPU:enableGraphCapture", if enable { "1" } else { "0" });
+		self.options
+			.set("ep.webgpuexecutionprovider.enableGraphCapture", if enable { "1" } else { "0" });
 		self
 	}
 
 	#[must_use]
 	pub fn with_dawn_proc_table(mut self, table: String) -> Self {
-		self.options.set("WebGPU:dawnProcTable", table);
+		self.options.set("ep.webgpuexecutionprovider.dawnProcTable", table);
 		self
 	}
 
 	#[must_use]
 	pub fn with_dawn_backend_type(mut self, backend_type: WebGPUDawnBackendType) -> Self {
-		self.options.set("WebGPU:dawnBackendType", backend_type.as_str());
+		self.options.set("ep.webgpuexecutionprovider.dawnBackendType", backend_type.as_str());
 		self
 	}
 
 	#[must_use]
 	pub fn with_device_id(mut self, id: i32) -> Self {
-		self.options.set("WebGPU:deviceId", id.to_string());
+		self.options.set("ep.webgpuexecutionprovider.deviceId", id.to_string());
 		self
 	}
 
 	#[must_use]
 	pub fn with_storage_buffer_cache_mode(mut self, mode: WebGPUBufferCacheMode) -> Self {
-		self.options.set("WebGPU:storageBufferCacheMode", mode.as_str());
+		self.options.set("ep.webgpuexecutionprovider.storageBufferCacheMode", mode.as_str());
 		self
 	}
 
 	#[must_use]
 	pub fn with_uniform_buffer_cache_mode(mut self, mode: WebGPUBufferCacheMode) -> Self {
-		self.options.set("WebGPU:uniformBufferCacheMode", mode.as_str());
+		self.options.set("ep.webgpuexecutionprovider.uniformBufferCacheMode", mode.as_str());
 		self
 	}
 
 	#[must_use]
 	pub fn with_query_resolve_buffer_cache_mode(mut self, mode: WebGPUBufferCacheMode) -> Self {
-		self.options.set("WebGPU:queryResolveBufferCacheMode", mode.as_str());
+		self.options.set("ep.webgpuexecutionprovider.queryResolveBufferCacheMode", mode.as_str());
 		self
 	}
 
 	#[must_use]
 	pub fn with_default_buffer_cache_mode(mut self, mode: WebGPUBufferCacheMode) -> Self {
-		self.options.set("WebGPU:defaultBufferCacheMode", mode.as_str());
+		self.options.set("ep.webgpuexecutionprovider.defaultBufferCacheMode", mode.as_str());
 		self
 	}
 
 	#[must_use]
 	pub fn with_validation_mode(mut self, mode: WebGPUValidationMode) -> Self {
-		self.options.set("WebGPU:validationMode", mode.as_str());
+		self.options.set("ep.webgpuexecutionprovider.validationMode", mode.as_str());
 		self
 	}
 
 	#[must_use]
 	pub fn with_force_cpu_node_names(mut self, names: String) -> Self {
-		self.options.set("WebGPU:forceCpuNodeNames", names);
+		self.options.set("ep.webgpuexecutionprovider.forceCpuNodeNames", names);
 		self
 	}
 
 	#[must_use]
 	pub fn with_enable_pix_capture(mut self, enable: bool) -> Self {
-		self.options.set("WebGPU:enablePIXCapture", if enable { "1" } else { "0" });
+		self.options
+			.set("ep.webgpuexecutionprovider.enablePIXCapture", if enable { "1" } else { "0" });
 		self
 	}
 }

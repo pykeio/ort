@@ -15,7 +15,7 @@ use std::path::PathBuf;
 
 use smallvec::SmallVec;
 
-use super::SessionBuilder;
+use super::{EditableSession, SessionBuilder};
 #[cfg(feature = "std")]
 use crate::error::{Error, ErrorCode};
 use crate::{
@@ -176,7 +176,7 @@ impl SessionBuilder {
 		self.commit_finalize(unsafe { NonNull::new_unchecked(session_ptr) })
 	}
 
-	pub(crate) fn commit_finalize(mut self, ptr: NonNull<ort_sys::OrtSession>) -> Result<Session> {
+	pub(crate) fn commit_finalize(&mut self, ptr: NonNull<ort_sys::OrtSession>) -> Result<Session> {
 		let allocator = match &self.memory_info {
 			Some(info) => {
 				let mut allocator_ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
@@ -217,5 +217,48 @@ impl SessionBuilder {
 			inputs,
 			outputs
 		})
+	}
+
+	#[cfg(feature = "std")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+	pub fn edit_from_file<P>(self, model_filepath: P) -> Result<EditableSession>
+	where
+		P: AsRef<Path>
+	{
+		let mut session_ptr: *mut ort_sys::OrtSession = ptr::null_mut();
+		let model_path = crate::util::path_to_os_char(model_filepath);
+
+		let env = get_environment()?;
+
+		ortsys![@editor:
+			unsafe CreateModelEditorSession(
+				env.ptr(),
+				model_path.as_ptr(),
+				self.session_options_ptr.as_ptr(),
+				&mut session_ptr
+			)?;
+			nonNull(session_ptr)
+		];
+
+		EditableSession::new(unsafe { NonNull::new_unchecked(session_ptr) }, self)
+	}
+
+	pub fn edit_from_memory(self, model_bytes: &[u8]) -> Result<EditableSession> {
+		let mut session_ptr: *mut ort_sys::OrtSession = ptr::null_mut();
+
+		let env = get_environment()?;
+
+		ortsys![@editor:
+			unsafe CreateModelEditorSessionFromArray(
+				env.ptr(),
+				model_bytes.as_ptr().cast(),
+				model_bytes.len() as _,
+				self.session_options_ptr.as_ptr(),
+				&mut session_ptr
+			)?;
+			nonNull(session_ptr)
+		];
+
+		EditableSession::new(unsafe { NonNull::new_unchecked(session_ptr) }, self)
 	}
 }

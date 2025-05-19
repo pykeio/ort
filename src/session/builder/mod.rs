@@ -8,11 +8,15 @@ use smallvec::SmallVec;
 
 use crate::{AsPointer, error::Result, logging::LoggerFunction, memory::MemoryInfo, operator::OperatorDomain, ortsys, util::with_cstr, value::DynValue};
 
+mod editable;
 mod impl_commit;
 mod impl_config_keys;
 mod impl_options;
 
-pub use self::impl_options::{GraphOptimizationLevel, PrepackedWeights};
+pub use self::{
+	editable::EditableSession,
+	impl_options::{GraphOptimizationLevel, PrepackedWeights}
+};
 
 /// Creates a session using the builder pattern.
 ///

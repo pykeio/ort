@@ -45,7 +45,7 @@ pub struct TVMExecutionProvider {
 super::impl_ep!(TVMExecutionProvider);
 
 impl ExecutionProvider for TVMExecutionProvider {
-	fn as_str(&self) -> &'static str {
+	fn name(&self) -> &'static str {
 		"TvmExecutionProvider"
 	}
 

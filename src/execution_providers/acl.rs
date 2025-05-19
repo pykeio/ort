@@ -1,24 +1,36 @@
 use super::{ExecutionProvider, RegisterError};
 use crate::{error::Result, session::builder::SessionBuilder};
 
+/// [Arm Compute Library execution provider](https://onnxruntime.ai/docs/execution-providers/community-maintained/ACL-ExecutionProvider.html)
+/// for ARM platforms.
 #[derive(Debug, Default, Clone)]
 pub struct ACLExecutionProvider {
-	use_arena: bool
+	fast_math: bool
 }
 
 super::impl_ep!(ACLExecutionProvider);
 
 impl ACLExecutionProvider {
+	/// Enable/disable ACL's fast math mode. Enabling can improve performance at the cost of some accuracy for
+	/// `MatMul`/`Conv` nodes.
+	///
+	/// ```
+	/// # use ort::{execution_providers::acl::ACLExecutionProvider, session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let ep = ACLExecutionProvider::default().with_fast_math(true).build();
+	/// # Ok(())
+	/// # }
+	/// ```
 	#[must_use]
-	pub fn with_arena_allocator(mut self, enable: bool) -> Self {
-		self.use_arena = enable;
+	pub fn with_fast_math(mut self, enable: bool) -> Self {
+		self.fast_math = enable;
 		self
 	}
 }
 
 impl ExecutionProvider for ACLExecutionProvider {
-	fn as_str(&self) -> &'static str {
-		"AclExecutionProvider"
+	fn name(&self) -> &'static str {
+		"ACLExecutionProvider"
 	}
 
 	fn supported_by_platform(&self) -> bool {
@@ -31,9 +43,9 @@ impl ExecutionProvider for ACLExecutionProvider {
 		{
 			use crate::AsPointer;
 
-			super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut ort_sys::OrtSessionOptions, use_arena: core::ffi::c_int) -> ort_sys::OrtStatusPtr);
+			super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut ort_sys::OrtSessionOptions, enable_fast_math: core::ffi::c_int) -> ort_sys::OrtStatusPtr);
 			return Ok(unsafe {
-				crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_ACL(session_builder.ptr_mut(), self.use_arena.into()))
+				crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_ACL(session_builder.ptr_mut(), self.fast_math.into()))
 			}?);
 		}
 

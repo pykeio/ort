@@ -13,6 +13,7 @@ pub enum QNNPerformanceMode {
 	LowPowerSaver,
 	LowBalanced,
 	PowerSaver,
+	ExtremePowerSaver,
 	SustainedHighPerformance
 }
 
@@ -28,6 +29,7 @@ impl QNNPerformanceMode {
 			QNNPerformanceMode::LowPowerSaver => "low_power_saver",
 			QNNPerformanceMode::LowBalanced => "low_balanced",
 			QNNPerformanceMode::PowerSaver => "power_saver",
+			QNNPerformanceMode::ExtremePowerSaver => "extreme_power_saver",
 			QNNPerformanceMode::SustainedHighPerformance => "sustained_high_performance"
 		}
 	}
@@ -65,7 +67,7 @@ impl QNNContextPriority {
 			QNNContextPriority::Low => "low",
 			QNNContextPriority::Normal => "normal",
 			QNNContextPriority::NormalHigh => "normal_high",
-			QNNContextPriority::High => "normal_high"
+			QNNContextPriority::High => "high"
 		}
 	}
 }
@@ -173,7 +175,7 @@ impl QNNExecutionProvider {
 }
 
 impl ExecutionProvider for QNNExecutionProvider {
-	fn as_str(&self) -> &'static str {
+	fn name(&self) -> &'static str {
 		"QNNExecutionProvider"
 	}
 

@@ -10,8 +10,7 @@ pub enum WebGPUPreferredLayout {
 }
 
 impl WebGPUPreferredLayout {
-	#[must_use]
-	pub fn as_str(&self) -> &'static str {
+	pub(crate) fn as_str(&self) -> &'static str {
 		match self {
 			WebGPUPreferredLayout::NCHW => "NCHW",
 			WebGPUPreferredLayout::NHWC => "NHWC"
@@ -26,8 +25,7 @@ pub enum WebGPUDawnBackendType {
 }
 
 impl WebGPUDawnBackendType {
-	#[must_use]
-	pub fn as_str(&self) -> &'static str {
+	pub(crate) fn as_str(&self) -> &'static str {
 		match self {
 			WebGPUDawnBackendType::Vulkan => "Vulkan",
 			WebGPUDawnBackendType::D3D12 => "D3D12"
@@ -44,8 +42,7 @@ pub enum WebGPUBufferCacheMode {
 }
 
 impl WebGPUBufferCacheMode {
-	#[must_use]
-	pub fn as_str(&self) -> &'static str {
+	pub(crate) fn as_str(&self) -> &'static str {
 		match self {
 			WebGPUBufferCacheMode::Disabled => "disabled",
 			WebGPUBufferCacheMode::LazyRelease => "lazyRelease",
@@ -157,7 +154,7 @@ impl WebGPUExecutionProvider {
 }
 
 impl ExecutionProvider for WebGPUExecutionProvider {
-	fn as_str(&self) -> &'static str {
+	fn name(&self) -> &'static str {
 		"WebGpuExecutionProvider"
 	}
 
@@ -174,7 +171,7 @@ impl ExecutionProvider for WebGPUExecutionProvider {
 			let ffi_options = self.options.to_ffi();
 			ortsys![unsafe SessionOptionsAppendExecutionProvider(
 				session_builder.ptr_mut(),
-				c"WebGPU".as_ptr().cast::<core::ffi::c_char>(),
+				c"WebGPU".as_ptr().cast::<core::ffi::c_char>(), // much consistency
 				ffi_options.key_ptrs(),
 				ffi_options.value_ptrs(),
 				ffi_options.len(),

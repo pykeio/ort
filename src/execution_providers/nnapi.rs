@@ -50,7 +50,7 @@ impl NNAPIExecutionProvider {
 }
 
 impl ExecutionProvider for NNAPIExecutionProvider {
-	fn as_str(&self) -> &'static str {
+	fn name(&self) -> &'static str {
 		"NnapiExecutionProvider"
 	}
 

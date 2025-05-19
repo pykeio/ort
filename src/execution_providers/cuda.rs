@@ -81,6 +81,8 @@ impl Default for CuDNNConvAlgorithmSearch {
 	}
 }
 
+/// [CUDA execution provider](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html) for NVIDIA
+/// CUDA-enabled GPUs.
 #[derive(Debug, Default, Clone)]
 pub struct CUDAExecutionProvider {
 	options: ExecutionProviderOptions
@@ -89,21 +91,50 @@ pub struct CUDAExecutionProvider {
 super::impl_ep!(arbitrary; CUDAExecutionProvider);
 
 impl CUDAExecutionProvider {
+	/// Configures which device the EP should use.
+	///
+	/// ```
+	/// # use ort::{execution_providers::cuda::CUDAExecutionProvider, session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let ep = CUDAExecutionProvider::default().with_device_id(0).build();
+	/// # Ok(())
+	/// # }
+	/// ```
 	#[must_use]
 	pub fn with_device_id(mut self, device_id: i32) -> Self {
 		self.options.set("device_id", device_id.to_string());
 		self
 	}
 
-	/// Configure the size limit of the device memory arena in bytes. This size limit is only for the execution
-	/// provider’s arena. The total device memory usage may be higher.
+	/// Configure the size limit of the device memory arena in bytes.
+	///
+	/// This only controls how much memory can be allocated to the *arena* - actual memory usage may be higher due to
+	/// internal CUDA allocations, like those required for different [`CuDNNConvAlgorithmSearch`] options.
+	///
+	/// ```
+	/// # use ort::{execution_providers::cuda::CUDAExecutionProvider, session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let ep = CUDAExecutionProvider::default().with_memory_limit(2 * 1024 * 1024 * 1024).build();
+	/// # Ok(())
+	/// # }
+	/// ```
 	#[must_use]
 	pub fn with_memory_limit(mut self, limit: usize) -> Self {
 		self.options.set("gpu_mem_limit", limit.to_string());
 		self
 	}
 
-	/// Confiure the strategy for extending the device's memory arena.
+	/// Configure the strategy for extending the device's memory arena.
+	///
+	/// ```
+	/// # use ort::{execution_providers::{cuda::CUDAExecutionProvider, ArenaExtendStrategy}, session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let ep = CUDAExecutionProvider::default()
+	/// 	.with_arena_extend_strategy(ArenaExtendStrategy::SameAsRequested)
+	/// 	.build();
+	/// # Ok(())
+	/// # }
+	/// ```
 	#[must_use]
 	pub fn with_arena_extend_strategy(mut self, strategy: ArenaExtendStrategy) -> Self {
 		self.options.set(
@@ -116,10 +147,40 @@ impl CUDAExecutionProvider {
 		self
 	}
 
-	/// ORT leverages cuDNN for convolution operations and the first step in this process is to determine an
-	/// “optimal” convolution algorithm to use while performing the convolution operation for the given input
-	/// configuration (input shape, filter shape, etc.) in each `Conv` node. This option controlls the type of search
-	/// done for cuDNN convolution algorithms. See [`CuDNNConvAlgorithmSearch`] for more info.
+	/// Controls the search mode used to select a kernel for `Conv` nodes.
+	///
+	/// cuDNN, the library used by ONNX Runtime's CUDA EP for many operations, provides many different implementations
+	/// of the `Conv` node. Each of these implementations has different performance characteristics depending on the
+	/// exact hardware and model/input size used. This option controls how cuDNN should determine which implementation
+	/// to use.
+	///
+	/// The default search algorithm, [`Exhaustive`][exh], will benchmark all available implementations and use the most
+	/// performant one. This option is very resource intensive (both computationally on first run and peak-memory-wise),
+	/// but ensures best performance. It is roughly equivalent to setting `torch.backends.cudnn.benchmark = True` with
+	/// PyTorch. See also [`CUDAExecutionProvider::with_conv_max_workspace`] to configure how much memory the exhaustive
+	/// search can use (the default is unlimited).
+	///
+	/// A less resource-intensive option is [`Heuristic`][heu]. Rather than benchmarking every implementation,
+	/// an optimal implementation is chosen based on a set of heuristics, thus saving compute. [`Heuristic`][heu] should
+	/// generally choose an optimal convolution algorithm, except in some corner cases.
+	///
+	/// [`Default`][def] can also be passed to instruct cuDNN to always use the default implementation (which is rarely
+	/// the most optimal). Note that the "Default" here refers to the **default convolution algorithm** being used, it
+	/// is not the *default behavior* (that would be [`Exhaustive`][exh]).
+	///
+	/// ```
+	/// # use ort::{execution_providers::cuda::{CUDAExecutionProvider, CuDNNConvAlgorithmSearch}, session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let ep = CUDAExecutionProvider::default()
+	/// 	.with_conv_algorithm_search(CuDNNConvAlgorithmSearch::Heuristic)
+	/// 	.build();
+	/// # Ok(())
+	/// # }
+	/// ```
+	///
+	/// [exh]: CuDNNConvAlgorithmSearch::Exhaustive
+	/// [heu]: CuDNNConvAlgorithmSearch::Heuristic
+	/// [def]: CuDNNConvAlgorithmSearch::Default
 	#[must_use]
 	pub fn with_conv_algorithm_search(mut self, search: CuDNNConvAlgorithmSearch) -> Self {
 		self.options.set(
@@ -133,100 +194,153 @@ impl CUDAExecutionProvider {
 		self
 	}
 
-	/// Whether to do copies in the default stream or use separate streams. The recommended setting is true. If false,
-	/// there are race conditions and possibly better performance.
-	#[must_use]
-	pub fn with_copy_in_default_stream(mut self, enable: bool) -> Self {
-		self.options.set("do_copy_in_default_stream", if enable { "1" } else { "0" });
-		self
-	}
-
-	/// ORT leverages cuDNN for convolution operations and the first step in this process is to determine an
-	/// “optimal” convolution algorithm to use while performing the convolution operation for the given input
-	/// configuration (input shape, filter shape, etc.) in each `Conv` node. This sub-step involves querying cuDNN for a
-	/// “workspace” memory size and have this allocated so that cuDNN can use this auxiliary memory while determining
-	/// the “optimal” convolution algorithm to use.
+	/// Configure whether the [`Exhaustive`][CuDNNConvAlgorithmSearch::Exhaustive] search can use as much memory as it
+	/// needs.
 	///
-	/// When `with_conv_max_workspace` is set to false, ORT will clamp the workspace size to 32 MB, which may lead to
-	/// cuDNN selecting a suboptimal convolution algorithm. The recommended (and default) value is `true`.
+	/// The default is `true`. When `false`, the memory used for the search is limited to 32 MB, which will impact its
+	/// ability to find an optimal convolution algorithm.
+	///
+	/// ```
+	/// # use ort::{execution_providers::cuda::CUDAExecutionProvider, session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let ep = CUDAExecutionProvider::default().with_conv_max_workspace(false).build();
+	/// # Ok(())
+	/// # }
+	/// ```
 	#[must_use]
 	pub fn with_conv_max_workspace(mut self, enable: bool) -> Self {
 		self.options.set("cudnn_conv_use_max_workspace", if enable { "1" } else { "0" });
 		self
 	}
 
-	/// ORT leverages cuDNN for convolution operations. While cuDNN only takes 4-D or 5-D tensors as input for
-	/// convolution operations, dimension padding is needed if the input is a 3-D tensor. Given an input tensor of shape
-	/// `[N, C, D]`, it can be padded to `[N, C, D, 1]` or `[N, C, 1, D]`. While both of these padding methods produce
-	/// the same output, the performance may differ because different convolution algorithms are selected,
-	/// especially on some devices such as A100. By default, the input is padded to `[N, C, D, 1]`. Set this option to
-	/// true to instead use `[N, C, 1, D]`.
+	// Here once lied `do_copy_in_default_stream`. After reading through upstream it doesn't seem like this option is
+	// used anymore, so the setter here was removed to reduce confusion.
+
+	/// Configure whether or not to pad 3-dimensional convolutions to `[N, C, 1, D]` (as opposed to the default `[N, C,
+	/// D, 1]`).
+	///
+	/// Enabling this option might significantly improve performance on devices like the A100. This does not affect
+	/// convolution operations that do not use 3-dimensional input shapes, or the *result* of such operations.
+	///
+	/// ```
+	/// # use ort::{execution_providers::cuda::CUDAExecutionProvider, session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let ep = CUDAExecutionProvider::default().with_conv1d_pad_to_nc1d(true).build();
+	/// # Ok(())
+	/// # }
+	/// ```
 	#[must_use]
 	pub fn with_conv1d_pad_to_nc1d(mut self, enable: bool) -> Self {
 		self.options.set("cudnn_conv1d_pad_to_nc1d", if enable { "1" } else { "0" });
 		self
 	}
 
-	/// ORT supports the usage of CUDA Graphs to remove CPU overhead associated with launching CUDA kernels
-	/// sequentially. Currently, there are some constraints with regards to using the CUDA Graphs feature:
+	/// Configures whether to create a CUDA graph.
 	///
-	/// - Models with control-flow ops (i.e. If, Loop and Scan ops) are not supported.
-	/// - Usage of CUDA Graphs is limited to models where-in all the model ops (graph nodes) can be partitioned to the
-	///   CUDA EP.
-	/// - The input/output types of models must be tensors.
-	/// - Shapes of inputs/outputs cannot change across inference calls. Dynamic shape models are supported, but the
-	///   input/output shapes must be the same across each inference call.
-	/// - By design, CUDA Graphs is designed to read from/write to the same CUDA virtual memory addresses during the
-	///   graph replaying step as it does during the graph capturing step. Due to this requirement, usage of this
-	///   feature requires using IOBinding so as to bind memory which will be used as input(s)/output(s) for the CUDA
-	///   Graph machinery to read from/write to (please see samples below).
-	/// - While updating the input(s) for subsequent inference calls, the fresh input(s) need to be copied over to the
-	///   corresponding CUDA memory location(s) of the bound `OrtValue` input(s). This is due to the fact that the
-	///   “graph replay” will require reading inputs from the same CUDA virtual memory addresses.
-	/// - Multi-threaded usage is currently not supported, i.e. `run()` MAY NOT be invoked on the same `Session` object
-	///   from multiple threads while using CUDA Graphs.
+	/// CUDA graphs eliminate the overhead of launching kernels sequentially by capturing the launch sequence into a
+	/// graph that is 'replayed' across runs, reducing CPU overhead and possibly improving performance.
 	///
-	/// > **NOTE**: The very first `run()` performs a variety of tasks under the hood like making CUDA memory
-	/// > allocations, capturing the CUDA graph for the model, and then performing a graph replay to ensure that the
-	/// > graph runs. Due to this, the latency associated with the first `run()` is bound to be high. Subsequent
-	/// > `run()`s only perform graph replays of the graph captured and cached in the first `run()`.
+	/// Using CUDA graphs comes with limitations, notably:
+	/// - Models with control flow operators (like `If`, `Loop`, or `Scan`) are not supported.
+	/// - Input/output shapes cannot change across inference calls.
+	/// - The address of inputs/outputs cannot change across inference calls, so
+	///   [`IoBinding`](crate::io_binding::IoBinding) must be used.
+	/// - `Session`s using CUDA graphs are technically not `Send` or `Sync`.
+	///
+	/// Consult the [ONNX Runtime documentation on CUDA graphs](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#using-cuda-graphs-preview) for more information.
+	///
+	/// ```
+	/// # use ort::{execution_providers::cuda::CUDAExecutionProvider, session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let ep = CUDAExecutionProvider::default().with_cuda_graph(true).build();
+	/// # Ok(())
+	/// # }
+	/// ```
 	#[must_use]
 	pub fn with_cuda_graph(mut self, enable: bool) -> Self {
 		self.options.set("enable_cuda_graph", if enable { "1" } else { "0" });
 		self
 	}
 
-	/// Whether to use strict mode in the `SkipLayerNormalization` implementation. The default and recommanded setting
-	/// is `false`. If enabled, accuracy may improve slightly, but performance may decrease.
+	/// Enable 'strict' mode for `SkipLayerNorm` nodes (created via fusion of `Add` & `LayerNorm` nodes).
+	///
+	/// `SkipLayerNorm`'s strict mode trades performance for accuracy. The default is `false` (strict mode disabled).
+	///
+	/// ```
+	/// # use ort::{execution_providers::cuda::CUDAExecutionProvider, session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let ep = CUDAExecutionProvider::default().with_skip_layer_norm_strict_mode(true).build();
+	/// # Ok(())
+	/// # }
+	/// ```
 	#[must_use]
 	pub fn with_skip_layer_norm_strict_mode(mut self, enable: bool) -> Self {
 		self.options.set("enable_skip_layer_norm_strict_mode", if enable { "1" } else { "0" });
 		self
 	}
 
-	/// TF32 is a math mode available on NVIDIA GPUs since Ampere. It allows certain float32 matrix multiplications and
-	/// convolutions to run much faster on tensor cores with TensorFloat-32 reduced precision: float32 inputs are
-	/// rounded with 10 bits of mantissa and results are accumulated with float32 precision.
+	/// Enable the usage of the reduced-precision [TensorFloat-32](https://blogs.nvidia.com/blog/tensorfloat-32-precision-format/)
+	/// format for matrix multiplications & convolutions.
+	///
+	/// TensorFloat-32 is a reduced-precision floating point format available on NVIDIA GPUs since the Ampere
+	/// microarchitecture. It allows `MatMul` & `Conv` to run much faster on Ampere's Tensor cores. This option is
+	/// **disabled** by default.
+	///
+	/// This option is roughly equivalent to `torch.backends.cudnn.allow_tf32 = True` &
+	/// `torch.backends.cuda.matmul.allow_tf32 = True` or `torch.set_float32_matmul_precision("medium")` in PyTorch.
+	///
+	/// ```
+	/// # use ort::{execution_providers::cuda::CUDAExecutionProvider, session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let ep = CUDAExecutionProvider::default().with_tf32(true).build();
+	/// # Ok(())
+	/// # }
+	/// ```
 	#[must_use]
 	pub fn with_tf32(mut self, enable: bool) -> Self {
 		self.options.set("use_tf32", if enable { "1" } else { "0" });
 		self
 	}
 
+	/// Configure whether to prefer `[N, H, W, C]` layout operations over the default `[N, C, H, W]` layout.
+	///
+	/// Tensor cores usually operate more efficiently with the NHWC layout, so enabling this option for
+	/// convolution-heavy models on Tensor core-enabled GPUs may provide a significant performance improvement.
+	///
+	/// ```
+	/// # use ort::{execution_providers::cuda::CUDAExecutionProvider, session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let ep = CUDAExecutionProvider::default().with_prefer_nhwc(true).build();
+	/// # Ok(())
+	/// # }
+	/// ```
 	#[must_use]
 	pub fn with_prefer_nhwc(mut self, enable: bool) -> Self {
 		self.options.set("prefer_nhwc", if enable { "1" } else { "0" });
 		self
 	}
 
+	/// Use a custom CUDA device stream rather than the default one.
+	///
 	/// # Safety
-	/// The provided `stream` must outlive the environment/session created with the execution provider.
+	/// The provided `stream` must outlive the environment/session configured to use this execution provider.
 	#[must_use]
 	pub unsafe fn with_compute_stream(mut self, stream: *mut ()) -> Self {
 		self.options.set("user_compute_stream", (stream as usize).to_string());
 		self
 	}
 
+	/// Configures the available backends used for `Attention` nodes.
+	///
+	/// ```
+	/// # use ort::{execution_providers::cuda::{CUDAExecutionProvider, CUDAAttentionBackend}, session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let ep = CUDAExecutionProvider::default()
+	/// 	.with_attention_backend(CUDAAttentionBackend::FLASH_ATTENTION | CUDAAttentionBackend::TRT_FUSED_ATTENTION)
+	/// 	.build();
+	/// # Ok(())
+	/// # }
+	/// ```
 	#[must_use]
 	pub fn with_attention_backend(mut self, flags: CUDAAttentionBackend) -> Self {
 		self.options.set("sdpa_kernel", flags.0.to_string());
@@ -244,7 +358,7 @@ impl CUDAExecutionProvider {
 }
 
 impl ExecutionProvider for CUDAExecutionProvider {
-	fn as_str(&self) -> &'static str {
+	fn name(&self) -> &'static str {
 		"CUDAExecutionProvider"
 	}
 
@@ -308,7 +422,33 @@ pub const CUDNN_DYLIBS: &[&str] = &[
 	"libcudnn.so.9"
 ];
 
+/// Preload the dylibs required by CUDA/cuDNN.
+///
+/// This attempts to load all dynamic libraries required by the CUDA execution provider from the given CUDA and cuDNN
+/// directories, if they are provided. Passing `None` will prevent preloading binaries for that component. This function
+/// will immediately return with an error when a library fails to load, without attempting to load the rest of the
+/// libraries.
+///
+/// Preloading a library in this way will prioritize it in the search order when the CUDA EP attempts to load its
+/// dependencies, effectively allowing you to customize the CUDA install path without modifying the `PATH` environment
+/// variable. Note that this function intentionally leaks memory; see [`crate::util::preload_dylib`] for more
+/// information.
+///
+/// ```
+/// # use std::path::Path;
+/// use ort::execution_providers::cuda;
+///
+/// let cuda_root = Path::new(r#"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\bin"#);
+/// let cudnn_root = Path::new(r#"D:\cudnn_9.8.0"#);
+///
+/// // Load CUDA & cuDNN
+/// let _ = cuda::preload_dylibs(Some(cuda_root), Some(cudnn_root));
+///
+/// // Only preload cuDNN
+/// let _ = cuda::preload_dylibs(None, Some(cudnn_root));
+/// ```
 #[cfg(feature = "load-dynamic")]
+#[cfg_attr(docsrs, doc(cfg(feature = "load-dynamic")))]
 pub fn preload_dylibs(cuda_root_dir: Option<&std::path::Path>, cudnn_root_dir: Option<&std::path::Path>) -> Result<()> {
 	use crate::util::preload_dylib;
 	if let Some(cuda_root_dir) = cuda_root_dir {

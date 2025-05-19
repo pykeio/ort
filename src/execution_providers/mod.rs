@@ -75,7 +75,7 @@ pub trait ExecutionProvider: Send + Sync {
 	///
 	/// This is the same as what's used in ONNX Runtime's Python API to register this execution provider, i.e.
 	/// [`TVMExecutionProvider`]'s identifier is `TvmExecutionProvider`.
-	fn as_str(&self) -> &'static str;
+	fn name(&self) -> &'static str;
 
 	/// Returns whether this execution provider is supported on this platform.
 	///
@@ -83,7 +83,7 @@ pub trait ExecutionProvider: Send + Sync {
 	/// ```ignore
 	/// impl ExecutionProvider for CoreMLExecutionProvider {
 	/// 	fn supported_by_platform() -> bool {
-	/// 		cfg!(any(target_os = "macos", target_os = "ios"))
+	/// 		cfg!(target_vendor = "apple")
 	/// 	}
 	/// }
 	/// ```
@@ -118,7 +118,7 @@ pub trait ExecutionProvider: Send + Sync {
 					return Err(e);
 				}
 			};
-			if self.as_str() == avail {
+			if self.name() == avail {
 				let _ = ortsys![unsafe ReleaseAvailableProviders(providers, num_providers)];
 				return Ok(true);
 			}
@@ -190,7 +190,7 @@ impl ExecutionProviderDispatch {
 
 impl Debug for ExecutionProviderDispatch {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		f.debug_struct(self.inner.as_str())
+		f.debug_struct(self.inner.name())
 			.field("error_on_failure", &self.error_on_failure)
 			.finish()
 	}
@@ -351,14 +351,14 @@ pub(crate) fn apply_execution_providers(session_builder: &mut SessionBuilder, ep
 				if ep.inner.supported_by_platform() {
 					crate::warn!(%source, "{e}");
 				} else {
-					crate::debug!(%source, "{e} (note: additionally, `{}` may not be supported on this platform)", ep.inner.as_str());
+					crate::debug!(%source, "{e} (note: additionally, `{}` may not be supported on this platform)", ep.inner.name());
 				}
 			} else {
-				crate::error!(%source, "An error occurred when attempting to register `{}`: {e}", ep.inner.as_str());
+				crate::error!(%source, "An error occurred when attempting to register `{}`: {e}", ep.inner.name());
 			}
 			Ok(false)
 		} else {
-			crate::info!(%source, "Successfully registered `{}`", ep.inner.as_str());
+			crate::info!(%source, "Successfully registered `{}`", ep.inner.name());
 			Ok(true)
 		}
 	}

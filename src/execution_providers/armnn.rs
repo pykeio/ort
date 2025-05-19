@@ -1,6 +1,8 @@
 use super::{ExecutionProvider, RegisterError};
 use crate::{error::Result, session::builder::SessionBuilder};
 
+/// [Arm NN execution provider](https://onnxruntime.ai/docs/execution-providers/community-maintained/ArmNN-ExecutionProvider.html)
+/// for ARM platforms.
 #[derive(Debug, Default, Clone)]
 pub struct ArmNNExecutionProvider {
 	use_arena: bool
@@ -9,6 +11,15 @@ pub struct ArmNNExecutionProvider {
 super::impl_ep!(ArmNNExecutionProvider);
 
 impl ArmNNExecutionProvider {
+	/// Enable/disable the usage of the arena allocator.
+	///
+	/// ```
+	/// # use ort::{execution_providers::armnn::ArmNNExecutionProvider, session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let ep = ArmNNExecutionProvider::default().with_arena_allocator(true).build();
+	/// # Ok(())
+	/// # }
+	/// ```
 	#[must_use]
 	pub fn with_arena_allocator(mut self, enable: bool) -> Self {
 		self.use_arena = enable;
@@ -17,7 +28,7 @@ impl ArmNNExecutionProvider {
 }
 
 impl ExecutionProvider for ArmNNExecutionProvider {
-	fn as_str(&self) -> &'static str {
+	fn name(&self) -> &'static str {
 		"ArmNNExecutionProvider"
 	}
 

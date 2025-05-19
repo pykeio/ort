@@ -1,7 +1,10 @@
 use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
 use crate::{error::Result, session::builder::SessionBuilder};
 
+/// [oneDNN/DNNL execution provider](https://onnxruntime.ai/docs/execution-providers/oneDNN-ExecutionProvider.html) for
+/// Intel CPUs & iGPUs.
 #[derive(Debug, Default, Clone)]
+#[doc(alias = "DNNLExecutionProvider")]
 pub struct OneDNNExecutionProvider {
 	options: ExecutionProviderOptions
 }
@@ -9,15 +12,24 @@ pub struct OneDNNExecutionProvider {
 super::impl_ep!(arbitrary; OneDNNExecutionProvider);
 
 impl OneDNNExecutionProvider {
+	/// Enable/disable the usage of the arena allocator.
+	///
+	/// ```
+	/// # use ort::{execution_providers::onednn::OneDNNExecutionProvider, session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let ep = OneDNNExecutionProvider::default().with_arena_allocator(true).build();
+	/// # Ok(())
+	/// # }
+	/// ```
 	#[must_use]
-	pub fn with_use_arena(mut self, enable: bool) -> Self {
+	pub fn with_arena_allocator(mut self, enable: bool) -> Self {
 		self.options.set("use_arena", if enable { "1" } else { "0" });
 		self
 	}
 }
 
 impl ExecutionProvider for OneDNNExecutionProvider {
-	fn as_str(&self) -> &'static str {
+	fn name(&self) -> &'static str {
 		"DnnlExecutionProvider"
 	}
 

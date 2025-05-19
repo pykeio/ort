@@ -255,7 +255,7 @@ impl TensorRTExecutionProvider {
 }
 
 impl ExecutionProvider for TensorRTExecutionProvider {
-	fn as_str(&self) -> &'static str {
+	fn name(&self) -> &'static str {
 		"TensorrtExecutionProvider"
 	}
 

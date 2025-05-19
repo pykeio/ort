@@ -3,26 +3,8 @@ use alloc::string::ToString;
 use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
 use crate::{error::Result, session::builder::SessionBuilder};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum OpenVINOModelPriority {
-	Low,
-	Medium,
-	High,
-	Default
-}
-
-impl OpenVINOModelPriority {
-	pub fn as_str(&self) -> &'static str {
-		match self {
-			Self::Low => "LOW",
-			Self::Medium => "MEDIUM",
-			Self::High => "HIGH",
-			Self::Default => "DEFAULT"
-		}
-	}
-}
-
+/// [OpenVINO execution provider](https://onnxruntime.ai/docs/execution-providers/OpenVINO-ExecutionProvider.html) for
+/// Intel CPUs/GPUs/NPUs.
 #[derive(Default, Debug, Clone)]
 pub struct OpenVINOExecutionProvider {
 	options: ExecutionProviderOptions
@@ -31,8 +13,18 @@ pub struct OpenVINOExecutionProvider {
 super::impl_ep!(arbitrary; OpenVINOExecutionProvider);
 
 impl OpenVINOExecutionProvider {
-	/// Overrides the accelerator hardware type and precision with these values at runtime. If this option is not
-	/// explicitly set, default hardware and precision specified during build time is used.
+	/// Overrides the accelerator hardware type and precision.
+	///
+	/// `device_type` should be in the format `CPU`, `NPU`, `GPU`, `GPU.0`, `GPU.1`, etc. Heterogenous combinations are
+	/// also supported in the format `HETERO:NPU,GPU`.
+	///
+	/// ```
+	/// # use ort::{execution_providers::openvino::OpenVINOExecutionProvider, session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let ep = OpenVINOExecutionProvider::default().with_device_type("GPU.0").build();
+	/// # Ok(())
+	/// # }
+	/// ```
 	#[must_use]
 	pub fn with_device_type(mut self, device_type: impl AsRef<str>) -> Self {
 		self.options.set("device_type", device_type.as_ref());
@@ -87,16 +79,10 @@ impl OpenVINOExecutionProvider {
 		self.options.set("precision", precision.as_ref());
 		self
 	}
-
-	#[must_use]
-	pub fn with_model_priority(mut self, priority: OpenVINOModelPriority) -> Self {
-		self.options.set("model_priority", priority.as_str());
-		self
-	}
 }
 
 impl ExecutionProvider for OpenVINOExecutionProvider {
-	fn as_str(&self) -> &'static str {
+	fn name(&self) -> &'static str {
 		"OpenVINOExecutionProvider"
 	}
 

@@ -28,7 +28,7 @@ impl VitisAIExecutionProvider {
 }
 
 impl ExecutionProvider for VitisAIExecutionProvider {
-	fn as_str(&self) -> &'static str {
+	fn name(&self) -> &'static str {
 		"VitisAIExecutionProvider"
 	}
 

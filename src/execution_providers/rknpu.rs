@@ -7,8 +7,8 @@ pub struct RKNPUExecutionProvider {}
 super::impl_ep!(RKNPUExecutionProvider);
 
 impl ExecutionProvider for RKNPUExecutionProvider {
-	fn as_str(&self) -> &'static str {
-		"RKNPUExecutionProvider"
+	fn name(&self) -> &'static str {
+		"RknpuExecutionProvider"
 	}
 
 	fn supported_by_platform(&self) -> bool {

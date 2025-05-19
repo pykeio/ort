@@ -87,8 +87,8 @@ impl ROCmExecutionProvider {
 }
 
 impl ExecutionProvider for ROCmExecutionProvider {
-	fn as_str(&self) -> &'static str {
-		"ROCmExecutionProvider"
+	fn name(&self) -> &'static str {
+		"ROCMExecutionProvider"
 	}
 
 	fn supported_by_platform(&self) -> bool {

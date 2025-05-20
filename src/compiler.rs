@@ -5,6 +5,7 @@ use core::{
 	ops::Deref,
 	ptr::{self, NonNull}
 };
+#[cfg(feature = "std")]
 use std::path::Path;
 
 use crate::{

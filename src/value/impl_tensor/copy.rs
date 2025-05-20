@@ -43,7 +43,7 @@ fn ep_for_device(device: AllocationDevice, device_id: i32) -> Result<ep::Executi
 			.with_conv_max_workspace(false)
 			.with_conv_algorithm_search(ep::cuda::CuDNNConvAlgorithmSearch::Default)
 			.build(),
-		AllocationDevice::DIRECTML | AllocationDevice::DIRECTML_CPU => ep::DirectMLExecutionProvider::default().with_device_id(device_id).build(),
+		AllocationDevice::DIRECTML => ep::DirectMLExecutionProvider::default().with_device_id(device_id).build(),
 		AllocationDevice::CANN | AllocationDevice::CANN_PINNED => ep::CANNExecutionProvider::default()
 			.with_arena_extend_strategy(ep::ArenaExtendStrategy::SameAsRequested)
 			.with_cann_graph(false)
@@ -63,8 +63,6 @@ fn ep_for_device(device: AllocationDevice, device_id: i32) -> Result<ep::Executi
 			.with_exhaustive_conv_search(false)
 			.with_device_id(device_id)
 			.build(),
-		AllocationDevice::TVM => ep::TVMExecutionProvider::default().build(),
-		AllocationDevice::XNNPACK => ep::XNNPACKExecutionProvider::default().build(),
 		_ => return Err(crate::Error::new("Unsupported allocation device {device} for tensor copy target"))
 	})
 }

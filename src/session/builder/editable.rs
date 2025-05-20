@@ -1,4 +1,4 @@
-use alloc::sync::Arc;
+use alloc::{boxed::Box, sync::Arc};
 use core::{
 	ops::Deref,
 	ptr::{self, NonNull}

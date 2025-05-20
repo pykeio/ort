@@ -255,13 +255,12 @@ impl AllocationDevice {
 	pub const CANN: AllocationDevice = AllocationDevice("Cann\0");
 	pub const CANN_PINNED: AllocationDevice = AllocationDevice("CannPinned\0");
 	pub const DIRECTML: AllocationDevice = AllocationDevice("DML\0");
-	pub const DIRECTML_CPU: AllocationDevice = AllocationDevice("DML CPU\0");
 	pub const HIP: AllocationDevice = AllocationDevice("Hip\0");
 	pub const HIP_PINNED: AllocationDevice = AllocationDevice("HipPinned\0");
 	pub const OPENVINO_CPU: AllocationDevice = AllocationDevice("OpenVINO_CPU\0");
 	pub const OPENVINO_GPU: AllocationDevice = AllocationDevice("OpenVINO_GPU\0");
-	pub const XNNPACK: AllocationDevice = AllocationDevice("XnnpackExecutionProvider\0");
-	pub const TVM: AllocationDevice = AllocationDevice("TVM\0");
+	pub const QNN_HTP_SHARED: AllocationDevice = AllocationDevice("QnnHtpShared\0");
+	pub const WEBGPU_BUFFER: AllocationDevice = AllocationDevice("WebGPU_Buffer\0");
 
 	pub fn as_str(&self) -> &'static str {
 		&self.0[..self.0.len() - 1]

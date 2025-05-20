@@ -44,6 +44,7 @@ cann = []
 qnn = []
 webgpu = [ "dep:glob" ]
 azure = []
+nv = []
 
 [build-dependencies]
 ureq = { version = "3", optional = true, default-features = false, features = [ "native-tls", "socks-proxy" ] }

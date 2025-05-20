@@ -206,7 +206,7 @@ impl Session {
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn run<'s, 'i, 'v: 'i, const N: usize>(&'s mut self, input_values: impl Into<SessionInputs<'i, 'v, N>>) -> Result<SessionOutputs<'s, 's>> {
+	pub fn run<'s, 'i, 'v: 'i, const N: usize>(&'s mut self, input_values: impl Into<SessionInputs<'i, 'v, N>>) -> Result<SessionOutputs<'s>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
 				self.run_inner(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), None)
@@ -250,7 +250,7 @@ impl Session {
 		&'s mut self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>>,
 		run_options: &'r RunOptions<O>
-	) -> Result<SessionOutputs<'r, 's>> {
+	) -> Result<SessionOutputs<'r>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
 				self.run_inner(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), Some(&run_options.inner))
@@ -269,7 +269,7 @@ impl Session {
 		input_names: SmallVec<&str, { STACK_SESSION_INPUTS }>,
 		input_values: SmallVec<&'i SessionInputValue<'v>, { STACK_SESSION_INPUTS }>,
 		run_options: Option<&'r UntypedRunOptions>
-	) -> Result<SessionOutputs<'r, 's>> {
+	) -> Result<SessionOutputs<'r>> {
 		if input_values.len() > input_names.len() {
 			// If we provide more inputs than the model expects with `ort::inputs![a, b, c]`, then we get an `input_names` shorter
 			// than `inputs`. ONNX Runtime will attempt to look up the name of all inputs before doing any checks, thus going out of
@@ -331,7 +331,7 @@ impl Session {
 		Ok(SessionOutputs::new(output_names, outputs))
 	}
 
-	pub fn run_binding<'b, 's: 'b>(&'s mut self, binding: &'b IoBinding) -> Result<SessionOutputs<'b, 's>> {
+	pub fn run_binding<'b, 's: 'b>(&'s mut self, binding: &'b IoBinding) -> Result<SessionOutputs<'b>> {
 		self.run_binding_inner(binding, None)
 	}
 
@@ -339,7 +339,7 @@ impl Session {
 		&'s mut self,
 		binding: &'b IoBinding,
 		run_options: &'r RunOptions<NoSelectedOutputs>
-	) -> Result<SessionOutputs<'b, 's>> {
+	) -> Result<SessionOutputs<'b>> {
 		self.run_binding_inner(binding, Some(run_options))
 	}
 
@@ -347,7 +347,7 @@ impl Session {
 		&'s self,
 		binding: &'b IoBinding,
 		run_options: Option<&'r RunOptions<NoSelectedOutputs>>
-	) -> Result<SessionOutputs<'b, 's>> {
+	) -> Result<SessionOutputs<'b>> {
 		let run_options_ptr = if let Some(run_options) = run_options { run_options.ptr() } else { ptr::null() };
 		ortsys![unsafe RunWithBinding(self.inner.ptr().cast_mut(), run_options_ptr, binding.ptr())?];
 
@@ -356,26 +356,22 @@ impl Session {
 			let mut output_values_ptr: *mut *mut ort_sys::OrtValue = ptr::null_mut();
 			ortsys![unsafe GetBoundOutputValues(binding.ptr(), self.inner.allocator.ptr().cast_mut(), &mut output_values_ptr, &mut count)?; nonNull(output_values_ptr)];
 
-			let output_values = unsafe { slice::from_raw_parts(output_values_ptr, count).to_vec() }
-				.into_iter()
+			let output_values = unsafe { slice::from_raw_parts(output_values_ptr, count) }
+				.iter()
 				.zip(binding.output_values.iter())
 				.map(|(ptr, (_, value))| unsafe {
 					if let Some(value) = value {
 						DynValue::clone_of(value)
 					} else {
-						DynValue::from_ptr(NonNull::new(ptr).expect("OrtValue ptrs returned by GetBoundOutputValues should not be null"), Some(self.inner()))
+						DynValue::from_ptr(NonNull::new(*ptr).expect("OrtValue ptrs returned by GetBoundOutputValues should not be null"), Some(self.inner()))
 					}
 				})
 				.collect();
+			unsafe {
+				self.inner.allocator.free(output_values_ptr);
+			}
 
-			// output values will be freed when the `Value`s in `SessionOutputs` drop
-
-			Ok(SessionOutputs::new_backed(
-				binding.output_values.iter().map(|(k, _)| k.as_str()).collect(),
-				output_values,
-				self.allocator(),
-				output_values_ptr.cast()
-			))
+			Ok(SessionOutputs::new(binding.output_values.iter().map(|(k, _)| k.as_str()).collect(), output_values))
 		} else {
 			Ok(SessionOutputs::new_empty())
 		}
@@ -407,7 +403,7 @@ impl Session {
 		&'s mut self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>>,
 		run_options: &'r RunOptions<O>
-	) -> Result<InferenceFut<'s, 'r, 'v>> {
+	) -> Result<InferenceFut<'r, 'v>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
 				self.run_inner_async(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), &run_options.inner)
@@ -427,7 +423,7 @@ impl Session {
 		input_names: SmallVec<&str, { STACK_SESSION_INPUTS }>,
 		input_values: SmallVec<&SessionInputValue<'v>, { STACK_SESSION_INPUTS }>,
 		run_options: &'r UntypedRunOptions
-	) -> Result<InferenceFut<'s, 'r, 'v>> {
+	) -> Result<InferenceFut<'r, 'v>> {
 		let input_name_ptrs = input_names
 			.into_iter()
 			.map(|name| CString::new(name.as_bytes()).map(|s| s.into_raw().cast_const()))

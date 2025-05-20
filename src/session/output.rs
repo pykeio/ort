@@ -1,6 +1,5 @@
 use alloc::string::String;
 use core::{
-	ffi::c_void,
 	iter::FusedIterator,
 	mem::ManuallyDrop,
 	ops::{Index, IndexMut},
@@ -10,7 +9,6 @@ use core::{
 use smallvec::SmallVec;
 
 use crate::{
-	memory::Allocator,
 	util::STACK_SESSION_OUTPUTS,
 	value::{DynValue, ValueRef, ValueRefMut}
 };
@@ -36,38 +34,21 @@ use crate::{
 ///
 /// [`Session`]: crate::session::Session
 #[derive(Debug)]
-pub struct SessionOutputs<'r, 's> {
+pub struct SessionOutputs<'r> {
 	keys: SmallVec<&'r str, { STACK_SESSION_OUTPUTS }>,
 	values: SmallVec<DynValue, { STACK_SESSION_OUTPUTS }>,
-	effective_len: usize,
-	backing_ptr: Option<(&'s Allocator, *mut c_void)>
+	effective_len: usize
 }
 
-unsafe impl Send for SessionOutputs<'_, '_> {}
+unsafe impl Send for SessionOutputs<'_> {}
 
-impl<'r, 's> SessionOutputs<'r, 's> {
+impl<'r> SessionOutputs<'r> {
 	pub(crate) fn new(output_names: SmallVec<&'r str, { STACK_SESSION_OUTPUTS }>, output_values: SmallVec<DynValue, { STACK_SESSION_OUTPUTS }>) -> Self {
 		debug_assert_eq!(output_names.len(), output_values.len());
 		Self {
 			effective_len: output_names.len(),
 			keys: output_names,
-			values: output_values,
-			backing_ptr: None
-		}
-	}
-
-	pub(crate) fn new_backed(
-		output_names: SmallVec<&'r str, { STACK_SESSION_OUTPUTS }>,
-		output_values: SmallVec<DynValue, { STACK_SESSION_OUTPUTS }>,
-		allocator: &'s Allocator,
-		backing_ptr: *mut c_void
-	) -> Self {
-		debug_assert_eq!(output_names.len(), output_values.len());
-		Self {
-			effective_len: output_names.len(),
-			keys: output_names,
-			values: output_values,
-			backing_ptr: Some((allocator, backing_ptr))
+			values: output_values
 		}
 	}
 
@@ -75,8 +56,7 @@ impl<'r, 's> SessionOutputs<'r, 's> {
 		Self {
 			effective_len: 0,
 			keys: SmallVec::new(),
-			values: SmallVec::new(),
-			backing_ptr: None
+			values: SmallVec::new()
 		}
 	}
 
@@ -172,7 +152,7 @@ impl<'r, 's> SessionOutputs<'r, 's> {
 	}
 }
 
-impl<'x, 'r> IntoIterator for &'x SessionOutputs<'r, '_> {
+impl<'x, 'r> IntoIterator for &'x SessionOutputs<'r> {
 	type IntoIter = Iter<'x, 'r>;
 	type Item = (&'r str, ValueRef<'x>);
 
@@ -181,7 +161,7 @@ impl<'x, 'r> IntoIterator for &'x SessionOutputs<'r, '_> {
 	}
 }
 
-impl<'x, 'r> IntoIterator for &'x mut SessionOutputs<'r, '_> {
+impl<'x, 'r> IntoIterator for &'x mut SessionOutputs<'r> {
 	type IntoIter = IterMut<'x, 'r>;
 	type Item = (&'r str, ValueRefMut<'x>);
 
@@ -190,8 +170,8 @@ impl<'x, 'r> IntoIterator for &'x mut SessionOutputs<'r, '_> {
 	}
 }
 
-impl<'r, 's> IntoIterator for SessionOutputs<'r, 's> {
-	type IntoIter = IntoIter<'r, 's>;
+impl<'r> IntoIterator for SessionOutputs<'r> {
+	type IntoIter = IntoIter<'r>;
 	type Item = (&'r str, DynValue);
 
 	fn into_iter(self) -> Self::IntoIter {
@@ -201,47 +181,38 @@ impl<'r, 's> IntoIterator for SessionOutputs<'r, 's> {
 		IntoIter {
 			keys,
 			values,
-			effective_len: this.effective_len,
-			backing_ptr: this.backing_ptr
+			effective_len: this.effective_len
 		}
 	}
 }
 
-impl Drop for SessionOutputs<'_, '_> {
-	fn drop(&mut self) {
-		if let Some((allocator, ptr)) = self.backing_ptr {
-			unsafe { allocator.free(ptr) };
-		}
-	}
-}
-
-impl Index<&str> for SessionOutputs<'_, '_> {
+impl Index<&str> for SessionOutputs<'_> {
 	type Output = DynValue;
 	fn index(&self, key: &str) -> &Self::Output {
 		self.get(key).unwrap_or_else(|| panic!("no output named `{key}`"))
 	}
 }
 
-impl IndexMut<&str> for SessionOutputs<'_, '_> {
+impl IndexMut<&str> for SessionOutputs<'_> {
 	fn index_mut(&mut self, key: &str) -> &mut Self::Output {
 		self.get_mut(key).unwrap_or_else(|| panic!("no output named `{key}`"))
 	}
 }
 
-impl Index<String> for SessionOutputs<'_, '_> {
+impl Index<String> for SessionOutputs<'_> {
 	type Output = DynValue;
 	fn index(&self, key: String) -> &Self::Output {
 		self.get(&key).unwrap_or_else(|| panic!("no output named `{key}`"))
 	}
 }
 
-impl IndexMut<String> for SessionOutputs<'_, '_> {
+impl IndexMut<String> for SessionOutputs<'_> {
 	fn index_mut(&mut self, key: String) -> &mut Self::Output {
 		self.get_mut(&key).unwrap_or_else(|| panic!("no output named `{key}`"))
 	}
 }
 
-impl Index<usize> for SessionOutputs<'_, '_> {
+impl Index<usize> for SessionOutputs<'_> {
 	type Output = DynValue;
 	fn index(&self, index: usize) -> &Self::Output {
 		if index > self.values.len() {
@@ -251,7 +222,7 @@ impl Index<usize> for SessionOutputs<'_, '_> {
 	}
 }
 
-impl IndexMut<usize> for SessionOutputs<'_, '_> {
+impl IndexMut<usize> for SessionOutputs<'_> {
 	fn index_mut(&mut self, index: usize) -> &mut Self::Output {
 		if index > self.values.len() {
 			panic!("attempted to index output #{index} when there are only {} outputs", self.values.len());
@@ -409,14 +380,13 @@ impl<'x, 'k> Iterator for IterMut<'x, 'k> {
 impl ExactSizeIterator for IterMut<'_, '_> {}
 impl FusedIterator for IterMut<'_, '_> {}
 
-pub struct IntoIter<'r, 's> {
+pub struct IntoIter<'r> {
 	keys: smallvec::IntoIter<&'r str, { STACK_SESSION_OUTPUTS }>,
 	values: smallvec::IntoIter<DynValue, { STACK_SESSION_OUTPUTS }>,
-	effective_len: usize,
-	backing_ptr: Option<(&'s Allocator, *mut c_void)>
+	effective_len: usize
 }
 
-impl<'r> Iterator for IntoIter<'r, '_> {
+impl<'r> Iterator for IntoIter<'r> {
 	type Item = (&'r str, DynValue);
 
 	fn next(&mut self) -> Option<Self::Item> {
@@ -434,13 +404,5 @@ impl<'r> Iterator for IntoIter<'r, '_> {
 
 	fn size_hint(&self) -> (usize, Option<usize>) {
 		(self.effective_len, Some(self.effective_len))
-	}
-}
-
-impl Drop for IntoIter<'_, '_> {
-	fn drop(&mut self) {
-		if let Some((allocator, ptr)) = self.backing_ptr {
-			unsafe { allocator.free(ptr) };
-		}
 	}
 }

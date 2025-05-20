@@ -20,12 +20,12 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub(crate) struct InferenceFutInner<'r, 's> {
-	value: UnsafeCell<Option<Result<SessionOutputs<'r, 's>>>>,
+pub(crate) struct InferenceFutInner<'r> {
+	value: UnsafeCell<Option<Result<SessionOutputs<'r>>>>,
 	waker: Mutex<Option<Waker>>
 }
 
-impl<'r, 's> InferenceFutInner<'r, 's> {
+impl<'r> InferenceFutInner<'r> {
 	pub(crate) fn new() -> Self {
 		InferenceFutInner {
 			waker: Mutex::new(None),
@@ -33,11 +33,11 @@ impl<'r, 's> InferenceFutInner<'r, 's> {
 		}
 	}
 
-	pub(crate) fn try_take(&self) -> Option<Result<SessionOutputs<'r, 's>>> {
+	pub(crate) fn try_take(&self) -> Option<Result<SessionOutputs<'r>>> {
 		unsafe { &mut *self.value.get() }.take()
 	}
 
-	pub(crate) fn emplace_value(&self, value: Result<SessionOutputs<'r, 's>>) {
+	pub(crate) fn emplace_value(&self, value: Result<SessionOutputs<'r>>) {
 		unsafe { &mut *self.value.get() }.replace(value);
 	}
 
@@ -52,20 +52,20 @@ impl<'r, 's> InferenceFutInner<'r, 's> {
 	}
 }
 
-unsafe impl Send for InferenceFutInner<'_, '_> {}
-unsafe impl Sync for InferenceFutInner<'_, '_> {}
+unsafe impl Send for InferenceFutInner<'_> {}
+unsafe impl Sync for InferenceFutInner<'_> {}
 
-pub struct InferenceFut<'s, 'r, 'v> {
-	inner: Arc<InferenceFutInner<'r, 's>>,
+pub struct InferenceFut<'r, 'v> {
+	inner: Arc<InferenceFutInner<'r>>,
 	run_options: &'r UntypedRunOptions,
 	did_receive: bool,
 	_inputs: PhantomData<&'v ()>
 }
 
-unsafe impl Send for InferenceFut<'_, '_, '_> {}
+unsafe impl Send for InferenceFut<'_, '_> {}
 
-impl<'s, 'r> InferenceFut<'s, 'r, '_> {
-	pub(crate) fn new(inner: Arc<InferenceFutInner<'r, 's>>, run_options: &'r UntypedRunOptions) -> Self {
+impl<'r> InferenceFut<'r, '_> {
+	pub(crate) fn new(inner: Arc<InferenceFutInner<'r>>, run_options: &'r UntypedRunOptions) -> Self {
 		Self {
 			inner,
 			run_options,
@@ -75,8 +75,8 @@ impl<'s, 'r> InferenceFut<'s, 'r, '_> {
 	}
 }
 
-impl<'s, 'r> Future for InferenceFut<'s, 'r, '_> {
-	type Output = Result<SessionOutputs<'r, 's>>;
+impl<'r> Future for InferenceFut<'r, '_> {
+	type Output = Result<SessionOutputs<'r>>;
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		let this = Pin::into_inner(self);
@@ -91,7 +91,7 @@ impl<'s, 'r> Future for InferenceFut<'s, 'r, '_> {
 	}
 }
 
-impl Drop for InferenceFut<'_, '_, '_> {
+impl Drop for InferenceFut<'_, '_> {
 	fn drop(&mut self) {
 		if !self.did_receive {
 			let _ = self.run_options.terminate();
@@ -101,7 +101,7 @@ impl Drop for InferenceFut<'_, '_, '_> {
 }
 
 pub(crate) struct AsyncInferenceContext<'r, 's> {
-	pub(crate) inner: Arc<InferenceFutInner<'r, 's>>,
+	pub(crate) inner: Arc<InferenceFutInner<'r>>,
 	pub(crate) input_ort_values: SmallVec<*const ort_sys::OrtValue, { STACK_SESSION_INPUTS }>,
 	pub(crate) _input_inner_holders: SmallVec<Arc<ValueInner>, { STACK_SESSION_INPUTS }>,
 	pub(crate) input_name_ptrs: SmallVec<*const c_char, { STACK_SESSION_INPUTS }>,

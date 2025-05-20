@@ -129,7 +129,7 @@ impl Trainer {
 		&'s self,
 		inputs: impl Into<SessionInputs<'i1, 'v1, N1>>,
 		labels: impl Into<SessionInputs<'i2, 'v2, N2>>
-	) -> Result<SessionOutputs<'s, 's>> {
+	) -> Result<SessionOutputs<'s>> {
 		match inputs.into() {
 			SessionInputs::ValueSlice(input_values) => match labels.into() {
 				SessionInputs::ValueSlice(labels) => self.step_inner(input_values.iter().chain(labels).map(Some), None),
@@ -165,7 +165,7 @@ impl Trainer {
 		&'s self,
 		input_values: impl Iterator<Item = Option<&'i1 SessionInputValue<'v1>>>,
 		run_options: Option<&'r RunOptions>
-	) -> Result<SessionOutputs<'r, 's>> {
+	) -> Result<SessionOutputs<'r>> {
 		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![ptr::null_mut(); self.train_output_names.len()];
 
 		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.map(|v| v.map_or(ptr::null(), |v| v.ptr())).collect();
@@ -190,7 +190,7 @@ impl Trainer {
 		&'s self,
 		inputs: impl Into<SessionInputs<'i1, 'v1, N1>>,
 		labels: impl Into<SessionInputs<'i2, 'v2, N2>>
-	) -> Result<SessionOutputs<'s, 's>> {
+	) -> Result<SessionOutputs<'s>> {
 		match inputs.into() {
 			SessionInputs::ValueSlice(input_values) => match labels.into() {
 				SessionInputs::ValueSlice(labels) => self.eval_step_inner(input_values.iter().chain(labels).map(Some), None),
@@ -226,7 +226,7 @@ impl Trainer {
 		&'s self,
 		input_values: impl Iterator<Item = Option<&'i1 SessionInputValue<'v1>>>,
 		run_options: Option<&'r RunOptions>
-	) -> Result<SessionOutputs<'r, 's>> {
+	) -> Result<SessionOutputs<'r>> {
 		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![ptr::null_mut(); self.eval_output_names.len()];
 
 		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.map(|v| v.map_or(ptr::null(), |v| v.ptr())).collect();

@@ -32,7 +32,7 @@ use crate::{
 	memory::Allocator,
 	metadata::ModelMetadata,
 	ortsys,
-	util::{STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS, with_cstr_ptr_array},
+	util::{STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS, with_cstr, with_cstr_ptr_array},
 	value::{DynValue, Value, ValueType}
 };
 
@@ -544,6 +544,14 @@ impl Session {
 	pub(crate) fn set_dynamic_option(&mut self, key: *const c_char, value: *const c_char) -> Result<()> {
 		ortsys![unsafe SetEpDynamicOptions(self.inner.session_ptr.as_ptr(), &key, &value, 1)?];
 		Ok(())
+	}
+
+	pub fn opset_for_domain(&self, domain: impl AsRef<str>) -> Result<u32> {
+		with_cstr(domain.as_ref().as_bytes(), &|domain| {
+			let mut opset = 0;
+			ortsys![@editor: unsafe SessionGetOpsetForDomain(self.inner.session_ptr.as_ptr(), domain.as_ptr(), &mut opset)?];
+			Ok(opset as u32)
+		})
 	}
 }
 

@@ -1,6 +1,6 @@
 [package]
 name = "ort-sys"
-description = "Unsafe Rust bindings for ONNX Runtime 1.21 - Optimize and Accelerate Machine Learning Inferencing"
+description = "Unsafe Rust bindings for ONNX Runtime 1.22 - Optimize and Accelerate Machine Learning Inferencing"
 version = "2.0.0-rc.9"
 edition = "2021"
 rust-version = "1.81"
@@ -44,6 +44,7 @@ cann = []
 qnn = []
 webgpu = [ "dep:glob" ]
 azure = []
+nv = []
 
 [build-dependencies]
 ureq = { version = "3", optional = true, default-features = false, features = [ "native-tls", "socks-proxy" ] }

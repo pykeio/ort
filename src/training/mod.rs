@@ -56,46 +56,9 @@ pub fn training_api() -> Result<&'static ort_sys::OrtTrainingApi> {
 
 /// Sets the seed used for RNG when training.
 pub fn set_seed(seed: i64) -> Result<()> {
-	trainsys![unsafe SetSeed(seed)?];
+	ortsys![@training: unsafe SetSeed(seed)?];
 	Ok(())
 }
-
-macro_rules! trainsys {
-	($method:ident) => {
-		($crate::training::training_api().unwrap().$method)
-	};
-	(unsafe $method:ident($($n:expr),+ $(,)?)) => {
-		unsafe { ($crate::training::training_api().unwrap().$method)($($n),+) }
-	};
-	(unsafe $method:ident($($n:expr),+ $(,)?).expect($e:expr)) => {
-		unsafe { $crate::error::status_to_result(($crate::training::training_api().unwrap().$method)($($n),+)) }.expect($e)
-	};
-	(unsafe $method:ident($($n:expr),+ $(,)?); nonNull($($check:expr),+ $(,)?)$(;)?) => {{
-		let _x = unsafe { ($crate::training::training_api().unwrap().$method)($($n),+) };
-		$(
-			// TODO: #[cfg(debug_assertions)]?
-			if ($check).is_null() {
-				$crate::util::cold();
-				panic!(concat!("expected `", stringify!($check), "` to not be null"));
-			}
-		)+
-		_x
-	}};
-	(unsafe $method:ident($($n:expr),+ $(,)?)?) => {
-		unsafe { $crate::error::status_to_result(($crate::training::training_api()?.$method)($($n),+)) }?
-	};
-	(unsafe $method:ident($($n:expr),+ $(,)?)?; nonNull($($check:expr),+ $(,)?)$(;)?) => {{
-		unsafe { $crate::error::status_to_result(($crate::training::training_api()?.$method)($($n),+)) }?;
-		$(
-			// TODO: #[cfg(debug_assertions)]?
-			if ($check).is_null() {
-				$crate::util::cold();
-				return Err($crate::Error::new(concat!("expected `", stringify!($check), "` to not be null")));
-			}
-		)+
-	}};
-}
-pub(crate) use trainsys;
 
 #[derive(Debug)]
 pub struct Checkpoint {
@@ -106,7 +69,7 @@ impl Checkpoint {
 	pub fn load(path: impl AsRef<Path>) -> Result<Self> {
 		let path = crate::util::path_to_os_char(path);
 		let mut ptr: *mut ort_sys::OrtCheckpointState = ptr::null_mut();
-		trainsys![unsafe LoadCheckpoint(path.as_ptr(), &mut ptr)?; nonNull(ptr)];
+		ortsys![@training: unsafe LoadCheckpoint(path.as_ptr(), &mut ptr)?; nonNull(ptr)];
 		Ok(Checkpoint {
 			ptr: unsafe { NonNull::new_unchecked(ptr) }
 		})
@@ -114,7 +77,7 @@ impl Checkpoint {
 
 	pub fn load_from_buffer(buffer: &[u8]) -> Result<Self> {
 		let mut ptr: *mut ort_sys::OrtCheckpointState = ptr::null_mut();
-		trainsys![unsafe LoadCheckpointFromBuffer(buffer.as_ptr().cast(), buffer.len(), &mut ptr)?; nonNull(ptr)];
+		ortsys![@training: unsafe LoadCheckpointFromBuffer(buffer.as_ptr().cast(), buffer.len(), &mut ptr)?; nonNull(ptr)];
 		Ok(Checkpoint {
 			ptr: unsafe { NonNull::new_unchecked(ptr) }
 		})
@@ -122,7 +85,7 @@ impl Checkpoint {
 
 	pub fn save(&self, path: impl AsRef<Path>, include_optimizer_state: bool) -> Result<()> {
 		let path = crate::util::path_to_os_char(path);
-		trainsys![unsafe SaveCheckpoint(self.ptr.as_ptr(), path.as_ptr(), include_optimizer_state)?];
+		ortsys![@training: unsafe SaveCheckpoint(self.ptr.as_ptr(), path.as_ptr(), include_optimizer_state)?];
 		Ok(())
 	}
 
@@ -131,13 +94,13 @@ impl Checkpoint {
 		with_cstr(name.as_ref().as_bytes(), &|name| {
 			match &property {
 				Property::Int(value) => {
-					trainsys![unsafe AddProperty(self.ptr.as_ptr(), name.as_ptr(), ort_sys::OrtPropertyType::OrtIntProperty, (value as *const i64).cast())?];
+					ortsys![@training: unsafe AddProperty(self.ptr.as_ptr(), name.as_ptr(), ort_sys::OrtPropertyType::OrtIntProperty, (value as *const i64).cast())?];
 				}
 				Property::Float(value) => {
-					trainsys![unsafe AddProperty(self.ptr.as_ptr(), name.as_ptr(), ort_sys::OrtPropertyType::OrtFloatProperty, (value as *const f32).cast())?];
+					ortsys![@training: unsafe AddProperty(self.ptr.as_ptr(), name.as_ptr(), ort_sys::OrtPropertyType::OrtFloatProperty, (value as *const f32).cast())?];
 				}
 				Property::String(value) => with_cstr(value.as_bytes(), &|value| {
-					trainsys![unsafe AddProperty(self.ptr.as_ptr(), name.as_ptr(), ort_sys::OrtPropertyType::OrtStringProperty, value.as_ptr().cast())?];
+					ortsys![@training: unsafe AddProperty(self.ptr.as_ptr(), name.as_ptr(), ort_sys::OrtPropertyType::OrtStringProperty, value.as_ptr().cast())?];
 					Ok(())
 				})?
 			}
@@ -151,7 +114,7 @@ impl Checkpoint {
 		let (property_type, property_value) = with_cstr(name.as_ref().as_bytes(), &|name| {
 			let mut property_type: ort_sys::OrtPropertyType = ort_sys::OrtPropertyType::OrtIntProperty;
 			let mut property_value: *const () = ptr::null();
-			trainsys![unsafe GetProperty(
+			ortsys![@training: unsafe GetProperty(
 				self.ptr.as_ptr(),
 				name.as_ptr(),
 				allocator.ptr().cast_mut(),
@@ -176,7 +139,7 @@ impl Checkpoint {
 	pub fn get_parameter(&self, name: impl AsRef<str>, allocator: &Allocator) -> Result<DynTensor> {
 		let value_ptr = with_cstr(name.as_ref().as_bytes(), &|name| {
 			let mut value_ptr = ptr::null_mut();
-			trainsys![unsafe GetParameter(self.ptr.as_ptr(), name.as_ptr(), allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
+			ortsys![@training: unsafe GetParameter(self.ptr.as_ptr(), name.as_ptr(), allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
 			Ok(value_ptr)
 		})?;
 		Ok(unsafe { DynTensor::from_ptr(NonNull::new_unchecked(value_ptr), None) })
@@ -184,7 +147,7 @@ impl Checkpoint {
 
 	pub fn update_parameter<T: ValueTypeMarker>(&mut self, name: impl AsRef<str>, value: &Value<T>) -> Result<()> {
 		with_cstr(name.as_ref().as_bytes(), &|name| {
-			trainsys![unsafe UpdateParameter(self.ptr.as_ptr(), name.as_ptr(), value.ptr().cast_mut())?];
+			ortsys![@training: unsafe UpdateParameter(self.ptr.as_ptr(), name.as_ptr(), value.ptr().cast_mut())?];
 			Ok(())
 		})
 	}
@@ -192,7 +155,7 @@ impl Checkpoint {
 	pub fn get_parameter_type(&self, name: impl AsRef<str>) -> Result<ValueType> {
 		let shape_info = with_cstr(name.as_ref().as_bytes(), &|name| {
 			let mut shape_info = ptr::null_mut();
-			trainsys![unsafe GetParameterTypeAndShape(self.ptr.as_ptr(), name.as_ptr(), &mut shape_info)?; nonNull(shape_info)];
+			ortsys![@training: unsafe GetParameterTypeAndShape(self.ptr.as_ptr(), name.as_ptr(), &mut shape_info)?; nonNull(shape_info)];
 			Ok(shape_info)
 		})?;
 		let value_type = unsafe { extract_data_type_from_tensor_info(shape_info) };
@@ -240,7 +203,7 @@ impl AsPointer for Checkpoint {
 impl Drop for Checkpoint {
 	fn drop(&mut self) {
 		crate::trace!("dropping checkpoint");
-		trainsys![unsafe ReleaseCheckpointState(self.ptr.as_ptr())];
+		ortsys![@training: unsafe ReleaseCheckpointState(self.ptr.as_ptr())];
 	}
 }
 
@@ -265,18 +228,18 @@ impl Optimizer<'_> {
 	}
 
 	pub fn reset_grad(&mut self) -> Result<()> {
-		trainsys![unsafe LazyResetGrad(self.session.as_ptr())?];
+		ortsys![@training: unsafe LazyResetGrad(self.session.as_ptr())?];
 		Ok(())
 	}
 
 	pub fn lr(&self) -> Result<f32> {
 		let mut lr = f32::NAN;
-		trainsys![unsafe GetLearningRate(self.session.as_ptr(), &mut lr)?];
+		ortsys![@training: unsafe GetLearningRate(self.session.as_ptr(), &mut lr)?];
 		Ok(lr)
 	}
 
 	pub fn set_lr(&mut self, lr: f32) -> Result<()> {
-		trainsys![unsafe SetLearningRate(self.session.as_ptr(), lr)?];
+		ortsys![@training: unsafe SetLearningRate(self.session.as_ptr(), lr)?];
 		Ok(())
 	}
 
@@ -287,24 +250,24 @@ impl Optimizer<'_> {
 				total_step_count,
 				initial_lr
 			} => {
-				trainsys![unsafe RegisterLinearLRScheduler(self.session.as_ptr(), warmup_step_count, total_step_count, initial_lr)?];
+				ortsys![@training: unsafe RegisterLinearLRScheduler(self.session.as_ptr(), warmup_step_count, total_step_count, initial_lr)?];
 			}
 		}
 		Ok(())
 	}
 
 	pub fn step(&mut self) -> Result<()> {
-		trainsys![unsafe OptimizerStep(self.session.as_ptr(), ptr::null_mut())?];
+		ortsys![@training: unsafe OptimizerStep(self.session.as_ptr(), ptr::null_mut())?];
 		Ok(())
 	}
 
 	pub fn step_with_options(&mut self, options: RunOptions<NoSelectedOutputs>) -> Result<()> {
-		trainsys![unsafe OptimizerStep(self.session.as_ptr(), options.ptr())?];
+		ortsys![@training: unsafe OptimizerStep(self.session.as_ptr(), options.ptr())?];
 		Ok(())
 	}
 
 	pub fn step_scheduler(&mut self) -> Result<()> {
-		trainsys![unsafe SchedulerStep(self.session.as_ptr())?];
+		ortsys![@training: unsafe SchedulerStep(self.session.as_ptr())?];
 		Ok(())
 	}
 }

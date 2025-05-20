@@ -25,6 +25,7 @@ pub mod __private {
 pub(crate) mod private;
 
 pub mod adapter;
+pub mod compiler;
 pub mod editor;
 pub mod environment;
 pub mod error;
@@ -44,7 +45,7 @@ pub mod value;
 pub mod api {
 	#[cfg(feature = "training")]
 	pub use super::training::training_api as training;
-	pub use super::{api as ort, editor::editor_api as editor};
+	pub use super::{api as ort, compiler::compile_api as compile, editor::editor_api as editor};
 }
 
 #[cfg(feature = "load-dynamic")]

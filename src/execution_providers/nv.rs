@@ -24,7 +24,7 @@ impl NVExecutionProvider {
 }
 
 impl ExecutionProvider for NVExecutionProvider {
-	fn as_str(&self) -> &'static str {
+	fn name(&self) -> &'static str {
 		"NvTensorRTRTXExecutionProvider"
 	}
 

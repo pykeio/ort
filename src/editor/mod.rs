@@ -25,11 +25,6 @@ pub const ONNX_ML_DOMAIN: &str = "ai.onnx.ml";
 
 /// Returns a pointer to the global [`ort_sys::OrtModelEditorApi`] object, or errors if the Model Editor API is not
 /// supported.
-///
-/// # Panics
-/// May panic if:
-/// - Getting the `OrtApi` struct fails, due to `ort` loading an unsupported version of ONNX Runtime.
-/// - Loading the ONNX Runtime dynamic library fails if the `load-dynamic` feature is enabled.
 pub fn editor_api() -> Result<&'static ort_sys::OrtModelEditorApi> {
 	struct ModelEditorApiPointer(*const ort_sys::OrtModelEditorApi);
 	unsafe impl Send for ModelEditorApiPointer {}

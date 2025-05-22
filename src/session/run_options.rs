@@ -202,7 +202,7 @@ impl RunOptions {
 		ortsys![unsafe CreateRunOptions(&mut run_options_ptr)?; nonNull(run_options_ptr)];
 		Ok(RunOptions {
 			inner: UntypedRunOptions {
-				ptr: unsafe { NonNull::new_unchecked(run_options_ptr) },
+				ptr: run_options_ptr,
 				outputs: OutputSelector::default(),
 				adapters: Vec::new()
 			},

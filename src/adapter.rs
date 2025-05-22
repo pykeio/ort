@@ -93,11 +93,9 @@ impl Adapter {
 		let path = crate::util::path_to_os_char(path);
 		let allocator_ptr = allocator.map(|c| c.ptr().cast_mut()).unwrap_or_else(ptr::null_mut);
 		let mut ptr = ptr::null_mut();
-		ortsys![unsafe CreateLoraAdapter(path.as_ptr(), allocator_ptr, &mut ptr)?];
+		ortsys![unsafe CreateLoraAdapter(path.as_ptr(), allocator_ptr, &mut ptr)?; nonNull(ptr)];
 		Ok(Adapter {
-			inner: Arc::new(AdapterInner {
-				ptr: unsafe { NonNull::new_unchecked(ptr) }
-			})
+			inner: Arc::new(AdapterInner { ptr })
 		})
 	}
 
@@ -138,11 +136,9 @@ impl Adapter {
 	pub fn from_memory(bytes: &[u8], allocator: Option<&Allocator>) -> Result<Self> {
 		let allocator_ptr = allocator.map(|c| c.ptr().cast_mut()).unwrap_or_else(ptr::null_mut);
 		let mut ptr = ptr::null_mut();
-		ortsys![unsafe CreateLoraAdapterFromArray(bytes.as_ptr().cast(), bytes.len(), allocator_ptr, &mut ptr)?];
+		ortsys![unsafe CreateLoraAdapterFromArray(bytes.as_ptr().cast(), bytes.len(), allocator_ptr, &mut ptr)?; nonNull(ptr)];
 		Ok(Adapter {
-			inner: Arc::new(AdapterInner {
-				ptr: unsafe { NonNull::new_unchecked(ptr) }
-			})
+			inner: Arc::new(AdapterInner { ptr })
 		})
 	}
 }

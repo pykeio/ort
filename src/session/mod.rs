@@ -183,8 +183,8 @@ impl Session {
 				ortsys![unsafe SessionGetOverridableInitializerName(self.ptr(), i, allocator.ptr().cast_mut(), &mut name).expect("infallible")];
 				let name = unsafe { CStr::from_ptr(name) }.to_string_lossy().into_owned();
 				let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = ptr::null_mut();
-				ortsys![unsafe SessionGetOverridableInitializerTypeInfo(self.ptr(), i, &mut typeinfo_ptr).expect("infallible")];
-				let dtype = ValueType::from_type_info(typeinfo_ptr);
+				ortsys![unsafe SessionGetOverridableInitializerTypeInfo(self.ptr(), i, &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
+				let dtype = unsafe { ValueType::from_type_info(typeinfo_ptr) };
 				OverridableInitializer { name, dtype }
 			})
 			.collect()
@@ -356,7 +356,7 @@ impl Session {
 			let mut output_values_ptr: *mut *mut ort_sys::OrtValue = ptr::null_mut();
 			ortsys![unsafe GetBoundOutputValues(binding.ptr(), self.inner.allocator.ptr().cast_mut(), &mut output_values_ptr, &mut count)?; nonNull(output_values_ptr)];
 
-			let output_values = unsafe { slice::from_raw_parts(output_values_ptr, count) }
+			let output_values = unsafe { slice::from_raw_parts(output_values_ptr.as_ptr(), count) }
 				.iter()
 				.zip(binding.output_values.iter())
 				.map(|(ptr, (_, value))| unsafe {
@@ -368,7 +368,7 @@ impl Session {
 				})
 				.collect();
 			unsafe {
-				self.inner.allocator.free(output_values_ptr);
+				self.inner.allocator.free(output_values_ptr.as_ptr());
 			}
 
 			Ok(SessionOutputs::new(binding.output_values.iter().map(|(k, _)| k.as_str()).collect(), output_values))
@@ -493,7 +493,7 @@ impl Session {
 	pub fn metadata(&self) -> Result<ModelMetadata<'_>> {
 		let mut metadata_ptr: *mut ort_sys::OrtModelMetadata = ptr::null_mut();
 		ortsys![unsafe SessionGetModelMetadata(self.inner.session_ptr.as_ptr(), &mut metadata_ptr)?; nonNull(metadata_ptr)];
-		Ok(ModelMetadata::new(unsafe { NonNull::new_unchecked(metadata_ptr) }))
+		Ok(unsafe { ModelMetadata::new(metadata_ptr) })
 	}
 
 	/// Returns the time that profiling was started, in nanoseconds.
@@ -508,10 +508,8 @@ impl Session {
 	/// Note that this must be explicitly called at the end of profiling, otherwise the profiling file will be empty.
 	pub fn end_profiling(&mut self) -> Result<String> {
 		let mut profiling_name: *mut c_char = ptr::null_mut();
-
 		ortsys![unsafe SessionEndProfiling(self.inner.session_ptr.as_ptr(), self.inner.allocator.ptr().cast_mut(), &mut profiling_name)?; nonNull(profiling_name)];
-
-		dangerous::raw_pointer_to_string(&self.inner.allocator, profiling_name)
+		dangerous::raw_pointer_to_string(&self.inner.allocator, profiling_name.as_ptr())
 	}
 
 	/// Sets this session's [workload type][`WorkloadType`] to instruct execution providers to prioritize performance or
@@ -679,11 +677,10 @@ mod dangerous {
 
 		let status = unsafe { f(session_ptr.as_ptr(), i, &mut typeinfo_ptr) };
 		unsafe { status_to_result(status) }?;
-		if typeinfo_ptr.is_null() {
+		let Some(typeinfo_ptr) = NonNull::new(typeinfo_ptr) else {
 			crate::util::cold();
 			return Err(crate::Error::new(concat!("expected `typeinfo_ptr` to not be null")));
-		}
-
-		Ok(ValueType::from_type_info(typeinfo_ptr))
+		};
+		Ok(unsafe { ValueType::from_type_info(typeinfo_ptr) })
 	}
 }

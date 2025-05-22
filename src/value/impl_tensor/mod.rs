@@ -7,7 +7,7 @@ use core::{
 	fmt::{self, Debug},
 	marker::PhantomData,
 	ops::{Index, IndexMut},
-	ptr::{self, NonNull}
+	ptr::{self}
 };
 
 pub use self::create::{OwnedTensorArrayData, TensorArrayData, TensorArrayDataMut, TensorArrayDataParts, ToShape};
@@ -120,10 +120,10 @@ impl DynTensor {
 
 		// `CreateTensorAsOrtValue` actually does not guarantee that the data allocated is zero'd out, so if we can, we should
 		// do it manually.
-		let memory_info = MemoryInfo::from_value(value_ptr).expect("CreateTensorAsOrtValue returned non-tensor");
+		let memory_info = unsafe { MemoryInfo::from_value(value_ptr) }.expect("CreateTensorAsOrtValue returned non-tensor");
 		if memory_info.is_cpu_accessible() && data_type != TensorElementType::String {
 			let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
-			ortsys![unsafe GetTensorMutableData(value_ptr, &mut buffer_ptr)?];
+			ortsys![unsafe GetTensorMutableData(value_ptr.as_ptr(), &mut buffer_ptr)?];
 			if !buffer_ptr.is_null() {
 				unsafe { buffer_ptr.write_bytes(0, data_type.byte_size(shape.num_elements())) };
 			}
@@ -131,14 +131,14 @@ impl DynTensor {
 
 		Ok(Value {
 			inner: Arc::new(ValueInner {
-				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
+				ptr: value_ptr,
 				dtype: ValueType::Tensor {
 					ty: data_type,
 					shape,
 					dimension_symbols: SymbolicDimensions::empty(shape_len)
 				},
 				drop: true,
-				memory_info: MemoryInfo::from_value(value_ptr),
+				memory_info: Some(memory_info),
 				_backing: None
 			}),
 			_markers: PhantomData

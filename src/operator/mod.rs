@@ -79,7 +79,7 @@ impl ShapeInferenceContext {
 		let mut tys = Vec::with_capacity(count);
 		for i in 0..count {
 			let mut ty_info = ptr::null_mut();
-			ortsys![unsafe ShapeInferContext_GetInputTypeShape(self.ptr(), i, &mut ty_info).expect("failed to get info type")];
+			ortsys![unsafe ShapeInferContext_GetInputTypeShape(self.ptr(), i, &mut ty_info).expect("failed to get info type"); nonNull(ty_info)];
 			tys.push(unsafe { extract_data_type_from_tensor_info(ty_info) });
 		}
 		tys
@@ -131,8 +131,8 @@ impl OperatorDomain {
 		let mut ptr: *mut ort_sys::OrtCustomOpDomain = ptr::null_mut();
 		ortsys![unsafe CreateCustomOpDomain(name.as_ptr(), &mut ptr)?; nonNull(ptr)];
 		Ok(Self {
+			ptr,
 			_name: name,
-			ptr: NonNull::from(unsafe { &mut *ptr }),
 			operators: Vec::new()
 		})
 	}

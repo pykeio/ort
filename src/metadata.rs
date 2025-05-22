@@ -1,4 +1,7 @@
-use alloc::{string::String, vec::Vec};
+use alloc::{
+	string::{String, ToString},
+	vec::Vec
+};
 use core::{
 	ffi::c_char,
 	marker::PhantomData,
@@ -6,7 +9,13 @@ use core::{
 	slice
 };
 
-use crate::{AsPointer, char_p_to_string, error::Result, memory::Allocator, ortsys, util::with_cstr};
+use crate::{
+	AsPointer, char_p_to_string,
+	error::Result,
+	memory::Allocator,
+	ortsys,
+	util::{AllocatedString, with_cstr}
+};
 
 /// Container for model metadata, including name & producer information.
 pub struct ModelMetadata<'s> {
@@ -16,7 +25,7 @@ pub struct ModelMetadata<'s> {
 }
 
 impl ModelMetadata<'_> {
-	pub(crate) fn new(metadata_ptr: NonNull<ort_sys::OrtModelMetadata>) -> Self {
+	pub(crate) unsafe fn new(metadata_ptr: NonNull<ort_sys::OrtModelMetadata>) -> Self {
 		ModelMetadata {
 			metadata_ptr,
 			allocator: Allocator::default(),
@@ -27,81 +36,36 @@ impl ModelMetadata<'_> {
 	/// Gets the model description, returning an error if no description is present.
 	pub fn description(&self) -> Result<String> {
 		let mut str_bytes: *mut c_char = ptr::null_mut();
-		ortsys![unsafe ModelMetadataGetDescription(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?; nonNull(str_bytes)];
-
-		let value = match char_p_to_string(str_bytes) {
-			Ok(value) => value,
-			Err(e) => {
-				unsafe { self.allocator.free(str_bytes) };
-				return Err(e);
-			}
-		};
-		unsafe { self.allocator.free(str_bytes) };
-		Ok(value)
+		ortsys![unsafe ModelMetadataGetDescription(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?];
+		Ok(unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }?.to_string())
 	}
 
 	/// Gets the description of the graph.
 	pub fn graph_description(&self) -> Result<String> {
 		let mut str_bytes: *mut c_char = ptr::null_mut();
-		ortsys![unsafe ModelMetadataGetGraphDescription(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?; nonNull(str_bytes)];
-
-		let value = match char_p_to_string(str_bytes) {
-			Ok(value) => value,
-			Err(e) => {
-				unsafe { self.allocator.free(str_bytes) };
-				return Err(e);
-			}
-		};
-		unsafe { self.allocator.free(str_bytes) };
-		Ok(value)
+		ortsys![unsafe ModelMetadataGetGraphDescription(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?];
+		Ok(unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }?.to_string())
 	}
 
 	/// Gets the model producer name, returning an error if no producer name is present.
 	pub fn producer(&self) -> Result<String> {
 		let mut str_bytes: *mut c_char = ptr::null_mut();
-		ortsys![unsafe ModelMetadataGetProducerName(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?; nonNull(str_bytes)];
-
-		let value = match char_p_to_string(str_bytes) {
-			Ok(value) => value,
-			Err(e) => {
-				unsafe { self.allocator.free(str_bytes) };
-				return Err(e);
-			}
-		};
-		unsafe { self.allocator.free(str_bytes) };
-		Ok(value)
+		ortsys![unsafe ModelMetadataGetProducerName(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?];
+		Ok(unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }?.to_string())
 	}
 
 	/// Gets the model name, returning an error if no name is present.
 	pub fn name(&self) -> Result<String> {
 		let mut str_bytes: *mut c_char = ptr::null_mut();
-		ortsys![unsafe ModelMetadataGetGraphName(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?; nonNull(str_bytes)];
-
-		let value = match char_p_to_string(str_bytes) {
-			Ok(value) => value,
-			Err(e) => {
-				unsafe { self.allocator.free(str_bytes) };
-				return Err(e);
-			}
-		};
-		unsafe { self.allocator.free(str_bytes) };
-		Ok(value)
+		ortsys![unsafe ModelMetadataGetGraphName(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?];
+		Ok(unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }?.to_string())
 	}
 
 	/// Returns the model's domain, returning an error if no name is present.
 	pub fn domain(&self) -> Result<String> {
 		let mut str_bytes: *mut c_char = ptr::null_mut();
-		ortsys![unsafe ModelMetadataGetDomain(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?; nonNull(str_bytes)];
-
-		let value = match char_p_to_string(str_bytes) {
-			Ok(value) => value,
-			Err(e) => {
-				unsafe { self.allocator.free(str_bytes) };
-				return Err(e);
-			}
-		};
-		unsafe { self.allocator.free(str_bytes) };
-		Ok(value)
+		ortsys![unsafe ModelMetadataGetDomain(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?];
+		Ok(unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }?.to_string())
 	}
 
 	/// Gets the model version, returning an error if no version is present.
@@ -118,19 +82,11 @@ impl ModelMetadata<'_> {
 			ortsys![unsafe ModelMetadataLookupCustomMetadataMap(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), key.as_ptr(), &mut str_bytes)?];
 			Ok(str_bytes)
 		})?;
-		if !str_bytes.is_null() {
-			let value = match char_p_to_string(str_bytes) {
-				Ok(value) => value,
-				Err(e) => {
-					unsafe { self.allocator.free(str_bytes) };
-					return Err(e);
-				}
-			};
-			unsafe { self.allocator.free(str_bytes) };
-			Ok(Some(value))
+		Ok(if !str_bytes.is_null() {
+			Some(unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }?.to_string())
 		} else {
-			Ok(None)
-		}
+			None
+		})
 	}
 
 	pub fn custom_keys(&self) -> Result<Vec<String>> {

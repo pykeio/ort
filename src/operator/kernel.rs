@@ -58,7 +58,7 @@ impl KernelAttributes {
 			let name = CString::from_vec_with_nul(name)?.into_string()?;
 			let mut type_info = ptr::null_mut();
 			ortsys![unsafe KernelInfo_GetInputTypeInfo(self.ptr.as_ptr(), idx, &mut type_info)?; nonNull(type_info)];
-			let input_type = ValueType::from_type_info(type_info);
+			let input_type = unsafe { ValueType::from_type_info(type_info) };
 			inputs.push(Input { name, input_type })
 		}
 		Ok(inputs)
@@ -77,7 +77,7 @@ impl KernelAttributes {
 			let name = CString::from_vec_with_nul(name)?.into_string()?;
 			let mut type_info = ptr::null_mut();
 			ortsys![unsafe KernelInfo_GetOutputTypeInfo(self.ptr.as_ptr(), idx, &mut type_info)?; nonNull(type_info)];
-			let output_type = ValueType::from_type_info(type_info);
+			let output_type = unsafe { ValueType::from_type_info(type_info) };
 			outputs.push(Output { name, output_type })
 		}
 		Ok(outputs)
@@ -87,11 +87,15 @@ impl KernelAttributes {
 		let mut value_ptr: *const ort_sys::OrtValue = ptr::null();
 		let mut is_constant = 0;
 		ortsys![unsafe KernelInfoGetConstantInput_tensor(self.ptr.as_ptr(), idx, &mut is_constant, &mut value_ptr)?];
-		if is_constant == 0 || value_ptr.is_null() {
-			return Err(Error::new("input index out of bounds or input is not constant"));
+		if is_constant == 0 {
+			return Err(Error::new("input is not constant"));
 		}
 
-		unsafe { ValueRef::new(DynValue::from_ptr_nodrop(NonNull::new_unchecked(value_ptr.cast_mut()), None)) }.downcast()
+		let Some(value_ptr) = NonNull::new(value_ptr.cast_mut()) else {
+			return Err(Error::new("input index out of bounds"));
+		};
+
+		unsafe { ValueRef::new(DynValue::from_ptr_nodrop(value_ptr, None)) }.downcast()
 	}
 
 	pub fn node_name(&self) -> Result<String> {
@@ -105,13 +109,13 @@ impl KernelAttributes {
 	pub fn allocator(&self, mem_type: MemoryType) -> Result<Allocator> {
 		let mut ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
 		ortsys![unsafe KernelInfoGetAllocator(self.ptr.as_ptr(), mem_type.into(), &mut ptr)?; nonNull(ptr)];
-		Ok(unsafe { Allocator::from_raw_unchecked(ptr) })
+		Ok(unsafe { Allocator::from_raw(ptr) })
 	}
 
 	pub fn logger(&self) -> Result<Logger<'_>> {
 		let mut logger: *const ort_sys::OrtLogger = ptr::null_mut();
 		ortsys![unsafe KernelInfo_GetLogger(self.ptr.as_ptr(), &mut logger)?; nonNull(logger)];
-		Ok(Logger::new(logger))
+		Ok(unsafe { Logger::from_raw(logger) })
 	}
 }
 
@@ -212,8 +216,8 @@ impl KernelContext {
 
 	pub fn allocator(&self, memory_info: &MemoryInfo) -> Result<Allocator> {
 		let mut allocator_ptr = ptr::null_mut();
-		ortsys![unsafe KernelContext_GetAllocator(self.ptr.as_ptr(), memory_info.ptr(), &mut allocator_ptr)?];
-		Ok(unsafe { Allocator::from_raw_unchecked(allocator_ptr) })
+		ortsys![unsafe KernelContext_GetAllocator(self.ptr.as_ptr(), memory_info.ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
+		Ok(unsafe { Allocator::from_raw(allocator_ptr) })
 	}
 
 	pub fn get_resource(&self, id: ort_sys::c_int, version: ort_sys::c_int) -> Result<Option<NonNull<ort_sys::c_void>>> {
@@ -234,7 +238,7 @@ impl KernelContext {
 	pub fn logger(&self) -> Result<Logger<'_>> {
 		let mut logger: *const ort_sys::OrtLogger = ptr::null_mut();
 		ortsys![unsafe KernelContext_GetLogger(self.ptr.as_ptr(), &mut logger)?; nonNull(logger)];
-		Ok(Logger::new(logger))
+		Ok(unsafe { Logger::from_raw(logger) })
 	}
 
 	// TODO: STATUS_ACCESS_VIOLATION inside `KernelContext_GetScratchBuffer`. gonna assume this one is just an internal ONNX

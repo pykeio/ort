@@ -3,7 +3,8 @@ use alloc::boxed::Box;
 use core::ptr;
 use core::{
 	ffi::{self, CStr},
-	marker::PhantomData
+	marker::PhantomData,
+	ptr::NonNull
 };
 
 use crate::{AsPointer, ortsys, util::with_cstr_ptr_array};
@@ -149,12 +150,12 @@ pub(crate) extern "system" fn custom_logger(
 /// Messages can be logged to a [`Logger`] via the [`log!`](crate::log) macro.
 #[derive(Debug)]
 pub struct Logger<'a> {
-	ptr: *const ort_sys::OrtLogger,
+	ptr: NonNull<ort_sys::OrtLogger>,
 	_p: PhantomData<&'a ()>
 }
 
 impl<'a> Logger<'a> {
-	pub(crate) fn new(ptr: *const ort_sys::OrtLogger) -> Self {
+	pub(crate) unsafe fn from_raw(ptr: NonNull<ort_sys::OrtLogger>) -> Self {
 		Self { ptr, _p: PhantomData }
 	}
 
@@ -174,12 +175,12 @@ impl<'a> Logger<'a> {
 			#[cfg(target_family = "windows")]
 			{
 				let file_path = crate::util::str_to_os_char(file_path);
-				ortsys![unsafe Logger_LogMessage(self.ptr, level.into(), message, file_path.as_ptr(), line as _, func_name)?];
+				ortsys![unsafe Logger_LogMessage(self.ptr.as_ptr(), level.into(), message, file_path.as_ptr(), line as _, func_name)?];
 				Ok(())
 			}
 			#[cfg(not(target_family = "windows"))]
 			crate::util::with_cstr(file_path.as_bytes(), &|file_path| {
-				ortsys![unsafe Logger_LogMessage(self.ptr, level.into(), message, file_path.as_ptr(), line as _, func_name)?];
+				ortsys![unsafe Logger_LogMessage(self.ptr.as_ptr(), level.into(), message, file_path.as_ptr(), line as _, func_name)?];
 				Ok(())
 			})
 		});
@@ -190,7 +191,7 @@ impl<'a> AsPointer for Logger<'a> {
 	type Sys = ort_sys::OrtLogger;
 
 	fn ptr(&self) -> *const Self::Sys {
-		self.ptr
+		self.ptr.as_ptr()
 	}
 }
 

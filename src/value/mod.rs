@@ -322,12 +322,12 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	#[must_use]
 	pub unsafe fn from_ptr(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value<Type> {
 		let mut typeinfo_ptr = ptr::null_mut();
-		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible")];
+		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
 		Value {
 			inner: Arc::new(ValueInner {
 				ptr,
-				memory_info: MemoryInfo::from_value(ptr.as_ptr()),
-				dtype: ValueType::from_type_info(typeinfo_ptr),
+				memory_info: unsafe { MemoryInfo::from_value(ptr) },
+				dtype: unsafe { ValueType::from_type_info(typeinfo_ptr) },
 				drop: true,
 				_backing: session.map(|v| Box::new(v) as Box<dyn Any>)
 			}),
@@ -340,12 +340,12 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	#[must_use]
 	pub(crate) unsafe fn from_ptr_nodrop(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value<Type> {
 		let mut typeinfo_ptr = ptr::null_mut();
-		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible")];
+		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
 		Value {
 			inner: Arc::new(ValueInner {
 				ptr,
-				memory_info: MemoryInfo::from_value(ptr.as_ptr()),
-				dtype: ValueType::from_type_info(typeinfo_ptr),
+				memory_info: unsafe { MemoryInfo::from_value(ptr) },
+				dtype: unsafe { ValueType::from_type_info(typeinfo_ptr) },
 				drop: false,
 				_backing: session.map(|v| Box::new(v) as Box<dyn Any>)
 			}),

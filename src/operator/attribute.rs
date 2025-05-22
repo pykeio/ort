@@ -14,7 +14,7 @@ use crate::{
 
 #[derive(Debug)]
 #[repr(transparent)] // required for `editor::Node::new`
-pub struct Attribute(*mut ort_sys::OrtOpAttr);
+pub struct Attribute(NonNull<ort_sys::OrtOpAttr>);
 
 impl Attribute {
 	pub fn new(name: impl AsRef<str>, value: impl ToAttribute) -> Result<Self> {
@@ -24,7 +24,7 @@ impl Attribute {
 
 impl Drop for Attribute {
 	fn drop(&mut self) {
-		ortsys![unsafe ReleaseOpAttr(self.0)];
+		ortsys![unsafe ReleaseOpAttr(self.0.as_ptr())];
 	}
 }
 
@@ -53,7 +53,7 @@ pub trait FromOpAttr {
 
 pub trait ToAttribute {
 	#[doc(hidden)]
-	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<*mut ort_sys::OrtOpAttr>
+	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<NonNull<ort_sys::OrtOpAttr>>
 	where
 		Self: Sized;
 
@@ -92,7 +92,7 @@ impl FromOpAttr for f32 {
 }
 
 impl ToAttribute for f32 {
-	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<*mut ort_sys::OrtOpAttr>
+	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<NonNull<ort_sys::OrtOpAttr>>
 	where
 		Self: Sized
 	{
@@ -145,7 +145,7 @@ impl FromOpAttr for i64 {
 }
 
 impl ToAttribute for i64 {
-	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<*mut ort_sys::OrtOpAttr>
+	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<NonNull<ort_sys::OrtOpAttr>>
 	where
 		Self: Sized
 	{
@@ -203,7 +203,7 @@ impl FromOpAttr for String {
 }
 
 impl ToAttribute for String {
-	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<*mut ort_sys::OrtOpAttr>
+	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<NonNull<ort_sys::OrtOpAttr>>
 	where
 		Self: Sized
 	{
@@ -260,7 +260,7 @@ impl FromOpAttr for Vec<f32> {
 }
 
 impl ToAttribute for &[f32] {
-	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<*mut ort_sys::OrtOpAttr>
+	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<NonNull<ort_sys::OrtOpAttr>>
 	where
 		Self: Sized
 	{
@@ -282,7 +282,7 @@ impl ToAttribute for &[f32] {
 }
 
 impl ToAttribute for Vec<f32> {
-	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<*mut ort_sys::OrtOpAttr>
+	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<NonNull<ort_sys::OrtOpAttr>>
 	where
 		Self: Sized
 	{
@@ -326,7 +326,7 @@ impl FromOpAttr for Vec<i64> {
 }
 
 impl ToAttribute for &[i64] {
-	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<*mut ort_sys::OrtOpAttr>
+	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<NonNull<ort_sys::OrtOpAttr>>
 	where
 		Self: Sized
 	{
@@ -348,7 +348,7 @@ impl ToAttribute for &[i64] {
 }
 
 impl ToAttribute for Vec<i64> {
-	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<*mut ort_sys::OrtOpAttr>
+	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<NonNull<ort_sys::OrtOpAttr>>
 	where
 		Self: Sized
 	{
@@ -359,7 +359,7 @@ impl ToAttribute for Vec<i64> {
 }
 
 impl ToAttribute for &[String] {
-	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<*mut ort_sys::OrtOpAttr>
+	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<NonNull<ort_sys::OrtOpAttr>>
 	where
 		Self: Sized
 	{
@@ -383,7 +383,7 @@ impl ToAttribute for &[String] {
 }
 
 impl ToAttribute for &[&str] {
-	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<*mut ort_sys::OrtOpAttr>
+	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<NonNull<ort_sys::OrtOpAttr>>
 	where
 		Self: Sized
 	{
@@ -407,7 +407,7 @@ impl ToAttribute for &[&str] {
 }
 
 impl ToAttribute for Vec<String> {
-	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<*mut ort_sys::OrtOpAttr>
+	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<NonNull<ort_sys::OrtOpAttr>>
 	where
 		Self: Sized
 	{
@@ -418,7 +418,7 @@ impl ToAttribute for Vec<String> {
 }
 
 impl ToAttribute for Vec<&str> {
-	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<*mut ort_sys::OrtOpAttr>
+	unsafe fn to_attribute(&self, name: *const ort_sys::c_char) -> Result<NonNull<ort_sys::OrtOpAttr>>
 	where
 		Self: Sized
 	{
@@ -439,7 +439,7 @@ impl<'s, T: DowncastableTarget> FromKernelAttributes<'s> for ValueRef<'s, T> {
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 		ortsys![unsafe KernelInfoGetAttribute_tensor(info, name, allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
-		unsafe { ValueRef::new(DynValue::from_ptr(NonNull::new_unchecked(value_ptr), None)) }.downcast()
+		unsafe { ValueRef::new(DynValue::from_ptr(value_ptr, None)) }.downcast()
 	}
 
 	private_impl!();

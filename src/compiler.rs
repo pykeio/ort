@@ -59,7 +59,7 @@ impl<'i> ModelCompiler<'i> {
 			nonNull(ptr)
 		];
 		Ok(Self {
-			ptr: unsafe { NonNull::new_unchecked(ptr) },
+			ptr,
 			_session_options: options,
 			_p: PhantomData
 		})

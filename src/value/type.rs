@@ -2,7 +2,11 @@ use alloc::{
 	boxed::Box,
 	string::{String, ToString}
 };
-use core::{ffi::CStr, fmt, ptr};
+use core::{
+	ffi::CStr,
+	fmt,
+	ptr::{self, NonNull}
+};
 
 use smallvec::{SmallVec, smallvec};
 
@@ -86,42 +90,42 @@ pub enum ValueType {
 }
 
 impl ValueType {
-	pub(crate) fn from_type_info(typeinfo_ptr: *mut ort_sys::OrtTypeInfo) -> Self {
+	pub(crate) unsafe fn from_type_info(typeinfo_ptr: NonNull<ort_sys::OrtTypeInfo>) -> Self {
 		let _guard = util::run_on_drop(|| {
-			ortsys![unsafe ReleaseTypeInfo(typeinfo_ptr)];
+			ortsys![unsafe ReleaseTypeInfo(typeinfo_ptr.as_ptr())];
 		});
 
 		let mut ty: ort_sys::ONNXType = ort_sys::ONNXType::ONNX_TYPE_UNKNOWN;
-		ortsys![unsafe GetOnnxTypeFromTypeInfo(typeinfo_ptr, &mut ty).expect("infallible")];
+		ortsys![unsafe GetOnnxTypeFromTypeInfo(typeinfo_ptr.as_ptr(), &mut ty).expect("infallible")];
 		match ty {
 			ort_sys::ONNXType::ONNX_TYPE_TENSOR | ort_sys::ONNXType::ONNX_TYPE_SPARSETENSOR => {
 				let mut info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = ptr::null_mut();
-				ortsys![unsafe CastTypeInfoToTensorInfo(typeinfo_ptr, &mut info_ptr).expect("infallible")];
+				ortsys![unsafe CastTypeInfoToTensorInfo(typeinfo_ptr.as_ptr(), &mut info_ptr).expect("infallible"); nonNull(info_ptr)];
 				unsafe { extract_data_type_from_tensor_info(info_ptr) }
 			}
 			ort_sys::ONNXType::ONNX_TYPE_SEQUENCE => {
 				let mut info_ptr: *const ort_sys::OrtSequenceTypeInfo = ptr::null_mut();
-				ortsys![unsafe CastTypeInfoToSequenceTypeInfo(typeinfo_ptr, &mut info_ptr).expect("infallible")];
+				ortsys![unsafe CastTypeInfoToSequenceTypeInfo(typeinfo_ptr.as_ptr(), &mut info_ptr).expect("infallible"); nonNull(info_ptr)];
 
 				let mut element_type_info: *mut ort_sys::OrtTypeInfo = ptr::null_mut();
-				ortsys![unsafe GetSequenceElementType(info_ptr, &mut element_type_info).expect("infallible")];
+				ortsys![unsafe GetSequenceElementType(info_ptr.as_ptr(), &mut element_type_info).expect("infallible"); nonNull(element_type_info)];
 				let _guard = util::run_on_drop(|| {
-					ortsys![unsafe ReleaseTypeInfo(element_type_info)];
+					ortsys![unsafe ReleaseTypeInfo(element_type_info.as_ptr())];
 				});
 
 				let mut ty: ort_sys::ONNXType = ort_sys::ONNXType::ONNX_TYPE_UNKNOWN;
-				ortsys![unsafe GetOnnxTypeFromTypeInfo(element_type_info, &mut ty).expect("infallible")];
+				ortsys![unsafe GetOnnxTypeFromTypeInfo(element_type_info.as_ptr(), &mut ty).expect("infallible")];
 
 				match ty {
 					ort_sys::ONNXType::ONNX_TYPE_TENSOR => {
 						let mut info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo = ptr::null_mut();
-						ortsys![unsafe CastTypeInfoToTensorInfo(element_type_info, &mut info_ptr).expect("infallible")];
+						ortsys![unsafe CastTypeInfoToTensorInfo(element_type_info.as_ptr(), &mut info_ptr).expect("infallible"); nonNull(info_ptr)];
 						let ty = unsafe { extract_data_type_from_tensor_info(info_ptr) };
 						ValueType::Sequence(Box::new(ty))
 					}
 					ort_sys::ONNXType::ONNX_TYPE_MAP => {
 						let mut info_ptr: *const ort_sys::OrtMapTypeInfo = ptr::null_mut();
-						ortsys![unsafe CastTypeInfoToMapTypeInfo(element_type_info, &mut info_ptr).expect("infallible")];
+						ortsys![unsafe CastTypeInfoToMapTypeInfo(element_type_info.as_ptr(), &mut info_ptr).expect("infallible"); nonNull(info_ptr)];
 						let ty = unsafe { extract_data_type_from_map_info(info_ptr) };
 						ValueType::Sequence(Box::new(ty))
 					}
@@ -130,15 +134,15 @@ impl ValueType {
 			}
 			ort_sys::ONNXType::ONNX_TYPE_MAP => {
 				let mut info_ptr: *const ort_sys::OrtMapTypeInfo = ptr::null_mut();
-				ortsys![unsafe CastTypeInfoToMapTypeInfo(typeinfo_ptr, &mut info_ptr).expect("infallible")];
+				ortsys![unsafe CastTypeInfoToMapTypeInfo(typeinfo_ptr.as_ptr(), &mut info_ptr).expect("infallible"); nonNull(info_ptr)];
 				unsafe { extract_data_type_from_map_info(info_ptr) }
 			}
 			ort_sys::ONNXType::ONNX_TYPE_OPTIONAL => {
 				let mut info_ptr: *const ort_sys::OrtOptionalTypeInfo = ptr::null_mut();
-				ortsys![unsafe CastTypeInfoToOptionalTypeInfo(typeinfo_ptr, &mut info_ptr).expect("infallible")];
+				ortsys![unsafe CastTypeInfoToOptionalTypeInfo(typeinfo_ptr.as_ptr(), &mut info_ptr).expect("infallible"); nonNull(info_ptr)];
 
 				let mut contained_type: *mut ort_sys::OrtTypeInfo = ptr::null_mut();
-				ortsys![unsafe GetOptionalContainedTypeInfo(info_ptr, &mut contained_type).expect("infallible")];
+				ortsys![unsafe GetOptionalContainedTypeInfo(info_ptr.as_ptr(), &mut contained_type).expect("infallible"); nonNull(contained_type)];
 
 				ValueType::Optional(Box::new(ValueType::from_type_info(contained_type)))
 			}
@@ -281,19 +285,19 @@ impl fmt::Display for ValueType {
 	}
 }
 
-pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys::OrtTensorTypeAndShapeInfo) -> ValueType {
+pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: NonNull<ort_sys::OrtTensorTypeAndShapeInfo>) -> ValueType {
 	let mut type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-	ortsys![unsafe GetTensorElementType(info_ptr, &mut type_sys).expect("infallible")];
+	ortsys![unsafe GetTensorElementType(info_ptr.as_ptr(), &mut type_sys).expect("infallible")];
 	assert_ne!(type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 	// This transmute should be safe since its value is read from GetTensorElementType, which we must trust
 	let mut num_dims = 0;
-	ortsys![unsafe GetDimensionsCount(info_ptr, &mut num_dims).expect("infallible")];
+	ortsys![unsafe GetDimensionsCount(info_ptr.as_ptr(), &mut num_dims).expect("infallible")];
 
 	let mut node_dims = Shape::empty(num_dims);
-	ortsys![unsafe GetDimensions(info_ptr, node_dims.as_mut_ptr(), num_dims).expect("infallible")];
+	ortsys![unsafe GetDimensions(info_ptr.as_ptr(), node_dims.as_mut_ptr(), num_dims).expect("infallible")];
 
 	let mut symbolic_dims: SmallVec<_, 4> = smallvec![ptr::null(); num_dims];
-	ortsys![unsafe GetSymbolicDimensions(info_ptr, symbolic_dims.as_mut_ptr(), num_dims).expect("infallible")];
+	ortsys![unsafe GetSymbolicDimensions(info_ptr.as_ptr(), symbolic_dims.as_mut_ptr(), num_dims).expect("infallible")];
 
 	let dimension_symbols = symbolic_dims
 		.into_iter()
@@ -307,13 +311,13 @@ pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: *const ort_sys
 	}
 }
 
-unsafe fn extract_data_type_from_map_info(info_ptr: *const ort_sys::OrtMapTypeInfo) -> ValueType {
+unsafe fn extract_data_type_from_map_info(info_ptr: NonNull<ort_sys::OrtMapTypeInfo>) -> ValueType {
 	let mut key_type_sys = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-	ortsys![unsafe GetMapKeyType(info_ptr, &mut key_type_sys).expect("infallible")];
+	ortsys![unsafe GetMapKeyType(info_ptr.as_ptr(), &mut key_type_sys).expect("infallible")];
 	assert_ne!(key_type_sys, ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED);
 
 	let mut value_type_info: *mut ort_sys::OrtTypeInfo = ptr::null_mut();
-	ortsys![unsafe GetMapValueType(info_ptr, &mut value_type_info).expect("infallible")];
+	ortsys![unsafe GetMapValueType(info_ptr.as_ptr(), &mut value_type_info).expect("infallible")];
 	let _guard = util::run_on_drop(|| {
 		ortsys![unsafe ReleaseTypeInfo(value_type_info)];
 	});
@@ -332,6 +336,8 @@ unsafe fn extract_data_type_from_map_info(info_ptr: *const ort_sys::OrtMapTypeIn
 
 #[cfg(test)]
 mod tests {
+	use core::ptr::NonNull;
+
 	use super::ValueType;
 	use crate::{
 		ortsys,
@@ -345,9 +351,9 @@ mod tests {
 			shape: Shape::new([-1, 32, 4, 32]),
 			dimension_symbols: SymbolicDimensions::new(["d1".to_string(), String::default(), String::default(), String::default()])
 		};
-		let ty_ptr = ty.to_tensor_type_info().expect("");
+		let ty_ptr = NonNull::new(ty.to_tensor_type_info().expect("")).expect("");
 		let ty_d = unsafe { super::extract_data_type_from_tensor_info(ty_ptr) };
-		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(ty_ptr)];
+		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(ty_ptr.as_ptr())];
 		assert_eq!(ty, ty_d);
 
 		Ok(())

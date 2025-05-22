@@ -121,14 +121,17 @@ impl SessionBuilder {
 			ortsys![unsafe DisablePerSessionThreads(self.ptr_mut())?];
 		}
 
-		let mut session_ptr: *mut ort_sys::OrtSession = ptr::null_mut();
-		if let Some(prepacked_weights) = self.prepacked_weights.as_ref() {
+		let session_ptr = if let Some(prepacked_weights) = self.prepacked_weights.as_ref() {
+			let mut session_ptr = ptr::null_mut();
 			ortsys![unsafe CreateSessionWithPrepackedWeightsContainer(env.ptr(), model_path.as_ptr(), self.ptr(), prepacked_weights.ptr().cast_mut(), &mut session_ptr)?; nonNull(session_ptr)];
+			session_ptr
 		} else {
+			let mut session_ptr = ptr::null_mut();
 			ortsys![unsafe CreateSession(env.ptr(), model_path.as_ptr(), self.ptr(), &mut session_ptr)?; nonNull(session_ptr)];
-		}
+			session_ptr
+		};
 
-		self.commit_finalize(unsafe { NonNull::new_unchecked(session_ptr) })
+		self.commit_finalize(session_ptr)
 	}
 
 	/// Load an ONNX graph from memory and commit the session
@@ -148,8 +151,6 @@ impl SessionBuilder {
 
 	/// Load an ONNX graph from memory and commit the session.
 	pub fn commit_from_memory(mut self, model_bytes: &[u8]) -> Result<Session> {
-		let mut session_ptr: *mut ort_sys::OrtSession = ptr::null_mut();
-
 		let env = get_environment()?;
 		if !self.no_env_eps {
 			apply_execution_providers(&mut self, &env.execution_providers, "environment")?;
@@ -161,19 +162,23 @@ impl SessionBuilder {
 
 		let model_data = model_bytes.as_ptr().cast::<c_void>();
 		let model_data_length = model_bytes.len();
-		if let Some(prepacked_weights) = self.prepacked_weights.as_ref() {
+		let session_ptr = if let Some(prepacked_weights) = self.prepacked_weights.as_ref() {
+			let mut session_ptr = ptr::null_mut();
 			ortsys![
 				unsafe CreateSessionFromArrayWithPrepackedWeightsContainer(env.ptr(), model_data, model_data_length, self.ptr(), prepacked_weights.ptr().cast_mut(), &mut session_ptr)?;
 				nonNull(session_ptr)
 			];
+			session_ptr
 		} else {
+			let mut session_ptr = ptr::null_mut();
 			ortsys![
 				unsafe CreateSessionFromArray(env.ptr(), model_data, model_data_length, self.ptr(), &mut session_ptr)?;
 				nonNull(session_ptr)
 			];
-		}
+			session_ptr
+		};
 
-		self.commit_finalize(unsafe { NonNull::new_unchecked(session_ptr) })
+		self.commit_finalize(session_ptr)
 	}
 
 	pub(crate) fn commit_finalize(&mut self, ptr: NonNull<ort_sys::OrtSession>) -> Result<Session> {
@@ -181,7 +186,7 @@ impl SessionBuilder {
 			Some(info) => {
 				let mut allocator_ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
 				ortsys![unsafe CreateAllocator(ptr.as_ptr(), info.ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
-				unsafe { Allocator::from_raw_unchecked(allocator_ptr) }
+				unsafe { Allocator::from_raw(allocator_ptr) }
 			}
 			None => Allocator::default()
 		};
@@ -240,7 +245,7 @@ impl SessionBuilder {
 			nonNull(session_ptr)
 		];
 
-		EditableSession::new(unsafe { NonNull::new_unchecked(session_ptr) }, self)
+		EditableSession::new(session_ptr, self)
 	}
 
 	pub fn edit_from_memory(self, model_bytes: &[u8]) -> Result<EditableSession> {
@@ -259,6 +264,6 @@ impl SessionBuilder {
 			nonNull(session_ptr)
 		];
 
-		EditableSession::new(unsafe { NonNull::new_unchecked(session_ptr) }, self)
+		EditableSession::new(session_ptr, self)
 	}
 }

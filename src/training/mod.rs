@@ -70,17 +70,13 @@ impl Checkpoint {
 		let path = crate::util::path_to_os_char(path);
 		let mut ptr: *mut ort_sys::OrtCheckpointState = ptr::null_mut();
 		ortsys![@training: unsafe LoadCheckpoint(path.as_ptr(), &mut ptr)?; nonNull(ptr)];
-		Ok(Checkpoint {
-			ptr: unsafe { NonNull::new_unchecked(ptr) }
-		})
+		Ok(Checkpoint { ptr })
 	}
 
 	pub fn load_from_buffer(buffer: &[u8]) -> Result<Self> {
 		let mut ptr: *mut ort_sys::OrtCheckpointState = ptr::null_mut();
 		ortsys![@training: unsafe LoadCheckpointFromBuffer(buffer.as_ptr().cast(), buffer.len(), &mut ptr)?; nonNull(ptr)];
-		Ok(Checkpoint {
-			ptr: unsafe { NonNull::new_unchecked(ptr) }
-		})
+		Ok(Checkpoint { ptr })
 	}
 
 	pub fn save(&self, path: impl AsRef<Path>, include_optimizer_state: bool) -> Result<()> {
@@ -142,7 +138,7 @@ impl Checkpoint {
 			ortsys![@training: unsafe GetParameter(self.ptr.as_ptr(), name.as_ptr(), allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
 			Ok(value_ptr)
 		})?;
-		Ok(unsafe { DynTensor::from_ptr(NonNull::new_unchecked(value_ptr), None) })
+		Ok(unsafe { DynTensor::from_ptr(value_ptr, None) })
 	}
 
 	pub fn update_parameter<T: ValueTypeMarker>(&mut self, name: impl AsRef<str>, value: &Value<T>) -> Result<()> {
@@ -159,7 +155,7 @@ impl Checkpoint {
 			Ok(shape_info)
 		})?;
 		let value_type = unsafe { extract_data_type_from_tensor_info(shape_info) };
-		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(shape_info)];
+		ortsys![unsafe ReleaseTensorTypeAndShapeInfo(shape_info.as_ptr())];
 		Ok(value_type)
 	}
 }

@@ -169,7 +169,7 @@ unsafe impl Send for ThreadWorker {}
 
 impl ThreadWorker {
 	pub fn work(self) {
-		unsafe { self.worker.unwrap_unchecked()(self.data) }
+		unsafe { (self.worker)(self.data) }
 	}
 }
 
@@ -322,8 +322,8 @@ impl EnvironmentBuilder {
 
 		let (env_ptr, thread_manager, has_global_threadpool) = if let Some(mut thread_pool_options) = self.global_thread_pool_options {
 			let env_ptr = with_cstr(self.name.as_bytes(), &|name| {
-				let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
-				if let Some((log_fn, log_ptr)) = logger {
+				Ok(if let Some((log_fn, log_ptr)) = logger {
+					let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
 					ortsys![
 						unsafe CreateEnvWithCustomLoggerAndGlobalThreadPools(
 							log_fn,
@@ -335,7 +335,9 @@ impl EnvironmentBuilder {
 						)?;
 						nonNull(env_ptr)
 					];
+					env_ptr
 				} else {
+					let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
 					ortsys![
 						unsafe CreateEnvWithGlobalThreadPools(
 							crate::logging::default_log_level(),
@@ -345,16 +347,16 @@ impl EnvironmentBuilder {
 						)?;
 						nonNull(env_ptr)
 					];
-				}
-				Ok(env_ptr)
+					env_ptr
+				})
 			})?;
 
 			let thread_manager = thread_pool_options.thread_manager.take();
 			(env_ptr, thread_manager, true)
 		} else {
 			let env_ptr = with_cstr(self.name.as_bytes(), &|name| {
-				let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
-				if let Some((log_fn, log_ptr)) = logger {
+				Ok(if let Some((log_fn, log_ptr)) = logger {
+					let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
 					ortsys![
 						unsafe CreateEnvWithCustomLogger(
 							log_fn,
@@ -365,7 +367,9 @@ impl EnvironmentBuilder {
 						)?;
 						nonNull(env_ptr)
 					];
+					env_ptr
 				} else {
+					let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
 					ortsys![
 						unsafe CreateEnv(
 							crate::logging::default_log_level(),
@@ -374,8 +378,8 @@ impl EnvironmentBuilder {
 						)?;
 						nonNull(env_ptr)
 					];
-				}
-				Ok(env_ptr)
+					env_ptr
+				})
 			})?;
 
 			(env_ptr, None, false)
@@ -383,15 +387,14 @@ impl EnvironmentBuilder {
 		crate::debug!(env_ptr = alloc::format!("{env_ptr:?}").as_str(), "Environment created");
 
 		if self.telemetry {
-			ortsys![unsafe EnableTelemetryEvents(env_ptr)?];
+			ortsys![unsafe EnableTelemetryEvents(env_ptr.as_ptr())?];
 		} else {
-			ortsys![unsafe DisableTelemetryEvents(env_ptr)?];
+			ortsys![unsafe DisableTelemetryEvents(env_ptr.as_ptr())?];
 		}
 
 		Ok(Environment {
 			execution_providers: self.execution_providers,
-			// we already asserted the env pointer is non-null in the `CreateEnvWithCustomLogger` call
-			ptr: unsafe { NonNull::new_unchecked(env_ptr) },
+			ptr: env_ptr,
 			has_global_threadpool,
 			_thread_manager: thread_manager,
 			_logger: self.logger
@@ -400,8 +403,7 @@ impl EnvironmentBuilder {
 
 	/// Commit the environment configuration.
 	pub fn commit(self) -> Result<bool> {
-		let env = self.commit_internal()?;
-		Ok(G_ENV.try_insert(env))
+		G_ENV.try_insert_with_fallible(|| self.commit_internal())
 	}
 }
 

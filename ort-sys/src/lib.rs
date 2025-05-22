@@ -776,7 +776,7 @@ extern "system" {
 	pub fn OrtGetApiBase() -> *const OrtApiBase;
 }
 #[doc = " \\brief Thread work loop function\n\n Onnxruntime will provide the working loop on custom thread creation\n Argument is an onnxruntime built-in type which will be provided when thread pool calls OrtCustomCreateThreadFn"]
-pub type OrtThreadWorkerFn = Option<unsafe extern "system" fn(ort_worker_fn_param: *mut core::ffi::c_void)>;
+pub type OrtThreadWorkerFn = unsafe extern "system" fn(ort_worker_fn_param: *mut core::ffi::c_void);
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct OrtCustomHandleType {

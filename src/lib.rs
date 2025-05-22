@@ -54,7 +54,7 @@ use alloc::{borrow::ToOwned, boxed::Box, string::String};
 use core::{
 	ffi::{CStr, c_char},
 	ptr::NonNull,
-	slice, str
+	str
 };
 
 pub use ort_sys as sys;
@@ -121,11 +121,7 @@ pub(crate) fn lib_handle() -> &'static libloading::Library {
 /// ```
 pub fn info() -> &'static str {
 	let str = unsafe { ortsys![GetBuildInfoString]() };
-	let mut len = 0;
-	while unsafe { *str.add(len) } != 0x00 {
-		len += 1;
-	}
-	unsafe { str::from_utf8_unchecked(slice::from_raw_parts(str.cast::<u8>(), len)) }
+	unsafe { CStr::from_ptr(str) }.to_str().expect("invalid build info string")
 }
 
 struct ApiPointer(NonNull<ort_sys::OrtApi>);
@@ -204,7 +200,7 @@ pub fn api() -> &'static ort_sys::OrtApi {
 /// Returns `true` if successful (i.e. no API has been set up to this point). This function will not override the API if
 /// one was already set.
 pub fn set_api(api: ort_sys::OrtApi) -> bool {
-	G_ORT_API.try_insert(ApiPointer(unsafe { NonNull::new_unchecked(Box::leak(Box::new(api))) }))
+	G_ORT_API.try_insert_with(|| ApiPointer(unsafe { NonNull::new_unchecked(Box::leak(Box::new(api))) }))
 }
 
 /// Trait to access raw pointers from safe types which wrap unsafe [`ort_sys`] types.
@@ -233,39 +229,37 @@ macro_rules! ortsys {
 	(unsafe $method:ident($($n:expr),* $(,)?).expect($e:expr)) => {
 		ortsys![@ort: unsafe $method($($n),*) as Result].expect($e)
 	};
-	(unsafe $method:ident($($n:expr),* $(,)?).expect($e:expr); nonNull($($check:ident),+ $(,)?)$(;)?) => {{
+	(unsafe $method:ident($($n:expr),* $(,)?).expect($e:expr); nonNull($($check:ident),+ $(,)?)$(;)?) => {
 		ortsys![unsafe $method($($n),*).expect($e)];
 		ortsys![@nonNull_panic; $($check),+];
-	}};
-	(unsafe $method:ident($($n:expr),* $(,)?); nonNull($($check:ident),+ $(,)?)$(;)?) => {{
+	};
+	(unsafe $method:ident($($n:expr),* $(,)?); nonNull($($check:ident),+ $(,)?)$(;)?) => {
 		let _x = ortsys![unsafe $method($($n),*)];
 		ortsys![@nonNull_panic; $($check),+];
 		_x
-	}};
+	};
 	(unsafe $method:ident($($n:expr),* $(,)?)?) => {
 		ortsys![@ort: unsafe $method($($n),+) as Result]?;
 	};
-	(unsafe $method:ident($($n:expr),* $(,)?)?; nonNull($($check:ident),+)$(;)?) => {{
+	(unsafe $method:ident($($n:expr),* $(,)?)?; nonNull($($check:ident),+)$(;)?) => {
 		ortsys![unsafe $method($($n),*)?];
 		ortsys![@nonNull?; $($check),+];
-	}};
+	};
 
 	(@nonNull_panic; $($check:ident),+) => {
 		$(
-			// TODO: #[cfg(debug_assertions)]?
-			if ($check).is_null() {
+			let Some($check) = $crate::__private::core::ptr::NonNull::new($check as *mut _) else {
 				$crate::util::cold();
 				$crate::__private::core::panic!(concat!("expected `", stringify!($check), "` to not be null"));
-			}
+			};
 		)+
 	};
 	(@nonNull?; $($check:ident),+) => {
 		$(
-			// TODO: #[cfg(debug_assertions)]?
-			if ($check).is_null() {
+			let Some($check) = $crate::__private::core::ptr::NonNull::new($check as *mut _) else {
 				$crate::util::cold();
 				return Err($crate::Error::new(concat!("expected `", stringify!($check), "` to not be null")));
-			}
+			};
 		)+
 	};
 
@@ -281,10 +275,10 @@ macro_rules! ortsys {
 	(@$api:ident: unsafe $method:ident($($n:expr),*)?) => {
 		$crate::api::$api().and_then(|api| unsafe { $crate::error::status_to_result((api.$method)($($n),+)) })?
 	};
-	(@$api:ident: unsafe $method:ident($($n:expr),*)?; nonNull($($check:ident),+)$(;)?) => {{
+	(@$api:ident: unsafe $method:ident($($n:expr),*)?; nonNull($($check:ident),+)$(;)?) => {
 		$crate::api::$api().and_then(|api| unsafe { $crate::error::status_to_result((api.$method)($($n),+)) })?;
 		ortsys![@nonNull?; $($check),+];
-	}};
+	};
 	(@$api:ident: unsafe $method:ident($($n:expr),*) as Result) => {
 		$crate::api::$api().and_then(|api| unsafe { $crate::error::status_to_result((api.$method)($($n),+)) })
 	};

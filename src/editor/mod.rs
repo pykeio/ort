@@ -1,7 +1,7 @@
 use alloc::{ffi::CString, sync::Arc};
 use core::{
 	ffi::c_char,
-	mem,
+	mem::{self, ManuallyDrop},
 	ptr::{self, NonNull}
 };
 
@@ -47,7 +47,7 @@ pub fn editor_api() -> Result<&'static ort_sys::OrtModelEditorApi> {
 
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct Outlet(*mut ort_sys::OrtValueInfo);
+pub struct Outlet(NonNull<ort_sys::OrtValueInfo>);
 
 impl Outlet {
 	pub fn new(name: impl AsRef<str>, dtype: &ValueType) -> Result<Self> {
@@ -56,33 +56,31 @@ impl Outlet {
 
 		let ptr = with_cstr(name.as_ref().as_bytes(), &|name| {
 			let mut ptr: *mut ort_sys::OrtValueInfo = ptr::null_mut();
-			ortsys![@editor: unsafe CreateValueInfo(name.as_ptr(), type_info, &mut ptr)?];
+			ortsys![@editor: unsafe CreateValueInfo(name.as_ptr(), type_info, &mut ptr)?; nonNull(ptr)];
 			Ok(ptr)
 		})?;
 		Ok(Self(ptr))
 	}
 
-	pub(crate) fn consume(self) -> *mut ort_sys::OrtValueInfo {
-		let ptr = self.0;
-		mem::forget(self);
-		ptr
+	pub(crate) fn consume(self) -> NonNull<ort_sys::OrtValueInfo> {
+		ManuallyDrop::new(self).0
 	}
 }
 
 impl AsPointer for Outlet {
 	type Sys = ort_sys::OrtValueInfo;
 	fn ptr(&self) -> *const Self::Sys {
-		self.0
+		self.0.as_ptr()
 	}
 }
 
 impl Drop for Outlet {
 	fn drop(&mut self) {
-		ortsys![unsafe ReleaseValueInfo(self.0)];
+		ortsys![unsafe ReleaseValueInfo(self.0.as_ptr())];
 	}
 }
 
-pub struct Node(*mut ort_sys::OrtNode);
+pub struct Node(NonNull<ort_sys::OrtNode>);
 
 impl Node {
 	pub fn new<I: AsRef<str>, O: AsRef<str>>(
@@ -125,22 +123,20 @@ impl Node {
 	}
 
 	pub(crate) fn consume(self) -> *mut ort_sys::OrtNode {
-		let ptr = self.0;
-		mem::forget(self);
-		ptr
+		ManuallyDrop::new(self).0.as_ptr()
 	}
 }
 
 impl AsPointer for Node {
 	type Sys = ort_sys::OrtNode;
 	fn ptr(&self) -> *const Self::Sys {
-		self.0
+		self.0.as_ptr()
 	}
 }
 
 impl Drop for Node {
 	fn drop(&mut self) {
-		ortsys![unsafe ReleaseNode(self.0)];
+		ortsys![unsafe ReleaseNode(self.0.as_ptr())];
 	}
 }
 
@@ -154,14 +150,14 @@ impl Graph {
 	}
 
 	pub fn set_inputs(&mut self, inputs: impl IntoIterator<Item = Outlet>) -> Result<()> {
-		let inputs: SmallVec<*mut ort_sys::OrtValueInfo, 4> = inputs.into_iter().map(|input| input.consume()).collect();
+		let inputs: SmallVec<NonNull<ort_sys::OrtValueInfo>, 4> = inputs.into_iter().map(|input| input.consume()).collect();
 		// no need to drop consumed pointers since this only errors on null pointers
 		ortsys![@editor: unsafe SetGraphInputs(self.0, inputs.as_ptr() as *mut _, inputs.len())?];
 		Ok(())
 	}
 
 	pub fn set_outputs(&mut self, outputs: impl IntoIterator<Item = Outlet>) -> Result<()> {
-		let outputs: SmallVec<*mut ort_sys::OrtValueInfo, 4> = outputs.into_iter().map(|output| output.consume()).collect();
+		let outputs: SmallVec<NonNull<ort_sys::OrtValueInfo>, 4> = outputs.into_iter().map(|output| output.consume()).collect();
 		// no need to drop consumed pointers since this only errors on null pointers
 		ortsys![@editor: unsafe SetGraphOutputs(self.0, outputs.as_ptr() as *mut _, outputs.len())?];
 		Ok(())
@@ -231,7 +227,7 @@ impl Opset {
 
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct Model(*mut ort_sys::OrtModel);
+pub struct Model(NonNull<ort_sys::OrtModel>);
 
 impl Model {
 	pub fn new(opsets: impl AsRef<[Opset]>) -> Result<Self> {
@@ -246,7 +242,7 @@ impl Model {
 
 	pub fn add_graph(&mut self, graph: Graph) -> Result<()> {
 		let graph = graph.consume();
-		ortsys![@editor: unsafe AddGraphToModel(self.0, graph)?]; // infallible (errors on null pointer)
+		ortsys![@editor: unsafe AddGraphToModel(self.0.as_ptr(), graph)?]; // infallible (errors on null pointer)
 		Ok(())
 	}
 
@@ -256,25 +252,25 @@ impl Model {
 		ortsys![@editor:
 			unsafe CreateSessionFromModel(
 				env.ptr(),
-				self.0,
+				self.0.as_ptr(),
 				options.ptr(),
 				&mut session_ptr
 			)?;
 			nonNull(session_ptr)
 		];
-		options.commit_finalize(unsafe { NonNull::new_unchecked(session_ptr) })
+		options.commit_finalize(session_ptr)
 	}
 }
 
 impl AsPointer for Model {
 	type Sys = ort_sys::OrtModel;
 	fn ptr(&self) -> *const Self::Sys {
-		self.0
+		self.0.as_ptr()
 	}
 }
 
 impl Drop for Model {
 	fn drop(&mut self) {
-		ortsys![unsafe ReleaseModel(self.0)];
+		ortsys![unsafe ReleaseModel(self.0.as_ptr())];
 	}
 }

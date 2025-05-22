@@ -58,7 +58,7 @@ impl Clone for SessionBuilder {
 			nonNull(session_options_ptr)
 		];
 		Self {
-			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },
+			session_options_ptr,
 			memory_info: self.memory_info.clone(),
 			operator_domains: self.operator_domains.clone(),
 			initializers: self.initializers.clone(),
@@ -96,7 +96,7 @@ impl SessionBuilder {
 		ortsys![unsafe CreateSessionOptions(&mut session_options_ptr)?; nonNull(session_options_ptr)];
 
 		Ok(Self {
-			session_options_ptr: unsafe { NonNull::new_unchecked(session_options_ptr) },
+			session_options_ptr,
 			memory_info: None,
 			operator_domains: SmallVec::new(),
 			initializers: SmallVec::new(),

@@ -2,7 +2,7 @@ use alloc::{boxed::Box, format, sync::Arc, vec::Vec};
 use core::{
 	fmt::{self, Debug, Display},
 	marker::PhantomData,
-	ptr::{self, NonNull}
+	ptr::{self}
 };
 
 use super::{DowncastableTarget, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker, format_value_type};
@@ -87,7 +87,7 @@ impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
 					let mut value_ptr = ptr::null_mut();
 					ortsys![unsafe GetValue(self.ptr(), i as _, allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
 
-					let mut value = ValueRef::new(unsafe { Value::from_ptr(NonNull::new_unchecked(value_ptr), None) });
+					let mut value = ValueRef::new(unsafe { Value::from_ptr(value_ptr, None) });
 					value.upgradable = false;
 
 					let value_type = value.dtype();
@@ -139,7 +139,7 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized + 'static> Value<Se
 		];
 		Ok(Value {
 			inner: Arc::new(ValueInner {
-				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
+				ptr: value_ptr,
 				// 1. `CreateValue` enforces that we have at least 1 value
 				// 2. `CreateValue` internally uses the first value to determine the element type, so we do the same here
 				dtype: ValueType::Sequence(Box::new(values[0].inner.dtype.clone())),

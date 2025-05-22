@@ -105,7 +105,7 @@ impl IoBinding {
 		let mut ptr: *mut ort_sys::OrtIoBinding = ptr::null_mut();
 		ortsys![unsafe CreateIoBinding(session.ptr().cast_mut(), &mut ptr)?; nonNull(ptr)];
 		Ok(Self {
-			ptr: unsafe { NonNull::new_unchecked(ptr) },
+			ptr,
 			held_inputs: MiniMap::new(),
 			output_values: MiniMap::new(),
 			_session: session.inner()

@@ -69,17 +69,17 @@ impl Tensor<String> {
 
 		let string_pointers = null_terminated_copies.iter().map(|cstring| cstring.as_ptr()).collect::<Vec<_>>();
 
-		ortsys![unsafe FillStringTensor(value_ptr, string_pointers.as_ptr(), string_pointers.len())?];
+		ortsys![unsafe FillStringTensor(value_ptr.as_ptr(), string_pointers.as_ptr(), string_pointers.len())?];
 
 		Ok(Value {
 			inner: Arc::new(ValueInner {
-				ptr: unsafe { NonNull::new_unchecked(value_ptr) },
+				ptr: value_ptr,
 				dtype: ValueType::Tensor {
 					ty: TensorElementType::String,
 					shape,
 					dimension_symbols: SymbolicDimensions::empty(shape_len)
 				},
-				memory_info: MemoryInfo::from_value(value_ptr),
+				memory_info: unsafe { MemoryInfo::from_value(value_ptr) },
 				drop: true,
 				_backing: None
 			}),
@@ -170,7 +170,7 @@ fn tensor_from_array(
 
 	Ok(DynTensor {
 		inner: Arc::new(ValueInner {
-			ptr: unsafe { NonNull::new_unchecked(value_ptr) },
+			ptr: value_ptr,
 			dtype: ValueType::Tensor {
 				ty: element_type,
 				dimension_symbols: SymbolicDimensions::empty(shape.len()),

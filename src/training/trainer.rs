@@ -46,9 +46,18 @@ impl Trainer {
 		let env = crate::environment::get_environment()?;
 
 		let mut ptr: *mut ort_sys::OrtTrainingSession = ptr::null_mut();
-		ortsys![@training: unsafe CreateTrainingSession(env.ptr(), session_options.ptr(), ckpt.ptr.as_ptr(), training_model_path.as_ptr(), eval_model_path.as_ptr(), optimizer_model_path.as_ptr(), &mut ptr)?; nonNull(ptr)];
-
-		let ptr = unsafe { NonNull::new_unchecked(ptr) };
+		ortsys![@training:
+			unsafe CreateTrainingSession(
+				env.ptr(),
+				session_options.ptr(),
+				ckpt.ptr.as_ptr(),
+				training_model_path.as_ptr(),
+				eval_model_path.as_ptr(),
+				optimizer_model_path.as_ptr(),
+				&mut ptr
+			)?;
+			nonNull(ptr)
+		];
 		Self::new_inner(ptr, allocator, ckpt)
 	}
 
@@ -100,8 +109,6 @@ impl Trainer {
 			)?;
 			nonNull(ptr)
 		];
-
-		let ptr = unsafe { NonNull::new_unchecked(ptr) };
 		Self::new_inner(ptr, allocator, ckpt)
 	}
 

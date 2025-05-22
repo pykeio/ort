@@ -1,5 +1,6 @@
 use alloc::{
 	ffi::{CString, NulError},
+	format,
 	vec::Vec
 };
 #[cfg(not(feature = "std"))]
@@ -11,12 +12,13 @@ use core::{
 	fmt,
 	marker::PhantomData,
 	mem::{self, ManuallyDrop, MaybeUninit},
+	ops::Deref,
 	ptr, slice
 };
 
 use smallvec::SmallVec;
 
-use crate::Result;
+use crate::{Result, memory::Allocator};
 
 // maximum number of session inputs to store on stack (~32 bytes per, + 16 bytes for run_async)
 pub(crate) const STACK_SESSION_INPUTS: usize = 6;
@@ -286,10 +288,16 @@ impl<T> OnceLock<T> {
 }
 
 impl<T> OnceLock<T> {
-	pub fn try_insert(&self, value: T) -> bool {
-		let mut container = Some(value);
-		self.get_or_init(|| unsafe { container.take().unwrap_unchecked() });
+	pub fn try_insert_with<F: FnOnce() -> T>(&self, inserter: F) -> bool {
+		let mut container = Some(inserter);
+		self.get_or_init(|| (unsafe { container.take().unwrap_unchecked() })());
 		container.is_none()
+	}
+
+	pub fn try_insert_with_fallible<F: FnOnce() -> Result<T, E>, E>(&self, inserter: F) -> Result<bool, E> {
+		let mut container = Some(inserter);
+		self.get_or_try_init(|| (unsafe { container.take().unwrap_unchecked() })())?;
+		Ok(container.is_none())
 	}
 }
 
@@ -506,4 +514,44 @@ pub fn preload_dylib<P: AsRef<std::ffi::OsStr>>(path: P) -> Result<(), libloadin
 	// Do not run `FreeLibrary` so the library remains in the loaded modules list.
 	mem::forget(library);
 	Ok(())
+}
+
+pub(crate) struct AllocatedString<'a, 'p> {
+	data: &'p str,
+	allocator: &'a Allocator
+}
+
+static EMPTY_DANGLING: &str = "";
+
+impl<'a, 'p> AllocatedString<'a, 'p> {
+	pub unsafe fn from_ptr(ptr: *const c_char, allocator: &'a Allocator) -> Result<Self> {
+		if ptr.is_null() {
+			return Ok(Self { data: EMPTY_DANGLING, allocator });
+		}
+
+		let c_string = unsafe { CStr::from_ptr(ptr.cast_mut()) };
+		match c_string.to_str() {
+			Ok(data) => Ok(Self { data, allocator }),
+			Err(e) => {
+				unsafe { allocator.free(ptr.cast_mut()) };
+				Err(crate::Error::new(format!("string could not be converted to UTF-8: {e}")))
+			}
+		}
+	}
+}
+
+impl<'p> Deref for AllocatedString<'_, 'p> {
+	type Target = str;
+	fn deref(&self) -> &Self::Target {
+		self.data
+	}
+}
+
+impl<'a, 'p> Drop for AllocatedString<'a, 'p> {
+	fn drop(&mut self) {
+		let ptr = self.data.as_ptr();
+		if !ptr::eq(ptr, EMPTY_DANGLING.as_ptr()) {
+			unsafe { self.allocator.free(ptr.cast_mut()) };
+		}
+	}
 }

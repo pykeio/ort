@@ -42,7 +42,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2.7.8
       - name: Run tests
         run: |
           cargo test --manifest-path backends/candle/Cargo.toml -p ort-candle --verbose -- --test-threads 1
@@ -62,7 +62,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2.7.8
       - name: Run tests
         run: |
           cargo test --manifest-path backends/tract/Cargo.toml -p ort-tract --verbose -- --test-threads 1

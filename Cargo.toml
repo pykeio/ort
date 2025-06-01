@@ -21,7 +21,7 @@ exclude = [
 [package]
 name = "ort"
 description = "A safe Rust wrapper for ONNX Runtime 1.22 - Optimize and accelerate machine learning inference & training"
-version = "2.0.0-rc.9"
+version = "2.0.0-rc.10"
 edition = "2021"
 rust-version = "1.81"
 license = "MIT OR Apache-2.0"
@@ -87,7 +87,7 @@ azure = [ "ort-sys/azure" ]
 nv = [ "ort-sys/nv" ]
 
 [dependencies]
-ort-sys = { version = "=2.0.0-rc.9", path = "ort-sys", default-features = false }
+ort-sys = { version = "=2.0.0-rc.10", path = "ort-sys", default-features = false }
 smallvec = { version = "=2.0.0-alpha.10", default-features = false }
 
 ndarray = { version = "0.16", default-features = false, optional = true }

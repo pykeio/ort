@@ -31,7 +31,7 @@ path = "lib.rs"
 [features]
 
 [workspace.dependencies]
-ort-sys = { version = "=2.0.0-rc.9", path = "../../ort-sys", default-features = false }
+ort-sys = { version = "=2.0.0-rc.10", path = "../../ort-sys", default-features = false }
 
 [dependencies]
 ort-sys = { workspace = true }
@@ -40,7 +40,7 @@ candle-onnx = { version = "0.8.1" }
 prost = { version = "0.12.1", default-features = false }
 
 [dev-dependencies]
-ort = { version = "=2.0.0-rc.9", path = "../../", default-features = false, features = [ "alternative-backend", "fetch-models" ] }
+ort = { version = "=2.0.0-rc.10", path = "../../", default-features = false, features = [ "alternative-backend", "fetch-models" ] }
 
 [[test]]
 name = "memory"

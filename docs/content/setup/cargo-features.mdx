@@ -13,7 +13,7 @@ title: Cargo features
 - ⚒️ **`num-complex`**: Enables support for creating & extracting complex32/complex64 tensors via the [`num-complex`](https://crates.io/crates/num-complex) crate.
 - ⚒️ **`load-dynamic`**: Enables [runtime dynamic linking](/setup/linking#runtime-loading-with-load-dynamic), which alleviates many of the troubles with compile-time dynamic linking and offers greater flexibility.
 - ⚒️ **`alternative-backend`**: Disables linking to ONNX Runtime, allowing you to instead configure an [alternative backend](/backends).
-- ⚒️ **`fetch-models`**: Enables the [`SessionBuilder::commit_from_url`](https://docs.rs/ort/2.0.0-rc.9/ort/session/builder/struct.SessionBuilder.html#method.commit_from_url) method, allowing you to quickly download & run a model from a URL. This should only be used for quick testing.
+- ⚒️ **`fetch-models`**: Enables the [`SessionBuilder::commit_from_url`](https://docs.rs/ort/2.0.0-rc.10/ort/session/builder/struct.SessionBuilder.html#method.commit_from_url) method, allowing you to quickly download & run a model from a URL. This should only be used for quick testing.
 
 ## Execution providers
 Each [execution provider](/perf/execution-providers) is also gated behind a Cargo feature.

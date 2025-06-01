@@ -14,7 +14,7 @@ For ONNX Runtime, a **value** represents any type that can be given to/returned 
 ## Creating values
 
 ### Creating tensors
-Tensors can be created with [`Tensor::from_array`](https://docs.rs/ort/2.0.0-rc.9/ort/value/type.Tensor.html#method.from_array) from either:
+Tensors can be created with [`Tensor::from_array`](https://docs.rs/ort/2.0.0-rc.10/ort/value/type.Tensor.html#method.from_array) from either:
 - an [`ndarray::Array`](https://docs.rs/ndarray/0.16.1/ndarray/type.Array.html), or
 - a tuple of `(shape, data)`, where:
     - `shape` is one of `Vec<I>`, `[I; N]` or `&[I]`, where `I` is `i64` or `usize`, and
@@ -29,7 +29,7 @@ let tensor = Tensor::from_array(([1usize, 2, 3], vec![1.0_f32, 2.0, 3.0, 4.0, 5.
 The created tensor will take ownership of the passed data. See [Creating views of external data](#creating-views-of-external-data) to create temporary tensors referencing borrowed data.
 
 ### Creating maps & sequences
-`Map`s can be [created](https://docs.rs/ort/2.0.0-rc.9/ort/value/type.Map.html#method.new) from any iterator yielding tuples of `(K, V)`, where `K` and `V` are tensor element types.
+`Map`s can be [created](https://docs.rs/ort/2.0.0-rc.10/ort/value/type.Map.html#method.new) from any iterator yielding tuples of `(K, V)`, where `K` and `V` are tensor element types.
 
 ```rs
 let mut map = HashMap::<String, f32>::new();
@@ -40,7 +40,7 @@ map.insert("three".to_string(), 3.0);
 let map = Map::<String, f32>::new(map)?;
 ```
 
-`Map`s can also be [created from 2 tensors](https://docs.rs/ort/2.0.0-rc.9/ort/value/type.Map.html#method.new_kv), one containing keys and the other containing values:
+`Map`s can also be [created from 2 tensors](https://docs.rs/ort/2.0.0-rc.10/ort/value/type.Map.html#method.new_kv), one containing keys and the other containing values:
 ```rs
 let keys = Tensor::<i64>::from_array(([4], vec![0, 1, 2, 3]))?;
 let values = Tensor::<f32>::from_array(([4], vec![1., 2., 3., 4.]))?;
@@ -48,7 +48,7 @@ let values = Tensor::<f32>::from_array(([4], vec![1., 2., 3., 4.]))?;
 let map = Map::new_kv(keys, values)?;
 ```
 
-`Sequence`s can be [created](https://docs.rs/ort/2.0.0-rc.9/ort/value/type.Sequence.html#method.new) from any iterator yielding a `Value` subtype:
+`Sequence`s can be [created](https://docs.rs/ort/2.0.0-rc.10/ort/value/type.Sequence.html#method.new) from any iterator yielding a `Value` subtype:
 ```rs
 let tensor1 = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
 let tensor2 = Tensor::<f32>::new(&allocator, [1, 224, 224, 3])?;
@@ -57,7 +57,7 @@ let sequence: Sequence<Tensor<f32>> = Sequence::new(vec![tensor1, tensor2])?;
 ```
 
 ## Using values
-Values can be used as an input in a session's [`run`](https://docs.rs/ort/2.0.0-rc.9/ort/session/struct.Session.html#method.run) function - either by value, by reference, or [by view](#views).
+Values can be used as an input in a session's [`run`](https://docs.rs/ort/2.0.0-rc.10/ort/session/struct.Session.html#method.run) function - either by value, by reference, or [by view](#views).
 ```rs
 let latents = Tensor::<f32>::new(&allocator, [1, 128, 128, 3])?;
 let text_embedding = Tensor::<f32>::new(&allocator, [1, 48, 256])?;
@@ -93,7 +93,7 @@ let mut original_array = vec![1_i64, 2, 3, 4, 5];
 assert_eq!(original_array, [1, 2, 42, 4, 5]);
 ```
 
-`Map` and `Sequence` have [`Map::extract_map`](https://docs.rs/ort/2.0.0-rc.9/ort/value/type.Map.html#method.extract_map) and [`Sequence::extract_sequence`](https://docs.rs/ort/2.0.0-rc.9/ort/value/type.Sequence.html#method.extract_sequence), which emit a `HashMap<K, V>` and a `Vec` of value [views](#views) respectively. Unlike `extract_tensor`, these types cannot mutably extract their data, and always allocate on each `extract` call, making them more computationally expensive.
+`Map` and `Sequence` have [`Map::extract_map`](https://docs.rs/ort/2.0.0-rc.10/ort/value/type.Map.html#method.extract_map) and [`Sequence::extract_sequence`](https://docs.rs/ort/2.0.0-rc.10/ort/value/type.Sequence.html#method.extract_sequence), which emit a `HashMap<K, V>` and a `Vec` of value [views](#views) respectively. Unlike `extract_tensor`, these types cannot mutably extract their data, and always allocate on each `extract` call, making them more computationally expensive.
 
 Session outputs return `DynValue`s, which are values whose [type is not known at compile time](#dynamic-values). In order to extract data from a `DynValue`, you must either [downcast it to a strong type](#downcasting) or use a corresponding `try_extract_*` method, which fails if the value's type is not compatible:
 ```rs
@@ -133,7 +133,7 @@ let tensor_view_mut = TensorRefMut::from_array_view_mut(([1, 3, 64, 64], &mut *o
 ```
 
 ## Dynamic values
-Sessions in `ort` return a map of `DynValue`s. These are values whose exact type is not known at compile time. You can determine a value's [type](https://docs.rs/ort/2.0.0-rc.9/ort/value/enum.ValueType.html) via its `.dtype()` method.
+Sessions in `ort` return a map of `DynValue`s. These are values whose exact type is not known at compile time. You can determine a value's [type](https://docs.rs/ort/2.0.0-rc.10/ort/value/enum.ValueType.html) via its `.dtype()` method.
 
 You can also use fallible methods to extract data from this value - for example, [`DynValue::try_extract_tensor`](https://docs.rs/ort/2.0.0-rc.10/ort/value/type.DynValue.html#method.try_extract_tensor), which fails if the value is not a tensor. Often times though, you'll want to reuse the same value which you are certain is a tensor - in which case, you can **downcast** the value.
 

@@ -31,7 +31,7 @@ path = "lib.rs"
 [features]
 
 [workspace.dependencies]
-ort-sys = { version = "=2.0.0-rc.9", path = "../../ort-sys", default-features = false }
+ort-sys = { version = "=2.0.0-rc.10", path = "../../ort-sys", default-features = false }
 
 [dependencies]
 ort-sys = { workspace = true }
@@ -39,7 +39,7 @@ tract-onnx = "0.21"
 parking_lot = "0.12"
 
 [dev-dependencies]
-ort = { version = "=2.0.0-rc.9", path = "../../", default-features = false, features = [ "alternative-backend", "fetch-models", "ndarray" ] }
+ort = { version = "=2.0.0-rc.10", path = "../../", default-features = false, features = [ "alternative-backend", "fetch-models", "ndarray" ] }
 ureq = "2.1"
 image = "0.25"
 ndarray = "0.16"

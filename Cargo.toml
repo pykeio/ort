@@ -34,7 +34,7 @@ authors = [
 	"pyke.io <contact@pyke.io>",
 	"Nicolas Bigaouette <nbigaouette@gmail.com>"
 ]
-include = [ "src/", "LICENSE-APACHE", "LICENSE-MIT", "README.md" ]
+include = [ "/src/", "/LICENSE-APACHE", "/LICENSE-MIT", "/README.md" ]
 
 [profile.release]
 opt-level = 3

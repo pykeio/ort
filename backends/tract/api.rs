@@ -1669,7 +1669,7 @@ unsafe extern "system" fn KernelContext_GetAllocator(
 }
 
 unsafe extern "system" fn GetBuildInfoString() -> *const ::std::os::raw::c_char {
-	concat!("ORT Build Info: backend=ort-candle, version=", env!("CARGO_PKG_VERSION"), "\0")
+	concat!("ORT Build Info: backend=ort-tract, version=", env!("CARGO_PKG_VERSION"), "\0")
 		.as_ptr()
 		.cast()
 }

@@ -12,7 +12,7 @@ use core::{
 
 use smallvec::{SmallVec, smallvec};
 
-#[cfg(feature = "ndarray")]
+#[cfg(all(feature = "ndarray", feature = "std"))]
 pub use self::ndarray::ArrayExtensions;
 pub use self::types::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType, Utf8Data};
 

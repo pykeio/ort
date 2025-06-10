@@ -1,30 +1,30 @@
 //! Helper traits to extend [`ndarray`] functionality.
 
-use core::ops::{DivAssign, SubAssign};
-
-use ndarray::{Array, ArrayBase};
-
 /// Trait extending [`ndarray::ArrayBase`](https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html)
 /// with useful tensor operations.
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 pub trait ArrayExtensions<S, T, D> {
 	/// Calculate the [softmax](https://en.wikipedia.org/wiki/Softmax_function) of the tensor along a given axis.
-	fn softmax(&self, axis: ndarray::Axis) -> Array<T, D>
+	fn softmax(&self, axis: ndarray::Axis) -> ndarray::Array<T, D>
 	where
 		D: ndarray::RemoveAxis,
 		S: ndarray::RawData + ndarray::Data + ndarray::RawData<Elem = T>,
 		<S as ndarray::RawData>::Elem: Clone,
-		T: ndarray::NdFloat + SubAssign + DivAssign;
+		T: ndarray::NdFloat + core::ops::SubAssign + core::ops::DivAssign;
 }
 
-impl<S, T, D> ArrayExtensions<S, T, D> for ArrayBase<S, D>
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+impl<S, T, D> ArrayExtensions<S, T, D> for ndarray::ArrayBase<S, D>
 where
 	D: ndarray::RemoveAxis,
 	S: ndarray::RawData + ndarray::Data + ndarray::RawData<Elem = T>,
 	<S as ndarray::RawData>::Elem: Clone,
-	T: ndarray::NdFloat + SubAssign + DivAssign
+	T: ndarray::NdFloat + core::ops::SubAssign + core::ops::DivAssign
 {
-	fn softmax(&self, axis: ndarray::Axis) -> Array<T, D> {
-		let mut new_array: Array<T, D> = self.to_owned();
+	fn softmax(&self, axis: ndarray::Axis) -> ndarray::Array<T, D> {
+		let mut new_array: ndarray::Array<T, D> = self.to_owned();
 		// FIXME: Change to non-overflowing formula
 		// e = np.exp(A - np.sum(A, axis=1, keepdims=True))
 		// np.exp(a) / np.sum(np.exp(a))

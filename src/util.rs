@@ -43,9 +43,11 @@ pub(crate) fn path_to_os_char(path: impl AsRef<std::path::Path>) -> OsCharArray 
 	#[cfg(not(target_family = "windows"))]
 	use core::ffi::c_char;
 	#[cfg(unix)]
-	use std::os::unix::ffi::OsStrExt;
+	use std::os::unix::ffi::OsStrExt as _;
+	#[cfg(target_os = "wasi")]
+	use std::os::wasi::ffi::OsStrExt as _;
 	#[cfg(target_family = "windows")]
-	use std::os::windows::ffi::OsStrExt;
+	use std::os::windows::ffi::OsStrExt as _;
 
 	let path = std::ffi::OsString::from(path.as_ref());
 	#[cfg(target_family = "windows")]

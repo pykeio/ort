@@ -217,7 +217,7 @@ impl<T> OnceLock<T> {
 						}
 					};
 					unsafe {
-						*(*self.data.get()).as_mut_ptr() = val;
+						(*self.data.get()).as_mut_ptr().write(val);
 					};
 					core::mem::forget(panic_catcher);
 

@@ -17,6 +17,7 @@ exclude = [
 	'examples/yolov8',
 	'tests/leak-check'
 ]
+resolver = "2"
 
 [package]
 name = "ort"

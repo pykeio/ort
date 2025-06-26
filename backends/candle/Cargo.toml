@@ -38,6 +38,7 @@ ort-sys = { workspace = true }
 candle-core = { version = "0.8.1", default-features = false }
 candle-onnx = { version = "0.8.1" }
 prost = { version = "0.12.1", default-features = false }
+getrandom = { version = "0.2", features = [ "js" ] }
 
 [dev-dependencies]
 ort = { version = "=2.0.0-rc.10", path = "../../", default-features = false, features = [ "alternative-backend", "fetch-models" ] }

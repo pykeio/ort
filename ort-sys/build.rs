@@ -217,6 +217,7 @@ fn prefer_dynamic_linking() -> bool {
 	}
 }
 
+#[cfg(feature = "download-binaries")]
 fn skip_download() -> bool {
 	match env::var(ORT_ENV_SKIP_DOWNLOAD) {
 		Ok(val) => val == "1" || val.to_lowercase() == "true",

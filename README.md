@@ -34,6 +34,7 @@
 - **[BoquilaHUB](https://github.com/boquila/boquilahub/)** uses `ort` for local AI deployment in biodiversity conservation efforts.
 - **[`FastEmbed-rs`](https://github.com/Anush008/fastembed-rs)** uses `ort` for generating vector embeddings, reranking locally.
 - **[Aftershoot](https://aftershoot.com/)** uses `ort` to power AI-assisted image editing workflows. 
+- **[Valentinus](https://github.com/kn0sys/valentinus)** uses `ort` to provide embedding model inference inside LMDB.
 
 ## 🌠 Sponsor `ort`
 <a href="https://opencollective.com/pyke-osai">

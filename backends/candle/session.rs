@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::Path};
+use std::collections::HashMap;
 
 use candle_core::Tensor;
 use candle_onnx::onnx::ModelProto;

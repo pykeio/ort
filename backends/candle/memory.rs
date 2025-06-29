@@ -1,9 +1,9 @@
-use std::{any::Any, ffi::CString, ptr};
+use std::{ffi::CString, ptr};
 
-use candle_core::{Device, DeviceLocation, backend::BackendDevice};
-use ort_sys::{OrtAllocatorType, OrtErrorCode, OrtMemType, OrtMemoryInfoDeviceType};
+use candle_core::{Device, DeviceLocation};
+use ort_sys::{OrtErrorCode, OrtMemType, OrtMemoryInfoDeviceType};
 
-use crate::error::Error;
+use crate::Error;
 
 #[repr(transparent)]
 pub struct MemoryInfo(pub Device);

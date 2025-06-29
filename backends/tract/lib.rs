@@ -2,13 +2,13 @@ use ort_sys::OrtErrorCode;
 use tract_onnx::{Onnx, prelude::DatumType};
 
 mod api;
-pub(crate) mod error;
 mod memory;
 mod session;
 mod tensor;
 
+pub(crate) use ort_sys::stub::Error;
+
 pub use self::api::api;
-use self::error::Error;
 
 pub(crate) struct Environment {
 	pub onnx: Onnx

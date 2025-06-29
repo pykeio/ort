@@ -1,10 +1,7 @@
 #![allow(non_snake_case, unused)]
 
-use std::{
-	collections::HashMap,
-	ffi::{CStr, CString, OsStr, OsString, c_char},
-	fs, mem, ptr
-};
+use alloc::{boxed::Box, ffi::CString, string::String};
+use core::{ffi::c_char, ptr};
 
 use crate::*;
 
@@ -49,7 +46,7 @@ impl Error {
 	}
 }
 
-unsafe extern "system" fn CreateStatus(code: OrtErrorCode, msg: *const ::std::os::raw::c_char) -> OrtStatusPtr {
+unsafe extern "system" fn CreateStatus(code: OrtErrorCode, msg: *const ::core::ffi::c_char) -> OrtStatusPtr {
 	let msg = CString::from_raw(msg.cast_mut());
 	Error::new_sys(code, msg.to_string_lossy())
 }
@@ -58,19 +55,19 @@ unsafe extern "system" fn GetErrorCode(status: *const OrtStatus) -> OrtErrorCode
 	Error::cast_from_sys(status).code
 }
 
-unsafe extern "system" fn GetErrorMessage(status: *const OrtStatus) -> *const ::std::os::raw::c_char {
+unsafe extern "system" fn GetErrorMessage(status: *const OrtStatus) -> *const ::core::ffi::c_char {
 	Error::cast_from_sys(status).message_ptr()
 }
 
-unsafe extern "system" fn CreateEnv(log_severity_level: OrtLoggingLevel, logid: *const ::std::os::raw::c_char, out: *mut *mut OrtEnv) -> OrtStatusPtr {
+unsafe extern "system" fn CreateEnv(log_severity_level: OrtLoggingLevel, logid: *const ::core::ffi::c_char, out: *mut *mut OrtEnv) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
 unsafe extern "system" fn CreateEnvWithCustomLogger(
 	logging_function: OrtLoggingFunction,
-	logger_param: *mut ::std::os::raw::c_void,
+	logger_param: *mut ::core::ffi::c_void,
 	log_severity_level: OrtLoggingLevel,
-	logid: *const ::std::os::raw::c_char,
+	logid: *const ::core::ffi::c_char,
 	out: *mut *mut OrtEnv
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -95,7 +92,7 @@ unsafe extern "system" fn CreateSession(
 
 unsafe extern "system" fn CreateSessionFromArray(
 	env: *const OrtEnv,
-	model_data: *const ::std::os::raw::c_void,
+	model_data: *const ::core::ffi::c_void,
 	model_data_length: usize,
 	options: *const OrtSessionOptions,
 	out: *mut *mut OrtSession
@@ -106,10 +103,10 @@ unsafe extern "system" fn CreateSessionFromArray(
 unsafe extern "system" fn Run(
 	session: *mut OrtSession,
 	run_options: *const OrtRunOptions,
-	input_names: *const *const ::std::os::raw::c_char,
+	input_names: *const *const ::core::ffi::c_char,
 	inputs: *const *const OrtValue,
 	input_len: usize,
-	output_names: *const *const ::std::os::raw::c_char,
+	output_names: *const *const ::core::ffi::c_char,
 	output_names_len: usize,
 	output_ptrs: *mut *mut OrtValue
 ) -> OrtStatusPtr {
@@ -156,15 +153,15 @@ unsafe extern "system" fn DisableCpuMemArena(options: *mut OrtSessionOptions) ->
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn SetSessionLogId(options: *mut OrtSessionOptions, logid: *const ::std::os::raw::c_char) -> OrtStatusPtr {
+unsafe extern "system" fn SetSessionLogId(options: *mut OrtSessionOptions, logid: *const ::core::ffi::c_char) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn SetSessionLogVerbosityLevel(options: *mut OrtSessionOptions, session_log_verbosity_level: ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn SetSessionLogVerbosityLevel(options: *mut OrtSessionOptions, session_log_verbosity_level: ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn SetSessionLogSeverityLevel(options: *mut OrtSessionOptions, session_log_severity_level: ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn SetSessionLogSeverityLevel(options: *mut OrtSessionOptions, session_log_severity_level: ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -172,15 +169,15 @@ unsafe extern "system" fn SetSessionGraphOptimizationLevel(options: *mut OrtSess
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn SetIntraOpNumThreads(options: *mut OrtSessionOptions, intra_op_num_threads: ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn SetIntraOpNumThreads(options: *mut OrtSessionOptions, intra_op_num_threads: ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn SetInterOpNumThreads(options: *mut OrtSessionOptions, inter_op_num_threads: ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn SetInterOpNumThreads(options: *mut OrtSessionOptions, inter_op_num_threads: ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn CreateCustomOpDomain(domain: *const ::std::os::raw::c_char, out: *mut *mut OrtCustomOpDomain) -> OrtStatusPtr {
+unsafe extern "system" fn CreateCustomOpDomain(domain: *const ::core::ffi::c_char, out: *mut *mut OrtCustomOpDomain) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -194,8 +191,8 @@ unsafe extern "system" fn AddCustomOpDomain(options: *mut OrtSessionOptions, cus
 
 unsafe extern "system" fn RegisterCustomOpsLibrary(
 	options: *mut OrtSessionOptions,
-	library_path: *const ::std::os::raw::c_char,
-	library_handle: *mut *mut ::std::os::raw::c_void
+	library_path: *const ::core::ffi::c_char,
+	library_handle: *mut *mut ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -228,7 +225,7 @@ unsafe extern "system" fn SessionGetInputName(
 	session: *const OrtSession,
 	index: usize,
 	allocator: *mut OrtAllocator,
-	value: *mut *mut ::std::os::raw::c_char
+	value: *mut *mut ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -237,7 +234,7 @@ unsafe extern "system" fn SessionGetOutputName(
 	session: *const OrtSession,
 	index: usize,
 	allocator: *mut OrtAllocator,
-	value: *mut *mut ::std::os::raw::c_char
+	value: *mut *mut ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -246,7 +243,7 @@ unsafe extern "system" fn SessionGetOverridableInitializerName(
 	session: *const OrtSession,
 	index: usize,
 	allocator: *mut OrtAllocator,
-	value: *mut *mut ::std::os::raw::c_char
+	value: *mut *mut ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -255,27 +252,27 @@ unsafe extern "system" fn CreateRunOptions(out: *mut *mut OrtRunOptions) -> OrtS
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn RunOptionsSetRunLogVerbosityLevel(options: *mut OrtRunOptions, log_verbosity_level: ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn RunOptionsSetRunLogVerbosityLevel(options: *mut OrtRunOptions, log_verbosity_level: ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn RunOptionsSetRunLogSeverityLevel(options: *mut OrtRunOptions, log_severity_level: ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn RunOptionsSetRunLogSeverityLevel(options: *mut OrtRunOptions, log_severity_level: ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn RunOptionsSetRunTag(options: *mut OrtRunOptions, run_tag: *const ::std::os::raw::c_char) -> OrtStatusPtr {
+unsafe extern "system" fn RunOptionsSetRunTag(options: *mut OrtRunOptions, run_tag: *const ::core::ffi::c_char) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn RunOptionsGetRunLogVerbosityLevel(options: *const OrtRunOptions, log_verbosity_level: *mut ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn RunOptionsGetRunLogVerbosityLevel(options: *const OrtRunOptions, log_verbosity_level: *mut ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn RunOptionsGetRunLogSeverityLevel(options: *const OrtRunOptions, log_severity_level: *mut ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn RunOptionsGetRunLogSeverityLevel(options: *const OrtRunOptions, log_severity_level: *mut ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn RunOptionsGetRunTag(options: *const OrtRunOptions, run_tag: *mut *const ::std::os::raw::c_char) -> OrtStatusPtr {
+unsafe extern "system" fn RunOptionsGetRunTag(options: *const OrtRunOptions, run_tag: *mut *const ::core::ffi::c_char) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -299,7 +296,7 @@ unsafe extern "system" fn CreateTensorAsOrtValue(
 
 unsafe extern "system" fn CreateTensorWithDataAsOrtValue(
 	info: *const OrtMemoryInfo,
-	p_data: *mut ::std::os::raw::c_void,
+	p_data: *mut ::core::ffi::c_void,
 	p_data_len: usize,
 	shape: *const i64,
 	shape_len: usize,
@@ -309,15 +306,15 @@ unsafe extern "system" fn CreateTensorWithDataAsOrtValue(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn IsTensor(value: *const OrtValue, out: *mut ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn IsTensor(value: *const OrtValue, out: *mut ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn GetTensorMutableData(value: *mut OrtValue, out: *mut *mut ::std::os::raw::c_void) -> OrtStatusPtr {
+unsafe extern "system" fn GetTensorMutableData(value: *mut OrtValue, out: *mut *mut ::core::ffi::c_void) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn FillStringTensor(value: *mut OrtValue, s: *const *const ::std::os::raw::c_char, s_len: usize) -> OrtStatusPtr {
+unsafe extern "system" fn FillStringTensor(value: *mut OrtValue, s: *const *const ::core::ffi::c_char, s_len: usize) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -327,7 +324,7 @@ unsafe extern "system" fn GetStringTensorDataLength(value: *const OrtValue, len:
 
 unsafe extern "system" fn GetStringTensorContent(
 	value: *const OrtValue,
-	s: *mut ::std::os::raw::c_void,
+	s: *mut ::core::ffi::c_void,
 	s_len: usize,
 	offsets: *mut usize,
 	offsets_len: usize
@@ -369,7 +366,7 @@ unsafe extern "system" fn GetDimensions(info: *const OrtTensorTypeAndShapeInfo, 
 
 unsafe extern "system" fn GetSymbolicDimensions(
 	info: *const OrtTensorTypeAndShapeInfo,
-	dim_params: *mut *const ::std::os::raw::c_char,
+	dim_params: *mut *const ::core::ffi::c_char,
 	dim_params_length: usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -392,9 +389,9 @@ unsafe extern "system" fn GetValueType(value: *const OrtValue, out: *mut ONNXTyp
 }
 
 unsafe extern "system" fn CreateMemoryInfo(
-	name: *const ::std::os::raw::c_char,
+	name: *const ::core::ffi::c_char,
 	type_: OrtAllocatorType,
-	id: ::std::os::raw::c_int,
+	id: ::core::ffi::c_int,
 	mem_type: OrtMemType,
 	out: *mut *mut OrtMemoryInfo
 ) -> OrtStatusPtr {
@@ -405,15 +402,15 @@ unsafe extern "system" fn CreateCpuMemoryInfo(type_: OrtAllocatorType, mem_type:
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn CompareMemoryInfo(info1: *const OrtMemoryInfo, info2: *const OrtMemoryInfo, out: *mut ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn CompareMemoryInfo(info1: *const OrtMemoryInfo, info2: *const OrtMemoryInfo, out: *mut ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn MemoryInfoGetName(ptr: *const OrtMemoryInfo, out: *mut *const ::std::os::raw::c_char) -> OrtStatusPtr {
+unsafe extern "system" fn MemoryInfoGetName(ptr: *const OrtMemoryInfo, out: *mut *const ::core::ffi::c_char) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn MemoryInfoGetId(ptr: *const OrtMemoryInfo, out: *mut ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn MemoryInfoGetId(ptr: *const OrtMemoryInfo, out: *mut ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -426,7 +423,7 @@ unsafe extern "system" fn MemoryInfoGetType(ptr: *const OrtMemoryInfo, out: *mut
 	OrtStatusPtr::default()
 }
 
-unsafe extern "system" fn AllocatorAlloc(ort_allocator: *mut OrtAllocator, size: usize, out: *mut *mut ::std::os::raw::c_void) -> OrtStatusPtr {
+unsafe extern "system" fn AllocatorAlloc(ort_allocator: *mut OrtAllocator, size: usize, out: *mut *mut ::core::ffi::c_void) -> OrtStatusPtr {
 	*out = unsafe { &*ort_allocator }.Alloc.unwrap()(ort_allocator, size);
 	if unsafe { *out }.is_null() {
 		return Error::new_sys(OrtErrorCode::ORT_RUNTIME_EXCEPTION, "Allocation failed");
@@ -434,7 +431,7 @@ unsafe extern "system" fn AllocatorAlloc(ort_allocator: *mut OrtAllocator, size:
 	OrtStatusPtr::default()
 }
 
-unsafe extern "system" fn AllocatorFree(ort_allocator: *mut OrtAllocator, p: *mut ::std::os::raw::c_void) -> OrtStatusPtr {
+unsafe extern "system" fn AllocatorFree(ort_allocator: *mut OrtAllocator, p: *mut ::core::ffi::c_void) -> OrtStatusPtr {
 	unsafe { &*ort_allocator }.Free.unwrap()(ort_allocator, p);
 	OrtStatusPtr::default()
 }
@@ -450,18 +447,13 @@ unsafe extern "system" fn GetAllocatorWithDefaultOptions(out: *mut *mut OrtAlloc
 
 unsafe extern "system" fn AddFreeDimensionOverride(
 	options: *mut OrtSessionOptions,
-	dim_denotation: *const ::std::os::raw::c_char,
+	dim_denotation: *const ::core::ffi::c_char,
 	dim_value: i64
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn GetValue(
-	value: *const OrtValue,
-	index: ::std::os::raw::c_int,
-	allocator: *mut OrtAllocator,
-	out: *mut *mut OrtValue
-) -> OrtStatusPtr {
+unsafe extern "system" fn GetValue(value: *const OrtValue, index: ::core::ffi::c_int, allocator: *mut OrtAllocator, out: *mut *mut OrtValue) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -474,9 +466,9 @@ unsafe extern "system" fn CreateValue(in_: *const *const OrtValue, num_values: u
 }
 
 unsafe extern "system" fn CreateOpaqueValue(
-	domain_name: *const ::std::os::raw::c_char,
-	type_name: *const ::std::os::raw::c_char,
-	data_container: *const ::std::os::raw::c_void,
+	domain_name: *const ::core::ffi::c_char,
+	type_name: *const ::core::ffi::c_char,
+	data_container: *const ::core::ffi::c_void,
 	data_container_size: usize,
 	out: *mut *mut OrtValue
 ) -> OrtStatusPtr {
@@ -484,27 +476,27 @@ unsafe extern "system" fn CreateOpaqueValue(
 }
 
 unsafe extern "system" fn GetOpaqueValue(
-	domain_name: *const ::std::os::raw::c_char,
-	type_name: *const ::std::os::raw::c_char,
+	domain_name: *const ::core::ffi::c_char,
+	type_name: *const ::core::ffi::c_char,
 	in_: *const OrtValue,
-	data_container: *mut ::std::os::raw::c_void,
+	data_container: *mut ::core::ffi::c_void,
 	data_container_size: usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn KernelInfoGetAttribute_float(info: *const OrtKernelInfo, name: *const ::std::os::raw::c_char, out: *mut f32) -> OrtStatusPtr {
+unsafe extern "system" fn KernelInfoGetAttribute_float(info: *const OrtKernelInfo, name: *const ::core::ffi::c_char, out: *mut f32) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn KernelInfoGetAttribute_int64(info: *const OrtKernelInfo, name: *const ::std::os::raw::c_char, out: *mut i64) -> OrtStatusPtr {
+unsafe extern "system" fn KernelInfoGetAttribute_int64(info: *const OrtKernelInfo, name: *const ::core::ffi::c_char, out: *mut i64) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
 unsafe extern "system" fn KernelInfoGetAttribute_string(
 	info: *const OrtKernelInfo,
-	name: *const ::std::os::raw::c_char,
-	out: *mut ::std::os::raw::c_char,
+	name: *const ::core::ffi::c_char,
+	out: *mut ::core::ffi::c_char,
 	size: *mut usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -556,7 +548,7 @@ unsafe extern "system" fn ReleaseCustomOpDomain(input: *mut OrtCustomOpDomain) {
 
 unsafe extern "system" fn GetDenotationFromTypeInfo(
 	type_info: *const OrtTypeInfo,
-	denotation: *mut *const ::std::os::raw::c_char,
+	denotation: *mut *const ::core::ffi::c_char,
 	len: *mut usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -586,7 +578,7 @@ unsafe extern "system" fn ReleaseMapTypeInfo(input: *mut OrtMapTypeInfo) {}
 
 unsafe extern "system" fn ReleaseSequenceTypeInfo(input: *mut OrtSequenceTypeInfo) {}
 
-unsafe extern "system" fn SessionEndProfiling(session: *mut OrtSession, allocator: *mut OrtAllocator, out: *mut *mut ::std::os::raw::c_char) -> OrtStatusPtr {
+unsafe extern "system" fn SessionEndProfiling(session: *mut OrtSession, allocator: *mut OrtAllocator, out: *mut *mut ::core::ffi::c_char) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -597,7 +589,7 @@ unsafe extern "system" fn SessionGetModelMetadata(session: *const OrtSession, ou
 unsafe extern "system" fn ModelMetadataGetProducerName(
 	model_metadata: *const OrtModelMetadata,
 	allocator: *mut OrtAllocator,
-	value: *mut *mut ::std::os::raw::c_char
+	value: *mut *mut ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -605,7 +597,7 @@ unsafe extern "system" fn ModelMetadataGetProducerName(
 unsafe extern "system" fn ModelMetadataGetGraphName(
 	model_metadata: *const OrtModelMetadata,
 	allocator: *mut OrtAllocator,
-	value: *mut *mut ::std::os::raw::c_char
+	value: *mut *mut ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -613,7 +605,7 @@ unsafe extern "system" fn ModelMetadataGetGraphName(
 unsafe extern "system" fn ModelMetadataGetDomain(
 	model_metadata: *const OrtModelMetadata,
 	allocator: *mut OrtAllocator,
-	value: *mut *mut ::std::os::raw::c_char
+	value: *mut *mut ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -621,7 +613,7 @@ unsafe extern "system" fn ModelMetadataGetDomain(
 unsafe extern "system" fn ModelMetadataGetDescription(
 	model_metadata: *const OrtModelMetadata,
 	allocator: *mut OrtAllocator,
-	value: *mut *mut ::std::os::raw::c_char
+	value: *mut *mut ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -629,8 +621,8 @@ unsafe extern "system" fn ModelMetadataGetDescription(
 unsafe extern "system" fn ModelMetadataLookupCustomMetadataMap(
 	model_metadata: *const OrtModelMetadata,
 	allocator: *mut OrtAllocator,
-	key: *const ::std::os::raw::c_char,
-	value: *mut *mut ::std::os::raw::c_char
+	key: *const ::core::ffi::c_char,
+	value: *mut *mut ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -643,7 +635,7 @@ unsafe extern "system" fn ReleaseModelMetadata(input: *mut OrtModelMetadata) {}
 
 unsafe extern "system" fn CreateEnvWithGlobalThreadPools(
 	log_severity_level: OrtLoggingLevel,
-	logid: *const ::std::os::raw::c_char,
+	logid: *const ::core::ffi::c_char,
 	tp_options: *const OrtThreadingOptions,
 	out: *mut *mut OrtEnv
 ) -> OrtStatusPtr {
@@ -663,7 +655,7 @@ unsafe extern "system" fn ReleaseThreadingOptions(input: *mut OrtThreadingOption
 unsafe extern "system" fn ModelMetadataGetCustomMetadataMapKeys(
 	model_metadata: *const OrtModelMetadata,
 	allocator: *mut OrtAllocator,
-	keys: *mut *mut *mut ::std::os::raw::c_char,
+	keys: *mut *mut *mut ::core::ffi::c_char,
 	num_keys: *mut i64
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -671,17 +663,17 @@ unsafe extern "system" fn ModelMetadataGetCustomMetadataMapKeys(
 
 unsafe extern "system" fn AddFreeDimensionOverrideByName(
 	options: *mut OrtSessionOptions,
-	dim_name: *const ::std::os::raw::c_char,
+	dim_name: *const ::core::ffi::c_char,
 	dim_value: i64
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn GetAvailableProviders(out_ptr: *mut *mut *mut ::std::os::raw::c_char, provider_length: *mut ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn GetAvailableProviders(out_ptr: *mut *mut *mut ::core::ffi::c_char, provider_length: *mut ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn ReleaseAvailableProviders(ptr: *mut *mut ::std::os::raw::c_char, providers_length: ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn ReleaseAvailableProviders(ptr: *mut *mut ::core::ffi::c_char, providers_length: ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -689,18 +681,18 @@ unsafe extern "system" fn GetStringTensorElementLength(value: *const OrtValue, i
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn GetStringTensorElement(value: *const OrtValue, s_len: usize, index: usize, s: *mut ::std::os::raw::c_void) -> OrtStatusPtr {
+unsafe extern "system" fn GetStringTensorElement(value: *const OrtValue, s_len: usize, index: usize, s: *mut ::core::ffi::c_void) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn FillStringTensorElement(value: *mut OrtValue, s: *const ::std::os::raw::c_char, index: usize) -> OrtStatusPtr {
+unsafe extern "system" fn FillStringTensorElement(value: *mut OrtValue, s: *const ::core::ffi::c_char, index: usize) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
 unsafe extern "system" fn AddSessionConfigEntry(
 	options: *mut OrtSessionOptions,
-	config_key: *const ::std::os::raw::c_char,
-	config_value: *const ::std::os::raw::c_char
+	config_key: *const ::core::ffi::c_char,
+	config_value: *const ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -721,17 +713,17 @@ unsafe extern "system" fn CreateIoBinding(session: *mut OrtSession, out: *mut *m
 
 unsafe extern "system" fn ReleaseIoBinding(input: *mut OrtIoBinding) {}
 
-unsafe extern "system" fn BindInput(binding_ptr: *mut OrtIoBinding, name: *const ::std::os::raw::c_char, val_ptr: *const OrtValue) -> OrtStatusPtr {
+unsafe extern "system" fn BindInput(binding_ptr: *mut OrtIoBinding, name: *const ::core::ffi::c_char, val_ptr: *const OrtValue) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn BindOutput(binding_ptr: *mut OrtIoBinding, name: *const ::std::os::raw::c_char, val_ptr: *const OrtValue) -> OrtStatusPtr {
+unsafe extern "system" fn BindOutput(binding_ptr: *mut OrtIoBinding, name: *const ::core::ffi::c_char, val_ptr: *const OrtValue) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
 unsafe extern "system" fn BindOutputToDevice(
 	binding_ptr: *mut OrtIoBinding,
-	name: *const ::std::os::raw::c_char,
+	name: *const ::core::ffi::c_char,
 	mem_info_ptr: *const OrtMemoryInfo
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -740,7 +732,7 @@ unsafe extern "system" fn BindOutputToDevice(
 unsafe extern "system" fn GetBoundOutputNames(
 	binding_ptr: *const OrtIoBinding,
 	allocator: *mut OrtAllocator,
-	buffer: *mut *mut ::std::os::raw::c_char,
+	buffer: *mut *mut ::core::ffi::c_char,
 	lengths: *mut *mut usize,
 	count: *mut usize
 ) -> OrtStatusPtr {
@@ -764,7 +756,7 @@ unsafe extern "system" fn TensorAt(
 	value: *mut OrtValue,
 	location_values: *const i64,
 	location_values_count: usize,
-	out: *mut *mut ::std::os::raw::c_void
+	out: *mut *mut ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -781,27 +773,27 @@ unsafe extern "system" fn SessionGetProfilingStartTimeNs(session: *const OrtSess
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn SetGlobalIntraOpNumThreads(tp_options: *mut OrtThreadingOptions, intra_op_num_threads: ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn SetGlobalIntraOpNumThreads(tp_options: *mut OrtThreadingOptions, intra_op_num_threads: ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn SetGlobalInterOpNumThreads(tp_options: *mut OrtThreadingOptions, inter_op_num_threads: ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn SetGlobalInterOpNumThreads(tp_options: *mut OrtThreadingOptions, inter_op_num_threads: ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn SetGlobalSpinControl(tp_options: *mut OrtThreadingOptions, allow_spinning: ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn SetGlobalSpinControl(tp_options: *mut OrtThreadingOptions, allow_spinning: ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn AddInitializer(options: *mut OrtSessionOptions, name: *const ::std::os::raw::c_char, val: *const OrtValue) -> OrtStatusPtr {
+unsafe extern "system" fn AddInitializer(options: *mut OrtSessionOptions, name: *const ::core::ffi::c_char, val: *const OrtValue) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
 unsafe extern "system" fn CreateEnvWithCustomLoggerAndGlobalThreadPools(
 	logging_function: OrtLoggingFunction,
-	logger_param: *mut ::std::os::raw::c_void,
+	logger_param: *mut ::core::ffi::c_void,
 	log_severity_level: OrtLoggingLevel,
-	logid: *const ::std::os::raw::c_char,
+	logid: *const ::core::ffi::c_char,
 	tp_options: *const OrtThreadingOptions,
 	out: *mut *mut OrtEnv
 ) -> OrtStatusPtr {
@@ -835,9 +827,9 @@ unsafe extern "system" fn SetGlobalDenormalAsZero(tp_options: *mut OrtThreadingO
 
 unsafe extern "system" fn CreateArenaCfg(
 	max_mem: usize,
-	arena_extend_strategy: ::std::os::raw::c_int,
-	initial_chunk_size_bytes: ::std::os::raw::c_int,
-	max_dead_bytes_per_chunk: ::std::os::raw::c_int,
+	arena_extend_strategy: ::core::ffi::c_int,
+	initial_chunk_size_bytes: ::core::ffi::c_int,
+	max_dead_bytes_per_chunk: ::core::ffi::c_int,
 	out: *mut *mut OrtArenaCfg
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -848,7 +840,7 @@ unsafe extern "system" fn ReleaseArenaCfg(input: *mut OrtArenaCfg) {}
 unsafe extern "system" fn ModelMetadataGetGraphDescription(
 	model_metadata: *const OrtModelMetadata,
 	allocator: *mut OrtAllocator,
-	value: *mut *mut ::std::os::raw::c_char
+	value: *mut *mut ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -860,17 +852,17 @@ unsafe extern "system" fn SessionOptionsAppendExecutionProvider_TensorRT(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn SetCurrentGpuDeviceId(device_id: ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn SetCurrentGpuDeviceId(device_id: ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn GetCurrentGpuDeviceId(device_id: *mut ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn GetCurrentGpuDeviceId(device_id: *mut ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
 unsafe extern "system" fn KernelInfoGetAttributeArray_float(
 	info: *const OrtKernelInfo,
-	name: *const ::std::os::raw::c_char,
+	name: *const ::core::ffi::c_char,
 	out: *mut f32,
 	size: *mut usize
 ) -> OrtStatusPtr {
@@ -879,7 +871,7 @@ unsafe extern "system" fn KernelInfoGetAttributeArray_float(
 
 unsafe extern "system" fn KernelInfoGetAttributeArray_int64(
 	info: *const OrtKernelInfo,
-	name: *const ::std::os::raw::c_char,
+	name: *const ::core::ffi::c_char,
 	out: *mut i64,
 	size: *mut usize
 ) -> OrtStatusPtr {
@@ -887,7 +879,7 @@ unsafe extern "system" fn KernelInfoGetAttributeArray_int64(
 }
 
 unsafe extern "system" fn CreateArenaCfgV2(
-	arena_config_keys: *const *const ::std::os::raw::c_char,
+	arena_config_keys: *const *const ::core::ffi::c_char,
 	arena_config_values: *const usize,
 	num_keys: usize,
 	out: *mut *mut OrtArenaCfg
@@ -897,8 +889,8 @@ unsafe extern "system" fn CreateArenaCfgV2(
 
 unsafe extern "system" fn AddRunConfigEntry(
 	options: *mut OrtRunOptions,
-	config_key: *const ::std::os::raw::c_char,
-	config_value: *const ::std::os::raw::c_char
+	config_key: *const ::core::ffi::c_char,
+	config_value: *const ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -921,7 +913,7 @@ unsafe extern "system" fn CreateSessionWithPrepackedWeightsContainer(
 
 unsafe extern "system" fn CreateSessionFromArrayWithPrepackedWeightsContainer(
 	env: *const OrtEnv,
-	model_data: *const ::std::os::raw::c_void,
+	model_data: *const ::core::ffi::c_void,
 	model_data_length: usize,
 	options: *const OrtSessionOptions,
 	prepacked_weights_container: *mut OrtPrepackedWeightsContainer,
@@ -943,8 +935,8 @@ unsafe extern "system" fn CreateTensorRTProviderOptions(out: *mut *mut OrtTensor
 
 unsafe extern "system" fn UpdateTensorRTProviderOptions(
 	tensorrt_options: *mut OrtTensorRTProviderOptionsV2,
-	provider_options_keys: *const *const ::std::os::raw::c_char,
-	provider_options_values: *const *const ::std::os::raw::c_char,
+	provider_options_keys: *const *const ::core::ffi::c_char,
+	provider_options_values: *const *const ::core::ffi::c_char,
 	num_keys: usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -953,7 +945,7 @@ unsafe extern "system" fn UpdateTensorRTProviderOptions(
 unsafe extern "system" fn GetTensorRTProviderOptionsAsString(
 	tensorrt_options: *const OrtTensorRTProviderOptionsV2,
 	allocator: *mut OrtAllocator,
-	ptr: *mut *mut ::std::os::raw::c_char
+	ptr: *mut *mut ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -972,7 +964,7 @@ unsafe extern "system" fn UnregisterAllocator(env: *mut OrtEnv, mem_info: *const
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn IsSparseTensor(value: *const OrtValue, out: *mut ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn IsSparseTensor(value: *const OrtValue, out: *mut ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -991,7 +983,7 @@ unsafe extern "system" fn FillSparseTensorCoo(
 	data_mem_info: *const OrtMemoryInfo,
 	values_shape: *const i64,
 	values_shape_len: usize,
-	values: *const ::std::os::raw::c_void,
+	values: *const ::core::ffi::c_void,
 	indices_data: *const i64,
 	indices_num: usize
 ) -> OrtStatusPtr {
@@ -1003,7 +995,7 @@ unsafe extern "system" fn FillSparseTensorCsr(
 	data_mem_info: *const OrtMemoryInfo,
 	values_shape: *const i64,
 	values_shape_len: usize,
-	values: *const ::std::os::raw::c_void,
+	values: *const ::core::ffi::c_void,
 	inner_indices_data: *const i64,
 	inner_indices_num: usize,
 	outer_indices_data: *const i64,
@@ -1017,7 +1009,7 @@ unsafe extern "system" fn FillSparseTensorBlockSparse(
 	data_mem_info: *const OrtMemoryInfo,
 	values_shape: *const i64,
 	values_shape_len: usize,
-	values: *const ::std::os::raw::c_void,
+	values: *const ::core::ffi::c_void,
 	indices_shape_data: *const i64,
 	indices_shape_len: usize,
 	indices_data: *const i32
@@ -1027,7 +1019,7 @@ unsafe extern "system" fn FillSparseTensorBlockSparse(
 
 unsafe extern "system" fn CreateSparseTensorWithValuesAsOrtValue(
 	info: *const OrtMemoryInfo,
-	p_data: *mut ::std::os::raw::c_void,
+	p_data: *mut ::core::ffi::c_void,
 	dense_shape: *const i64,
 	dense_shape_len: usize,
 	values_shape: *const i64,
@@ -1069,7 +1061,7 @@ unsafe extern "system" fn GetSparseTensorValuesTypeAndShape(ort_value: *const Or
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn GetSparseTensorValues(ort_value: *const OrtValue, out: *mut *const ::std::os::raw::c_void) -> OrtStatusPtr {
+unsafe extern "system" fn GetSparseTensorValues(ort_value: *const OrtValue, out: *mut *const ::core::ffi::c_void) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -1085,16 +1077,16 @@ unsafe extern "system" fn GetSparseTensorIndices(
 	ort_value: *const OrtValue,
 	indices_format: OrtSparseIndicesFormat,
 	num_indices: *mut usize,
-	indices: *mut *const ::std::os::raw::c_void
+	indices: *mut *const ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn HasValue(value: *const OrtValue, out: *mut ::std::os::raw::c_int) -> OrtStatusPtr {
+unsafe extern "system" fn HasValue(value: *const OrtValue, out: *mut ::core::ffi::c_int) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn KernelContext_GetGPUComputeStream(context: *const OrtKernelContext, out: *mut *mut ::std::os::raw::c_void) -> OrtStatusPtr {
+unsafe extern "system" fn KernelContext_GetGPUComputeStream(context: *const OrtKernelContext, out: *mut *mut ::core::ffi::c_void) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -1103,9 +1095,9 @@ unsafe extern "system" fn GetTensorMemoryInfo(value: *const OrtValue, mem_info: 
 }
 
 unsafe extern "system" fn GetExecutionProviderApi(
-	provider_name: *const ::std::os::raw::c_char,
+	provider_name: *const ::core::ffi::c_char,
 	version: u32,
-	provider_api: *mut *const ::std::os::raw::c_void
+	provider_api: *mut *const ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -1119,7 +1111,7 @@ unsafe extern "system" fn SessionOptionsSetCustomCreateThreadFn(
 
 unsafe extern "system" fn SessionOptionsSetCustomThreadCreationOptions(
 	options: *mut OrtSessionOptions,
-	ort_custom_thread_creation_options: *mut ::std::os::raw::c_void
+	ort_custom_thread_creation_options: *mut ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -1140,7 +1132,7 @@ unsafe extern "system" fn SetGlobalCustomCreateThreadFn(
 
 unsafe extern "system" fn SetGlobalCustomThreadCreationOptions(
 	tp_options: *mut OrtThreadingOptions,
-	ort_custom_thread_creation_options: *mut ::std::os::raw::c_void
+	ort_custom_thread_creation_options: *mut ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -1170,8 +1162,8 @@ unsafe extern "system" fn CreateCUDAProviderOptions(out: *mut *mut OrtCUDAProvid
 
 unsafe extern "system" fn UpdateCUDAProviderOptions(
 	cuda_options: *mut OrtCUDAProviderOptionsV2,
-	provider_options_keys: *const *const ::std::os::raw::c_char,
-	provider_options_values: *const *const ::std::os::raw::c_char,
+	provider_options_keys: *const *const ::core::ffi::c_char,
+	provider_options_values: *const *const ::core::ffi::c_char,
 	num_keys: usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -1180,7 +1172,7 @@ unsafe extern "system" fn UpdateCUDAProviderOptions(
 unsafe extern "system" fn GetCUDAProviderOptionsAsString(
 	cuda_options: *const OrtCUDAProviderOptionsV2,
 	allocator: *mut OrtAllocator,
-	ptr: *mut *mut ::std::os::raw::c_char
+	ptr: *mut *mut ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -1196,7 +1188,7 @@ unsafe extern "system" fn SessionOptionsAppendExecutionProvider_MIGraphX(
 
 unsafe extern "system" fn AddExternalInitializers(
 	options: *mut OrtSessionOptions,
-	initializer_names: *const *const ::std::os::raw::c_char,
+	initializer_names: *const *const ::core::ffi::c_char,
 	initializers: *const *const OrtValue,
 	initializers_num: usize
 ) -> OrtStatusPtr {
@@ -1204,9 +1196,9 @@ unsafe extern "system" fn AddExternalInitializers(
 }
 
 unsafe extern "system" fn CreateOpAttr(
-	name: *const ::std::os::raw::c_char,
-	data: *const ::std::os::raw::c_void,
-	len: ::std::os::raw::c_int,
+	name: *const ::core::ffi::c_char,
+	data: *const ::core::ffi::c_void,
+	len: ::core::ffi::c_int,
 	type_: OrtOpAttrType,
 	op_attr: *mut *mut OrtOpAttr
 ) -> OrtStatusPtr {
@@ -1217,16 +1209,16 @@ unsafe extern "system" fn ReleaseOpAttr(input: *mut OrtOpAttr) {}
 
 unsafe extern "system" fn CreateOp(
 	info: *const OrtKernelInfo,
-	op_name: *const ::std::os::raw::c_char,
-	domain: *const ::std::os::raw::c_char,
-	version: ::std::os::raw::c_int,
-	type_constraint_names: *mut *const ::std::os::raw::c_char,
+	op_name: *const ::core::ffi::c_char,
+	domain: *const ::core::ffi::c_char,
+	version: ::core::ffi::c_int,
+	type_constraint_names: *mut *const ::core::ffi::c_char,
 	type_constraint_values: *const ONNXTensorElementDataType,
-	type_constraint_count: ::std::os::raw::c_int,
+	type_constraint_count: ::core::ffi::c_int,
 	attr_values: *const *const OrtOpAttr,
-	attr_count: ::std::os::raw::c_int,
-	input_count: ::std::os::raw::c_int,
-	output_count: ::std::os::raw::c_int,
+	attr_count: ::core::ffi::c_int,
+	input_count: ::core::ffi::c_int,
+	output_count: ::core::ffi::c_int,
 	ort_op: *mut *mut OrtOp
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -1236,9 +1228,9 @@ unsafe extern "system" fn InvokeOp(
 	context: *const OrtKernelContext,
 	ort_op: *const OrtOp,
 	input_values: *const *const OrtValue,
-	input_count: ::std::os::raw::c_int,
+	input_count: ::core::ffi::c_int,
 	output_values: *const *mut OrtValue,
-	output_count: ::std::os::raw::c_int
+	output_count: ::core::ffi::c_int
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -1247,9 +1239,9 @@ unsafe extern "system" fn ReleaseOp(input: *mut OrtOp) {}
 
 unsafe extern "system" fn SessionOptionsAppendExecutionProvider(
 	options: *mut OrtSessionOptions,
-	provider_name: *const ::std::os::raw::c_char,
-	provider_options_keys: *const *const ::std::os::raw::c_char,
-	provider_options_values: *const *const ::std::os::raw::c_char,
+	provider_name: *const ::core::ffi::c_char,
+	provider_options_keys: *const *const ::core::ffi::c_char,
+	provider_options_values: *const *const ::core::ffi::c_char,
 	num_keys: usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -1278,8 +1270,8 @@ unsafe extern "system" fn CreateCANNProviderOptions(out: *mut *mut OrtCANNProvid
 
 unsafe extern "system" fn UpdateCANNProviderOptions(
 	cann_options: *mut OrtCANNProviderOptions,
-	provider_options_keys: *const *const ::std::os::raw::c_char,
-	provider_options_values: *const *const ::std::os::raw::c_char,
+	provider_options_keys: *const *const ::core::ffi::c_char,
+	provider_options_values: *const *const ::core::ffi::c_char,
 	num_keys: usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -1288,7 +1280,7 @@ unsafe extern "system" fn UpdateCANNProviderOptions(
 unsafe extern "system" fn GetCANNProviderOptionsAsString(
 	cann_options: *const OrtCANNProviderOptions,
 	allocator: *mut OrtAllocator,
-	ptr: *mut *mut ::std::os::raw::c_char
+	ptr: *mut *mut ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -1303,7 +1295,7 @@ unsafe extern "system" fn UpdateEnvWithCustomLogLevel(ort_env: *mut OrtEnv, log_
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn SetGlobalIntraOpThreadAffinity(tp_options: *mut OrtThreadingOptions, affinity_string: *const ::std::os::raw::c_char) -> OrtStatusPtr {
+unsafe extern "system" fn SetGlobalIntraOpThreadAffinity(tp_options: *mut OrtThreadingOptions, affinity_string: *const ::core::ffi::c_char) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -1311,10 +1303,7 @@ unsafe extern "system" fn RegisterCustomOpsLibrary_V2(options: *mut OrtSessionOp
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn RegisterCustomOpsUsingFunction(
-	options: *mut OrtSessionOptions,
-	registration_func_name: *const ::std::os::raw::c_char
-) -> OrtStatusPtr {
+unsafe extern "system" fn RegisterCustomOpsUsingFunction(options: *mut OrtSessionOptions, registration_func_name: *const ::core::ffi::c_char) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -1326,21 +1315,11 @@ unsafe extern "system" fn KernelInfo_GetOutputCount(info: *const OrtKernelInfo, 
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn KernelInfo_GetInputName(
-	info: *const OrtKernelInfo,
-	index: usize,
-	out: *mut ::std::os::raw::c_char,
-	size: *mut usize
-) -> OrtStatusPtr {
+unsafe extern "system" fn KernelInfo_GetInputName(info: *const OrtKernelInfo, index: usize, out: *mut ::core::ffi::c_char, size: *mut usize) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn KernelInfo_GetOutputName(
-	info: *const OrtKernelInfo,
-	index: usize,
-	out: *mut ::std::os::raw::c_char,
-	size: *mut usize
-) -> OrtStatusPtr {
+unsafe extern "system" fn KernelInfo_GetOutputName(info: *const OrtKernelInfo, index: usize, out: *mut ::core::ffi::c_char, size: *mut usize) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -1354,7 +1333,7 @@ unsafe extern "system" fn KernelInfo_GetOutputTypeInfo(info: *const OrtKernelInf
 
 unsafe extern "system" fn KernelInfoGetAttribute_tensor(
 	info: *const OrtKernelInfo,
-	name: *const ::std::os::raw::c_char,
+	name: *const ::core::ffi::c_char,
 	allocator: *mut OrtAllocator,
 	out: *mut *mut OrtValue
 ) -> OrtStatusPtr {
@@ -1363,16 +1342,16 @@ unsafe extern "system" fn KernelInfoGetAttribute_tensor(
 
 unsafe extern "system" fn HasSessionConfigEntry(
 	options: *const OrtSessionOptions,
-	config_key: *const ::std::os::raw::c_char,
-	out: *mut ::std::os::raw::c_int
+	config_key: *const ::core::ffi::c_char,
+	out: *mut ::core::ffi::c_int
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
 unsafe extern "system" fn GetSessionConfigEntry(
 	options: *const OrtSessionOptions,
-	config_key: *const ::std::os::raw::c_char,
-	config_value: *mut ::std::os::raw::c_char,
+	config_key: *const ::core::ffi::c_char,
+	config_value: *mut ::core::ffi::c_char,
 	size: *mut usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -1391,8 +1370,8 @@ unsafe extern "system" fn CreateDnnlProviderOptions(out: *mut *mut OrtDnnlProvid
 
 unsafe extern "system" fn UpdateDnnlProviderOptions(
 	dnnl_options: *mut OrtDnnlProviderOptions,
-	provider_options_keys: *const *const ::std::os::raw::c_char,
-	provider_options_values: *const *const ::std::os::raw::c_char,
+	provider_options_keys: *const *const ::core::ffi::c_char,
+	provider_options_values: *const *const ::core::ffi::c_char,
 	num_keys: usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -1401,14 +1380,14 @@ unsafe extern "system" fn UpdateDnnlProviderOptions(
 unsafe extern "system" fn GetDnnlProviderOptionsAsString(
 	dnnl_options: *const OrtDnnlProviderOptions,
 	allocator: *mut OrtAllocator,
-	ptr: *mut *mut ::std::os::raw::c_char
+	ptr: *mut *mut ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
 unsafe extern "system" fn ReleaseDnnlProviderOptions(input: *mut OrtDnnlProviderOptions) {}
 
-unsafe extern "system" fn KernelInfo_GetNodeName(info: *const OrtKernelInfo, out: *mut ::std::os::raw::c_char, size: *mut usize) -> OrtStatusPtr {
+unsafe extern "system" fn KernelInfo_GetNodeName(info: *const OrtKernelInfo, out: *mut ::core::ffi::c_char, size: *mut usize) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -1423,10 +1402,10 @@ unsafe extern "system" fn KernelContext_GetLogger(context: *const OrtKernelConte
 unsafe extern "system" fn Logger_LogMessage(
 	logger: *const OrtLogger,
 	log_severity_level: OrtLoggingLevel,
-	message: *const ::std::os::raw::c_char,
+	message: *const ::core::ffi::c_char,
 	file_path: *const ortchar,
-	line_number: ::std::os::raw::c_int,
-	func_name: *const ::std::os::raw::c_char
+	line_number: ::core::ffi::c_int,
+	func_name: *const ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -1438,7 +1417,7 @@ unsafe extern "system" fn Logger_GetLoggingSeverityLevel(logger: *const OrtLogge
 unsafe extern "system" fn KernelInfoGetConstantInput_tensor(
 	info: *const OrtKernelInfo,
 	index: usize,
-	is_constant: *mut ::std::os::raw::c_int,
+	is_constant: *mut ::core::ffi::c_int,
 	out: *mut *const OrtValue
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -1456,7 +1435,7 @@ unsafe extern "system" fn GetResizedStringTensorElementBuffer(
 	value: *mut OrtValue,
 	index: usize,
 	length_in_bytes: usize,
-	buffer: *mut *mut ::std::os::raw::c_char
+	buffer: *mut *mut ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -1469,7 +1448,7 @@ unsafe extern "system" fn KernelContext_GetAllocator(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn GetBuildInfoString() -> *const ::std::os::raw::c_char {
+unsafe extern "system" fn GetBuildInfoString() -> *const ::core::ffi::c_char {
 	c"ORT Build Info: ort-sys stub".as_ptr().cast()
 }
 
@@ -1479,8 +1458,8 @@ unsafe extern "system" fn CreateROCMProviderOptions(out: *mut *mut OrtROCMProvid
 
 unsafe extern "system" fn UpdateROCMProviderOptions(
 	rocm_options: *mut OrtROCMProviderOptions,
-	provider_options_keys: *const *const ::std::os::raw::c_char,
-	provider_options_values: *const *const ::std::os::raw::c_char,
+	provider_options_keys: *const *const ::core::ffi::c_char,
+	provider_options_values: *const *const ::core::ffi::c_char,
 	num_keys: usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -1489,7 +1468,7 @@ unsafe extern "system" fn UpdateROCMProviderOptions(
 unsafe extern "system" fn GetROCMProviderOptionsAsString(
 	rocm_options: *const OrtROCMProviderOptions,
 	allocator: *mut OrtAllocator,
-	ptr: *mut *mut ::std::os::raw::c_char
+	ptr: *mut *mut ::core::ffi::c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -1498,11 +1477,11 @@ unsafe extern "system" fn ReleaseROCMProviderOptions(input: *mut OrtROCMProvider
 
 unsafe extern "system" fn CreateAndRegisterAllocatorV2(
 	env: *mut OrtEnv,
-	provider_type: *const ::std::os::raw::c_char,
+	provider_type: *const ::core::ffi::c_char,
 	mem_info: *const OrtMemoryInfo,
 	arena_cfg: *const OrtArenaCfg,
-	provider_options_keys: *const *const ::std::os::raw::c_char,
-	provider_options_values: *const *const ::std::os::raw::c_char,
+	provider_options_keys: *const *const ::core::ffi::c_char,
+	provider_options_values: *const *const ::core::ffi::c_char,
 	num_keys: usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -1511,55 +1490,55 @@ unsafe extern "system" fn CreateAndRegisterAllocatorV2(
 unsafe extern "system" fn RunAsync(
 	session: *mut OrtSession,
 	run_options: *const OrtRunOptions,
-	input_names: *const *const ::std::os::raw::c_char,
+	input_names: *const *const ::core::ffi::c_char,
 	input: *const *const OrtValue,
 	input_len: usize,
-	output_names: *const *const ::std::os::raw::c_char,
+	output_names: *const *const ::core::ffi::c_char,
 	output_names_len: usize,
 	output: *mut *mut OrtValue,
 	run_async_callback: RunAsyncCallbackFn,
-	user_data: *mut ::std::os::raw::c_void
+	user_data: *mut ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
 unsafe extern "system" fn UpdateTensorRTProviderOptionsWithValue(
 	tensorrt_options: *mut OrtTensorRTProviderOptionsV2,
-	key: *const ::std::os::raw::c_char,
-	value: *mut ::std::os::raw::c_void
+	key: *const ::core::ffi::c_char,
+	value: *mut ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
 unsafe extern "system" fn GetTensorRTProviderOptionsByName(
 	tensorrt_options: *const OrtTensorRTProviderOptionsV2,
-	key: *const ::std::os::raw::c_char,
-	ptr: *mut *mut ::std::os::raw::c_void
+	key: *const ::core::ffi::c_char,
+	ptr: *mut *mut ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
 unsafe extern "system" fn UpdateCUDAProviderOptionsWithValue(
 	cuda_options: *mut OrtCUDAProviderOptionsV2,
-	key: *const ::std::os::raw::c_char,
-	value: *mut ::std::os::raw::c_void
+	key: *const ::core::ffi::c_char,
+	value: *mut ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
 unsafe extern "system" fn GetCUDAProviderOptionsByName(
 	cuda_options: *const OrtCUDAProviderOptionsV2,
-	key: *const ::std::os::raw::c_char,
-	ptr: *mut *mut ::std::os::raw::c_void
+	key: *const ::core::ffi::c_char,
+	ptr: *mut *mut ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
 unsafe extern "system" fn KernelContext_GetResource(
 	context: *const OrtKernelContext,
-	resouce_version: ::std::os::raw::c_int,
-	resource_id: ::std::os::raw::c_int,
-	resource: *mut *mut ::std::os::raw::c_void
+	resouce_version: ::core::ffi::c_int,
+	resource_id: ::core::ffi::c_int,
+	resource: *mut *mut ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -1567,7 +1546,7 @@ unsafe extern "system" fn KernelContext_GetResource(
 unsafe extern "system" fn SetUserLoggingFunction(
 	options: *mut OrtSessionOptions,
 	user_logging_function: OrtLoggingFunction,
-	user_logging_param: *mut ::std::os::raw::c_void
+	user_logging_param: *mut ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -1586,7 +1565,7 @@ unsafe extern "system" fn ShapeInferContext_GetInputTypeShape(
 
 unsafe extern "system" fn ShapeInferContext_GetAttribute(
 	context: *const OrtShapeInferContext,
-	attr_name: *const ::std::os::raw::c_char,
+	attr_name: *const ::core::ffi::c_char,
 	attr: *mut *const OrtOpAttr
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -1602,7 +1581,7 @@ unsafe extern "system" fn ShapeInferContext_SetOutputTypeShape(
 
 unsafe extern "system" fn SetSymbolicDimensions(
 	info: *mut OrtTensorTypeAndShapeInfo,
-	dim_params: *mut *const ::std::os::raw::c_char,
+	dim_params: *mut *const ::core::ffi::c_char,
 	dim_params_length: usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -1611,7 +1590,7 @@ unsafe extern "system" fn SetSymbolicDimensions(
 unsafe extern "system" fn ReadOpAttr(
 	op_attr: *const OrtOpAttr,
 	type_: OrtOpAttrType,
-	data: *mut ::std::os::raw::c_void,
+	data: *mut ::core::ffi::c_void,
 	len: usize,
 	out: *mut usize
 ) -> OrtStatusPtr {
@@ -1624,18 +1603,18 @@ unsafe extern "system" fn SetDeterministicCompute(options: *mut OrtSessionOption
 
 unsafe extern "system" fn KernelContext_ParallelFor(
 	context: *const OrtKernelContext,
-	fn_: unsafe extern "system" fn(arg1: *mut ::std::os::raw::c_void, arg2: usize),
+	fn_: unsafe extern "system" fn(arg1: *mut ::core::ffi::c_void, arg2: usize),
 	total: usize,
 	num_batch: usize,
-	usr_data: *mut ::std::os::raw::c_void
+	usr_data: *mut ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
 unsafe extern "system" fn SessionOptionsAppendExecutionProvider_OpenVINO_V2(
 	options: *mut OrtSessionOptions,
-	provider_options_keys: *const *const ::std::os::raw::c_char,
-	provider_options_values: *const *const ::std::os::raw::c_char,
+	provider_options_keys: *const *const ::core::ffi::c_char,
+	provider_options_values: *const *const ::core::ffi::c_char,
 	num_keys: usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -1643,8 +1622,8 @@ unsafe extern "system" fn SessionOptionsAppendExecutionProvider_OpenVINO_V2(
 
 unsafe extern "system" fn SessionOptionsAppendExecutionProvider_VitisAI(
 	options: *mut OrtSessionOptions,
-	provider_options_keys: *const *const ::std::os::raw::c_char,
-	provider_options_values: *const *const ::std::os::raw::c_char,
+	provider_options_keys: *const *const ::core::ffi::c_char,
+	provider_options_values: *const *const ::core::ffi::c_char,
 	num_keys: usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -1654,7 +1633,7 @@ unsafe extern "system" fn KernelContext_GetScratchBuffer(
 	context: *const OrtKernelContext,
 	mem_info: *const OrtMemoryInfo,
 	count_or_bytes: usize,
-	out: *mut *mut ::std::os::raw::c_void
+	out: *mut *mut ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -1666,7 +1645,7 @@ unsafe extern "system" fn KernelInfoGetAllocator(info: *const OrtKernelInfo, mem
 unsafe extern "system" fn AddExternalInitializersFromMemory(
 	options: *mut OrtSessionOptions,
 	external_initializer_file_names: *const *const ortchar,
-	external_initializer_file_buffer_array: *const *mut ::std::os::raw::c_char,
+	external_initializer_file_buffer_array: *const *mut ::core::ffi::c_char,
 	external_initializer_file_lengths: *const usize,
 	num_external_initializer_files: usize
 ) -> OrtStatusPtr {
@@ -1678,7 +1657,7 @@ unsafe extern "system" fn CreateLoraAdapter(adapter_file_path: *const ortchar, a
 }
 
 unsafe extern "system" fn CreateLoraAdapterFromArray(
-	bytes: *const ::std::os::raw::c_void,
+	bytes: *const ::core::ffi::c_void,
 	num_bytes: usize,
 	allocator: *mut OrtAllocator,
 	out: *mut *mut OrtLoraAdapter
@@ -1694,8 +1673,8 @@ unsafe extern "system" fn RunOptionsAddActiveLoraAdapter(options: *mut OrtRunOpt
 
 unsafe extern "system" fn SetEpDynamicOptions(
 	sess: *mut OrtSession,
-	keys: *const *const ::std::os::raw::c_char,
-	values: *const *const ::std::os::raw::c_char,
+	keys: *const *const ::core::ffi::c_char,
+	values: *const *const ::core::ffi::c_char,
 	kv_len: usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -1709,7 +1688,7 @@ unsafe extern "system" fn ReleaseGraph(input: *mut OrtGraph) {}
 
 unsafe extern "system" fn ReleaseModel(input: *mut OrtModel) {}
 
-unsafe extern "system" fn GetValueInfoName(value_info: *const OrtValueInfo, name: *mut *const ::std::os::raw::c_char) -> OrtStatusPtr {
+unsafe extern "system" fn GetValueInfoName(value_info: *const OrtValueInfo, name: *mut *const ::core::ffi::c_char) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -1723,7 +1702,7 @@ unsafe extern "system" fn GetModelEditorApi() -> *const OrtModelEditorApi {
 
 unsafe extern "system" fn CreateTensorWithDataAndDeleterAsOrtValue(
 	deleter: *mut OrtAllocator,
-	p_data: *mut ::std::os::raw::c_void,
+	p_data: *mut ::core::ffi::c_void,
 	p_data_len: usize,
 	shape: *const i64,
 	shape_len: usize,
@@ -1745,33 +1724,33 @@ unsafe extern "system" fn CreateKeyValuePairs(out: *mut *mut OrtKeyValuePairs) {
 	unsafe { *out = ptr::null_mut() };
 }
 
-unsafe extern "system" fn AddKeyValuePair(kvps: *mut OrtKeyValuePairs, key: *const ::std::os::raw::c_char, value: *const ::std::os::raw::c_char) {}
+unsafe extern "system" fn AddKeyValuePair(kvps: *mut OrtKeyValuePairs, key: *const ::core::ffi::c_char, value: *const ::core::ffi::c_char) {}
 
-unsafe extern "system" fn GetKeyValue(kvps: *const OrtKeyValuePairs, key: *const ::std::os::raw::c_char) -> *const ::std::os::raw::c_char {
+unsafe extern "system" fn GetKeyValue(kvps: *const OrtKeyValuePairs, key: *const ::core::ffi::c_char) -> *const ::core::ffi::c_char {
 	ptr::null()
 }
 
 unsafe extern "system" fn GetKeyValuePairs(
 	kvps: *const OrtKeyValuePairs,
-	keys: *mut *const *const ::std::os::raw::c_char,
-	values: *mut *const *const ::std::os::raw::c_char,
+	keys: *mut *const *const ::core::ffi::c_char,
+	values: *mut *const *const ::core::ffi::c_char,
 	num_entries: *mut usize
 ) {
 }
 
-unsafe extern "system" fn RemoveKeyValuePair(kvps: *mut OrtKeyValuePairs, key: *const ::std::os::raw::c_char) {}
+unsafe extern "system" fn RemoveKeyValuePair(kvps: *mut OrtKeyValuePairs, key: *const ::core::ffi::c_char) {}
 
 unsafe extern "system" fn ReleaseKeyValuePairs(input: *mut OrtKeyValuePairs) {}
 
 unsafe extern "system" fn RegisterExecutionProviderLibrary(
 	env: *mut OrtEnv,
-	registration_name: *const ::std::os::raw::c_char,
+	registration_name: *const ::core::ffi::c_char,
 	path: *const ortchar
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn UnregisterExecutionProviderLibrary(env: *mut OrtEnv, registration_name: *const ::std::os::raw::c_char) -> OrtStatusPtr {
+unsafe extern "system" fn UnregisterExecutionProviderLibrary(env: *mut OrtEnv, registration_name: *const ::core::ffi::c_char) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -1784,8 +1763,8 @@ unsafe extern "system" fn SessionOptionsAppendExecutionProvider_V2(
 	env: *mut OrtEnv,
 	ep_devices: *const *const OrtEpDevice,
 	num_ep_devices: usize,
-	ep_option_keys: *const *const ::std::os::raw::c_char,
-	ep_option_vals: *const *const ::std::os::raw::c_char,
+	ep_option_keys: *const *const ::core::ffi::c_char,
+	ep_option_vals: *const *const ::core::ffi::c_char,
 	num_ep_options: usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -1801,7 +1780,7 @@ unsafe extern "system" fn SessionOptionsSetEpSelectionPolicy(
 unsafe extern "system" fn SessionOptionsSetEpSelectionPolicyDelegate(
 	session_options: *mut OrtSessionOptions,
 	delegate: EpSelectionDelegate,
-	delegate_state: *mut ::std::os::raw::c_void
+	delegate_state: *mut ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
@@ -1814,7 +1793,7 @@ unsafe extern "system" fn HardwareDevice_VendorId(device: *const OrtHardwareDevi
 	0
 }
 
-unsafe extern "system" fn HardwareDevice_Vendor(device: *const OrtHardwareDevice) -> *const ::std::os::raw::c_char {
+unsafe extern "system" fn HardwareDevice_Vendor(device: *const OrtHardwareDevice) -> *const ::core::ffi::c_char {
 	ptr::null()
 }
 
@@ -1826,11 +1805,11 @@ unsafe extern "system" fn HardwareDevice_Metadata(device: *const OrtHardwareDevi
 	ptr::null()
 }
 
-unsafe extern "system" fn EpDevice_EpName(ep_device: *const OrtEpDevice) -> *const ::std::os::raw::c_char {
+unsafe extern "system" fn EpDevice_EpName(ep_device: *const OrtEpDevice) -> *const ::core::ffi::c_char {
 	ptr::null()
 }
 
-unsafe extern "system" fn EpDevice_EpVendor(ep_device: *const OrtEpDevice) -> *const ::std::os::raw::c_char {
+unsafe extern "system" fn EpDevice_EpVendor(ep_device: *const OrtEpDevice) -> *const ::core::ffi::c_char {
 	ptr::null()
 }
 

@@ -4,6 +4,7 @@
 #![allow(clippy::type_complexity)]
 #![cfg_attr(all(not(test), not(feature = "std")), no_std)]
 
+extern crate alloc;
 extern crate core;
 
 #[doc(hidden)]

@@ -10,7 +10,7 @@ none	aarch64-pc-windows-msvc	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.0/aarch64
 train	x86_64-apple-darwin	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.0/x86_64-apple-darwin+train.tgz	76BA116987AFA98BB9689970C2BE1DC863826769BE7F5977A7290C1BD89CA2FF
 train	aarch64-unknown-linux-gnu	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.0/aarch64-unknown-linux-gnu+train.tgz	EFC624FE76E86BA851B5A3CAE6FB5BBC02FE5564A78954DDC46BEBC30A6CEAB2
 none	aarch64-apple-darwin	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.0/aarch64-apple-darwin.tgz	00FBFD6F08BAC2A4E28C66723AF900D58D1B4B1C73EFBA6290637CD3019883D5
-none	wasm32-unknown-emscripten	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.0/wasm32-unknown-emscripten.tgz	3507498F71825550AE782033C4B84E8E1854B84C87EC01BBA1847048D5D0A1CB
+none	wasm32-unknown-emscripten	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.0+068d902/wasm32-unknown-emscripten.tgz	78FC5BCADEAB0E281D9A945557E66C613D7385FC51945B5B8AEB434C84AC9BBD
 train	aarch64-apple-darwin	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.0/aarch64-apple-darwin+train.tgz	9D4D04609EDC1537260C28AB0748FF3E8ECAA29ECEAF3D085F290618A312A6AE
 wgpu	x86_64-unknown-linux-gnu	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.0/x86_64-unknown-linux-gnu+wgpu.tgz	D766B62A8419124D242BB02A0AB1D2407B86C39011FEC6214D83D5AC304D5593
 train	x86_64-unknown-linux-gnu	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.0/x86_64-unknown-linux-gnu+train.tgz	081B3D09E73F5B07CBCE33EEB231F11A74FF198722673CC517BF2C0D624EA280

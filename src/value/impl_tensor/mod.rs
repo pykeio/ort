@@ -374,6 +374,20 @@ mod tests {
 	}
 
 	#[test]
+	fn test_empty_tensor() -> crate::Result<()> {
+		let value = Tensor::<f32>::new(&Allocator::default(), Shape::empty(0))?;
+		let _ = value.try_extract_tensor::<f32>()?;
+
+		let value = Tensor::<f32>::new(&Allocator::default(), Shape::empty(4))?;
+		let _ = value.try_extract_tensor::<f32>()?;
+
+		let value = Tensor::<f32>::new(&Allocator::default(), Shape::new([1, 0, 512]))?;
+		let _ = value.try_extract_tensor::<f32>()?;
+
+		Ok(())
+	}
+
+	#[test]
 	#[cfg(feature = "ndarray")]
 	fn test_tensor_lifetimes() -> crate::Result<()> {
 		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];

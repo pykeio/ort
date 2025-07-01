@@ -53,7 +53,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_array<T: PrimitiveTensorElementType>(&self) -> Result<ndarray::ArrayViewD<'_, T>> {
 		extract_tensor(self, T::into_tensor_element_type())
-			.and_then(|(ptr, shape)| Ok(unsafe { ndarray::ArrayView::from_shape_ptr(shape.to_ixdyn(), data_ptr(ptr)?.cast::<T>()) }))
+			.and_then(|(ptr, shape)| Ok(unsafe { ndarray::ArrayView::from_shape_ptr(shape.to_ixdyn(), data_ptr(ptr)?) }))
 	}
 
 	/// Attempt to extract the scalar from a tensor of type `T`.
@@ -87,7 +87,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 				));
 			}
 
-			Ok(unsafe { *data_ptr(ptr)?.cast::<T>() })
+			Ok(unsafe { *data_ptr(ptr)? })
 		})
 	}
 
@@ -122,7 +122,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_array_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<ndarray::ArrayViewMutD<'_, T>> {
 		extract_tensor(self, T::into_tensor_element_type())
-			.and_then(|(ptr, shape)| Ok(unsafe { ndarray::ArrayViewMut::from_shape_ptr(shape.to_ixdyn(), data_ptr(ptr)?.cast::<T>()) }))
+			.and_then(|(ptr, shape)| Ok(unsafe { ndarray::ArrayViewMut::from_shape_ptr(shape.to_ixdyn(), data_ptr(ptr)?) }))
 	}
 
 	/// Attempt to extract the underlying data into a view tuple, consisting of the tensor's [`Shape`] and an
@@ -155,7 +155,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_tensor<T: PrimitiveTensorElementType>(&self) -> Result<(&Shape, &[T])> {
 		extract_tensor(self, T::into_tensor_element_type())
-			.and_then(|(ptr, shape)| Ok((shape, unsafe { slice::from_raw_parts(data_ptr(ptr)?.cast::<T>(), shape.num_elements()) })))
+			.and_then(|(ptr, shape)| Ok((shape, unsafe { slice::from_raw_parts(data_ptr(ptr)?, shape.num_elements()) })))
 	}
 
 	/// Attempt to extract the underlying data into a view tuple, consisting of the tensor's shape and a
@@ -185,7 +185,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_tensor_mut<T: PrimitiveTensorElementType>(&mut self) -> Result<(&Shape, &mut [T])> {
 		extract_tensor(self, T::into_tensor_element_type())
-			.and_then(|(ptr, shape)| Ok((shape, unsafe { slice::from_raw_parts_mut(data_ptr(ptr)?.cast::<T>(), shape.num_elements()) })))
+			.and_then(|(ptr, shape)| Ok((shape, unsafe { slice::from_raw_parts_mut(data_ptr(ptr)?, shape.num_elements()) })))
 	}
 
 	/// Attempt to extract the underlying data into a Rust `ndarray`.
@@ -281,9 +281,16 @@ fn extract_tensor<Type: TensorValueTypeMarker + ?Sized>(value: &Value<Type>, exp
 	}
 }
 
-unsafe fn data_ptr(ptr: *mut ort_sys::OrtValue) -> Result<*mut c_void> {
+unsafe fn data_ptr<T>(ptr: *mut ort_sys::OrtValue) -> Result<*mut T> {
 	let mut output_array_ptr: *mut c_void = ptr::null_mut();
 	ortsys![unsafe GetTensorMutableData(ptr, &mut output_array_ptr)?];
+
+	// Cast the pointer to the expected data type now.
+	// We do this here because the very next step is to replace the pointer with a dangling one in the case of zero-sized
+	// tensors. If we do this to a `c_void` pointer, the dangling pointer will be aligned to 1 byte, meaning casting to T
+	// afterwards is UB if T has alignment >= 2.
+	let mut output_array_ptr = output_array_ptr.cast::<T>();
+
 	// Zero-sized tensors can have a null data pointer. An empty slice with a null data pointer is invalid, but it is valid
 	// to have an empty slice with a *dangling* pointer. Note that this function is only called when the data resides on
 	// the CPU, so this won't change semantics for non-CPU data.

@@ -35,6 +35,7 @@
 - **[`FastEmbed-rs`](https://github.com/Anush008/fastembed-rs)** uses `ort` for generating vector embeddings, reranking locally.
 - **[Aftershoot](https://aftershoot.com/)** uses `ort` to power AI-assisted image editing workflows. 
 - **[Valentinus](https://github.com/kn0sys/valentinus)** uses `ort` to provide embedding model inference inside LMDB.
+- **[retto](https://github.com/NekoImageLand/retto)** uses `ort` for reliable, fast ONNX inference of PaddleOCR models on Desktop and WASM platforms.
 
 ## 🌠 Sponsor `ort`
 <a href="https://opencollective.com/pyke-osai">

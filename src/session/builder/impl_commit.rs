@@ -6,6 +6,7 @@ use core::{
 	ffi::c_void,
 	marker::PhantomData,
 	mem::replace,
+	ops::Deref,
 	ptr::{self, NonNull}
 };
 #[cfg(feature = "std")]
@@ -25,19 +26,26 @@ use crate::{
 	execution_providers::apply_execution_providers,
 	memory::Allocator,
 	ortsys,
-	session::{InMemorySession, Input, Output, Session, SharedSessionInner, dangerous}
+	session::{InMemorySession, Input, Output, Session, SharedSessionInner, dangerous},
+	util::OsCharArray
 };
 
 impl SessionBuilder {
 	/// Downloads a pre-trained ONNX model from the given URL and builds the session.
-	#[cfg(all(feature = "fetch-models", feature = "std"))]
+	#[cfg(target_arch = "wasm32")]
+	pub fn commit_from_url(self, model_url: impl AsRef<str>) -> Result<Session> {
+		self.commit_from_file_inner(unsafe { core::mem::transmute::<&[u8], &[core::ffi::c_char]>(model_url.as_ref().as_bytes()) })
+	}
+
+	/// Downloads a pre-trained ONNX model from the given URL and builds the session.
+	#[cfg(all(feature = "fetch-models", feature = "std", not(target_arch = "wasm32")))]
 	#[cfg_attr(docsrs, doc(cfg(all(feature = "fetch-models", feature = "std"))))]
 	pub fn commit_from_url(self, model_url: impl AsRef<str>) -> Result<Session> {
 		let downloaded_path = SessionBuilder::download(model_url.as_ref())?;
 		self.commit_from_file(downloaded_path)
 	}
 
-	#[cfg(all(feature = "fetch-models", feature = "std"))]
+	#[cfg(all(feature = "fetch-models", feature = "std", not(target_arch = "wasm32")))]
 	fn download(url: &str) -> Result<PathBuf> {
 		let mut download_dir = ort_sys::internal::dirs::cache_dir()
 			.expect("could not determine cache directory")
@@ -97,21 +105,21 @@ impl SessionBuilder {
 	/// Loads an ONNX model from a file and builds the session.
 	#[cfg(feature = "std")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-	pub fn commit_from_file<P>(self, model_filepath: P) -> Result<Session>
+	pub fn commit_from_file<P>(self, model_path: P) -> Result<Session>
 	where
 		P: AsRef<Path>
 	{
-		self.commit_from_file_inner(model_filepath.as_ref())
-	}
-
-	#[cfg(feature = "std")]
-	fn commit_from_file_inner(mut self, model_filepath: &Path) -> Result<Session> {
-		if !model_filepath.exists() {
-			return Err(Error::new_with_code(ErrorCode::NoSuchFile, format!("File at `{}` does not exist", model_filepath.display())));
+		let model_path = model_path.as_ref();
+		if !model_path.exists() {
+			return Err(Error::new_with_code(ErrorCode::NoSuchFile, format!("File at `{}` does not exist", model_path.display())));
 		}
 
-		let model_path = crate::util::path_to_os_char(model_filepath);
+		let model_path = crate::util::path_to_os_char(model_path);
+		self.commit_from_file_inner(model_path.as_ref())
+	}
 
+	#[cfg(any(feature = "std", target_arch = "wasm32"))]
+	fn commit_from_file_inner(mut self, model_path: &<OsCharArray as Deref>::Target) -> Result<Session> {
 		let env = get_environment()?;
 		if !self.no_env_eps {
 			apply_execution_providers(&mut self, &env.execution_providers, "environment")?;

@@ -34,18 +34,14 @@ const STACK_CSTR_ARRAY_MAX_TOTAL: usize = 768;
 const STACK_CSTR_ARRAY_MAX_ELEMENTS: usize = 12;
 
 #[cfg(target_family = "windows")]
-type OsCharArray = Vec<u16>;
+pub(crate) type OsCharArray = Vec<u16>;
 #[cfg(not(target_family = "windows"))]
-type OsCharArray = Vec<core::ffi::c_char>;
+pub(crate) type OsCharArray = Vec<core::ffi::c_char>;
 
 #[cfg(feature = "std")]
 pub(crate) fn path_to_os_char(path: impl AsRef<std::path::Path>) -> OsCharArray {
 	#[cfg(not(target_family = "windows"))]
 	use core::ffi::c_char;
-	#[cfg(unix)]
-	use std::os::unix::ffi::OsStrExt as _;
-	#[cfg(target_os = "wasi")]
-	use std::os::wasi::ffi::OsStrExt as _;
 	#[cfg(target_family = "windows")]
 	use std::os::windows::ffi::OsStrExt as _;
 
@@ -53,7 +49,12 @@ pub(crate) fn path_to_os_char(path: impl AsRef<std::path::Path>) -> OsCharArray 
 	#[cfg(target_family = "windows")]
 	let path: Vec<u16> = path.encode_wide().chain(std::iter::once(0)).collect();
 	#[cfg(not(target_family = "windows"))]
-	let path: Vec<c_char> = path.as_bytes().iter().chain(std::iter::once(&b'\0')).map(|b| *b as c_char).collect();
+	let path: Vec<c_char> = path
+		.as_encoded_bytes()
+		.iter()
+		.chain(std::iter::once(&b'\0'))
+		.map(|b| *b as c_char)
+		.collect();
 	path
 }
 

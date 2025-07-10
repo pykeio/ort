@@ -65,6 +65,12 @@ pub mod azure;
 pub use self::azure::AzureExecutionProvider;
 pub mod nv;
 pub use self::nv::NVExecutionProvider;
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;
+#[cfg(target_arch = "wasm32")]
+pub mod webnn;
+#[cfg(target_arch = "wasm32")]
+pub use self::{wasm::WASMExecutionProvider, webnn::WebNNExecutionProvider};
 
 /// ONNX Runtime works with different hardware acceleration libraries through its extensible **Execution Providers**
 /// (EP) framework to optimally execute the ONNX models on the hardware platform. This interface enables flexibility for

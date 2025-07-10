@@ -166,7 +166,7 @@ impl ExecutionProvider for WebGPUExecutionProvider {
 
 	#[allow(unused, unreachable_code)]
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
-		#[cfg(any(feature = "load-dynamic", feature = "webgpu"))]
+		#[cfg(any(target_arch = "wasm32", feature = "load-dynamic", feature = "webgpu"))]
 		{
 			use crate::{AsPointer, ortsys};
 

@@ -17,8 +17,10 @@ use std::path::PathBuf;
 use smallvec::SmallVec;
 
 use super::{EditableSession, SessionBuilder};
-#[cfg(feature = "std")]
+#[cfg(any(target_arch = "wasm32", feature = "std"))]
 use crate::error::{Error, ErrorCode};
+#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+use crate::util::OsCharArray;
 use crate::{
 	AsPointer,
 	environment::get_environment,
@@ -26,17 +28,10 @@ use crate::{
 	execution_providers::apply_execution_providers,
 	memory::Allocator,
 	ortsys,
-	session::{InMemorySession, Input, Output, Session, SharedSessionInner, dangerous},
-	util::OsCharArray
+	session::{InMemorySession, Input, Output, Session, SharedSessionInner, dangerous}
 };
 
 impl SessionBuilder {
-	/// Downloads a pre-trained ONNX model from the given URL and builds the session.
-	#[cfg(target_arch = "wasm32")]
-	pub fn commit_from_url(self, model_url: impl AsRef<str>) -> Result<Session> {
-		self.commit_from_file_inner(unsafe { core::mem::transmute::<&[u8], &[core::ffi::c_char]>(model_url.as_ref().as_bytes()) })
-	}
-
 	/// Downloads a pre-trained ONNX model from the given URL and builds the session.
 	#[cfg(all(feature = "fetch-models", feature = "std", not(target_arch = "wasm32")))]
 	#[cfg_attr(docsrs, doc(cfg(all(feature = "fetch-models", feature = "std"))))]
@@ -103,7 +98,7 @@ impl SessionBuilder {
 	}
 
 	/// Loads an ONNX model from a file and builds the session.
-	#[cfg(feature = "std")]
+	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn commit_from_file<P>(self, model_path: P) -> Result<Session>
 	where
@@ -118,7 +113,7 @@ impl SessionBuilder {
 		self.commit_from_file_inner(model_path.as_ref())
 	}
 
-	#[cfg(any(feature = "std", target_arch = "wasm32"))]
+	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 	fn commit_from_file_inner(mut self, model_path: &<OsCharArray as Deref>::Target) -> Result<Session> {
 		let env = get_environment()?;
 		if !self.no_env_eps {
@@ -148,6 +143,7 @@ impl SessionBuilder {
 	///
 	/// If you wish to store the model bytes and the [`InMemorySession`] in the same struct, look for crates that
 	/// facilitate creating self-referential structs, such as [`ouroboros`](https://github.com/joshua-maros/ouroboros).
+	#[cfg(not(target_arch = "wasm32"))]
 	pub fn commit_from_memory_directly(mut self, model_bytes: &[u8]) -> Result<InMemorySession<'_>> {
 		// Enable zero-copy deserialization for models in `.ort` format.
 		self.add_config_entry("session.use_ort_model_bytes_directly", "1")?;
@@ -158,6 +154,7 @@ impl SessionBuilder {
 	}
 
 	/// Load an ONNX graph from memory and commit the session.
+	#[cfg(not(target_arch = "wasm32"))]
 	pub fn commit_from_memory(mut self, model_bytes: &[u8]) -> Result<Session> {
 		let env = get_environment()?;
 		if !self.no_env_eps {
@@ -184,6 +181,44 @@ impl SessionBuilder {
 				nonNull(session_ptr)
 			];
 			session_ptr
+		};
+
+		self.commit_finalize(session_ptr)
+	}
+
+	/// Downloads a pre-trained ONNX model from the given URL and builds the session.
+	#[cfg(target_arch = "wasm32")]
+	pub async fn commit_from_url(mut self, model_url: impl AsRef<str>) -> Result<Session> {
+		let env = get_environment()?;
+		if !self.no_env_eps {
+			apply_execution_providers(&mut self, &env.execution_providers, "environment")?;
+		}
+
+		let mut session_ptr = ptr::null_mut();
+		let status = ortsys![unsafe CreateSession(env.ptr(), model_url.as_ref(), self.ptr(), &mut session_ptr)].await;
+		unsafe { crate::error::status_to_result(status) }?;
+
+		let Some(session_ptr) = NonNull::new(session_ptr) else {
+			return Err(Error::new(alloc::format!("Session creation failed with unknown error")));
+		};
+
+		self.commit_finalize(session_ptr)
+	}
+
+	/// Load an ONNX graph from memory and commit the session.
+	#[cfg(target_arch = "wasm32")]
+	pub async fn commit_from_memory(mut self, model_bytes: &[u8]) -> Result<Session> {
+		let env = get_environment()?;
+		if !self.no_env_eps {
+			apply_execution_providers(&mut self, &env.execution_providers, "environment")?;
+		}
+
+		let mut session_ptr = ptr::null_mut();
+		let status = ortsys![unsafe CreateSessionFromArray(env.ptr(), model_bytes.as_ref(), self.ptr(), &mut session_ptr)].await;
+		unsafe { crate::error::status_to_result(status) }?;
+
+		let Some(session_ptr) = NonNull::new(session_ptr) else {
+			return Err(Error::new(alloc::format!("Session creation failed with unknown error")));
 		};
 
 		self.commit_finalize(session_ptr)

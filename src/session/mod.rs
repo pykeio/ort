@@ -36,15 +36,15 @@ use crate::{
 	value::{DynValue, Value, ValueType}
 };
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 mod r#async;
 pub mod builder;
 pub mod input;
 pub mod output;
 pub mod run_options;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 pub use self::r#async::InferenceFut;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 use self::r#async::{AsyncInferenceContext, InferenceFutInner};
 use self::{builder::SessionBuilder, run_options::UntypedRunOptions};
 pub use self::{
@@ -206,6 +206,7 @@ impl Session {
 	/// # 	Ok(())
 	/// # }
 	/// ```
+	#[cfg(not(target_arch = "wasm32"))]
 	pub fn run<'s, 'i, 'v: 'i, const N: usize>(&'s mut self, input_values: impl Into<SessionInputs<'i, 'v, N>>) -> Result<SessionOutputs<'s>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
@@ -246,6 +247,7 @@ impl Session {
 	/// # 	Ok(())
 	/// # }
 	/// ```
+	#[cfg(not(target_arch = "wasm32"))]
 	pub fn run_with_options<'r, 's: 'r, 'i, 'v: 'i, O: SelectedOutputMarker, const N: usize>(
 		&'s mut self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>>,
@@ -264,6 +266,7 @@ impl Session {
 		}
 	}
 
+	#[cfg(not(target_arch = "wasm32"))]
 	fn run_inner<'i, 'r, 's: 'r, 'v: 'i>(
 		&'s self,
 		input_names: SmallVec<&str, { STACK_SESSION_INPUTS }>,
@@ -331,10 +334,12 @@ impl Session {
 		Ok(SessionOutputs::new(output_names, outputs))
 	}
 
+	#[cfg(not(target_arch = "wasm32"))]
 	pub fn run_binding<'b, 's: 'b>(&'s mut self, binding: &'b IoBinding) -> Result<SessionOutputs<'b>> {
 		self.run_binding_inner(binding, None)
 	}
 
+	#[cfg(not(target_arch = "wasm32"))]
 	pub fn run_binding_with_options<'r, 'b, 's: 'b>(
 		&'s mut self,
 		binding: &'b IoBinding,
@@ -343,6 +348,7 @@ impl Session {
 		self.run_binding_inner(binding, Some(run_options))
 	}
 
+	#[cfg(not(target_arch = "wasm32"))]
 	fn run_binding_inner<'r, 'b, 's: 'b>(
 		&'s self,
 		binding: &'b IoBinding,
@@ -397,7 +403,7 @@ impl Session {
 	/// # 	Ok(())
 	/// # }) }
 	/// ```
-	#[cfg(feature = "std")]
+	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn run_async<'r, 's: 'r, 'i, 'v: 'i + 's, O: SelectedOutputMarker, const N: usize>(
 		&'s mut self,
@@ -417,7 +423,7 @@ impl Session {
 		}
 	}
 
-	#[cfg(feature = "std")]
+	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 	fn run_inner_async<'i, 'r, 's: 'r, 'v: 'i + 's>(
 		&'s self,
 		input_names: SmallVec<&str, { STACK_SESSION_INPUTS }>,
@@ -487,6 +493,99 @@ impl Session {
 		];
 
 		Ok(InferenceFut::new(async_inner, run_options))
+	}
+
+	/// Run input data through the ONNX graph, performing inference.
+	///
+	/// See [`crate::inputs!`] for a convenient macro which will help you create your session inputs from `ndarray`s or
+	/// other data. You can also provide a `Vec`, array, or `HashMap` of [`Value`]s if you create your inputs
+	/// dynamically.
+	///
+	/// ```
+	/// # use std::sync::Arc;
+	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef}, tensor::TensorElementType};
+	/// # fn main() -> ort::Result<()> { tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+	/// let mut session = Session::builder()?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
+	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
+	/// let options = RunOptions::new()?;
+	/// let outputs = session.run_async(ort::inputs![TensorRef::from_array_view(&input)?], &options)?.await?;
+	/// # 	Ok(())
+	/// # }) }
+	/// ```
+	#[cfg(target_arch = "wasm32")]
+	pub async fn run_async<'r, 's: 'r, 'i, 'v: 'i + 's, O: SelectedOutputMarker, const N: usize>(
+		&'s mut self,
+		input_values: impl Into<SessionInputs<'i, 'v, N>>,
+		run_options: &'r RunOptions<O>
+	) -> Result<SessionOutputs<'r>> {
+		match input_values.into() {
+			SessionInputs::ValueSlice(input_values) => {
+				self.run_inner_async(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), &run_options.inner)
+					.await
+			}
+			SessionInputs::ValueArray(input_values) => {
+				self.run_inner_async(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), &run_options.inner)
+					.await
+			}
+			SessionInputs::ValueMap(input_values) => {
+				self.run_inner_async(input_values.iter().map(|(k, _)| k.as_ref()).collect(), input_values.iter().map(|(_, v)| v).collect(), &run_options.inner)
+					.await
+			}
+		}
+	}
+
+	#[cfg(target_arch = "wasm32")]
+	async fn run_inner_async<'i, 'r, 's: 'r, 'v: 'i + 's>(
+		&'s self,
+		input_names: SmallVec<&str, { STACK_SESSION_INPUTS }>,
+		input_values: SmallVec<&SessionInputValue<'v>, { STACK_SESSION_INPUTS }>,
+		run_options: &'r UntypedRunOptions
+	) -> Result<SessionOutputs<'r>> {
+		if input_values.len() > input_names.len() {
+			return Err(Error::new_with_code(
+				ErrorCode::InvalidArgument,
+				format!("{} inputs were provided, but the model only accepts {}.", input_values.len(), input_names.len())
+			));
+		}
+
+		let (output_names, mut output_tensors) = run_options.outputs.resolve_outputs(&self.outputs);
+		let mut output_value_ptrs: SmallVec<*mut ort_sys::OrtValue, { STACK_SESSION_OUTPUTS }> = output_tensors
+			.iter_mut()
+			.map(|c| match c {
+				Some(v) => v.ptr_mut(),
+				None => ptr::null_mut()
+			})
+			.collect();
+		let input_value_ptrs: SmallVec<*const ort_sys::OrtValue, { STACK_SESSION_INPUTS }> = input_values.iter().map(|c| c.ptr()).collect();
+
+		let status = ortsys![
+			unsafe RunAsync(
+				self.inner.session_ptr.as_ptr(),
+				run_options.ptr.as_ptr(),
+				&input_names,
+				&input_value_ptrs,
+				&output_names,
+				&mut output_value_ptrs
+			)
+		]
+		.await;
+		unsafe { crate::error::status_to_result(status) }?;
+
+		let outputs = output_tensors
+			.into_iter()
+			.enumerate()
+			.map(|(i, v)| match v {
+				Some(value) => value,
+				None => unsafe {
+					Value::from_ptr(
+						NonNull::new(output_value_ptrs[i]).expect("OrtValue ptr returned from session Run should not be null"),
+						Some(Arc::clone(&self.inner))
+					)
+				}
+			})
+			.collect();
+
+		Ok(SessionOutputs::new(output_names, outputs))
 	}
 
 	/// Gets the session model metadata. See [`ModelMetadata`] for more info.

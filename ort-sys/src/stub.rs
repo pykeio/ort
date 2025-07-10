@@ -81,6 +81,7 @@ unsafe extern "system" fn DisableTelemetryEvents(env: *const OrtEnv) -> OrtStatu
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 unsafe extern "system" fn CreateSession(
 	env: *const OrtEnv,
 	model_path: *const ortchar,
@@ -90,6 +91,17 @@ unsafe extern "system" fn CreateSession(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(target_arch = "wasm32")]
+unsafe fn CreateSession(
+	env: *const OrtEnv,
+	model_path: &str,
+	options: *const OrtSessionOptions,
+	out: *mut *mut OrtSession
+) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = OrtStatusPtr>>> {
+	Box::pin(async { Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented") })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 unsafe extern "system" fn CreateSessionFromArray(
 	env: *const OrtEnv,
 	model_data: *const ::core::ffi::c_void,
@@ -98,6 +110,16 @@ unsafe extern "system" fn CreateSessionFromArray(
 	out: *mut *mut OrtSession
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+#[cfg(target_arch = "wasm32")]
+unsafe fn CreateSessionFromArray(
+	env: *const OrtEnv,
+	model_data: &[u8],
+	options: *const OrtSessionOptions,
+	out: *mut *mut OrtSession
+) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = OrtStatusPtr>>> {
+	Box::pin(async { Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented") })
 }
 
 unsafe extern "system" fn Run(
@@ -1487,6 +1509,7 @@ unsafe extern "system" fn CreateAndRegisterAllocatorV2(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 unsafe extern "system" fn RunAsync(
 	session: *mut OrtSession,
 	run_options: *const OrtRunOptions,
@@ -1500,6 +1523,18 @@ unsafe extern "system" fn RunAsync(
 	user_data: *mut ::core::ffi::c_void
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+#[cfg(target_arch = "wasm32")]
+unsafe fn RunAsync(
+	session: *mut OrtSession,
+	run_options: *const OrtRunOptions,
+	input_names: &[&str],
+	inputs: &[*const OrtValue],
+	output_names: &[&str],
+	outputs: &mut [*mut OrtValue]
+) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = OrtStatusPtr>>> {
+	Box::pin(async { Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented") })
 }
 
 unsafe extern "system" fn UpdateTensorRTProviderOptionsWithValue(

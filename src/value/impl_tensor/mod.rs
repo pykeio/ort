@@ -1,3 +1,4 @@
+#[cfg(not(target_arch = "wasm32"))] // `ort-web` does not support synchronous `Run`, which `.clone()` depends on.
 mod copy;
 mod create;
 mod extract;
@@ -121,6 +122,7 @@ impl DynTensor {
 		// `CreateTensorAsOrtValue` actually does not guarantee that the data allocated is zero'd out, so if we can, we should
 		// do it manually.
 		let memory_info = unsafe { MemoryInfo::from_value(value_ptr) }.expect("CreateTensorAsOrtValue returned non-tensor");
+		#[cfg(not(target_arch = "wasm32"))] // Data is not available at this point with `ort-web`, so this would just instantly fail
 		if memory_info.is_cpu_accessible() && data_type != TensorElementType::String {
 			let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
 			ortsys![unsafe GetTensorMutableData(value_ptr.as_ptr(), &mut buffer_ptr)?];

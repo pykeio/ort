@@ -818,8 +818,17 @@ pub struct OrtApi {
 	) -> OrtStatusPtr,
 	pub EnableTelemetryEvents: unsafe extern "system" fn(env: *const OrtEnv) -> OrtStatusPtr,
 	pub DisableTelemetryEvents: unsafe extern "system" fn(env: *const OrtEnv) -> OrtStatusPtr,
+	#[cfg(not(target_arch = "wasm32"))]
 	pub CreateSession:
 		unsafe extern "system" fn(env: *const OrtEnv, model_path: *const ortchar, options: *const OrtSessionOptions, out: *mut *mut OrtSession) -> OrtStatusPtr,
+	#[cfg(target_arch = "wasm32")]
+	pub CreateSession: unsafe fn(
+		env: *const OrtEnv,
+		model_path: &str,
+		options: *const OrtSessionOptions,
+		out: *mut *mut OrtSession
+	) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = OrtStatusPtr>>>,
+	#[cfg(not(target_arch = "wasm32"))]
 	pub CreateSessionFromArray: unsafe extern "system" fn(
 		env: *const OrtEnv,
 		model_data: *const core::ffi::c_void,
@@ -827,6 +836,13 @@ pub struct OrtApi {
 		options: *const OrtSessionOptions,
 		out: *mut *mut OrtSession
 	) -> OrtStatusPtr,
+	#[cfg(target_arch = "wasm32")]
+	pub CreateSessionFromArray: unsafe fn(
+		env: *const OrtEnv,
+		model_data: &[u8],
+		options: *const OrtSessionOptions,
+		out: *mut *mut OrtSession
+	) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = OrtStatusPtr>>>,
 	pub Run: unsafe extern "system" fn(
 		session: *mut OrtSession,
 		run_options: *const OrtRunOptions,
@@ -1399,6 +1415,7 @@ pub struct OrtApi {
 		provider_options_values: *const *const core::ffi::c_char,
 		num_keys: usize
 	) -> OrtStatusPtr,
+	#[cfg(not(target_arch = "wasm32"))]
 	pub RunAsync: unsafe extern "system" fn(
 		session: *mut OrtSession,
 		run_options: *const OrtRunOptions,
@@ -1411,6 +1428,15 @@ pub struct OrtApi {
 		run_async_callback: RunAsyncCallbackFn,
 		user_data: *mut core::ffi::c_void
 	) -> OrtStatusPtr,
+	#[cfg(target_arch = "wasm32")]
+	pub RunAsync: unsafe fn(
+		session: *mut OrtSession,
+		run_options: *const OrtRunOptions,
+		input_names: &[&str],
+		inputs: &[*const OrtValue],
+		output_names: &[&str],
+		outputs: &mut [*mut OrtValue]
+	) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = OrtStatusPtr>>>,
 	pub UpdateTensorRTProviderOptionsWithValue: unsafe extern "system" fn(
 		tensorrt_options: *mut OrtTensorRTProviderOptionsV2,
 		key: *const core::ffi::c_char,

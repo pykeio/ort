@@ -665,7 +665,7 @@ fn link_ios_frameworks() -> bool {
 	println!("cargo:rustc-link-search=framework={}", ext_fwk_dir.display());
 
 	// Link extensions framework if found
-	if ext_fwk_dir.join("onnxruntim_extensions.framework").exists() {
+	if ext_fwk_dir.join("onnxruntime_extensions.framework").exists() {
 		println!("cargo:rustc-link-lib=framework=onnxruntime_extensions");
 	}
 

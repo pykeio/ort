@@ -9,6 +9,8 @@ const ONNXRUNTIME_VERSION: &str = "1.22.1";
 
 const ORT_ENV_SYSTEM_LIB_LOCATION: &str = "ORT_LIB_LOCATION";
 const ORT_ENV_SYSTEM_LIB_PROFILE: &str = "ORT_LIB_PROFILE";
+const ORT_ENV_IOS_ONNX_XCFWK_LOCATION: &str = "ORT_IOS_XCFWK_LOCATION";
+const ORT_ENV_IOS_ONNX_EXT_XCFWK_LOCATION: &str = "ORT_EXT_IOS_XCFWK_LOCATION";
 const ORT_ENV_PREFER_DYNAMIC_LINK: &str = "ORT_PREFER_DYNAMIC_LINK";
 const ORT_ENV_SKIP_DOWNLOAD: &str = "ORT_SKIP_DOWNLOAD";
 const ORT_ENV_CXX_STDLIB: &str = "ORT_CXX_STDLIB";
@@ -173,6 +175,17 @@ fn macos_rtlib_search_dir() -> Option<String> {
 	None
 }
 
+fn ios_rtlib_search_dir() -> Option<String> {
+	let output = Command::new("xcrun").args(&["clang", "--print-resource-dir"]).output().ok()?;
+
+	if !output.status.success() {
+		return None;
+	}
+
+	let resource_dir = String::from_utf8_lossy(&output.stdout).trim().to_string();
+	Some(format!("{}/lib/darwin", resource_dir))
+}
+
 fn static_link_prerequisites(using_pyke_libs: bool) {
 	let target_triple = env::var("TARGET").unwrap();
 
@@ -191,11 +204,22 @@ fn static_link_prerequisites(using_pyke_libs: bool) {
 		println!("cargo:rustc-link-lib={cpp_link_stdlib}");
 	}
 
-	if target_triple.contains("apple") {
+	if target_triple.contains("apple-darwin") {
 		println!("cargo:rustc-link-lib=framework=Foundation");
 		if let Some(dir) = macos_rtlib_search_dir() {
 			println!("cargo:rustc-link-search={dir}");
 			println!("cargo:rustc-link-lib=clang_rt.osx");
+		}
+	} else if target_triple.contains("apple-ios") {
+		println!("cargo:rustc-link-lib=framework=Foundation");
+		println!("cargo:rustc-link-lib=framework=CoreML");
+		if let Some(dir) = ios_rtlib_search_dir() {
+			println!("cargo:rustc-link-search={dir}");
+			if target_triple.contains("ios-sim") {
+				println!("cargo:rustc-link-lib=clang_rt.iossim");
+			} else {
+				println!("cargo:rustc-link-lib=clang_rt.ios");
+			}
 		}
 	}
 	if target_triple.contains("windows") && using_pyke_libs {
@@ -606,6 +630,48 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 	}
 }
 
+fn link_ios_frameworks() -> bool {
+	let Ok(target) = env::var("TARGET") else {
+		return false;
+	};
+
+	// XCFramework for onnxruntime only has support for ios, ios-sim and macos.
+	let sub_dir = match &*target {
+		"aarch64-apple-ios" => "ios-arm64",
+		"aarch64-apple-ios-sim" => "ios-arm64_x86_64-simulator",
+		_ => return false
+	};
+
+	let Ok(xcfwk_dir) = env::var(ORT_ENV_IOS_ONNX_XCFWK_LOCATION) else {
+		return false;
+	};
+
+	let fwk_dir = Path::new(&xcfwk_dir).join(sub_dir);
+	println!("cargo:rustc-link-search=framework={}", fwk_dir.display());
+
+	if fwk_dir.join("onnxruntime.framework").exists() {
+		println!("cargo:rustc-link-lib=framework=onnxruntime");
+	} else {
+		// Framework not found, skip attempting extension framework
+		return false;
+	}
+
+	let Ok(ext_xcfwk_dir) = env::var(ORT_ENV_IOS_ONNX_EXT_XCFWK_LOCATION) else {
+		// If ext is not set, skip linking
+		return true;
+	};
+
+	let ext_fwk_dir = Path::new(&ext_xcfwk_dir).join(sub_dir);
+	println!("cargo:rustc-link-search=framework={}", ext_fwk_dir.display());
+
+	// Link extensions framework if found
+	if ext_fwk_dir.join("onnxruntim_extensions.framework").exists() {
+		println!("cargo:rustc-link-lib=framework=onnxruntime_extensions");
+	}
+
+	true
+}
+
 fn try_setup_with_pkg_config() -> bool {
 	match pkg_config::Config::new().probe("libonnxruntime") {
 		Ok(lib) => {
@@ -639,10 +705,17 @@ fn try_setup_with_pkg_config() -> bool {
 fn real_main(link: bool) {
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_SYSTEM_LIB_LOCATION);
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_SYSTEM_LIB_PROFILE);
+	println!("cargo:rerun-if-env-changed={}", ORT_ENV_IOS_ONNX_XCFWK_LOCATION);
+	println!("cargo:rerun-if-env-changed={}", ORT_ENV_IOS_ONNX_EXT_XCFWK_LOCATION);
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_PREFER_DYNAMIC_LINK);
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_SKIP_DOWNLOAD);
 	println!("cargo:rerun-if-env-changed={}", ORT_ENV_CXX_STDLIB);
 	println!("cargo:rerun-if-env-changed={}", ENV_CXXSTDLIB);
+
+	if link && link_ios_frameworks() {
+		static_link_prerequisites(false);
+		return;
+	}
 
 	let (install_dir, needs_link) = prepare_libort_dir();
 

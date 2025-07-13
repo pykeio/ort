@@ -636,17 +636,27 @@ fn link_ios_frameworks() -> bool {
 	};
 
 	// XCFramework for onnxruntime only has support for ios, ios-sim and macos.
-	let sub_dir = match &*target {
-		"aarch64-apple-ios" => "ios-arm64",
-		"aarch64-apple-ios-sim" => "ios-arm64_x86_64-simulator",
-		_ => return false
-	};
+	// Here we only care about ios target triples
+	match &*target {
+		"aarch64-apple-ios" => search_and_link_frameworks_in_sub_dir("ios-arm64"),
+		"aarch64-apple-ios-sim" => {
+			// Legacy xcode builds will have ios-arm64_x86_64-simulator and newer ones will use ios-arm64-simulator
+			search_and_link_frameworks_in_sub_dir("ios-arm64_x86_64-simulator") || search_and_link_frameworks_in_sub_dir("ios-arm64-simulator")
+		}
+		_ => false
+	}
+}
 
+fn search_and_link_frameworks_in_sub_dir(sub_dir: &str) -> bool {
 	let Ok(xcfwk_dir) = env::var(ORT_ENV_IOS_ONNX_XCFWK_LOCATION) else {
 		return false;
 	};
 
 	let fwk_dir = Path::new(&xcfwk_dir).join(sub_dir);
+	if !fwk_dir.exists() {
+		// Framework directory not found, dont add search path at all
+		return false;
+	}
 	println!("cargo:rustc-link-search=framework={}", fwk_dir.display());
 
 	if fwk_dir.join("onnxruntime.framework").exists() {
@@ -662,6 +672,11 @@ fn link_ios_frameworks() -> bool {
 	};
 
 	let ext_fwk_dir = Path::new(&ext_xcfwk_dir).join(sub_dir);
+
+	if !ext_fwk_dir.exists() {
+		// Extension framework directory not found, dont add search path at all
+		return true;
+	}
 	println!("cargo:rustc-link-search=framework={}", ext_fwk_dir.display());
 
 	// Link extensions framework if found

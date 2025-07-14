@@ -317,7 +317,7 @@ impl SessionBuilder {
 /// - When layout optimizations are enabled, the offline mode can only be used on compatible hardware to the environment
 ///   when the offline model is saved. For example, if model has layout optimized for AVX2, the offline model would
 ///   require CPUs that support AVX2.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum GraphOptimizationLevel {
 	/// Disables all graph optimizations.
 	Disable,

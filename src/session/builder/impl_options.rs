@@ -382,6 +382,9 @@ impl From<GraphOptimizationLevel> for ort_sys::GraphOptimizationLevel {
 #[derive(Debug)]
 struct PrepackedWeightsInner(*mut ort_sys::OrtPrepackedWeightsContainer);
 
+unsafe impl Send for PrepackedWeightsInner {}
+unsafe impl Sync for PrepackedWeightsInner {}
+
 impl Drop for PrepackedWeightsInner {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleasePrepackedWeightsContainer(self.0)];

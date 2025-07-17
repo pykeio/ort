@@ -4,6 +4,12 @@ use std::{
 	process::Command
 };
 
+#[cfg(all(feature = "download-binaries", not(feature = "__tls")))]
+compile_error!(
+	"When using `download-binaries`, a TLS feature must be configured. Enable exactly one of: \
+	`tls-rustls` (uses `ring` as provider), `tls-rustls-no-provider`, `tls-native`, or `tls-native-vendored`."
+);
+
 #[allow(unused)]
 const ONNXRUNTIME_VERSION: &str = "1.22.1";
 
@@ -36,7 +42,11 @@ fn fetch_file(source_url: &str) -> Vec<u8> {
 			.https_only(true)
 			.tls_config(
 				ureq::tls::TlsConfig::builder()
-					.provider(ureq::tls::TlsProvider::NativeTls)
+					.provider(if cfg!(feature = "tls-rustls-no-provider") {
+						ureq::tls::TlsProvider::Rustls
+					} else {
+						ureq::tls::TlsProvider::NativeTls
+					})
 					.root_certs(ureq::tls::RootCerts::PlatformVerifier)
 					.build()
 			)
@@ -176,7 +186,7 @@ fn macos_rtlib_search_dir() -> Option<String> {
 }
 
 fn ios_rtlib_search_dir() -> Option<String> {
-	let output = Command::new("xcrun").args(&["clang", "--print-resource-dir"]).output().ok()?;
+	let output = Command::new("xcrun").args(["clang", "--print-resource-dir"]).output().ok()?;
 
 	if !output.status.success() {
 		return None;

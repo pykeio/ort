@@ -46,8 +46,14 @@ webgpu = [ "dep:glob" ]
 azure = []
 nv = []
 
+tls-rustls = [ "tls-rustls-no-provider", "ureq?/rustls" ]
+tls-rustls-no-provider = [ "__tls", "ureq?/rustls-no-provider" ]
+tls-native = [ "__tls", "ureq?/native-tls" ]
+tls-native-vendored = [ "tls-native", "ureq?/vendored" ]
+__tls = []
+
 [build-dependencies]
-ureq = { version = "3", optional = true, default-features = false, features = [ "native-tls", "socks-proxy" ] }
+ureq = { version = "3", optional = true, default-features = false, features = [ "socks-proxy" ] }
 tar = { version = "0.4", optional = true }
 flate2 = { version = "1.0", optional = true }
 sha2 = { version = "0.10", optional = true }

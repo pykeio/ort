@@ -47,7 +47,11 @@ fn fetch_file(source_url: &str) -> Vec<u8> {
 					} else {
 						ureq::tls::TlsProvider::NativeTls
 					})
-					.root_certs(ureq::tls::RootCerts::PlatformVerifier)
+					.root_certs(if cfg!(feature = "tls-rustls-no-provider") {
+						ureq::tls::RootCerts::WebPki
+					} else {
+						ureq::tls::RootCerts::PlatformVerifier
+					})
 					.build()
 			)
 			.user_agent(format!(

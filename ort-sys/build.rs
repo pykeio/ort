@@ -424,6 +424,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 						println!("cargo:rustc-link-lib=static=absl_city");
 						println!("cargo:rustc-link-lib=static=absl_low_level_hash");
 						add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("container"), &profile));
+						println!("cargo:rustc-link-lib=static=absl_hashtablez_sampler");
 						println!("cargo:rustc-link-lib=static=absl_raw_hash_set");
 						add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("synchronization"), &profile));
 						println!("cargo:rustc-link-lib=static=absl_kernel_timeout_internal");

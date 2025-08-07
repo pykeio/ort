@@ -175,9 +175,7 @@ mod unix {
 #[cfg(target_os = "linux")]
 #[must_use]
 pub fn cache_dir() -> Option<std::path::PathBuf> {
-	std::env::var_os("XDG_CACHE_HOME")
-		.and_then(self::unix::is_absolute_path)
-		.or_else(|| self::unix::home_dir().map(|h| h.join(".cache").join(PYKE_ROOT)))
+	Some(std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap()).join(PYKE_ROOT))
 }
 
 #[cfg(target_os = "macos")]

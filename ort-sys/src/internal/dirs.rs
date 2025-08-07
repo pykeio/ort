@@ -2,6 +2,8 @@
 
 #![allow(unused)]
 
+use std::path::PathBuf;
+
 pub const PYKE_ROOT: &str = "ort.pyke.io";
 
 #[cfg(all(target_os = "windows", target_arch = "x86"))]
@@ -95,7 +97,7 @@ mod windows {
 }
 #[cfg(target_os = "windows")]
 #[must_use]
-pub fn cache_dir() -> Option<std::path::PathBuf> {
+fn cache_dir_default() -> Option<PathBuf> {
 	self::windows::known_folder_local_app_data().map(|h| h.join(PYKE_ROOT))
 }
 
@@ -174,7 +176,7 @@ mod unix {
 
 #[cfg(target_os = "linux")]
 #[must_use]
-pub fn cache_dir() -> Option<std::path::PathBuf> {
+fn cache_dir_default() -> Option<PathBuf> {
 	std::env::var_os("XDG_CACHE_HOME")
 		.and_then(self::unix::is_absolute_path)
 		.or_else(|| self::unix::home_dir().map(|h| h.join(".cache").join(PYKE_ROOT)))
@@ -182,6 +184,10 @@ pub fn cache_dir() -> Option<std::path::PathBuf> {
 
 #[cfg(target_os = "macos")]
 #[must_use]
-pub fn cache_dir() -> Option<std::path::PathBuf> {
+fn cache_dir_default() -> Option<PathBuf> {
 	self::unix::home_dir().map(|h| h.join("Library/Caches").join(PYKE_ROOT))
+}
+
+pub fn cache_dir() -> Option<PathBuf> {
+	std::env::var_os("ORT_CACHE_DIR").map(PathBuf::from).or_else(cache_dir_default)
 }

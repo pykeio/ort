@@ -117,7 +117,7 @@ impl<K: Eq, V> MiniMap<K, V> {
 		}
 	}
 
-	pub fn drain(&mut self) -> alloc::vec::Drain<(K, V)> {
+	pub fn drain(&mut self) -> alloc::vec::Drain<'_, (K, V)> {
 		self.values.drain(..)
 	}
 

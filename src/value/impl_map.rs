@@ -303,7 +303,7 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementT
 
 	/// Converts from a strongly-typed [`Map<K, V>`] to a reference to a type-erased [`DynMap`].
 	#[inline]
-	pub fn upcast_ref(&self) -> DynMapRef {
+	pub fn upcast_ref(&self) -> DynMapRef<'_> {
 		DynMapRef::new(Value {
 			inner: Arc::clone(&self.inner),
 			_markers: PhantomData
@@ -312,7 +312,7 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementT
 
 	/// Converts from a strongly-typed [`Map<K, V>`] to a mutable reference to a type-erased [`DynMap`].
 	#[inline]
-	pub fn upcast_mut(&mut self) -> DynMapRefMut {
+	pub fn upcast_mut(&mut self) -> DynMapRefMut<'_> {
 		DynMapRefMut::new(Value {
 			inner: Arc::clone(&self.inner),
 			_markers: PhantomData

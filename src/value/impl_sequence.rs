@@ -165,7 +165,7 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized> Value<SequenceValu
 
 	/// Converts from a strongly-typed [`Sequence<T>`] to a reference to a type-erased [`DynSequence`].
 	#[inline]
-	pub fn upcast_ref(&self) -> DynSequenceRef {
+	pub fn upcast_ref(&self) -> DynSequenceRef<'_> {
 		DynSequenceRef::new(Value {
 			inner: Arc::clone(&self.inner),
 			_markers: PhantomData
@@ -174,7 +174,7 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized> Value<SequenceValu
 
 	/// Converts from a strongly-typed [`Sequence<T>`] to a mutable reference to a type-erased [`DynSequence`].
 	#[inline]
-	pub fn upcast_mut(&mut self) -> DynSequenceRefMut {
+	pub fn upcast_mut(&mut self) -> DynSequenceRefMut<'_> {
 		DynSequenceRefMut::new(Value {
 			inner: Arc::clone(&self.inner),
 			_markers: PhantomData

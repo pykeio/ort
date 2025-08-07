@@ -260,7 +260,7 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// # }
 	/// ```
 	#[inline]
-	pub fn upcast_ref(&self) -> DynTensorRef {
+	pub fn upcast_ref(&self) -> DynTensorRef<'_> {
 		DynTensorRef::new(Value {
 			inner: Arc::clone(&self.inner),
 			_markers: PhantomData
@@ -284,7 +284,7 @@ impl<T: IntoTensorElementType + Debug> Tensor<T> {
 	/// # }
 	/// ```
 	#[inline]
-	pub fn upcast_mut(&mut self) -> DynTensorRefMut {
+	pub fn upcast_mut(&mut self) -> DynTensorRefMut<'_> {
 		DynTensorRefMut::new(Value {
 			inner: Arc::clone(&self.inner),
 			_markers: PhantomData

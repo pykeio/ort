@@ -747,7 +747,7 @@ mod dangerous {
 		unsafe { status_to_result(status) }?;
 		if name_ptr.is_null() {
 			crate::util::cold();
-			return Err(crate::Error::new(concat!("expected `name_ptr` to not be null")));
+			return Err(crate::Error::new("expected `name_ptr` to not be null"));
 		}
 
 		raw_pointer_to_string(allocator, name_ptr)
@@ -778,7 +778,7 @@ mod dangerous {
 		unsafe { status_to_result(status) }?;
 		let Some(typeinfo_ptr) = NonNull::new(typeinfo_ptr) else {
 			crate::util::cold();
-			return Err(crate::Error::new(concat!("expected `typeinfo_ptr` to not be null")));
+			return Err(crate::Error::new("expected `typeinfo_ptr` to not be null"));
 		};
 		Ok(unsafe { ValueType::from_type_info(typeinfo_ptr) })
 	}

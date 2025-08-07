@@ -188,6 +188,11 @@ fn cache_dir_default() -> Option<PathBuf> {
 	self::unix::home_dir().map(|h| h.join("Library/Caches").join(PYKE_ROOT))
 }
 
+#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+fn cache_dir_default() -> Option<PathBuf> {
+	None
+}
+
 pub fn cache_dir() -> Option<PathBuf> {
 	std::env::var_os("ORT_CACHE_DIR").map(PathBuf::from).or_else(cache_dir_default)
 }

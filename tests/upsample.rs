@@ -61,8 +61,8 @@ fn upsample() -> ort::Result<()> {
 
 	{
 		let metadata = session.metadata()?;
-		assert_eq!(metadata.name()?, "tf2onnx");
-		assert_eq!(metadata.producer()?, "tf2onnx");
+		assert_eq!(metadata.name().as_deref(), Some("tf2onnx"));
+		assert_eq!(metadata.producer().as_deref(), Some("tf2onnx"));
 
 		assert_eq!(&**session.inputs[0].input_type.tensor_shape().expect("input0 to be a tensor type"), [-1, -1, -1, 3]);
 		assert_eq!(&**session.outputs[0].output_type.tensor_shape().expect("output0 to be a tensor type"), [-1, -1, -1, 3]);

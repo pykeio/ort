@@ -19,10 +19,10 @@ fn vectorizer() -> ort::Result<()> {
 
 	{
 		let metadata = session.metadata()?;
-		assert_eq!(metadata.producer()?, "skl2onnx");
-		assert_eq!(metadata.description()?, "test description");
+		assert_eq!(metadata.producer().as_deref(), Some("skl2onnx"));
+		assert_eq!(metadata.description().as_deref(), Some("test description"));
 		assert_eq!(metadata.custom_keys()?, ["custom_key"]);
-		assert_eq!(metadata.custom("custom_key")?.as_deref(), Some("custom_value"));
+		assert_eq!(metadata.custom("custom_key").as_deref(), Some("custom_value"));
 	}
 
 	let array = ndarray::CowArray::from(ndarray::Array::from_shape_vec((1,), vec!["document".to_owned()]).unwrap());

@@ -29,8 +29,8 @@ fn squeezenet_mushroom() -> ort::Result<()> {
 
 	let input0_shape = {
 		let metadata = session.metadata()?;
-		assert_eq!(metadata.name()?, "main_graph");
-		assert_eq!(metadata.producer()?, "pytorch");
+		assert_eq!(metadata.name().as_deref(), Some("main_graph"));
+		assert_eq!(metadata.producer().as_deref(), Some("pytorch"));
 
 		let input0_shape = session.inputs[0].input_type.tensor_shape().expect("input0 to be a tensor type");
 		let output0_shape = session.outputs[0].output_type.tensor_shape().expect("output0 to be a tensor type");

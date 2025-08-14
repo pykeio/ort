@@ -34,59 +34,68 @@ impl ModelMetadata<'_> {
 	}
 
 	/// Gets the model description, returning an error if no description is present.
-	pub fn description(&self) -> Result<String> {
+	pub fn description(&self) -> Option<String> {
 		let mut str_bytes: *mut c_char = ptr::null_mut();
-		ortsys![unsafe ModelMetadataGetDescription(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?];
-		Ok(unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }?.to_string())
+		ortsys![@ort: unsafe ModelMetadataGetDescription(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes) as Result].ok()?;
+		unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }
+			.ok()
+			.map(|s| s.to_string())
 	}
 
 	/// Gets the description of the graph.
-	pub fn graph_description(&self) -> Result<String> {
+	pub fn graph_description(&self) -> Option<String> {
 		let mut str_bytes: *mut c_char = ptr::null_mut();
-		ortsys![unsafe ModelMetadataGetGraphDescription(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?];
-		Ok(unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }?.to_string())
+		ortsys![@ort: unsafe ModelMetadataGetGraphDescription(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes) as Result].ok()?;
+		unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }
+			.ok()
+			.map(|s| s.to_string())
 	}
 
 	/// Gets the model producer name, returning an error if no producer name is present.
-	pub fn producer(&self) -> Result<String> {
+	pub fn producer(&self) -> Option<String> {
 		let mut str_bytes: *mut c_char = ptr::null_mut();
-		ortsys![unsafe ModelMetadataGetProducerName(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?];
-		Ok(unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }?.to_string())
+		ortsys![@ort: unsafe ModelMetadataGetProducerName(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes) as Result].ok()?;
+		unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }
+			.ok()
+			.map(|s| s.to_string())
 	}
 
 	/// Gets the model name, returning an error if no name is present.
-	pub fn name(&self) -> Result<String> {
+	pub fn name(&self) -> Option<String> {
 		let mut str_bytes: *mut c_char = ptr::null_mut();
-		ortsys![unsafe ModelMetadataGetGraphName(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?];
-		Ok(unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }?.to_string())
+		ortsys![@ort: unsafe ModelMetadataGetGraphName(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes) as Result].ok()?;
+		unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }
+			.ok()
+			.map(|s| s.to_string())
 	}
 
 	/// Returns the model's domain, returning an error if no name is present.
-	pub fn domain(&self) -> Result<String> {
+	pub fn domain(&self) -> Option<String> {
 		let mut str_bytes: *mut c_char = ptr::null_mut();
-		ortsys![unsafe ModelMetadataGetDomain(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes)?];
-		Ok(unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }?.to_string())
+		ortsys![@ort: unsafe ModelMetadataGetDomain(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes) as Result].ok()?;
+		unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }
+			.ok()
+			.map(|s| s.to_string())
 	}
 
 	/// Gets the model version, returning an error if no version is present.
-	pub fn version(&self) -> Result<i64> {
+	pub fn version(&self) -> Option<i64> {
 		let mut ver = 0i64;
-		ortsys![unsafe ModelMetadataGetVersion(self.metadata_ptr.as_ptr(), &mut ver)?];
-		Ok(ver)
+		ortsys![@ort: unsafe ModelMetadataGetVersion(self.metadata_ptr.as_ptr(), &mut ver) as Result].ok()?;
+		Some(ver)
 	}
 
 	/// Fetch the value of a custom metadata key. Returns `Ok(None)` if the key is not found.
-	pub fn custom(&self, key: &str) -> Result<Option<String>> {
+	pub fn custom(&self, key: &str) -> Option<String> {
 		let str_bytes = with_cstr(key.as_bytes(), &|key| {
 			let mut str_bytes: *mut c_char = ptr::null_mut();
 			ortsys![unsafe ModelMetadataLookupCustomMetadataMap(self.metadata_ptr.as_ptr(), self.allocator.ptr().cast_mut(), key.as_ptr(), &mut str_bytes)?];
 			Ok(str_bytes)
-		})?;
-		Ok(if !str_bytes.is_null() {
-			Some(unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }?.to_string())
-		} else {
-			None
 		})
+		.ok()?;
+		unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }
+			.ok()
+			.map(|s| s.to_string())
 	}
 
 	pub fn custom_keys(&self) -> Result<Vec<String>> {

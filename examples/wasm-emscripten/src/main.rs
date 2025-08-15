@@ -41,22 +41,16 @@ pub extern "C" fn dealloc(ptr: *mut std::os::raw::c_void, size: usize) {
 pub extern "C" fn detect_objects(ptr: *const u8, width: u32, height: u32) {
 	ort::set_api(ort_tract::api());
 	ort::init()
-		.with_global_thread_pool(ort::environment::GlobalThreadPoolOptions::default())
 		.commit()
 		.expect("Cannot initialize ort.");
 
 	let mut builder = ort::session::Session::builder()
 		.expect("Cannot create Session builder.")
 		.with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level3)
-		.expect("Cannot optimize graph.")
-		.with_parallel_execution(true)
-		.expect("Cannot activate parallel execution.")
-		.with_intra_threads(2)
-		.expect("Cannot set intra thread count.")
-		.with_inter_threads(1)
-		.expect("Cannot set inter thread count.");
+		.expect("Cannot optimize graph.");
 
-	let use_webgpu = true; // TODO: Make `use_webgpu` a parameter of `detect_objects`? Or say in README to change it here.
+
+	let use_webgpu = false; // TODO: Make `use_webgpu` a parameter of `detect_objects`? Or say in README to change it here.
 	if use_webgpu {
 		use ort::execution_providers::ExecutionProvider;
 		let ep = ort::execution_providers::WebGPUExecutionProvider::default();
@@ -67,10 +61,14 @@ pub extern "C" fn detect_objects(ptr: *const u8, width: u32, height: u32) {
 		}
 	}
 
+	let time_start = std::time::Instant::now();
 	let mut session = builder
 		.commit_from_memory(include_bytes!("../yolov8m.onnx"))
 		.expect("Cannot commit model.");
+	println!("Model loaded in {} ms", time_start.elapsed().as_millis());
 
+
+	let time_start = std::time::Instant::now();
 	let image_data = unsafe { std::slice::from_raw_parts(ptr, (width * height * 4) as usize).to_vec() }; // Copy via .to_vec might be not necessary as memory lives long enough.
 	let image = image::ImageBuffer::<image::Rgba<u8>, Vec<u8>>::from_raw(width, height, image_data).expect("Cannot parse input image.");
 	let image640 = image::imageops::resize(&image, 640, 640, image::imageops::FilterType::CatmullRom);
@@ -80,6 +78,7 @@ pub extern "C" fn detect_objects(ptr: *const u8, width: u32, height: u32) {
 
 	let outputs: ort::session::SessionOutputs = session.run(ort::inputs!["images" => tensor]).unwrap();
 	let output = outputs["output0"].try_extract_array::<f32>().unwrap().t().into_owned();
+	println!("time to infer in {} ms", time_start.elapsed().as_millis());
 
 	let mut boxes = Vec::new();
 	let output = output.slice(ndarray::s![.., .., 0]);

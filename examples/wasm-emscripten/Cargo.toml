@@ -9,10 +9,19 @@ path = "src/main.rs"
 name = "wasm_example"
 
 [dependencies]
-ort = { path = "../../", default-features = false, features = ["ndarray", "webgpu", "download-binaries"] }
+ort-tract = "0.1.0+0.21"
+#ort = { path = "../../", default-features = false, features = ["ndarray", "download-binaries"] }
 ndarray = "0.16"
 image = "0.25"
 
 [build-dependencies]
 glob = "0.3"
 reqwest = { version = "0.12", features = ["blocking"] }
+
+[dependencies.ort]
+version = "=2.0.0-rc.10"
+default-features = false # Disables the `download-binaries` feature since we don't need it
+features = [
+    "ndarray",
+    "alternative-backend"
+]

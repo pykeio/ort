@@ -39,6 +39,7 @@ pub extern "C" fn dealloc(ptr: *mut std::os::raw::c_void, size: usize) {
 
 #[no_mangle]
 pub extern "C" fn detect_objects(ptr: *const u8, width: u32, height: u32) {
+	ort::set_api(ort_tract::api());
 	ort::init()
 		.with_global_thread_pool(ort::environment::GlobalThreadPoolOptions::default())
 		.commit()

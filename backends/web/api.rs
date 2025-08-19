@@ -18,7 +18,7 @@ use ort_sys::{stub::Error, *};
 
 use crate::{
 	binding,
-	env::Environment,
+	env::{Environment, TelemetryEvent},
 	memory::{Allocator, MemoryInfo},
 	session::{RunOptions, Session, SessionOptions},
 	tensor::{SyncDirection, Tensor, TensorData, TypeInfo, create_buffer, onnx_to_dtype},
@@ -41,16 +41,20 @@ unsafe extern "system" fn CreateEnvWithCustomLogger(
 	OrtStatusPtr::default()
 }
 
-unsafe extern "system" fn EnableTelemetryEvents(_env: *const OrtEnv) -> OrtStatusPtr {
+unsafe extern "system" fn EnableTelemetryEvents(env: *const OrtEnv) -> OrtStatusPtr {
+	let env = unsafe { Environment::cast_from_sys_mut(env.cast_mut()) };
+	env.with_telemetry = true;
 	OrtStatusPtr::default()
 }
 
-unsafe extern "system" fn DisableTelemetryEvents(_env: *const OrtEnv) -> OrtStatusPtr {
+unsafe extern "system" fn DisableTelemetryEvents(env: *const OrtEnv) -> OrtStatusPtr {
+	let env = unsafe { Environment::cast_from_sys_mut(env.cast_mut()) };
+	env.with_telemetry = false;
 	OrtStatusPtr::default()
 }
 
 unsafe fn CreateSession(
-	_env: *const OrtEnv,
+	env: *const OrtEnv,
 	model_path: &str,
 	options: *const OrtSessionOptions,
 	out: *mut *mut OrtSession
@@ -63,6 +67,11 @@ unsafe fn CreateSession(
 				let ptr = (Box::leak(Box::new(session))) as *mut Session;
 				unsafe { out.write(ptr.cast()) };
 
+				{
+					let env = unsafe { Environment::cast_from_sys(env) };
+					env.send_telemetry_event(TelemetryEvent::SessionInit);
+				}
+
 				OrtStatusPtr::default()
 			}
 			Err(e) => e.into_sys()
@@ -72,7 +81,7 @@ unsafe fn CreateSession(
 }
 
 unsafe fn CreateSessionFromArray(
-	_env: *const OrtEnv,
+	env: *const OrtEnv,
 	model_data: &[u8],
 	options: *const OrtSessionOptions,
 	out: *mut *mut OrtSession
@@ -84,6 +93,11 @@ unsafe fn CreateSessionFromArray(
 			Ok(session) => {
 				let ptr = (Box::leak(Box::new(session))) as *mut Session;
 				unsafe { out.write(ptr.cast()) };
+
+				{
+					let env = unsafe { Environment::cast_from_sys(env) };
+					env.send_telemetry_event(TelemetryEvent::SessionInit);
+				}
 
 				OrtStatusPtr::default()
 			}

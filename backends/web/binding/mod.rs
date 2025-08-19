@@ -33,3 +33,9 @@ extern "C" {
 	#[wasm_bindgen(catch, js_name = "initRuntime")]
 	pub async fn init_runtime(features: u8) -> Result<Boolean, JsValue>;
 }
+
+#[wasm_bindgen(module = "/_telemetry.js")]
+extern "C" {
+	#[wasm_bindgen(catch, js_name = "trackSessionInit")]
+	pub fn track_session_init() -> Result<Boolean, JsValue>;
+}

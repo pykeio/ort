@@ -77,7 +77,9 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 	}
 }
 
-/// Construct the inputs to a session from an array or named map of values.
+/// Construct the inputs ([`SessionInputs`]) to a session from either an array or a named map of values
+/// ([`SessionInputValue`]s). The crate provides conversion utilities for [`std::collections::HashMap`], [`Vec`],
+/// arrays and slices.
 ///
 /// # Example
 ///
@@ -108,6 +110,34 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 /// # 	Ok(())
 /// # }
 /// ```
+///
+/// ## Incremental construction
+///
+/// ```no_run
+/// # use std::{error::Error, sync::Arc};
+/// # use ndarray::Array1;
+/// # use ort::{value::Tensor, session::{builder::GraphOptimizationLevel, Session}};
+/// # fn main() -> Result<(), Box<dyn Error>> {
+/// # 	let mut session = Session::builder()?.commit_from_file("model.onnx")?;
+/// let mut my_inputs = input![
+/// 	"input_ids" => my_input_ids,
+/// 	"position_ids" => my_position_ids,
+/// ];
+/// for layer in 0..model_layers {
+/// 	model_inputs.push((
+///     	format!("past_key_values.{}.key", layer).into(),
+/// 	    Tensor::from_array((vec![1], 1)),
+/// 	));
+/// 	model_inputs.push((
+///     	format!("past_key_values.{}.value", layer).into(),
+///     	Tensor::from_array((vec![1], 1)),
+/// 	));
+/// }
+/// let _outputs = session.run(my_inputs)?;
+/// # 	Ok(())
+/// # }
+/// ```
+
 #[macro_export]
 macro_rules! inputs {
 	($($v:expr),+ $(,)?) => (

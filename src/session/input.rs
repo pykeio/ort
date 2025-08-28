@@ -77,9 +77,10 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 	}
 }
 
-/// Construct the inputs to a session from an array or named map of values.
+/// Construct the inputs to a session ([`SessionInputs`]) from either an array or a named map of values
+/// ([`SessionInputValue`]s).
 ///
-/// # Example
+/// # Examples
 ///
 /// ## Array of values
 ///
@@ -105,6 +106,34 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 /// let _ = session.run(ort::inputs! {
 /// 	"tokens" => Tensor::from_array(([5], vec![1, 2, 3, 4, 5]))?
 /// })?;
+/// # 	Ok(())
+/// # }
+/// ```
+///
+/// ## Incremental construction
+///
+/// ```no_run
+/// # use std::{error::Error, sync::Arc};
+/// # use ndarray::Array1;
+/// # use ort::{value::Tensor, session::{builder::GraphOptimizationLevel, Session}};
+/// # fn main() -> Result<(), Box<dyn Error>> {
+/// # 	let mut session = Session::builder()?.commit_from_file("model.onnx")?;
+/// # 	let model_layers = 12;
+/// 	let mut my_inputs = ort::inputs![
+/// 		"input_ids" => Tensor::from_array((vec![1, 1i64], vec![0]))?,
+/// 		"position_ids" => Tensor::from_array((vec![1, 1i64], vec![0]))?,
+/// 	];
+/// 	for layer in 0..model_layers {
+/// 		my_inputs.push((
+/// 	    	format!("past_key_values.{}.key", layer).into(),
+/// 		    Tensor::from_array(((), vec![1i64]))?.into(),
+/// 		));
+/// 		my_inputs.push((
+/// 	    	format!("past_key_values.{}.value", layer).into(),
+/// 	    	Tensor::from_array(((), vec![1i64]))?.into(),
+/// 		));
+/// 	}
+/// 	let _outputs = session.run(my_inputs)?;
 /// # 	Ok(())
 /// # }
 /// ```

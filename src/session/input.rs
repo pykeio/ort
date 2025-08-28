@@ -78,10 +78,9 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 }
 
 /// Construct the inputs to a session ([`SessionInputs`]) from either an array or a named map of values
-/// ([`SessionInputValue`]s). The crate provides conversion utilities for [`std::collections::HashMap`], [`Vec`],
-/// arrays and slices.
+/// ([`SessionInputValue`]s).
 ///
-/// # Example
+/// # Examples
 ///
 /// ## Array of values
 ///

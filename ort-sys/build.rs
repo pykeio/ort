@@ -577,7 +577,7 @@ fn prepare_libort_dir() -> (PathBuf, bool) {
 
 			let mut dist = find_dist(&target, &feature_set);
 			if dist.is_none() && feature_set != "none" {
-				println!("full feature set {feature_set} not available, attempting to download with no features instead");
+				println!("cargo:warning=full feature set {feature_set} not available, attempting to download with no features instead");
 				// i dont like this behavior at all but the only thing i like less than it is rust-analyzer breaking because it
 				// ***insists*** on enabling --all-features
 				dist = find_dist(&target, "none");

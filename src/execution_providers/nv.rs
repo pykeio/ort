@@ -38,8 +38,6 @@ impl ExecutionProvider for NVExecutionProvider {
 		{
 			use crate::{AsPointer, ortsys};
 
-			let _ = crate::environment::get_environment();
-
 			let ffi_options = self.options.to_ffi();
 			ortsys![unsafe SessionOptionsAppendExecutionProvider(
 				session_builder.ptr_mut(),

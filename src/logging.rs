@@ -1,4 +1,4 @@
-use alloc::boxed::Box;
+use alloc::sync::Arc;
 #[cfg(feature = "tracing")]
 use core::ptr;
 use core::{
@@ -122,7 +122,7 @@ pub(crate) extern "system" fn tracing_logger(
 
 /// `LoggerFunction` accepts the message's [`LogLevel`], its category, log ID, code location, and the message
 /// itself.
-pub type LoggerFunction = Box<dyn Fn(LogLevel, &str, &str, &str, &str) + Sync>;
+pub type LoggerFunction = Arc<dyn Fn(LogLevel, &str, &str, &str, &str) + Send + Sync>;
 
 pub(crate) extern "system" fn custom_logger(
 	logger: *mut ffi::c_void,

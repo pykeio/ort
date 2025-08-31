@@ -97,10 +97,7 @@ impl ExecutionProvider for OpenVINOExecutionProvider {
 			use alloc::ffi::CString;
 			use core::ffi::c_char;
 
-			use crate::{AsPointer, environment::get_environment, ortsys};
-
-			// Like TensorRT, the OpenVINO EP is also pretty picky about needing an environment by this point.
-			let _ = get_environment();
+			use crate::{AsPointer, ortsys};
 
 			let ffi_options = self.options.to_ffi();
 			ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO_V2(

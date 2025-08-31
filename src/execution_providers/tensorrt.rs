@@ -269,12 +269,7 @@ impl ExecutionProvider for TensorRTExecutionProvider {
 		{
 			use core::ptr;
 
-			use crate::{AsPointer, environment::get_environment, ortsys, util};
-
-			// The TensorRT execution provider specifically is pretty picky about requiring an environment to be initialized by the
-			// time we register it. This isn't always the case in `ort`, so if we get to this point, let's make sure we have an
-			// environment initialized.
-			let _ = get_environment();
+			use crate::{AsPointer, ortsys, util};
 
 			let mut trt_options: *mut ort_sys::OrtTensorRTProviderOptionsV2 = ptr::null_mut();
 			ortsys![unsafe CreateTensorRTProviderOptions(&mut trt_options)?];

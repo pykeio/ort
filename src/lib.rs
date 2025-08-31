@@ -51,6 +51,8 @@ pub mod api {
 #[cfg(feature = "load-dynamic")]
 use alloc::sync::Arc;
 use alloc::{borrow::ToOwned, boxed::Box, string::String};
+#[cfg(feature = "load-dynamic")]
+use core::mem::ManuallyDrop;
 use core::{
 	ffi::{CStr, c_char},
 	ptr::NonNull,
@@ -74,7 +76,7 @@ pub const MINOR_VERSION: u32 = ort_sys::ORT_API_VERSION;
 #[cfg(feature = "load-dynamic")]
 pub(crate) static G_ORT_DYLIB_PATH: OnceLock<Arc<String>> = OnceLock::new();
 #[cfg(feature = "load-dynamic")]
-pub(crate) static G_ORT_LIB: OnceLock<Arc<libloading::Library>> = OnceLock::new();
+pub(crate) static G_ORT_LIB: OnceLock<ManuallyDrop<Arc<libloading::Library>>> = OnceLock::new();
 
 #[cfg(feature = "load-dynamic")]
 pub(crate) fn dylib_path() -> &'static String {
@@ -109,7 +111,7 @@ pub(crate) fn lib_handle() -> &'static libloading::Library {
 		};
 		let lib = unsafe { libloading::Library::new(&absolute_path) }
 			.unwrap_or_else(|e| panic!("An error occurred while attempting to load the ONNX Runtime binary at `{}`: {e}", absolute_path.display()));
-		Arc::new(lib)
+		ManuallyDrop::new(Arc::new(lib))
 	})
 }
 

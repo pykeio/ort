@@ -296,12 +296,6 @@ impl<T> OnceLock<T> {
 		self.get_or_init(|| (unsafe { container.take().unwrap_unchecked() })());
 		container.is_none()
 	}
-
-	pub fn try_insert_with_fallible<F: FnOnce() -> Result<T, E>, E>(&self, inserter: F) -> Result<bool, E> {
-		let mut container = Some(inserter);
-		self.get_or_try_init(|| (unsafe { container.take().unwrap_unchecked() })())?;
-		Ok(container.is_none())
-	}
 }
 
 impl<T> Drop for OnceLock<T> {
@@ -328,7 +322,7 @@ mod mutex {
 	pub struct Mutex<T>(StdMutex<T>);
 
 	impl<T> Mutex<T> {
-		pub fn new(data: T) -> Self {
+		pub const fn new(data: T) -> Self {
 			Self(StdMutex::new(data))
 		}
 
@@ -358,7 +352,7 @@ mod mutex {
 	unsafe impl<T: Send> Sync for Mutex<T> {}
 
 	impl<T> Mutex<T> {
-		pub fn new(data: T) -> Self {
+		pub const fn new(data: T) -> Self {
 			Mutex {
 				is_locked: AtomicBool::new(false),
 				data: UnsafeCell::new(data)

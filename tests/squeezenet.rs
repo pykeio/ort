@@ -17,7 +17,7 @@ use ort::{
 fn squeezenet_mushroom() -> ort::Result<()> {
 	const IMAGE_TO_LOAD: &str = "mushroom.png";
 
-	ort::init().with_name("integration_test").commit()?;
+	ort::init().with_name("integration_test").commit();
 
 	let mut session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?

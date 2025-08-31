@@ -13,7 +13,7 @@ To configure an `Environment`, you instead use the `ort::init` function, which r
 ```rust
 ort::init()
     .with_execution_providers([CUDAExecutionProvider::default().build()])
-    .commit()?;
+    .commit();
 ```
 
 `commit()` must be called before any sessions are created to take effect. Otherwise, a default environment will be created. The global environment can be updated afterward by calling `commit()` on another `EnvironmentBuilder`, however you'll need to recreate sessions after comitting the new environment in order for them to use it.

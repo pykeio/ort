@@ -4,14 +4,16 @@
 //! ```
 //! # use ort::execution_providers::CUDAExecutionProvider;
 //! # fn main() -> ort::Result<()> {
-//! ort::init()
-//! 	.with_execution_providers([CUDAExecutionProvider::default().build()])
-//! 	.commit()?;
+//! ort::init().with_execution_providers([CUDAExecutionProvider::default().build()]).commit();
 //! # Ok(())
 //! # }
 //! ```
 
-use alloc::{boxed::Box, string::String};
+use alloc::{
+	boxed::Box,
+	string::String,
+	sync::{Arc, Weak}
+};
 use core::{
 	any::Any,
 	ffi::c_void,
@@ -29,10 +31,16 @@ use crate::{
 	execution_providers::ExecutionProviderDispatch,
 	logging::{LogLevel, LoggerFunction},
 	ortsys,
-	util::{OnceLock, STACK_EXECUTION_PROVIDERS, with_cstr}
+	util::{Mutex, OnceLock, STACK_EXECUTION_PROVIDERS, with_cstr}
 };
 
-static G_ENV: OnceLock<Environment> = OnceLock::new();
+/// Hold onto a weak reference here so that the environment is dropped when all sessions under it are. Statics don't run
+/// destructors; holding a strong reference to the environment here thus leads to issues, so instead of holding the
+/// environment for the entire duration of the process, we keep `Arc` references of this weak `Environment` in sessions.
+/// That way, the environment is actually dropped when it is no longer needed.
+static G_ENV: Mutex<Option<Weak<Environment>>> = Mutex::new(None);
+
+static G_ENV_OPTIONS: OnceLock<EnvironmentBuilder> = OnceLock::new();
 
 /// An `Environment` is a process-global structure, under which [`Session`](crate::session::Session)s are created.
 ///
@@ -47,7 +55,7 @@ pub struct Environment {
 	pub(crate) execution_providers: SmallVec<ExecutionProviderDispatch, { STACK_EXECUTION_PROVIDERS }>,
 	ptr: NonNull<ort_sys::OrtEnv>,
 	pub(crate) has_global_threadpool: bool,
-	_thread_manager: Option<Box<dyn Any>>,
+	_thread_manager: Option<Arc<dyn Any>>,
 	_logger: Option<LoggerFunction>
 }
 
@@ -83,20 +91,29 @@ impl Drop for Environment {
 	}
 }
 
-/// Gets a reference to the global environment, creating one if an environment has not been
-/// [`commit`](EnvironmentBuilder::commit)ted yet.
-pub fn get_environment() -> Result<&'static Environment> {
-	G_ENV.get_or_try_init(|| {
-		crate::debug!("Environment not yet initialized, creating a new one");
-		EnvironmentBuilder::new().commit_internal()
-	})
+/// Gets a reference to the global environment, creating one if an environment does not yet exist.
+pub fn get_environment() -> Result<Arc<Environment>> {
+	let mut env_lock = G_ENV.lock();
+	if let Some(env) = env_lock.as_ref() {
+		if let Some(upgraded) = Weak::upgrade(env) {
+			return Ok(upgraded);
+		}
+	}
+
+	let options = G_ENV_OPTIONS.get_or_init(EnvironmentBuilder::new);
+	let env = options.create_environment().map(Arc::new)?;
+	*env_lock = Some(Arc::downgrade(&env));
+	Ok(env)
 }
 
 #[derive(Debug)]
 pub struct GlobalThreadPoolOptions {
 	ptr: *mut ort_sys::OrtThreadingOptions,
-	thread_manager: Option<Box<dyn Any>>
+	thread_manager: Option<Arc<dyn Any>>
 }
+
+unsafe impl Send for GlobalThreadPoolOptions {}
+unsafe impl Sync for GlobalThreadPoolOptions {}
 
 impl Default for GlobalThreadPoolOptions {
 	fn default() -> Self {
@@ -137,11 +154,11 @@ impl GlobalThreadPoolOptions {
 	}
 
 	pub fn with_thread_manager<T: ThreadManager + Any + 'static>(mut self, manager: T) -> Result<Self> {
-		let mut manager = Box::new(manager);
-		ortsys![unsafe SetGlobalCustomThreadCreationOptions(self.ptr_mut(), (&mut *manager as *mut T).cast())?];
+		let manager = Arc::new(manager);
+		ortsys![unsafe SetGlobalCustomThreadCreationOptions(self.ptr_mut(), (&*manager as *const T as *mut T).cast())?];
 		ortsys![unsafe SetGlobalCustomCreateThreadFn(self.ptr_mut(), Some(thread_create::<T>))?];
 		ortsys![unsafe SetGlobalCustomJoinThreadFn(self.ptr_mut(), Some(thread_join::<T>))?];
-		self.thread_manager = Some(manager as Box<dyn Any>);
+		self.thread_manager = Some(manager as Arc<dyn Any>);
 		Ok(self)
 	}
 }
@@ -176,7 +193,7 @@ impl ThreadWorker {
 pub trait ThreadManager {
 	type Thread;
 
-	fn create(&mut self, worker: ThreadWorker) -> crate::Result<Self::Thread>;
+	fn create(&self, worker: ThreadWorker) -> crate::Result<Self::Thread>;
 
 	fn join(thread: Self::Thread) -> crate::Result<()>;
 }
@@ -297,13 +314,15 @@ impl EnvironmentBuilder {
 	///
 	/// ```
 	/// # fn main() -> ort::Result<()> {
+	/// use std::sync::Arc;
+	///
 	/// ort::init()
-	/// 	.with_logger(Box::new(
+	/// 	.with_logger(Arc::new(
 	/// 		|level: ort::logging::LogLevel, category: &str, id: &str, code_location: &str, message: &str| {
 	/// 			// ...
 	/// 		}
 	/// 	))
-	/// 	.commit()?;
+	/// 	.commit();
 	/// # 	Ok(())
 	/// # }
 	/// ```
@@ -312,7 +331,7 @@ impl EnvironmentBuilder {
 		self
 	}
 
-	pub(crate) fn commit_internal(self) -> Result<Environment> {
+	pub(crate) fn create_environment(&self) -> Result<Environment> {
 		let logger = self
 			.logger
 			.as_ref()
@@ -320,7 +339,7 @@ impl EnvironmentBuilder {
 		#[cfg(feature = "tracing")]
 		let logger = logger.or(Some((crate::logging::tracing_logger, ptr::null_mut())));
 
-		let (env_ptr, thread_manager, has_global_threadpool) = if let Some(mut thread_pool_options) = self.global_thread_pool_options {
+		let (env_ptr, thread_manager, has_global_threadpool) = if let Some(thread_pool_options) = self.global_thread_pool_options.as_ref() {
 			let env_ptr = with_cstr(self.name.as_bytes(), &|name| {
 				Ok(if let Some((log_fn, log_ptr)) = logger {
 					let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
@@ -351,7 +370,7 @@ impl EnvironmentBuilder {
 				})
 			})?;
 
-			let thread_manager = thread_pool_options.thread_manager.take();
+			let thread_manager = thread_pool_options.thread_manager.clone();
 			(env_ptr, thread_manager, true)
 		} else {
 			let env_ptr = with_cstr(self.name.as_bytes(), &|name| {
@@ -393,17 +412,17 @@ impl EnvironmentBuilder {
 		}
 
 		Ok(Environment {
-			execution_providers: self.execution_providers,
+			execution_providers: self.execution_providers.clone(),
 			ptr: env_ptr,
 			has_global_threadpool,
 			_thread_manager: thread_manager,
-			_logger: self.logger
+			_logger: self.logger.clone()
 		})
 	}
 
 	/// Commit the environment configuration.
-	pub fn commit(self) -> Result<bool> {
-		G_ENV.try_insert_with_fallible(|| self.commit_internal())
+	pub fn commit(self) -> bool {
+		G_ENV_OPTIONS.try_insert_with(|| self)
 	}
 }
 
@@ -412,9 +431,7 @@ impl EnvironmentBuilder {
 /// ```
 /// # use ort::execution_providers::CUDAExecutionProvider;
 /// # fn main() -> ort::Result<()> {
-/// ort::init()
-/// 	.with_execution_providers([CUDAExecutionProvider::default().build()])
-/// 	.commit()?;
+/// ort::init().with_execution_providers([CUDAExecutionProvider::default().build()]).commit();
 /// # Ok(())
 /// # }
 /// ```
@@ -443,7 +460,7 @@ pub fn init() -> EnvironmentBuilder {
 /// let lib_path = std::env::current_exe().unwrap().parent().unwrap().join("lib");
 /// ort::init_from(lib_path.join("onnxruntime.dll"))
 /// 	.with_execution_providers([CUDAExecutionProvider::default().build()])
-/// 	.commit()?;
+/// 	.commit();
 /// # Ok(())
 /// # }
 /// ```

@@ -185,7 +185,7 @@ use ort::{execution_providers::CUDAExecutionProvider, session::Session};
 fn main() -> anyhow::Result<()> {
     ort::init()
         .with_execution_providers([CUDAExecutionProvider::default().build()])
-        .commit()?;
+        .commit();
 
     let session = Session::builder()?.commit_from_file("model.onnx")?;
     // The session will attempt to register the CUDA EP

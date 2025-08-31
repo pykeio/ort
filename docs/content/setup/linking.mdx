@@ -49,7 +49,7 @@ ort = { version = "2", features = [ "load-dynamic" ] }
             // Initialize ort with the path to the dylib. This **must** be called before any usage of `ort`!
             // `init_from` returns an `EnvironmentBuilder` which you can use to further configure the environment
             // before `.commit()`ing; see the Environment docs for more information on what you can configure.
-            ort::init_from(dylib_path).commit()?;
+            ort::init_from(dylib_path).commit();
 
             Ok(())
         }

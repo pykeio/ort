@@ -9,7 +9,6 @@ use smallvec::SmallVec;
 
 use crate::{
 	AsPointer, Error, OnceLock, Result,
-	environment::get_environment,
 	operator::attribute::Attribute,
 	ortsys,
 	session::{Session, builder::SessionBuilder},
@@ -247,11 +246,10 @@ impl Model {
 	}
 
 	pub fn into_session(self, mut options: SessionBuilder) -> Result<Session> {
-		let env = get_environment()?;
 		let mut session_ptr = ptr::null_mut();
 		ortsys![@editor:
 			unsafe CreateSessionFromModel(
-				env.ptr(),
+				options.environment.ptr(),
 				self.0.as_ptr(),
 				options.ptr(),
 				&mut session_ptr

@@ -6,7 +6,17 @@ use core::{
 
 use smallvec::SmallVec;
 
-use crate::{AsPointer, error::Result, logging::LoggerFunction, memory::MemoryInfo, operator::OperatorDomain, ortsys, util::with_cstr, value::DynValue};
+use crate::{
+	AsPointer,
+	environment::{Environment, get_environment},
+	error::Result,
+	logging::LoggerFunction,
+	memory::MemoryInfo,
+	operator::OperatorDomain,
+	ortsys,
+	util::with_cstr,
+	value::DynValue
+};
 
 mod editable;
 mod impl_commit;
@@ -46,7 +56,8 @@ pub struct SessionBuilder {
 	thread_manager: Option<Arc<dyn Any>>,
 	logger: Option<Arc<LoggerFunction>>,
 	no_global_thread_pool: bool,
-	no_env_eps: bool
+	no_env_eps: bool,
+	pub(crate) environment: Arc<Environment>
 }
 
 impl Clone for SessionBuilder {
@@ -67,7 +78,8 @@ impl Clone for SessionBuilder {
 			thread_manager: self.thread_manager.clone(),
 			logger: self.logger.clone(),
 			no_global_thread_pool: self.no_global_thread_pool,
-			no_env_eps: self.no_env_eps
+			no_env_eps: self.no_env_eps,
+			environment: self.environment.clone()
 		}
 	}
 }
@@ -92,6 +104,8 @@ impl SessionBuilder {
 	/// # }
 	/// ```
 	pub fn new() -> Result<Self> {
+		let _environment = get_environment()?;
+
 		let mut session_options_ptr: *mut ort_sys::OrtSessionOptions = ptr::null_mut();
 		ortsys![unsafe CreateSessionOptions(&mut session_options_ptr)?; nonNull(session_options_ptr)];
 
@@ -105,7 +119,8 @@ impl SessionBuilder {
 			thread_manager: None,
 			logger: None,
 			no_global_thread_pool: false,
-			no_env_eps: false
+			no_env_eps: false,
+			environment: _environment
 		})
 	}
 

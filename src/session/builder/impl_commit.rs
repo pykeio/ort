@@ -23,7 +23,6 @@ use crate::error::{Error, ErrorCode};
 use crate::util::OsCharArray;
 use crate::{
 	AsPointer,
-	environment::get_environment,
 	error::Result,
 	execution_providers::apply_execution_providers,
 	memory::Allocator,
@@ -115,22 +114,15 @@ impl SessionBuilder {
 
 	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 	fn commit_from_file_inner(mut self, model_path: &<OsCharArray as Deref>::Target) -> Result<Session> {
-		let env = get_environment()?;
-		if !self.no_env_eps {
-			apply_execution_providers(&mut self, &env.execution_providers, "environment")?;
-		}
-
-		if env.has_global_threadpool && !self.no_global_thread_pool {
-			ortsys![unsafe DisablePerSessionThreads(self.ptr_mut())?];
-		}
+		self.pre_commit()?;
 
 		let session_ptr = if let Some(prepacked_weights) = self.prepacked_weights.as_ref() {
 			let mut session_ptr = ptr::null_mut();
-			ortsys![unsafe CreateSessionWithPrepackedWeightsContainer(env.ptr(), model_path.as_ptr(), self.ptr(), prepacked_weights.ptr().cast_mut(), &mut session_ptr)?; nonNull(session_ptr)];
+			ortsys![unsafe CreateSessionWithPrepackedWeightsContainer(self.environment.ptr(), model_path.as_ptr(), self.ptr(), prepacked_weights.ptr().cast_mut(), &mut session_ptr)?; nonNull(session_ptr)];
 			session_ptr
 		} else {
 			let mut session_ptr = ptr::null_mut();
-			ortsys![unsafe CreateSession(env.ptr(), model_path.as_ptr(), self.ptr(), &mut session_ptr)?; nonNull(session_ptr)];
+			ortsys![unsafe CreateSession(self.environment.ptr(), model_path.as_ptr(), self.ptr(), &mut session_ptr)?; nonNull(session_ptr)];
 			session_ptr
 		};
 
@@ -156,28 +148,21 @@ impl SessionBuilder {
 	/// Load an ONNX graph from memory and commit the session.
 	#[cfg(not(target_arch = "wasm32"))]
 	pub fn commit_from_memory(mut self, model_bytes: &[u8]) -> Result<Session> {
-		let env = get_environment()?;
-		if !self.no_env_eps {
-			apply_execution_providers(&mut self, &env.execution_providers, "environment")?;
-		}
-
-		if env.has_global_threadpool && !self.no_global_thread_pool {
-			ortsys![unsafe DisablePerSessionThreads(self.ptr_mut())?];
-		}
+		self.pre_commit()?;
 
 		let model_data = model_bytes.as_ptr().cast::<c_void>();
 		let model_data_length = model_bytes.len();
 		let session_ptr = if let Some(prepacked_weights) = self.prepacked_weights.as_ref() {
 			let mut session_ptr = ptr::null_mut();
 			ortsys![
-				unsafe CreateSessionFromArrayWithPrepackedWeightsContainer(env.ptr(), model_data, model_data_length, self.ptr(), prepacked_weights.ptr().cast_mut(), &mut session_ptr)?;
+				unsafe CreateSessionFromArrayWithPrepackedWeightsContainer(self.environment.ptr(), model_data, model_data_length, self.ptr(), prepacked_weights.ptr().cast_mut(), &mut session_ptr)?;
 				nonNull(session_ptr)
 			];
 			session_ptr
 		} else {
 			let mut session_ptr = ptr::null_mut();
 			ortsys![
-				unsafe CreateSessionFromArray(env.ptr(), model_data, model_data_length, self.ptr(), &mut session_ptr)?;
+				unsafe CreateSessionFromArray(self.environment.ptr(), model_data, model_data_length, self.ptr(), &mut session_ptr)?;
 				nonNull(session_ptr)
 			];
 			session_ptr
@@ -189,10 +174,7 @@ impl SessionBuilder {
 	/// Downloads a pre-trained ONNX model from the given URL and builds the session.
 	#[cfg(target_arch = "wasm32")]
 	pub async fn commit_from_url(mut self, model_url: impl AsRef<str>) -> Result<Session> {
-		let env = get_environment()?;
-		if !self.no_env_eps {
-			apply_execution_providers(&mut self, &env.execution_providers, "environment")?;
-		}
+		self.pre_commit()?;
 
 		let mut session_ptr = ptr::null_mut();
 		let status = ortsys![unsafe CreateSession(env.ptr(), model_url.as_ref(), self.ptr(), &mut session_ptr)].await;
@@ -208,10 +190,7 @@ impl SessionBuilder {
 	/// Load an ONNX graph from memory and commit the session.
 	#[cfg(target_arch = "wasm32")]
 	pub async fn commit_from_memory(mut self, model_bytes: &[u8]) -> Result<Session> {
-		let env = get_environment()?;
-		if !self.no_env_eps {
-			apply_execution_providers(&mut self, &env.execution_providers, "environment")?;
-		}
+		self.pre_commit()?;
 
 		let mut session_ptr = ptr::null_mut();
 		let status = ortsys![unsafe CreateSessionFromArray(env.ptr(), model_bytes.as_ref(), self.ptr(), &mut session_ptr)].await;
@@ -222,6 +201,19 @@ impl SessionBuilder {
 		};
 
 		self.commit_finalize(session_ptr)
+	}
+
+	pub(crate) fn pre_commit(&mut self) -> Result<()> {
+		if !self.no_env_eps {
+			let env = Arc::clone(&self.environment); // dumb borrowck hack
+			apply_execution_providers(self, &env.execution_providers, "environment")?;
+		}
+
+		if self.environment.has_global_threadpool && !self.no_global_thread_pool {
+			ortsys![unsafe DisablePerSessionThreads(self.ptr_mut())?];
+		}
+
+		Ok(())
 	}
 
 	pub(crate) fn commit_finalize(&mut self, ptr: NonNull<ort_sys::OrtSession>) -> Result<Session> {
@@ -260,7 +252,8 @@ impl SessionBuilder {
 				session_ptr: ptr,
 				allocator,
 				_initializers: replace(&mut self.initializers, SmallVec::new()),
-				_extras: extras
+				_extras: extras,
+				_environment: self.environment.clone()
 			}),
 			inputs,
 			outputs
@@ -276,11 +269,9 @@ impl SessionBuilder {
 		let mut session_ptr: *mut ort_sys::OrtSession = ptr::null_mut();
 		let model_path = crate::util::path_to_os_char(model_filepath);
 
-		let env = get_environment()?;
-
 		ortsys![@editor:
 			unsafe CreateModelEditorSession(
-				env.ptr(),
+				self.environment.ptr(),
 				model_path.as_ptr(),
 				self.session_options_ptr.as_ptr(),
 				&mut session_ptr
@@ -294,11 +285,9 @@ impl SessionBuilder {
 	pub fn edit_from_memory(self, model_bytes: &[u8]) -> Result<EditableSession> {
 		let mut session_ptr: *mut ort_sys::OrtSession = ptr::null_mut();
 
-		let env = get_environment()?;
-
 		ortsys![@editor:
 			unsafe CreateModelEditorSessionFromArray(
-				env.ptr(),
+				self.environment.ptr(),
 				model_bytes.as_ptr().cast(),
 				model_bytes.len() as _,
 				self.session_options_ptr.as_ptr(),

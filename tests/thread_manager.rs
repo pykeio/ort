@@ -40,7 +40,7 @@ struct StdThreadManager {
 impl ThreadManager for StdThreadManager {
 	type Thread = StdThread;
 
-	fn create(&mut self, worker: ThreadWorker) -> ort::Result<Self::Thread> {
+	fn create(&self, worker: ThreadWorker) -> ort::Result<Self::Thread> {
 		Ok(StdThread::spawn(worker, &self.stats))
 	}
 
@@ -62,7 +62,7 @@ fn global_thread_manager() -> ort::Result<()> {
 				.with_intra_threads(2)?
 				.with_thread_manager(StdThreadManager { stats: Arc::clone(&stats) })?
 		)
-		.commit()?;
+		.commit();
 
 	assert_eq!(stats.active_threads.load(Ordering::Acquire), 4);
 

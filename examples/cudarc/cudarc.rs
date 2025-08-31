@@ -29,7 +29,7 @@ fn main() -> anyhow::Result<()> {
 				// exit the program with an error if the CUDA EP fails to register
 				.error_on_failure()
 		])
-		.commit()?;
+		.commit();
 
 	let mut session =
 		Session::builder()?.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/modnet_photographic_portrait_matting.onnx")?;
@@ -83,10 +83,13 @@ fn main() -> anyhow::Result<()> {
 	let window = show_image::context()
 		.run_function_wait(move |context| -> Result<_, String> {
 			let mut window = context
-				.create_window("ort + modnet", WindowOptions {
-					size: Some([img_width, img_height]),
-					..WindowOptions::default()
-				})
+				.create_window(
+					"ort + modnet",
+					WindowOptions {
+						size: Some([img_width, img_height]),
+						..WindowOptions::default()
+					}
+				)
 				.map_err(|e| e.to_string())?;
 			window.set_image("photo", &output.as_image_view().map_err(|e| e.to_string())?);
 			Ok(window.proxy())

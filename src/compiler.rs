@@ -10,7 +10,6 @@ use std::path::Path;
 
 use crate::{
 	AsPointer,
-	environment::get_environment,
 	error::{Error, Result},
 	memory::Allocator,
 	ortsys,
@@ -42,17 +41,16 @@ pub fn compile_api() -> Result<&'static ort_sys::OrtCompileApi> {
 
 pub struct ModelCompiler<'i> {
 	ptr: NonNull<ort_sys::OrtModelCompilationOptions>,
-	_session_options: SessionBuilder,
+	session_options: SessionBuilder,
 	_p: PhantomData<&'i ()>
 }
 
 impl<'i> ModelCompiler<'i> {
 	pub fn new(options: SessionBuilder) -> Result<Self> {
-		let env = get_environment()?;
 		let mut ptr = ptr::null_mut();
 		ortsys![@compile:
 			unsafe CreateModelCompilationOptionsFromSessionOptions(
-				env.ptr(),
+				options.environment.ptr(),
 				options.ptr(),
 				&mut ptr
 			)?;
@@ -60,7 +58,7 @@ impl<'i> ModelCompiler<'i> {
 		];
 		Ok(Self {
 			ptr,
-			_session_options: options,
+			session_options: options,
 			_p: PhantomData
 		})
 	}
@@ -116,7 +114,6 @@ impl<'i> ModelCompiler<'i> {
 	#[cfg(feature = "std")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn compile_to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-		let env = get_environment()?;
 		let model_path = crate::util::path_to_os_char(path);
 		ortsys![@compile:
 			unsafe ModelCompilationOptions_SetOutputModelPath(
@@ -124,12 +121,11 @@ impl<'i> ModelCompiler<'i> {
 				model_path.as_ptr()
 			)?
 		];
-		ortsys![@compile: unsafe CompileModel(env.ptr(), self.ptr.as_ptr())?];
+		ortsys![@compile: unsafe CompileModel(self.session_options.environment.ptr(), self.ptr.as_ptr())?];
 		Ok(())
 	}
 
 	pub fn compile_to_buffer(&self) -> Result<CompiledModel> {
-		let env = get_environment()?;
 		let mut allocator = Allocator::default();
 		let mut ptr = ptr::null_mut();
 		let mut size = 0;
@@ -141,7 +137,7 @@ impl<'i> ModelCompiler<'i> {
 				&mut size
 			)?
 		];
-		ortsys![@compile: unsafe CompileModel(env.ptr(), self.ptr.as_ptr())?];
+		ortsys![@compile: unsafe CompileModel(self.session_options.environment.ptr(), self.ptr.as_ptr())?];
 		Ok(CompiledModel { ptr, size, allocator })
 	}
 }

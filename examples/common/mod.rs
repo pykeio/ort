@@ -47,7 +47,7 @@ pub fn init() -> ort::Result<()> {
 			#[cfg(feature = "webgpu")]
 			WebGPUExecutionProvider::default().build()
 		])
-		.commit()?;
+		.commit();
 
 	Ok(())
 }

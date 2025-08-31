@@ -12,7 +12,7 @@ use ort::{
 fn mnist_5() -> ort::Result<()> {
 	const IMAGE_TO_LOAD: &str = "mnist_5.jpg";
 
-	ort::init().with_name("integration_test").commit()?;
+	ort::init().with_name("integration_test").commit();
 
 	let mut session = Session::builder()?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?

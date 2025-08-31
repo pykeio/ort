@@ -253,8 +253,10 @@ impl SessionBuilder {
 	/// ```
 	/// # use ort::{session::Session};
 	/// # fn main() -> ort::Result<()> {
+	/// use std::sync::Arc;
+	///
 	/// let mut session = Session::builder()?
-	/// 	.with_logger(Box::new(
+	/// 	.with_logger(Arc::new(
 	/// 		|level: ort::logging::LogLevel, category: &str, id: &str, code_location: &str, message: &str| {
 	/// 			// ...
 	/// 		}

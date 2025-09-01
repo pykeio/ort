@@ -6,7 +6,10 @@ use std::{
 	thread::{self, JoinHandle}
 };
 
-use ort::environment::{GlobalThreadPoolOptions, ThreadManager, ThreadWorker};
+use ort::{
+	environment::{GlobalThreadPoolOptions, ThreadManager, ThreadWorker},
+	session::Session
+};
 
 struct ThreadStats {
 	active_threads: AtomicUsize
@@ -63,6 +66,8 @@ fn global_thread_manager() -> ort::Result<()> {
 				.with_thread_manager(StdThreadManager { stats: Arc::clone(&stats) })?
 		)
 		.commit();
+
+	let _session = Session::builder()?.commit_from_file("tests/data/upsample.ort")?;
 
 	assert_eq!(stats.active_threads.load(Ordering::Acquire), 4);
 

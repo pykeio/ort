@@ -8,10 +8,10 @@ use super::DefiniteTensorValueTypeMarker;
 use crate::{
 	Error, OnceLock, Result, execution_providers as ep,
 	io_binding::IoBinding,
-	memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
+	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
 	session::{NoSelectedOutputs, RunOptions, Session, builder::GraphOptimizationLevel},
 	util::{MiniMap, Mutex, MutexGuard},
-	value::Value
+	value::{DynTensor, Value}
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,7 +92,10 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	pub fn to(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
 		self.copy_to_inner(device, device_id, |identity_session| {
 			let target_memory_info = MemoryInfo::new(device, device_id, AllocatorType::Device, MemoryType::Default)?;
-			identity_session.binding.bind_output_to_device("output", &target_memory_info)?;
+
+			let allocator = Allocator::new(&identity_session.session, target_memory_info)?;
+			let new_tensor = DynTensor::new(&allocator, *self.data_type(), self.shape().clone())?;
+			identity_session.binding.bind_output("output", new_tensor)?;
 
 			let output = identity_session
 				.session
@@ -292,7 +295,7 @@ impl IdentitySessionHandle {
 				);
 
 				let mut builder = Session::builder()?
-					.with_optimization_level(GraphOptimizationLevel::Disable)?
+					.with_optimization_level(GraphOptimizationLevel::Level3)?
 					// since these sessions are persistent for the lifetime of the program, keep them as lean as possible
 					// by disabling threading & memory optimizations (there's only 1 operation in the graph anyway)
 					.with_intra_threads(1)?
@@ -300,7 +303,6 @@ impl IdentitySessionHandle {
 					.with_inter_op_spinning(false)?
 					.with_intra_op_spinning(false)?
 					.with_memory_pattern(false)?
-					.with_allocator(MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?)?
 					.with_no_environment_execution_providers()?;
 				// Avoid registering the same EP twice, since that's an error.
 				if source_ep.inner.name() != target_ep.inner.name() {
@@ -341,7 +343,6 @@ mod tests {
 	use crate::value::Tensor;
 
 	#[test]
-	#[cfg(feature = "cuda")]
 	fn test_clone_tensor() -> crate::Result<()> {
 		let tensor = Tensor::<f32>::from_array(([1, 5], vec![2.167892, 333., 1.0, -0.0, f32::EPSILON]))?;
 		let clone = tensor.clone();

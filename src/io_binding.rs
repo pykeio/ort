@@ -158,7 +158,13 @@ impl IoBinding {
 		Ok(())
 	}
 
-	/// Bind a session output to a device which is specified by `mem_info`.
+	/// Bind a session output to a device which is specified by `mem_info`. Used when the shape of the output is
+	/// unknown.
+	///
+	/// Note that the same output buffer will be reused across runs, so the output must be `.clone()`d to avoid race
+	/// conditions.
+	///
+	/// Alternatively, if the shape of the output is known, use [`IoBinding::bind_output`] instead.
 	pub fn bind_output_to_device<S: Into<String>>(&mut self, name: S, mem_info: &MemoryInfo) -> Result<()> {
 		let name: String = name.into();
 		let ptr = self.ptr_mut();

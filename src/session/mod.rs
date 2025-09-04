@@ -366,13 +366,8 @@ impl Session {
 
 			let output_values = unsafe { slice::from_raw_parts(output_values_ptr.as_ptr(), count) }
 				.iter()
-				.zip(binding.output_values.iter())
-				.map(|(ptr, (_, value))| unsafe {
-					if let Some(value) = value {
-						DynValue::clone_of(value)
-					} else {
-						DynValue::from_ptr(NonNull::new(*ptr).expect("OrtValue ptrs returned by GetBoundOutputValues should not be null"), Some(self.inner()))
-					}
+				.map(|ptr| unsafe {
+					DynValue::from_ptr(NonNull::new(*ptr).expect("OrtValue ptrs returned by GetBoundOutputValues should not be null"), Some(self.inner()))
 				})
 				.collect();
 			unsafe {

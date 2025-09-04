@@ -48,11 +48,7 @@ pub mod api {
 	pub use super::{api as ort, compiler::compile_api as compile, editor::editor_api as editor};
 }
 
-#[cfg(feature = "load-dynamic")]
-use alloc::sync::Arc;
 use alloc::{borrow::ToOwned, boxed::Box, string::String};
-#[cfg(feature = "load-dynamic")]
-use core::mem::ManuallyDrop;
 use core::{
 	ffi::{CStr, c_char},
 	ptr::NonNull,
@@ -74,45 +70,57 @@ pub use self::{
 pub const MINOR_VERSION: u32 = ort_sys::ORT_API_VERSION;
 
 #[cfg(feature = "load-dynamic")]
-pub(crate) static G_ORT_DYLIB_PATH: OnceLock<Arc<String>> = OnceLock::new();
-#[cfg(feature = "load-dynamic")]
-pub(crate) static G_ORT_LIB: OnceLock<ManuallyDrop<Arc<libloading::Library>>> = OnceLock::new();
+pub(crate) static G_ORT_LIB: OnceLock<libloading::Library> = OnceLock::new();
 
 #[cfg(feature = "load-dynamic")]
-pub(crate) fn dylib_path() -> &'static String {
-	G_ORT_DYLIB_PATH.get_or_init(|| {
-		let path = match std::env::var("ORT_DYLIB_PATH") {
-			Ok(s) if !s.is_empty() => s,
-			#[cfg(target_os = "windows")]
-			_ => "onnxruntime.dll".to_owned(),
-			#[cfg(any(target_os = "linux", target_os = "android"))]
-			_ => "libonnxruntime.so".to_owned(),
-			#[cfg(any(target_os = "macos", target_os = "ios"))]
-			_ => "libonnxruntime.dylib".to_owned()
-		};
-		Arc::new(path)
-	})
-}
+pub(crate) fn load_dylib_from_path(path: &std::path::Path) -> Result<bool> {
+	let mut inserter = Some(|| -> crate::Result<libloading::Library> {
+		use core::cmp::Ordering;
 
-#[cfg(feature = "load-dynamic")]
-pub(crate) fn lib_handle() -> &'static libloading::Library {
-	G_ORT_LIB.get_or_init(|| {
-		// resolve path relative to executable
-		let path: std::path::PathBuf = dylib_path().into();
 		let absolute_path = if path.is_absolute() {
-			path
+			path.to_path_buf()
 		} else {
 			let relative = std::env::current_exe()
 				.expect("could not get current executable path")
 				.parent()
 				.expect("executable is root?")
-				.join(&path);
-			if relative.exists() { relative } else { path }
+				.join(path);
+			if relative.exists() { relative } else { path.to_path_buf() }
 		};
-		let lib = unsafe { libloading::Library::new(&absolute_path) }
-			.unwrap_or_else(|e| panic!("An error occurred while attempting to load the ONNX Runtime binary at `{}`: {e}", absolute_path.display()));
-		ManuallyDrop::new(Arc::new(lib))
-	})
+		let lib =
+			unsafe { libloading::Library::new(&absolute_path) }.map_err(|e| Error::new(format!("failed to load from `{}`: {e}", absolute_path.display())))?;
+
+		let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const ort_sys::OrtApiBase> =
+			unsafe { lib.get(b"OrtGetApiBase") }.map_err(|_| Error::new("expected `OrtGetApiBase` to be present in dylib"))?;
+		let base: *const ort_sys::OrtApiBase = unsafe { base_getter() };
+		assert!(!base.is_null());
+
+		let version_string = unsafe { ((*base).GetVersionString)() };
+		let version_string = unsafe { CStr::from_ptr(version_string) }.to_string_lossy();
+
+		let lib_minor_version = version_string.split('.').nth(1).map_or(0, |x| x.parse::<u32>().unwrap_or(0));
+		match lib_minor_version.cmp(&MINOR_VERSION) {
+			Ordering::Less => {
+				return Err(Error::new(format!(
+					"ort {} is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
+					env!("CARGO_PKG_VERSION"),
+					absolute_path.display()
+				)));
+			}
+			Ordering::Greater => crate::warn!(
+				"ort {} may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
+				env!("CARGO_PKG_VERSION"),
+				absolute_path.display()
+			),
+			Ordering::Equal => {}
+		};
+
+		crate::info!("Loaded ONNX Runtime dylib from \"{}\"; version '{version_string}'", absolute_path.display());
+
+		Ok(lib)
+	});
+	G_ORT_LIB.get_or_try_init(|| (unsafe { inserter.take().unwrap_unchecked() })())?;
+	Ok(inserter.is_none())
 }
 
 /// Returns information about the build of ONNX Runtime used, including version, Git commit, and compile flags.
@@ -151,44 +159,34 @@ pub fn api() -> &'static ort_sys::OrtApi {
 	let ptr = G_ORT_API
 		.get_or_init(|| {
 			#[cfg(feature = "load-dynamic")]
-			unsafe {
-				use core::cmp::Ordering;
-
-				let dylib = lib_handle();
+			let base = unsafe {
+				let dylib = if let Some(handle) = G_ORT_LIB.get() {
+					handle
+				} else {
+					let path: std::path::PathBuf = match std::env::var("ORT_DYLIB_PATH") {
+						Ok(s) if !s.is_empty() => s,
+						#[cfg(target_os = "windows")]
+						_ => "onnxruntime.dll".to_owned(),
+						#[cfg(any(target_os = "linux", target_os = "android"))]
+						_ => "libonnxruntime.so".to_owned(),
+						#[cfg(any(target_os = "macos", target_os = "ios"))]
+						_ => "libonnxruntime.dylib".to_owned()
+					}
+					.into();
+					load_dylib_from_path(&path).expect("Failed to load ONNX Runtime dylib");
+					G_ORT_LIB.get_unchecked()
+				};
 				let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const ort_sys::OrtApiBase> = dylib
 					.get(b"OrtGetApiBase")
 					.expect("`OrtGetApiBase` must be present in ONNX Runtime dylib");
-				let base: *const ort_sys::OrtApiBase = base_getter();
-				assert!(!base.is_null());
-
-				let version_string = ((*base).GetVersionString)();
-				let version_string = CStr::from_ptr(version_string).to_string_lossy();
-				crate::info!("Loaded ONNX Runtime dylib with version '{version_string}'");
-
-				let lib_minor_version = version_string.split('.').nth(1).map_or(0, |x| x.parse::<u32>().unwrap_or(0));
-				match lib_minor_version.cmp(&MINOR_VERSION) {
-					Ordering::Less => panic!(
-						"ort {} is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
-						env!("CARGO_PKG_VERSION"),
-						dylib_path()
-					),
-					Ordering::Greater => crate::warn!(
-						"ort {} may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
-						env!("CARGO_PKG_VERSION"),
-						dylib_path()
-					),
-					Ordering::Equal => {}
-				};
-				let api: *const ort_sys::OrtApi = ((*base).GetApi)(ort_sys::ORT_API_VERSION);
-				ApiPointer(NonNull::new(api.cast_mut()).expect("Failed to initialize ORT API"))
-			}
+				base_getter()
+			};
 			#[cfg(not(feature = "load-dynamic"))]
-			unsafe {
-				let base: *const ort_sys::OrtApiBase = ort_sys::OrtGetApiBase();
-				assert!(!base.is_null());
-				let api: *const ort_sys::OrtApi = ((*base).GetApi)(ort_sys::ORT_API_VERSION);
-				ApiPointer(NonNull::new(api.cast_mut()).expect("Failed to initialize ORT API"))
-			}
+			let base = unsafe { ort_sys::OrtGetApiBase() };
+
+			assert!(!base.is_null());
+			let api: *const ort_sys::OrtApi = unsafe { ((*base).GetApi)(ort_sys::ORT_API_VERSION) };
+			ApiPointer(NonNull::new(api.cast_mut()).expect("Failed to initialize ORT API"))
 		})
 		.0;
 	unsafe { ptr.as_ref() }

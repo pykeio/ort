@@ -47,9 +47,10 @@ ort = { version = "2", features = [ "load-dynamic" ] }
             // - on Windows: C:\Program Files\...\onnxruntime.dll
 
             // Initialize ort with the path to the dylib. This **must** be called before any usage of `ort`!
-            // `init_from` returns an `EnvironmentBuilder` which you can use to further configure the environment
+            // `init_from` returns a `Result<EnvironmentBuilder>` which you can use to further configure the environment
             // before `.commit()`ing; see the Environment docs for more information on what you can configure.
-            ort::init_from(dylib_path).commit();
+            // `init_from` will return an `Err` if it fails to load the dylib.
+            ort::init_from(dylib_path)?.commit();
 
             Ok(())
         }

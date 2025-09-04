@@ -23,8 +23,6 @@ use core::{
 
 use smallvec::SmallVec;
 
-#[cfg(feature = "load-dynamic")]
-use crate::G_ORT_DYLIB_PATH;
 use crate::{
 	AsPointer,
 	error::Result,
@@ -421,6 +419,9 @@ impl EnvironmentBuilder {
 	}
 
 	/// Commit the environment configuration.
+	///
+	/// Returns `true` if the environment configuration was successfully committed; returns `false` if an environment
+	/// has already been configured, indicating this config will not take effect.
 	pub fn commit(self) -> bool {
 		G_ENV_OPTIONS.try_insert_with(|| self)
 	}
@@ -450,7 +451,7 @@ pub fn init() -> EnvironmentBuilder {
 }
 
 /// Creates an ONNX Runtime environment, dynamically loading ONNX Runtime from the library file (`.dll`/`.so`/`.dylib`)
-/// specified by `path`.
+/// specified by `path`. Returns an error if the dylib fails to load.
 ///
 /// This must be called before any other `ort` APIs are used in order for the correct dynamic library to be loaded.
 ///
@@ -458,7 +459,7 @@ pub fn init() -> EnvironmentBuilder {
 /// # use ort::execution_providers::CUDAExecutionProvider;
 /// # fn main() -> ort::Result<()> {
 /// let lib_path = std::env::current_exe().unwrap().parent().unwrap().join("lib");
-/// ort::init_from(lib_path.join("onnxruntime.dll"))
+/// ort::init_from(lib_path.join("onnxruntime.dll"))?
 /// 	.with_execution_providers([CUDAExecutionProvider::default().build()])
 /// 	.commit();
 /// # Ok(())
@@ -473,7 +474,7 @@ pub fn init() -> EnvironmentBuilder {
 #[cfg(feature = "load-dynamic")]
 #[cfg_attr(docsrs, doc(cfg(feature = "load-dynamic")))]
 #[must_use = "commit() must be called in order for the environment to take effect"]
-pub fn init_from(path: impl ToString) -> EnvironmentBuilder {
-	let _ = G_ORT_DYLIB_PATH.get_or_init(|| alloc::sync::Arc::new(path.to_string()));
-	EnvironmentBuilder::new()
+pub fn init_from<P: AsRef<std::path::Path>>(path: P) -> Result<EnvironmentBuilder> {
+	crate::load_dylib_from_path(path.as_ref())?;
+	Ok(EnvironmentBuilder::new())
 }

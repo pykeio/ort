@@ -91,7 +91,7 @@ fn main() -> anyhow::Result<()> {
 EPs have configuration options to control behavior or increase performance. Each `XXXExecutionProvider` struct returns a builder with configuration methods. See the [API reference](https://docs.rs/ort/2.0.0-rc.10/ort/execution_providers/index.html#reexports) for the EP structs for more information on which options are supported and what they do.
 
 ```rust
-use ort::{execution_providers::CoreMLExecutionProvider, session::Session};
+use ort::{execution_providers::{coreml::CoreMLComputeUnits, CoreMLExecutionProvider}, session::Session};
 
 fn main() -> anyhow::Result<()> {
     let session = Session::builder()?
@@ -99,8 +99,7 @@ fn main() -> anyhow::Result<()> {
             CoreMLExecutionProvider::default()
                 // this model uses control flow operators, so enable CoreML on subgraphs too
                 .with_subgraphs()
-                // only use the ANE as the CoreML CPU implementation is super slow for this model
-                .with_ane_only()
+                .with_compute_units(CoreMLComputeUnits::CPUAndNeuralEngine)
                 .build()
         ])?
         .commit_from_file("model.onnx")?;

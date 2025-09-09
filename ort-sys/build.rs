@@ -101,15 +101,107 @@ fn hex_str_to_bytes(c: impl AsRef<[u8]>) -> Vec<u8> {
 
 #[cfg(feature = "download-binaries")]
 fn verify_file(buf: &[u8], hash: impl AsRef<[u8]>) -> bool {
-	<sha2::Sha256 as sha2::Digest>::digest(buf)[..] == hex_str_to_bytes(hash)
+	hmac_sha256::Hash::hash(buf)[..] == hex_str_to_bytes(hash)
 }
 
 #[cfg(feature = "download-binaries")]
 fn extract_tgz(buf: &[u8], output: &Path) {
-	let buf: std::io::BufReader<&[u8]> = std::io::BufReader::new(buf);
-	let tar = flate2::read::GzDecoder::new(buf);
-	let mut archive = tar::Archive::new(tar);
-	archive.unpack(output).expect("Failed to extract .tgz file");
+	// Note that this tar reader is only functional enough to read tar files produced by Deno's @std/tar, version 0.1.8.
+	use std::{
+		fs::File,
+		io::{self, BufReader, BufWriter, Read},
+		str
+	};
+
+	fn parse_octal(bytes: &[u8]) -> io::Result<u64> {
+		let s = bytes.iter().take_while(|v| **v != 0).map(|v| *v as char).collect::<String>();
+		u64::from_str_radix(s.trim().trim_matches('\0'), 8).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "bad octal data"))
+	}
+
+	fn parse_str(bytes: &[u8]) -> &str {
+		let pos = bytes.iter().position(|v| *v == 0).unwrap_or(bytes.len());
+		str::from_utf8(&bytes[..pos]).unwrap_or("")
+	}
+
+	#[derive(Debug)]
+	struct TarHeader {
+		data: [u8; 512]
+	}
+
+	impl TarHeader {
+		fn read_from<R: Read>(r: &mut R) -> io::Result<Option<Self>> {
+			let mut data = [0; 512];
+			if let Err(e) = r.read_exact(&mut data) {
+				match e.kind() {
+					io::ErrorKind::UnexpectedEof if data.iter().all(|b| *b == 0) => return Ok(None),
+					_ => return Err(e)
+				}
+			}
+
+			if data.iter().all(|b| *b == 0) {
+				return Ok(None);
+			}
+			Ok(Some(Self { data }))
+		}
+
+		fn slice(&self, offset: usize, len: usize) -> &[u8] {
+			&self.data[offset..offset + len]
+		}
+
+		fn checksum(&self) -> u64 {
+			let mut sum = 0;
+			for (i, v) in self.data.iter().enumerate() {
+				if !(148..156).contains(&i) {
+					sum += *v as u64;
+				} else {
+					sum += 32;
+				}
+			}
+			sum
+		}
+
+		fn path(&self) -> String {
+			let prefix = parse_str(self.slice(345, 155));
+			let name = parse_str(self.slice(0, 100));
+			if !prefix.is_empty() { format!("{prefix}/{name}") } else { name.to_string() }
+		}
+	}
+
+	let mut tar = flate2::read::GzDecoder::new(BufReader::new(buf));
+	let mut pad_container = [0; 512];
+
+	loop {
+		let Some(header) = TarHeader::read_from(&mut tar).expect("Failed to read tar entry header") else {
+			println!("Encountered null entry; end of tar stream");
+			break;
+		};
+
+		if parse_octal(header.slice(148, 8)).expect("failed to read tar entry checksum") != header.checksum() {
+			panic!("tar entry checksum does not match");
+		}
+
+		if header.data[156] != b'0' {
+			// directory; skip
+			continue;
+		}
+
+		let path = output.join(header.path());
+		if let Some(parent) = path.parent() {
+			let _ = std::fs::create_dir_all(parent);
+		}
+
+		let size = parse_octal(header.slice(124, 12)).expect("failed to read tar entry size");
+		let mut file = BufWriter::new(File::create(&path).unwrap_or_else(|e| panic!("Failed to create file '{}': {e}", path.display())));
+
+		let copied_bytes = io::copy(&mut tar.by_ref().take(size), &mut file).unwrap_or_else(|e| panic!("Failed to decompress to '{}': {e}", path.display()));
+		assert_eq!(size, copied_bytes, "did not copy full entry");
+
+		let padding_bytes = size.next_multiple_of(512) - size;
+		if padding_bytes != 0 {
+			tar.read_exact(&mut pad_container[..padding_bytes as usize])
+				.expect("failed to skip padding bytes");
+		}
+	}
 }
 
 #[cfg(feature = "copy-dylibs")]
@@ -702,6 +794,7 @@ fn search_and_link_frameworks_in_sub_dir(sub_dir: &str) -> bool {
 	true
 }
 
+#[cfg(feature = "pkg-config")]
 fn try_setup_with_pkg_config() -> bool {
 	match pkg_config::Config::new().probe("libonnxruntime") {
 		Ok(lib) => {
@@ -730,6 +823,10 @@ fn try_setup_with_pkg_config() -> bool {
 			false
 		}
 	}
+}
+#[cfg(not(feature = "pkg-config"))]
+fn try_setup_with_pkg_config() -> bool {
+	false
 }
 
 fn real_main(link: bool) {

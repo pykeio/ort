@@ -19,13 +19,13 @@ fn main() -> ort::Result<()> {
 	let session = Session::builder()?.commit_from_file(path)?;
 
 	let meta = session.metadata()?;
-	if let Ok(x) = meta.name() {
+	if let Some(x) = meta.name() {
 		println!("Name: {x}");
 	}
-	if let Ok(x) = meta.description() {
+	if let Some(x) = meta.description() {
 		println!("Description: {x}");
 	}
-	if let Ok(x) = meta.producer() {
+	if let Some(x) = meta.producer() {
 		println!("Produced by {x}");
 	}
 

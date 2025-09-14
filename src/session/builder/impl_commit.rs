@@ -41,6 +41,11 @@ impl SessionBuilder {
 
 	#[cfg(all(feature = "fetch-models", feature = "std", not(target_arch = "wasm32")))]
 	fn download(url: &str) -> Result<PathBuf> {
+		use ureq::{
+			config::Config,
+			tls::{RootCerts, TlsConfig, TlsProvider}
+		};
+
 		let mut download_dir = ort_sys::internal::dirs::cache_dir()
 			.expect("could not determine cache directory")
 			.join("models");
@@ -59,7 +64,25 @@ impl SessionBuilder {
 		} else {
 			crate::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), url = format!("{url:?}").as_str(), "Downloading model");
 
-			let resp = ureq::get(url).call().map_err(|e| Error::new(format!("Error downloading to file: {e}")))?;
+			let agent = Config::builder()
+				.tls_config(
+					TlsConfig::builder()
+						.root_certs(RootCerts::WebPki)
+						.provider(if cfg!(any(feature = "tls-rustls", feature = "tls-rustls-no-provider")) {
+							TlsProvider::Rustls
+						} else if cfg!(any(feature = "tls-native", feature = "tls-native-vendored")) {
+							TlsProvider::NativeTls
+						} else {
+							return Err(Error::new(
+								"No TLS provider configured. When using `fetch-models` with HTTPS URLs, a `tls-*` feature must be enabled."
+							));
+						})
+						.build()
+				)
+				.build()
+				.new_agent();
+
+			let resp = agent.get(url).call().map_err(|e| Error::new(format!("Error downloading to file: {e}")))?;
 
 			let len = resp
 				.headers()

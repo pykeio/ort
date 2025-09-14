@@ -72,7 +72,7 @@ jobs:
         run: cargo install cargo-tarpaulin --version 0.32.8
       - name: Generate code coverage
         run: |
-          cargo tarpaulin -p ort --features fetch-models --verbose --timeout 120 --out xml --engine llvm --doc --lib --tests -- --test-threads 1
+          cargo tarpaulin -p ort --features fetch-models,tls-rustls --verbose --timeout 120 --out xml --engine llvm --doc --lib --tests -- --test-threads 1
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v4
         with:

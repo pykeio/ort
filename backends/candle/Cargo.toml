@@ -1,7 +1,7 @@
 [package]
 name = "ort-candle"
 description = "ort + candle = 🦀 - An alternative backend for ort, powered by candle."
-version = "0.1.0+0.8"
+version = "0.2.0+0.9"
 edition = "2021"
 rust-version = "1.70"
 license = "MIT OR Apache-2.0"
@@ -35,8 +35,8 @@ ort-sys = { version = "=2.0.0-rc.10", path = "../../ort-sys", default-features =
 
 [dependencies]
 ort-sys = { workspace = true }
-candle-core = { version = "0.8.1", default-features = false }
-candle-onnx = { version = "0.8.1" }
+candle-core = { version = "0.9.1", default-features = false }
+candle-onnx = { version = "0.9.1" }
 prost = { version = "0.12.1", default-features = false }
 
 [dev-dependencies]

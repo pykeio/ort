@@ -8,10 +8,10 @@ on:
         default: "v1.22.1"
   push:
     paths:
-      - 'ort-sys/build.rs'
+      - 'ort-sys/build/**/*.rs'
   pull_request:
     paths:
-      - 'ort-sys/build.rs'
+      - 'ort-sys/build/**/*.rs'
 env:
   RUST_BACKTRACE: 1
   CARGO_INCREMENTAL: 0

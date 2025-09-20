@@ -55,7 +55,10 @@ fn main() {
 				"cargo:error=ort-sys could not link to the ONNX Runtime build in `{}`\nrerun the build with `cargo build -vv | grep ort-sys` to see debug messages",
 				lib_dir.display()
 			);
+		} else {
+			self::static_link::static_link_prerequisites(BinariesSource::UserProvided);
 		}
+
 		return;
 	}
 

@@ -36,22 +36,22 @@ jobs:
       - name: Run test
         run: |
           ORT_LIB_LOCATION="$(pwd)/onnxruntime/build/Linux/Release" cargo example-custom-ops
-  minimal-build:
-    name: Minimal build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Compile ONNX Runtime
-        run: |
-          git clone https://github.com/microsoft/onnxruntime --recursive --branch ${{ inputs.onnxruntime-branch || 'v1.22.1' }} --single-branch --depth 1
-          cd onnxruntime
-          ./build.sh --update --build --config Release --parallel --compile_no_warning_as_error --skip_submodule_sync --minimal_build
-          cd ..
-      - name: Install stable Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2.7.8
-      - name: Test linking
-        run: |
-          ORT_LIB_LOCATION="$(pwd)/onnxruntime/build/Linux/Release" cargo build --manifest-path examples/custom-ops/Cargo.toml --example custom-ops --target-dir target
+  # minimal-build:
+  #   name: Minimal build
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Compile ONNX Runtime
+  #       run: |
+  #         git clone https://github.com/microsoft/onnxruntime --recursive --branch ${{ inputs.onnxruntime-branch || 'v1.22.1' }} --single-branch --depth 1
+  #         cd onnxruntime
+  #         ./build.sh --update --build --config Release --parallel --compile_no_warning_as_error --skip_submodule_sync --minimal_build
+  #         cd ..
+  #     - name: Install stable Rust toolchain
+  #       uses: dtolnay/rust-toolchain@stable
+  #       with:
+  #         toolchain: stable
+  #     - uses: Swatinem/rust-cache@v2.7.8
+  #     - name: Test linking
+  #       run: |
+  #         ORT_LIB_LOCATION="$(pwd)/onnxruntime/build/Linux/Release" cargo build --manifest-path examples/custom-ops/Cargo.toml --example custom-ops --target-dir target

@@ -1,6 +1,5 @@
 name: 🧩 Backends
 on:
-  workflow_dispatch:
   push:
     paths:
       - '.github/workflows/backends.yml'
@@ -9,16 +8,20 @@ on:
       - 'ort-sys/src/lib.rs'
       - 'Cargo.toml'
   pull_request:
+    types: [ opened, synchronize, reopened ]
     paths:
       - '.github/workflows/backends.yml'
       - 'src/**/*.rs'
       - 'backends/**/*.rs'
       - 'ort-sys/src/lib.rs'
       - 'Cargo.toml'
+permissions:
+  contents: read
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
+  cancel-in-progress: true
 env:
   RUST_BACKTRACE: 1
-  CARGO_INCREMENTAL: 0
-  CARGO_PROFILE_DEV_DEBUG: 0
 jobs:
   candle:
     name: Candle

@@ -1,32 +1,28 @@
 name: 🚩 Misc Checks
 on:
-  workflow_dispatch:
   push:
     paths:
       - '.github/workflows/other-checks.yml'
       - 'src/**/*.rs'
-      - 'examples/**/*'
       - 'ort-sys/**/*.rs'
       - 'ort-sys/**/dist.txt'
-      - 'build.rs'
       - 'Cargo.toml'
-      - '.cargo/**/*'
-      - 'tests/**/*'
   pull_request:
+    types: [ opened, synchronize, reopened ]
     paths:
       - '.github/workflows/other-checks.yml'
       - 'src/**/*.rs'
       - 'examples/**/*'
       - 'ort-sys/**/*.rs'
       - 'ort-sys/**/dist.txt'
-      - 'build.rs'
       - 'Cargo.toml'
-      - '.cargo/**/*'
-      - 'tests/**/*'
+permissions:
+  contents: read
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
+  cancel-in-progress: true
 env:
   RUST_BACKTRACE: 1
-  CARGO_INCREMENTAL: 0
-  CARGO_PROFILE_DEV_DEBUG: 0
 jobs:
   no-default-features:
     name: --no-default-features

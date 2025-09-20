@@ -1,35 +1,33 @@
 name: 📋 Code Quality
 on:
-  workflow_dispatch:
   push:
     paths:
       - '.github/workflows/code-quality.yml'
       - 'src/**/*.rs'
-      - 'build.rs'
       - 'Cargo.toml'
-      - '.cargo/**/*'
       - 'tests/**/*'
       - 'codecov.yml'
-      - 'ort-sys/build.rs'
+      - 'ort-sys/build/**/*.rs'
       - 'ort-sys/src/**/*.rs'
-      - 'ort-sys/wrapper.h'
       - 'ort-sys/Cargo.toml'
   pull_request:
+    types: [ opened, synchronize, reopened ]
     paths:
       - '.github/workflows/code-quality.yml'
       - 'src/**/*.rs'
       - 'Cargo.toml'
-      - '.cargo/**/*'
       - 'tests/**/*'
       - 'codecov.yml'
-      - 'ort-sys/build.rs'
+      - 'ort-sys/build/**/*.rs'
       - 'ort-sys/src/**/*.rs'
-      - 'ort-sys/wrapper.h'
       - 'ort-sys/Cargo.toml'
+permissions:
+  contents: read
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
+  cancel-in-progress: true
 env:
   RUST_BACKTRACE: 1
-  CARGO_INCREMENTAL: 0
-  CARGO_PROFILE_DEV_DEBUG: 0
 jobs:
   lint-and-fmt:
     name: Lint & format

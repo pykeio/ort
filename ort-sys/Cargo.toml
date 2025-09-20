@@ -13,7 +13,8 @@ categories = [ "algorithms", "mathematics", "science" ]
 authors = [
 	"pyke.io <contact@pyke.io>"
 ]
-include = [ "src/", "dist.txt", "build.rs", "LICENSE-APACHE", "LICENSE-MIT" ]
+include = [ "src/", "build/", "LICENSE-APACHE", "LICENSE-MIT" ]
+build = "build/main.rs"
 
 [features]
 default = [ "std" ]
@@ -21,7 +22,6 @@ std = []
 pkg-config = [ "dep:pkg-config" ]
 training = []
 download-binaries = [ "dep:ureq", "dep:flate2", "dep:hmac-sha256" ]
-load-dynamic = []
 copy-dylibs = []
 
 disable-linking = []

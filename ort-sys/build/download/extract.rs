@@ -6,7 +6,7 @@
 use std::{
 	fs::File,
 	io::{self, BufWriter, Read},
-	path::Path,
+	path::{Component, Path, PathBuf},
 	str
 };
 
@@ -87,7 +87,26 @@ pub fn extract_tgz<R: Read>(reader: &mut R, output: &Path) -> Result<(), Error> 
 			continue;
 		}
 
-		let path = output.join(header.path());
+		// only allow entries below the root
+		let mut subpath = PathBuf::new();
+		for comp in PathBuf::from(header.path()).components() {
+			match comp {
+				Component::Prefix(_) | Component::RootDir => {
+					return Err(Error::new("invalid entry path"));
+				}
+				Component::CurDir => {
+					continue;
+				}
+				Component::ParentDir => {
+					subpath.pop();
+				}
+				Component::Normal(x) => {
+					subpath.push(x);
+				}
+			}
+		}
+
+		let path = output.join(subpath);
 		if let Some(parent) = path.parent() {
 			let _ = std::fs::create_dir_all(parent);
 		}

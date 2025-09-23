@@ -7,11 +7,9 @@ train	x86_64-pc-windows-msvc	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.1/x86_64-
 train	aarch64-pc-windows-msvc	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.1/aarch64-pc-windows-msvc+train.tgz	D27474EF926F3CA9D11FBBF4E75445D9028A35443DA4D6A8E843BDACE8970C01
 none	x86_64-pc-windows-msvc	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.1/x86_64-pc-windows-msvc.tgz	DB87454C0918939AE50CC2615521297A25F799D9782717463AD8C4EEE8AEE74A
 none	aarch64-pc-windows-msvc	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.1/aarch64-pc-windows-msvc.tgz	B5D1D9746D626E2687438BBB202F4C5149897121682772EDA3BB797B9F64AB37
-train	x86_64-apple-darwin	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.1/x86_64-apple-darwin+train.tgz	D742D152E63E6E6E23F08082B5D987C3199139F200CD62E2D8EB135DB9AA8A45
 train	aarch64-unknown-linux-gnu	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.1/aarch64-unknown-linux-gnu+train.tgz	6F73D46CACF4AFB675FEF8162F364F41C348747020A0025B632D3B767D1B7EA5
 none	aarch64-apple-darwin	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.1/aarch64-apple-darwin.tgz	47A4DCF38801D0F0F1AAA51C1B9D01971093E3D0DB35FE22ACB5D4C25D0481AB
 train	x86_64-unknown-linux-gnu	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.1/x86_64-unknown-linux-gnu+train.tgz	E54857AE50704DFC7FB3D3CDDEB4CE961E04E0443ACBCF27C770AF031DC83374
-none	x86_64-apple-darwin	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.1/x86_64-apple-darwin.tgz	1492C57F52C6AF4A47ACD8711C7C0BF246821339C60C4516BE645BAB47530252
 wgpu	x86_64-unknown-linux-gnu	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.1/x86_64-unknown-linux-gnu+wgpu.tgz	A29B4835B0EAEE93561630BECF6440BEC1C1D209D6FFC125FAE91646E29C157E
 none	x86_64-unknown-linux-gnu	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.1/x86_64-unknown-linux-gnu.tgz	6091157395630D55AC75F18068254ED76C53502D9EF6917F5C40AC4BEF9B9AF4
 none	aarch64-unknown-linux-gnu	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.22.1/aarch64-unknown-linux-gnu.tgz	D9D83F10347F071CCCB47475F3D3E36065AD1989D1ACD7FC95DAD1111DBFD2F0

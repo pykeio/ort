@@ -11,10 +11,11 @@ extern crate core;
 #[cfg(feature = "std")]
 pub mod internal;
 pub mod stub;
-
-pub const ORT_API_VERSION: u32 = 22;
+mod version;
 
 pub use core::ffi::{c_char, c_int, c_ulong, c_ulonglong, c_ushort, c_void};
+
+pub use self::version::ORT_API_VERSION;
 
 #[cfg(target_os = "windows")]
 pub type ortchar = c_ushort;

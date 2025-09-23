@@ -112,7 +112,7 @@ pub fn extract_tgz<R: Read>(reader: &mut R, output: &Path) -> Result<(), Error> 
 		}
 
 		let size = parse_octal(header.slice(124, 12)).with_context(|| "Failed to read tar entry size")?;
-		let mut file = BufWriter::new(File::create(&path).with_context(|| format!("Failed to create file '{}'", path.display()))?);
+		let mut file = BufWriter::new(File::create_new(&path).with_context(|| format!("Failed to create file '{}'", path.display()))?);
 
 		let copied_bytes = io::copy(&mut tar.by_ref().take(size), &mut file).with_context(|| format!("Failed to extract to '{}'", path.display()))?;
 		assert_eq!(size, copied_bytes, "did not copy full entry");

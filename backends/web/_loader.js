@@ -14,7 +14,7 @@ const FEATURES_ALL = FEATURES_WEBGL | FEATURES_WEBGPU;
  * @property {Record<'main' | 'wrapper' | 'binary', string>} integrities
  */
 
-const DIST_BASE = 'https://cdn.pyke.io/0/pyke:ort-rs/web@1.22.0/';
+const DIST_BASE = 'https://cdn.pyke.io/0/pyke:ort-rs/web@1.23.0/';
 
 /** @type {Record<number, Dist>} */
 const DIST = {

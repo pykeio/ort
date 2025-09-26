@@ -11,7 +11,7 @@ use super::SessionBuilder;
 #[cfg(feature = "std")]
 use crate::util::path_to_os_char;
 use crate::{
-	AsPointer,
+	AsPointer, Error, ErrorCode,
 	environment::{self, ThreadManager},
 	error::Result,
 	execution_providers::{ExecutionProviderDispatch, apply_execution_providers},
@@ -121,10 +121,13 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
-	/// Set the session's allocator options from a [`MemoryInfo`].
-	///
-	/// If not provided, the session is created using ONNX Runtime's default device allocator.
+	/// Configure this session to use a custom allocator, rather than the global default. This allocator is responsible
+	/// for allocating the *metadata* associated with values -- not the contents of the values themselves; that's
+	/// handled by the active execution providers. As such, only CPU-accessible allocators are allowed.
 	pub fn with_allocator(mut self, info: MemoryInfo) -> Result<Self> {
+		if !info.is_cpu_accessible() {
+			return Err(Error::new_with_code(ErrorCode::InvalidArgument, "SessionBuilder::with_allocator may only use a CPU-accessible allocator"));
+		}
 		self.memory_info = Some(Arc::new(info));
 		Ok(self)
 	}

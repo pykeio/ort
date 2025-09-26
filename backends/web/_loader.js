@@ -23,9 +23,9 @@ const DIST = {
 		scriptName: 'ort.wasm.min.js',
 		binaryName: 'ort-wasm-simd-threaded.wasm',
 		integrities: {
-			main: 'epp8GDQUoLKx5qHa6SoDHKv7fSHILsEYk4uEsHdPRBztXEIVWCe/lhhrQJUBMZcf',
-			wrapper: 'LXMGGJ76ujT3yGw+OWQZVB6vBmJ7lqTO957Fh6ov3385aw3EncleBNFfYFAl3vXW',
-			binary: 'Eu/XUdOA62yl+TueG792KtrQlAGAMW3g10sY4G3LBYyYZUtM126Z4Gr3ljTlXUGG'
+			main: 'Uvpo3KshAzID7bmsY+Pz2/tiNWwl6Y5XeDTPpktDx73e0o/1TdssZDScTVHxpLYv',
+			wrapper: 'Y/ZaWdP4FERyRvi+anEVDVDDhMJKldzf33TRb2MiCALo054swqCUe6aM/tD8XL6g',
+			binary: '9UMXJFWi2zyn9PbGgXmJjEYM4hu8T8zmqmgxX6zQ08ZmNBOso3IT0cTp3M3oU7DU'
 		}
 	},
 	[FEATURES_WEBGL]: {
@@ -33,9 +33,9 @@ const DIST = {
 		scriptName: 'ort.webgl.min.js',
 		binaryName: 'ort-wasm-simd-threaded.wasm',
 		integrities: {
-			main: 'IbmlOTVtLFqdmXae30hOMw60GXx+uyALrXF1TomZTqfkz2eL2RL/Po/TzbsGe/yv',
-			wrapper: 'LXMGGJ76ujT3yGw+OWQZVB6vBmJ7lqTO957Fh6ov3385aw3EncleBNFfYFAl3vXW',
-			binary: 'Eu/XUdOA62yl+TueG792KtrQlAGAMW3g10sY4G3LBYyYZUtM126Z4Gr3ljTlXUGG'
+			main: 'pD9jsAlDhP5yhHaVikKM6mXw/E4HPB+4kc/rf3lrMctGWwT0XpIxiTdH/XDHR7Pr',
+			wrapper: 'Y/ZaWdP4FERyRvi+anEVDVDDhMJKldzf33TRb2MiCALo054swqCUe6aM/tD8XL6g',
+			binary: '9UMXJFWi2zyn9PbGgXmJjEYM4hu8T8zmqmgxX6zQ08ZmNBOso3IT0cTp3M3oU7DU'
 		}
 	},
 	[FEATURES_WEBGPU]: {
@@ -43,9 +43,9 @@ const DIST = {
 		scriptName: 'ort.webgpu.min.js',
 		binaryName: 'ort-wasm-simd-threaded.jsep.wasm',
 		integrities: {
-			main: 'XM2cMlQFAUJFJ3s2424PSr/v9zkRT4aXfi1cUz2SunZatAOwTR5GfTcIKLJIf3Ns',
-			wrapper: 'fZi+E4spXPUbkMSScLJlEGqj5QdfSJK7VQ2AZC5HLLV8lZg1j+TZT0RK6aEakeeX',
-			binary: 'NNN1BawwGTHI+TPz2ivQSKo1AJHr/496DqG53T9IUQ6B9ruFNrov0DNJhqucIwZ1'
+			main: 'rY/SpyGuo298HuKPNCTIhlm3xc022++95XwJnuGVpKaW4yEzMTTDvgXoRQdiicvj',
+			wrapper: 'Liv6LVoHkWBuJEPAGGmpzPGesXdc9YN5Eu0UaA9a9qChwB0H21V86UFBLhnIBieb',
+			binary: 'jVPVL8reOtRz4+v3ZZAWg8bO5m7HGJr7tsMxmvNae28TztYbHZIk8JXHeZ/82yST'
 		}
 	},
 	[FEATURES_ALL]: {
@@ -53,9 +53,9 @@ const DIST = {
 		scriptName: 'ort.all.min.js',
 		binaryName: 'ort-wasm-simd-threaded.jsep.wasm',
 		integrities: {
-			main: 'YWRTN6ucI4mQ8JMXfTaXD+iM7ExBj4KSHo6k6W9UIgx1tG98UgXpekjyYvRQ6akx',
-			wrapper: 'fZi+E4spXPUbkMSScLJlEGqj5QdfSJK7VQ2AZC5HLLV8lZg1j+TZT0RK6aEakeeX',
-			binary: 'NNN1BawwGTHI+TPz2ivQSKo1AJHr/496DqG53T9IUQ6B9ruFNrov0DNJhqucIwZ1'
+			main: 'VVNyVdgdgHOM/8agRDy7rVx66N+/9T1vkYzwYtSS/u36YVzaln3cMtxt24ozySvr',
+			wrapper: 'Liv6LVoHkWBuJEPAGGmpzPGesXdc9YN5Eu0UaA9a9qChwB0H21V86UFBLhnIBieb',
+			binary: 'jVPVL8reOtRz4+v3ZZAWg8bO5m7HGJr7tsMxmvNae28TztYbHZIk8JXHeZ/82yST'
 		}
 	}
 };

@@ -17,14 +17,16 @@ Here are the supported platforms and binary availability status, as of v2.0.0-rc
 |:-------- |:------- |:------ |:------ |:------ |
 | **Windows** | 🔷 | 🟢<sup>\*</sup> | 🔷 | 🟢<sup>\*</sup> |
 | **Linux** | 🔷 | 🟢† | 🔷 | 🟢† |
-| **macOS** | ❌ | 🟢§ | ❌ | 🟢 |
-| **iOS** | ❌ | ❌ | ❌ | 🔷 |
-| **Android** | ❌ | ❌ | 🔷 | 🔷 |
+| **macOS** | ❌ | ❌ | ❌ | 🟢§ |
+| **iOS** | ❌ | ❌ | ❌ | 🟢‡ |
+| **Android** | ❌ | ❌ | 🔷 | 🟢⹋ |
 
 <div style={{ opacity: 0.5, display: 'flex', flexDirection: 'column', fontSize: '0.75rem' }}>
-<p>\* A recent version of Windows 10/11 & Visual Studio 2022 (≥ 17.11) are required for pyke binaries.</p>
-<p>† glibc ≥ 2.35 & libstdc++ >= 12 (Ubuntu ≥ 22.04, Debian ≥ 12 'Bookworm') required for pyke binaries.</p>
-<p>§ macOS ≥ 10.15 required.</p>
+<p>\* A recent version of Windows 11 & Visual Studio 2022 (≥ 17.14) are required for pyke binaries.</p>
+<p>† glibc ≥ 2.39 & libstdc++ >= 13.2 (Ubuntu ≥ 24.04, Debian ≥ 13 'Trixie') required for pyke binaries.</p>
+<p>§ macOS ≥ 13.4 required.</p>
+<p>‡ Supports iOS >= 15.1.</p>
+<p>⹋ Supports Android >= 7.0 (API 24).</p>
 </div>
 
 If your platform is marked as 🟢, you're in luck! Almost no setup will be required to get `ort` up and running.

@@ -1,1 +1,1 @@
-pub const ORT_API_VERSION: u32 = 22;
+pub const ORT_API_VERSION: u32 = 23;

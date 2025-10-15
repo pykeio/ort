@@ -20,7 +20,7 @@ exclude = [
 
 [package]
 name = "ort"
-description = "A safe Rust wrapper for ONNX Runtime 1.22 - Optimize and accelerate machine learning inference & training"
+description = "A safe Rust wrapper for ONNX Runtime 1.23 - Optimize and accelerate machine learning inference & training"
 version = "2.0.0-rc.10"
 edition = "2021"
 rust-version = "1.85"

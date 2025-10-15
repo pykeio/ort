@@ -115,9 +115,7 @@ Alternatively, try a different backend like `ort-tract`; see https://ort.pyke.io
 			.join("dfbin")
 			.join(target)
 			.join(dist.hash);
-
-		let lib_dir = bin_extract_dir.join("onnxruntime").join("lib");
-		if !lib_dir.exists() {
+		if !bin_extract_dir.exists() {
 			let mut verified_reader = match download::fetch_file(dist.url) {
 				Ok(reader) => download::VerifyReader::new(reader),
 				Err(e) => {
@@ -172,9 +170,9 @@ The downloaded binaries are available to inspect at: {}",
 		static_link::static_link_prerequisites(BinariesSource::Pyke);
 
 		#[cfg(feature = "copy-dylibs")]
-		dynamic_link::copy_dylibs(&lib_dir, &std::path::PathBuf::from(env::var("OUT_DIR").unwrap()));
+		dynamic_link::copy_dylibs(&bin_extract_dir, &std::path::PathBuf::from(env::var("OUT_DIR").unwrap()));
 
-		println!("cargo:rustc-link-search=native={}", lib_dir.display());
+		println!("cargo:rustc-link-search=native={}", bin_extract_dir.display());
 		println!("cargo:rustc-link-lib=static=onnxruntime");
 	}
 }

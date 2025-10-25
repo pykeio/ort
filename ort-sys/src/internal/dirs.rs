@@ -127,7 +127,7 @@ mod unix {
 		pub pw_shell: *mut c_char
 	}
 
-	extern "C" {
+	unsafe extern "C" {
 		fn sysconf(name: c_int) -> c_long;
 		fn getpwuid_r(uid: uid_t, pwd: *mut passwd, buf: *mut c_char, buflen: size_t, result: *mut *mut passwd) -> c_int;
 		fn getuid() -> uid_t;
@@ -155,17 +155,17 @@ mod unix {
 		}
 		#[cfg(not(any(target_os = "android", target_os = "ios", target_os = "emscripten")))]
 		unsafe fn fallback() -> Option<OsString> {
-			let amt = match sysconf(SC_GETPW_R_SIZE_MAX) {
+			let amt = match unsafe { sysconf(SC_GETPW_R_SIZE_MAX) } {
 				n if n < 0 => 512,
 				n => n as usize
 			};
 			let mut buf = Vec::with_capacity(amt);
-			let mut passwd: passwd = mem::zeroed();
+			let mut passwd: passwd = unsafe { mem::zeroed() };
 			let mut result = ptr::null_mut();
-			match getpwuid_r(getuid(), &mut passwd, buf.as_mut_ptr(), buf.capacity(), &mut result) {
+			match unsafe { getpwuid_r(getuid(), &mut passwd, buf.as_mut_ptr(), buf.capacity(), &mut result) } {
 				0 if !result.is_null() => {
 					let ptr = passwd.pw_dir as *const _;
-					let bytes = CStr::from_ptr(ptr).to_bytes();
+					let bytes = unsafe { CStr::from_ptr(ptr) }.to_bytes();
 					if bytes.is_empty() { None } else { Some(OsStringExt::from_vec(bytes.to_vec())) }
 				}
 				_ => None

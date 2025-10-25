@@ -10,7 +10,7 @@ pub const PYKE_ROOT: &str = "ort.pyke.io";
 macro_rules! win32_extern {
     ($library:literal $abi:literal $($link_name:literal)? $(#[$doc:meta])? fn $($function:tt)*) => (
         #[link(name = $library, kind = "raw-dylib", modifiers = "+verbatim", import_name_type = "undecorated")]
-        extern $abi {
+        unsafe extern $abi {
             $(#[$doc])?
             $(#[link_name=$link_name])?
             fn $($function)*;
@@ -21,7 +21,7 @@ macro_rules! win32_extern {
 macro_rules! win32_extern {
 	($library:literal $abi:literal $($link_name:literal)? $(#[$doc:meta])? fn $($function:tt)*) => (
 		#[link(name = $library, kind = "raw-dylib", modifiers = "+verbatim")]
-		extern "C" {
+		unsafe extern "C" {
 			$(#[$doc])?
 			$(#[link_name=$link_name])?
 			fn $($function)*;

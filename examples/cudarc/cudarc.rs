@@ -1,10 +1,10 @@
 use std::{ops::Mul, path::Path};
 
-use cudarc::driver::{CudaDevice, DevicePtr, DevicePtrMut, sys::CUdeviceptr};
+use cudarc::driver::{CudaDevice, DevicePtr};
 use image::{GenericImageView, ImageBuffer, Rgba, imageops::FilterType};
 use ndarray::Array;
 use ort::{
-	execution_providers::{CUDAExecutionProvider, ExecutionProvider},
+	execution_providers::CUDAExecutionProvider,
 	memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
 	session::Session,
 	tensor::Shape,
@@ -48,12 +48,12 @@ fn main() -> anyhow::Result<()> {
 	}
 
 	let device = CudaDevice::new(0)?;
-	let device_data = device.htod_sync_copy(&input.into_raw_vec())?;
+	let device_data = device.htod_sync_copy(&input.into_raw_vec_and_offset().0)?;
 	let tensor: TensorRefMut<'_, f32> = unsafe {
 		TensorRefMut::from_raw(
 			MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?,
 			(*device_data.device_ptr() as usize as *mut ()).cast(),
-			Shape::from([1, 3, 512, 512])
+			Shape::from([1i64, 3, 512, 512])
 		)
 		.unwrap()
 	};
@@ -63,7 +63,7 @@ fn main() -> anyhow::Result<()> {
 
 	// convert to 8-bit
 	let output = output.mul(255.0).map(|x| *x as u8);
-	let output = output.into_raw_vec();
+	let (output, _) = output.into_raw_vec_and_offset();
 
 	// change rgb to rgba
 	let output_img = ImageBuffer::from_fn(512, 512, |x, y| {

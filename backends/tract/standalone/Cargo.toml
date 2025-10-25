@@ -2,7 +2,7 @@
 name = "ort-tract-standalone"
 publish = false
 version = "1.23.1"
-edition = "2021"
+edition = "2024"
 
 [package.metadata.winresource]
 ProductName = "ONNX Runtime (tract)"

@@ -1,4 +1,5 @@
 [workspace]
+resolver = "3"
 members = [ 'ort-sys' ]
 default-members = [ '.' ]
 exclude = [
@@ -22,7 +23,7 @@ exclude = [
 name = "ort"
 description = "A safe Rust wrapper for ONNX Runtime 1.23 - Optimize and accelerate machine learning inference & training"
 version = "2.0.0-rc.10"
-edition = "2021"
+edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/pykeio/ort"

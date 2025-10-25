@@ -42,21 +42,21 @@ impl Error {
 	}
 
 	pub unsafe fn consume_sys(status: *mut OrtStatus) -> Box<Error> {
-		Box::from_raw(status.cast::<Error>())
+		unsafe { Box::from_raw(status.cast::<Error>()) }
 	}
 }
 
 unsafe extern "system" fn CreateStatus(code: OrtErrorCode, msg: *const ::core::ffi::c_char) -> OrtStatusPtr {
-	let msg = CString::from_raw(msg.cast_mut());
+	let msg = unsafe { CString::from_raw(msg.cast_mut()) };
 	Error::new_sys(code, msg.to_string_lossy())
 }
 
 unsafe extern "system" fn GetErrorCode(status: *const OrtStatus) -> OrtErrorCode {
-	Error::cast_from_sys(status).code
+	unsafe { Error::cast_from_sys(status) }.code
 }
 
 unsafe extern "system" fn GetErrorMessage(status: *const OrtStatus) -> *const ::core::ffi::c_char {
-	Error::cast_from_sys(status).message_ptr()
+	unsafe { Error::cast_from_sys(status) }.message_ptr()
 }
 
 unsafe extern "system" fn CreateEnv(log_severity_level: OrtLoggingLevel, logid: *const ::core::ffi::c_char, out: *mut *mut OrtEnv) -> OrtStatusPtr {
@@ -441,12 +441,12 @@ unsafe extern "system" fn MemoryInfoGetMemType(ptr: *const OrtMemoryInfo, out: *
 }
 
 unsafe extern "system" fn MemoryInfoGetType(ptr: *const OrtMemoryInfo, out: *mut OrtAllocatorType) -> OrtStatusPtr {
-	*out = OrtAllocatorType::OrtDeviceAllocator;
+	unsafe { *out = OrtAllocatorType::OrtDeviceAllocator };
 	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn AllocatorAlloc(ort_allocator: *mut OrtAllocator, size: usize, out: *mut *mut ::core::ffi::c_void) -> OrtStatusPtr {
-	*out = unsafe { &*ort_allocator }.Alloc.unwrap()(ort_allocator, size);
+	unsafe { *out = (&*ort_allocator).Alloc.unwrap()(ort_allocator, size) };
 	if unsafe { *out }.is_null() {
 		return Error::new_sys(OrtErrorCode::ORT_RUNTIME_EXCEPTION, "Allocation failed");
 	}
@@ -454,12 +454,12 @@ unsafe extern "system" fn AllocatorAlloc(ort_allocator: *mut OrtAllocator, size:
 }
 
 unsafe extern "system" fn AllocatorFree(ort_allocator: *mut OrtAllocator, p: *mut ::core::ffi::c_void) -> OrtStatusPtr {
-	unsafe { &*ort_allocator }.Free.unwrap()(ort_allocator, p);
+	unsafe { (&*ort_allocator).Free.unwrap()(ort_allocator, p) };
 	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn AllocatorGetInfo(ort_allocator: *const OrtAllocator, out: *mut *const OrtMemoryInfo) -> OrtStatusPtr {
-	*out = unsafe { &*ort_allocator }.Info.unwrap()(ort_allocator);
+	unsafe { *out = (&*ort_allocator).Info.unwrap()(ort_allocator) };
 	OrtStatusPtr::default()
 }
 
@@ -549,7 +549,7 @@ unsafe extern "system" fn KernelContext_GetOutput(
 unsafe extern "system" fn ReleaseEnv(input: *mut OrtEnv) {}
 
 unsafe extern "system" fn ReleaseStatus(input: *mut OrtStatus) {
-	drop(Error::consume_sys(input));
+	drop(unsafe { Error::consume_sys(input) });
 }
 
 unsafe extern "system" fn ReleaseMemoryInfo(input: *mut OrtMemoryInfo) {}

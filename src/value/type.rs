@@ -144,7 +144,7 @@ impl ValueType {
 				let mut contained_type: *mut ort_sys::OrtTypeInfo = ptr::null_mut();
 				ortsys![unsafe GetOptionalContainedTypeInfo(info_ptr.as_ptr(), &mut contained_type).expect("infallible"); nonNull(contained_type)];
 
-				ValueType::Optional(Box::new(ValueType::from_type_info(contained_type)))
+				ValueType::Optional(Box::new(unsafe { ValueType::from_type_info(contained_type) }))
 			}
 			_ => unreachable!()
 		}

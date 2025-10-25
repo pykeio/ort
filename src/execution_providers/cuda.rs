@@ -46,7 +46,7 @@ impl BitOr for CUDAAttentionBackend {
 }
 
 /// The type of search done for cuDNN convolution algorithms.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum CuDNNConvAlgorithmSearch {
 	/// Expensive exhaustive benchmarking using [`cudnnFindConvolutionForwardAlgorithmEx`][exhaustive].
 	/// This function will attempt all possible algorithms for `cudnnConvolutionForward` to find the fastest algorithm.
@@ -54,6 +54,7 @@ pub enum CuDNNConvAlgorithmSearch {
 	/// possible convolution algorithms are tested.
 	///
 	/// [exhaustive]: https://docs.nvidia.com/deeplearning/cudnn/api/index.html#cudnnFindConvolutionForwardAlgorithmEx
+	#[default]
 	Exhaustive,
 	/// Lightweight heuristic-based search using [`cudnnGetConvolutionForwardAlgorithm_v7`][heuristic].
 	/// Heuristic search sorts available convolution algorithms by expected (based on internal heuristic) relative
@@ -73,12 +74,6 @@ pub enum CuDNNConvAlgorithmSearch {
 	/// [`Exhaustive`]: CuDNNConvAlgorithmSearch::Exhaustive
 	/// [`Heuristic`]: CuDNNConvAlgorithmSearch::Heuristic
 	Default
-}
-
-impl Default for CuDNNConvAlgorithmSearch {
-	fn default() -> Self {
-		Self::Exhaustive
-	}
 }
 
 /// [CUDA execution provider](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html) for NVIDIA

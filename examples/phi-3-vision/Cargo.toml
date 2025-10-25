@@ -2,7 +2,7 @@
 publish = false
 name = "example-phi-3-vision"
 version = "0.0.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 ort = { path = "../../" }
@@ -42,7 +42,3 @@ azure = [ "ort/azure" ]
 
 backend-candle = [ "ort/alternative-backend", "dep:ort-candle" ]
 backend-tract = [ "ort/alternative-backend", "dep:ort-tract" ]
-
-[[example]]
-name = "gpt2"
-path = "gpt2.rs"

@@ -286,7 +286,7 @@ impl ToAttribute for Vec<f32> {
 	where
 		Self: Sized
 	{
-		self.as_slice().to_attribute(name)
+		unsafe { self.as_slice().to_attribute(name) }
 	}
 
 	private_impl!();
@@ -352,7 +352,7 @@ impl ToAttribute for Vec<i64> {
 	where
 		Self: Sized
 	{
-		self.as_slice().to_attribute(name)
+		unsafe { self.as_slice().to_attribute(name) }
 	}
 
 	private_impl!();
@@ -411,7 +411,7 @@ impl ToAttribute for Vec<String> {
 	where
 		Self: Sized
 	{
-		self.as_slice().to_attribute(name)
+		unsafe { self.as_slice().to_attribute(name) }
 	}
 
 	private_impl!();
@@ -422,7 +422,7 @@ impl ToAttribute for Vec<&str> {
 	where
 		Self: Sized
 	{
-		self.as_slice().to_attribute(name)
+		unsafe { self.as_slice().to_attribute(name) }
 	}
 
 	private_impl!();

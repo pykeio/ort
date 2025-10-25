@@ -2,8 +2,8 @@
 name = "ort-candle"
 description = "ort + candle = 🦀 - An alternative backend for ort, powered by candle."
 version = "0.2.0+0.9"
-edition = "2021"
-rust-version = "1.70"
+edition = "2024"
+rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/pykeio/ort"
 homepage = "https://ort.pyke.io/backends/candle"
@@ -14,7 +14,7 @@ authors = [
 ]
 
 [workspace]
-resolver = "2"
+resolver = "3"
 members = [ "standalone" ]
 default-members = []
 

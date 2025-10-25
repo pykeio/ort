@@ -4,7 +4,7 @@ use std::{ops::Mul, path::Path};
 
 use image::{GenericImageView, ImageBuffer, Rgba, imageops::FilterType};
 use ndarray::Array;
-use ort::{execution_providers::CUDAExecutionProvider, inputs, session::Session, value::TensorRef};
+use ort::{inputs, session::Session, value::TensorRef};
 use show_image::{AsImageView, WindowOptions, event};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -66,10 +66,13 @@ fn main() -> ort::Result<()> {
 	let window = show_image::context()
 		.run_function_wait(move |context| -> Result<_, String> {
 			let mut window = context
-				.create_window("ort + modnet", WindowOptions {
-					size: Some([img_width, img_height]),
-					..WindowOptions::default()
-				})
+				.create_window(
+					"ort + modnet",
+					WindowOptions {
+						size: Some([img_width, img_height]),
+						..WindowOptions::default()
+					}
+				)
 				.map_err(|e| e.to_string())?;
 			window.set_image("photo", &output.as_image_view().map_err(|e| e.to_string())?);
 			Ok(window.proxy())

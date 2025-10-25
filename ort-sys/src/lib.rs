@@ -774,7 +774,7 @@ pub struct OrtApiBase {
 	#[doc = " \\brief Returns a null terminated string of the version of the Onnxruntime library (eg: \"1.8.1\")\n\n  \\return UTF-8 encoded version string. Do not deallocate the returned buffer."]
 	pub GetVersionString: unsafe extern "system" fn() -> *const core::ffi::c_char
 }
-extern "system" {
+unsafe extern "system" {
 	#[doc = " \\brief The Onnxruntime library's entry point to access the C API\n\n Call this to get the a pointer to an ::OrtApiBase"]
 	pub fn OrtGetApiBase() -> *const OrtApiBase;
 }
@@ -1619,7 +1619,7 @@ pub struct OrtCustomOp {
 	pub GetAliasMap: Option<unsafe extern "system" fn(input_index: *mut *mut core::ffi::c_int, output_index: *mut *mut core::ffi::c_int) -> usize>,
 	pub ReleaseAliasMap: Option<unsafe extern "system" fn(input_index: *mut core::ffi::c_int, output_index: *mut *mut core::ffi::c_int)>
 }
-extern "system" {
+unsafe extern "system" {
 	pub fn OrtSessionOptionsAppendExecutionProvider_CUDA(options: *mut OrtSessionOptions, device_id: core::ffi::c_int) -> OrtStatusPtr;
 	pub fn OrtSessionOptionsAppendExecutionProvider_ROCM(options: *mut OrtSessionOptions, device_id: core::ffi::c_int) -> OrtStatusPtr;
 	pub fn OrtSessionOptionsAppendExecutionProvider_MIGraphX(options: *mut OrtSessionOptions, device_id: core::ffi::c_int) -> OrtStatusPtr;

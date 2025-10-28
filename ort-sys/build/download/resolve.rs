@@ -29,6 +29,9 @@ pub fn resolve_dist() -> Result<Distribution, Option<String>> {
 	if cfg!(feature = "webgpu") {
 		feature_set.push("wgpu");
 	}
+	if cfg!(feature = "nv") {
+		feature_set.push("nvrtx");
+	}
 	if cfg!(any(feature = "cuda", feature = "tensorrt")) {
 		feature_set.push("cu12");
 	}

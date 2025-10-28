@@ -4,13 +4,13 @@ use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
 use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Default, Clone)]
-pub struct NVExecutionProvider {
+pub struct NVRTXExecutionProvider {
 	options: ExecutionProviderOptions
 }
 
-super::impl_ep!(arbitrary; NVExecutionProvider);
+super::impl_ep!(arbitrary; NVRTXExecutionProvider);
 
-impl NVExecutionProvider {
+impl NVRTXExecutionProvider {
 	pub fn with_device_id(mut self, device_id: u32) -> Self {
 		self.options.set("ep.nvtensorrtrtxexecutionprovider.device_id", device_id.to_string());
 		self
@@ -23,7 +23,7 @@ impl NVExecutionProvider {
 	}
 }
 
-impl ExecutionProvider for NVExecutionProvider {
+impl ExecutionProvider for NVRTXExecutionProvider {
 	fn name(&self) -> &'static str {
 		"NvTensorRTRTXExecutionProvider"
 	}
@@ -34,7 +34,7 @@ impl ExecutionProvider for NVExecutionProvider {
 
 	#[allow(unused, unreachable_code)]
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
-		#[cfg(any(feature = "load-dynamic", feature = "nv"))]
+		#[cfg(any(feature = "load-dynamic", feature = "nvrtx"))]
 		{
 			use crate::{AsPointer, ortsys};
 

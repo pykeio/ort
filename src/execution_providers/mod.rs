@@ -63,8 +63,8 @@ pub mod webgpu;
 pub use self::webgpu::WebGPUExecutionProvider;
 pub mod azure;
 pub use self::azure::AzureExecutionProvider;
-pub mod nv;
-pub use self::nv::NVExecutionProvider;
+pub mod nvrtx;
+pub use self::nvrtx::NVRTXExecutionProvider;
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
 #[cfg(target_arch = "wasm32")]

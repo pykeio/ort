@@ -41,7 +41,7 @@ parking_lot = "0.12"
 [dev-dependencies]
 ort = { version = "=2.0.0-rc.10", path = "../../", default-features = false, features = [ "alternative-backend", "fetch-models", "tls-rustls", "ndarray" ] }
 image = "0.25"
-ndarray = "0.16"
+ndarray = "0.17"
 
 [[test]]
 name = "memory"

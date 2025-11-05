@@ -96,7 +96,7 @@ nvrtx = [ "ort-sys/nvrtx" ]
 ort-sys = { version = "=2.0.0-rc.10", path = "ort-sys", default-features = false }
 smallvec = { version = "=2.0.0-alpha.11", default-features = false }
 
-ndarray = { version = "0.16", default-features = false, optional = true }
+ndarray = { version = "0.17", default-features = false, optional = true }
 libloading = { version = "0.8", optional = true }
 ureq = { version = "3", optional = true, default-features = false }
 sha2 = { version = "0.10", optional = true }

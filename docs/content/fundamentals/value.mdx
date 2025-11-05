@@ -15,7 +15,7 @@ For ONNX Runtime, a **value** represents any type that can be given to/returned 
 
 ### Creating tensors
 Tensors can be created with [`Tensor::from_array`](https://docs.rs/ort/2.0.0-rc.10/ort/value/type.Tensor.html#method.from_array) from either:
-- an [`ndarray::Array`](https://docs.rs/ndarray/0.16.1/ndarray/type.Array.html), or
+- an [`ndarray::Array`](https://docs.rs/ndarray/0.17.1/ndarray/type.Array.html), or
 - a tuple of `(shape, data)`, where:
     - `shape` is one of `Vec<I>`, `[I; N]` or `&[I]`, where `I` is `i64` or `usize`, and
     - `data` is one of `Vec<T>` or `Box<[T]>`.

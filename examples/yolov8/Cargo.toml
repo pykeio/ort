@@ -6,7 +6,7 @@ edition = "2024"
 
 [dependencies]
 ort = { path = "../../", features = [ "fetch-models" ] }
-ndarray = "0.16"
+ndarray = "0.17"
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
 image = "0.25"
 show-image = { version = "=0.14.0", features = [ "image", "raqote" ] }

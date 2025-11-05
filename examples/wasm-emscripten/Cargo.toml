@@ -10,7 +10,7 @@ name = "wasm_example"
 
 [dependencies]
 ort = { path = "../../", default-features = false, features = ["ndarray", "webgpu", "download-binaries"] }
-ndarray = "0.16"
+ndarray = "0.17"
 image = "0.25"
 
 [build-dependencies]

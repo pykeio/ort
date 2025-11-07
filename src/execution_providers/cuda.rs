@@ -398,25 +398,25 @@ pub const CUDA_DYLIBS: &[&str] = &["libcudart.so.12", "libcublasLt.so.12", "libc
 
 #[cfg(windows)]
 pub const CUDNN_DYLIBS: &[&str] = &[
-    "cudnn64_9.dll",
-    "cudnn_graph64_9.dll",
-    "cudnn_ops64_9.dll",
-    "cudnn_heuristic64_9.dll",
-    "cudnn_adv64_9.dll",
-    "cudnn_cnn64_9.dll",
+	"cudnn64_9.dll",
+	"cudnn_graph64_9.dll",
+	"cudnn_ops64_9.dll",
+	"cudnn_heuristic64_9.dll",
+	"cudnn_adv64_9.dll",
+	"cudnn_cnn64_9.dll",
 	"cudnn_engines_precompiled64_9.dll",
-    "cudnn_engines_runtime_compiled64_9.dll"
+	"cudnn_engines_runtime_compiled64_9.dll"
 ];
 #[cfg(not(windows))]
 pub const CUDNN_DYLIBS: &[&str] = &[
-    "libcudnn.so.9",
-    "libcudnn_graph.so.9",
-    "libcudnn_ops.so.9",
-    "libcudnn_heuristic.so.9",
-    "libcudnn_adv.so.9",
-    "libcudnn_cnn.so.9",
+	"libcudnn.so.9",
+	"libcudnn_graph.so.9",
+	"libcudnn_ops.so.9",
+	"libcudnn_heuristic.so.9",
+	"libcudnn_adv.so.9",
+	"libcudnn_cnn.so.9",
 	"libcudnn_engines_precompiled.so.9",
-    "libcudnn_engines_runtime_compiled.so.9"
+	"libcudnn_engines_runtime_compiled.so.9"
 ];
 
 /// Preload the dylibs required by CUDA/cuDNN.

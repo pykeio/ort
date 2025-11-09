@@ -101,7 +101,7 @@ libloading = { version = "0.8", optional = true }
 ureq = { version = "3", optional = true, default-features = false }
 sha2 = { version = "0.10", optional = true }
 tracing = { version = "0.1", optional = true, default-features = false }
-half = { version = "2.1", default-features = false, optional = true }
+half = { version = "2.7", default-features = false, optional = true }
 num-complex = { version = "0.4", default-features = false, optional = true }
 
 [dev-dependencies]
@@ -109,4 +109,4 @@ anyhow = "1.0"
 ureq = { version = "3", default-features = false, features = [ "native-tls" ] }
 image = "0.25"
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
-tokio = { version = "1.36", features = [ "test-util" ] }
+tokio = { version = "1.48", features = [ "test-util" ] }

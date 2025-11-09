@@ -58,18 +58,9 @@ pub(crate) fn path_to_os_char(path: impl AsRef<std::path::Path>) -> OsCharArray 
 	path
 }
 
+#[cfg(target_family = "windows")]
 pub(crate) fn str_to_os_char(string: &str) -> OsCharArray {
-	#[cfg(target_family = "windows")]
-	let os_char = string.encode_utf16().chain(core::iter::once(0)).collect();
-	#[cfg(not(target_family = "windows"))]
-	let os_char = string
-		.as_bytes()
-		.iter()
-		.copied()
-		.chain(core::iter::once(0))
-		.map(|b| b as c_char)
-		.collect();
-	os_char
+	string.encode_utf16().chain(core::iter::once(0)).collect()
 }
 
 // generally as performant or faster than HashMap<K, V> for <50 items. good enough for #[no_std]

@@ -37,10 +37,14 @@ impl Error {
 		self.message.as_ptr()
 	}
 
+	/// # Safety
+	/// `status` must point to an `Error` allocated by this stub and remain valid for the returned lifetime.
 	pub unsafe fn cast_from_sys<'e>(status: *const OrtStatus) -> &'e Error {
 		unsafe { &*status.cast::<Error>() }
 	}
 
+	/// # Safety
+	/// `status` must come from `Error::into_sys` and must not be consumed more than once.
 	pub unsafe fn consume_sys(status: *mut OrtStatus) -> Box<Error> {
 		unsafe { Box::from_raw(status.cast::<Error>()) }
 	}

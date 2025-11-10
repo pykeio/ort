@@ -24,12 +24,13 @@ pub use self::{
 };
 
 pub fn fetch_file(source_url: &str) -> Result<BodyReader<'static>, Error> {
-	let tls_provider = if cfg!(feature = "tls-rustls-no-provider") {
+	let use_rustls = cfg!(any(feature = "tls-rustls", feature = "tls-rustls-no-provider"));
+	let tls_provider = if use_rustls {
 		TlsProvider::Rustls
 	} else {
 		TlsProvider::NativeTls
 	};
-	let root_certs = if cfg!(feature = "tls-rustls-no-provider") {
+	let root_certs = if use_rustls {
 		RootCerts::WebPki
 	} else {
 		RootCerts::PlatformVerifier

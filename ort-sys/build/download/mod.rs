@@ -9,7 +9,7 @@ use std::{env, time::Duration};
 use ureq::{
 	Agent, BodyReader, Proxy,
 	config::Config as UreqConfig,
-	tls::{RootCerts, TlsConfig, TlsProvider}
+	tls::{RootCerts, TlsConfig, TlsProvider},
 };
 
 use crate::{Error, log, vars};
@@ -20,21 +20,13 @@ mod verify;
 pub use self::{
 	extract::extract_tgz,
 	resolve::resolve_dist,
-	verify::{VerifyReader, bytes_to_hex_str, hex_str_to_bytes}
+	verify::{VerifyReader, bytes_to_hex_str, hex_str_to_bytes},
 };
 
 pub fn fetch_file(source_url: &str) -> Result<BodyReader<'static>, Error> {
 	let use_rustls = cfg!(any(feature = "tls-rustls", feature = "tls-rustls-no-provider"));
-	let tls_provider = if use_rustls {
-		TlsProvider::Rustls
-	} else {
-		TlsProvider::NativeTls
-	};
-	let root_certs = if use_rustls {
-		RootCerts::WebPki
-	} else {
-		RootCerts::PlatformVerifier
-	};
+	let tls_provider = if use_rustls { TlsProvider::Rustls } else { TlsProvider::NativeTls };
+	let root_certs = if use_rustls { RootCerts::WebPki } else { RootCerts::PlatformVerifier };
 
 	log::debug!("downloading from '{source_url}'; tls_provider={tls_provider:?}, root_certs={root_certs:?}");
 
@@ -53,7 +45,7 @@ pub fn fetch_file(source_url: &str) -> Result<BodyReader<'static>, Error> {
 			))
 			.timeout_global(Some(Duration::from_secs(1800)))
 			.http_status_as_error(true)
-			.build()
+			.build(),
 	)
 	.get(source_url)
 	.call()?;
@@ -68,6 +60,6 @@ pub fn should_skip() -> bool {
 	vars::get("CARGO_NET_OFFLINE").as_deref() == Some("true")
 		|| match vars::get(vars::SKIP_DOWNLOAD) {
 			Some(val) => val == "1" || val.to_lowercase() == "true",
-			None => false
+			None => false,
 		}
 }

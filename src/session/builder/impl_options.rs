@@ -5,7 +5,7 @@ use core::{
 	ptr
 };
 #[cfg(feature = "std")]
-use std::{borrow::Cow, path::Path};
+use std::path::Path;
 
 use super::SessionBuilder;
 #[cfg(feature = "std")]
@@ -187,7 +187,7 @@ impl SessionBuilder {
 
 	#[cfg(feature = "std")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-	pub fn with_external_initializer_file_in_memory(mut self, file_name: impl AsRef<Path>, buffer: Cow<'static, [u8]>) -> Result<Self> {
+	pub fn with_external_initializer_file_in_memory(mut self, file_name: impl AsRef<Path>, buffer: alloc::borrow::Cow<'static, [u8]>) -> Result<Self> {
 		let file_name = path_to_os_char(file_name);
 		let sizes = [buffer.len()];
 		ortsys![unsafe AddExternalInitializersFromMemory(self.ptr_mut(), &file_name.as_ptr(), &buffer.as_ptr().cast::<core::ffi::c_char>().cast_mut(), sizes.as_ptr(), 1)?];

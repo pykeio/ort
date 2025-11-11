@@ -290,8 +290,7 @@ impl fmt::Display for RegisterError {
 	}
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for RegisterError {}
+impl core::error::Error for RegisterError {}
 
 #[allow(unused)]
 macro_rules! define_ep_register {

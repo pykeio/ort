@@ -1,8 +1,9 @@
 use alloc::{
+	boxed::Box,
 	format,
 	string::{String, ToString}
 };
-use core::{convert::Infallible, ffi::c_char, fmt, ptr};
+use core::{convert::Infallible, error::Error as CoreError, ffi::c_char, fmt, ptr};
 
 use crate::{char_p_to_string, ortsys, util::with_cstr};
 
@@ -35,20 +36,7 @@ impl Error {
 	///
 	/// This can be used to return custom errors from e.g. training dataloaders or custom operators if a non-`ort`
 	/// related operation fails.
-	#[cfg(feature = "std")]
-	pub fn wrap<T: std::error::Error + Send + Sync + 'static>(err: T) -> Self {
-		Error {
-			code: ErrorCode::GenericFailure,
-			msg: err.to_string()
-		}
-	}
-
-	/// Wrap a custom, user-provided error in an [`ort::Error`](Error)..
-	///
-	/// This can be used to return custom errors from e.g. training dataloaders or custom operators if a non-`ort`
-	/// related operation fails.
-	#[cfg(not(feature = "std"))]
-	pub fn wrap<T: core::fmt::Display + Send + Sync + 'static>(err: T) -> Self {
+	pub fn wrap<T: CoreError + Send + Sync + 'static>(err: T) -> Self {
 		Error {
 			code: ErrorCode::GenericFailure,
 			msg: err.to_string()
@@ -83,12 +71,10 @@ impl fmt::Display for Error {
 	}
 }
 
-#[cfg(feature = "std")] // sigh...
-impl std::error::Error for Error {}
+impl CoreError for Error {}
 
-#[cfg(feature = "std")]
-impl From<Box<dyn std::error::Error + Send + Sync + 'static>> for Error {
-	fn from(err: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
+impl From<Box<dyn CoreError + Send + Sync + 'static>> for Error {
+	fn from(err: Box<dyn CoreError + Send + Sync + 'static>) -> Self {
 		Error {
 			code: ErrorCode::GenericFailure,
 			msg: err.to_string()

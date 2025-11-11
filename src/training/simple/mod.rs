@@ -1,4 +1,5 @@
-use std::{collections::VecDeque, fs};
+use alloc::collections::VecDeque;
+use std::fs;
 
 use crate::{error::Result, session::input::SessionInputs, training::Trainer};
 

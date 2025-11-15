@@ -6,7 +6,7 @@ use std::{
 
 use kdam::BarExt;
 use ort::{
-	execution_providers::CUDAExecutionProvider,
+	ep,
 	memory::Allocator,
 	session::{Session, builder::SessionBuilder},
 	training::{CheckpointStrategy, Trainer, TrainerCallbacks, TrainerControl, TrainerState, TrainingArguments},
@@ -56,7 +56,7 @@ fn main() -> ort::Result<()> {
 	common::init()?;
 
 	let trainer = Trainer::new_from_artifacts(
-		SessionBuilder::new()?.with_execution_providers([CUDAExecutionProvider::default().build()])?,
+		SessionBuilder::new()?.with_execution_providers([ep::CUDA::default().build()])?,
 		Allocator::default(),
 		"tools/train-data/mini-clm",
 		None

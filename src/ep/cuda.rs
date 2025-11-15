@@ -7,9 +7,9 @@ use crate::{error::Result, session::builder::SessionBuilder};
 // https://github.com/microsoft/onnxruntime/blob/ffceed9d44f2f3efb9dd69fa75fea51163c91d91/onnxruntime/contrib_ops/cpu/bert/attention_common.h#L160-L171
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct CUDAAttentionBackend(u32);
+pub struct AttentionBackend(u32);
 
-impl CUDAAttentionBackend {
+impl AttentionBackend {
 	pub const FLASH_ATTENTION: Self = Self(1 << 0);
 	pub const EFFICIENT_ATTENTION: Self = Self(1 << 1);
 	pub const TRT_FUSED_ATTENTION: Self = Self(1 << 2);
@@ -23,7 +23,7 @@ impl CUDAAttentionBackend {
 	pub const LEAN_ATTENTION: Self = Self(1 << 8);
 
 	pub fn none() -> Self {
-		CUDAAttentionBackend(0)
+		AttentionBackend(0)
 	}
 
 	pub fn all() -> Self {
@@ -38,7 +38,7 @@ impl CUDAAttentionBackend {
 	}
 }
 
-impl BitOr for CUDAAttentionBackend {
+impl BitOr for AttentionBackend {
 	type Output = Self;
 	fn bitor(self, rhs: Self) -> Self::Output {
 		Self(rhs.0 | self.0)
@@ -47,7 +47,7 @@ impl BitOr for CUDAAttentionBackend {
 
 /// The type of search done for cuDNN convolution algorithms.
 #[derive(Debug, Clone, Default)]
-pub enum CuDNNConvAlgorithmSearch {
+pub enum ConvAlgorithmSearch {
 	/// Expensive exhaustive benchmarking using [`cudnnFindConvolutionForwardAlgorithmEx`][exhaustive].
 	/// This function will attempt all possible algorithms for `cudnnConvolutionForward` to find the fastest algorithm.
 	/// Exhaustive search trades off between memory usage and speed. The first execution of a graph will be slow while
@@ -71,27 +71,27 @@ pub enum CuDNNConvAlgorithmSearch {
 	/// > search algorithm is actually [`Exhaustive`].
 	///
 	/// [fwdalgo]: https://docs.nvidia.com/deeplearning/cudnn/api/index.html#cudnnConvolutionFwdAlgo_t
-	/// [`Exhaustive`]: CuDNNConvAlgorithmSearch::Exhaustive
-	/// [`Heuristic`]: CuDNNConvAlgorithmSearch::Heuristic
+	/// [`Exhaustive`]: ConvAlgorithmSearch::Exhaustive
+	/// [`Heuristic`]: ConvAlgorithmSearch::Heuristic
 	Default
 }
 
 /// [CUDA execution provider](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html) for NVIDIA
 /// CUDA-enabled GPUs.
 #[derive(Debug, Default, Clone)]
-pub struct CUDAExecutionProvider {
+pub struct CUDA {
 	options: ExecutionProviderOptions
 }
 
-super::impl_ep!(arbitrary; CUDAExecutionProvider);
+super::impl_ep!(arbitrary; CUDA);
 
-impl CUDAExecutionProvider {
+impl CUDA {
 	/// Configures which device the EP should use.
 	///
 	/// ```
-	/// # use ort::{execution_providers::cuda::CUDAExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CUDAExecutionProvider::default().with_device_id(0).build();
+	/// let ep = ep::CUDA::default().with_device_id(0).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -104,12 +104,12 @@ impl CUDAExecutionProvider {
 	/// Configure the size limit of the device memory arena in bytes.
 	///
 	/// This only controls how much memory can be allocated to the *arena* - actual memory usage may be higher due to
-	/// internal CUDA allocations, like those required for different [`CuDNNConvAlgorithmSearch`] options.
+	/// internal CUDA allocations, like those required for different [`ConvAlgorithmSearch`] options.
 	///
 	/// ```
-	/// # use ort::{execution_providers::cuda::CUDAExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CUDAExecutionProvider::default().with_memory_limit(2 * 1024 * 1024 * 1024).build();
+	/// let ep = ep::CUDA::default().with_memory_limit(2 * 1024 * 1024 * 1024).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -122,9 +122,9 @@ impl CUDAExecutionProvider {
 	/// Configure the strategy for extending the device's memory arena.
 	///
 	/// ```
-	/// # use ort::{execution_providers::{cuda::CUDAExecutionProvider, ArenaExtendStrategy}, session::Session};
+	/// # use ort::{ep::{self, ArenaExtendStrategy}, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CUDAExecutionProvider::default()
+	/// let ep = ep::CUDA::default()
 	/// 	.with_arena_extend_strategy(ArenaExtendStrategy::SameAsRequested)
 	/// 	.build();
 	/// # Ok(())
@@ -152,7 +152,7 @@ impl CUDAExecutionProvider {
 	/// The default search algorithm, [`Exhaustive`][exh], will benchmark all available implementations and use the most
 	/// performant one. This option is very resource intensive (both computationally on first run and peak-memory-wise),
 	/// but ensures best performance. It is roughly equivalent to setting `torch.backends.cudnn.benchmark = True` with
-	/// PyTorch. See also [`CUDAExecutionProvider::with_conv_max_workspace`] to configure how much memory the exhaustive
+	/// PyTorch. See also [`CUDA::with_conv_max_workspace`] to configure how much memory the exhaustive
 	/// search can use (the default is unlimited).
 	///
 	/// A less resource-intensive option is [`Heuristic`][heu]. Rather than benchmarking every implementation,
@@ -164,41 +164,41 @@ impl CUDAExecutionProvider {
 	/// is not the *default behavior* (that would be [`Exhaustive`][exh]).
 	///
 	/// ```
-	/// # use ort::{execution_providers::cuda::{CUDAExecutionProvider, CuDNNConvAlgorithmSearch}, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CUDAExecutionProvider::default()
-	/// 	.with_conv_algorithm_search(CuDNNConvAlgorithmSearch::Heuristic)
+	/// let ep = ep::CUDA::default()
+	/// 	.with_conv_algorithm_search(ep::cuda::ConvAlgorithmSearch::Heuristic)
 	/// 	.build();
 	/// # Ok(())
 	/// # }
 	/// ```
 	///
-	/// [exh]: CuDNNConvAlgorithmSearch::Exhaustive
-	/// [heu]: CuDNNConvAlgorithmSearch::Heuristic
-	/// [def]: CuDNNConvAlgorithmSearch::Default
+	/// [exh]: ConvAlgorithmSearch::Exhaustive
+	/// [heu]: ConvAlgorithmSearch::Heuristic
+	/// [def]: ConvAlgorithmSearch::Default
 	#[must_use]
-	pub fn with_conv_algorithm_search(mut self, search: CuDNNConvAlgorithmSearch) -> Self {
+	pub fn with_conv_algorithm_search(mut self, search: ConvAlgorithmSearch) -> Self {
 		self.options.set(
 			"cudnn_conv_algo_search",
 			match search {
-				CuDNNConvAlgorithmSearch::Exhaustive => "EXHAUSTIVE",
-				CuDNNConvAlgorithmSearch::Heuristic => "HEURISTIC",
-				CuDNNConvAlgorithmSearch::Default => "DEFAULT"
+				ConvAlgorithmSearch::Exhaustive => "EXHAUSTIVE",
+				ConvAlgorithmSearch::Heuristic => "HEURISTIC",
+				ConvAlgorithmSearch::Default => "DEFAULT"
 			}
 		);
 		self
 	}
 
-	/// Configure whether the [`Exhaustive`][CuDNNConvAlgorithmSearch::Exhaustive] search can use as much memory as it
+	/// Configure whether the [`Exhaustive`][ConvAlgorithmSearch::Exhaustive] search can use as much memory as it
 	/// needs.
 	///
 	/// The default is `true`. When `false`, the memory used for the search is limited to 32 MB, which will impact its
 	/// ability to find an optimal convolution algorithm.
 	///
 	/// ```
-	/// # use ort::{execution_providers::cuda::CUDAExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CUDAExecutionProvider::default().with_conv_max_workspace(false).build();
+	/// let ep = ep::CUDA::default().with_conv_max_workspace(false).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -218,9 +218,9 @@ impl CUDAExecutionProvider {
 	/// convolution operations that do not use 3-dimensional input shapes, or the *result* of such operations.
 	///
 	/// ```
-	/// # use ort::{execution_providers::cuda::CUDAExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CUDAExecutionProvider::default().with_conv1d_pad_to_nc1d(true).build();
+	/// let ep = ep::CUDA::default().with_conv1d_pad_to_nc1d(true).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -245,9 +245,9 @@ impl CUDAExecutionProvider {
 	/// Consult the [ONNX Runtime documentation on CUDA graphs](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#using-cuda-graphs-preview) for more information.
 	///
 	/// ```
-	/// # use ort::{execution_providers::cuda::CUDAExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CUDAExecutionProvider::default().with_cuda_graph(true).build();
+	/// let ep = ep::CUDA::default().with_cuda_graph(true).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -262,9 +262,9 @@ impl CUDAExecutionProvider {
 	/// `SkipLayerNorm`'s strict mode trades performance for accuracy. The default is `false` (strict mode disabled).
 	///
 	/// ```
-	/// # use ort::{execution_providers::cuda::CUDAExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CUDAExecutionProvider::default().with_skip_layer_norm_strict_mode(true).build();
+	/// let ep = ep::CUDA::default().with_skip_layer_norm_strict_mode(true).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -285,9 +285,9 @@ impl CUDAExecutionProvider {
 	/// `torch.backends.cuda.matmul.allow_tf32 = True` or `torch.set_float32_matmul_precision("medium")` in PyTorch.
 	///
 	/// ```
-	/// # use ort::{execution_providers::cuda::CUDAExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CUDAExecutionProvider::default().with_tf32(true).build();
+	/// let ep = ep::CUDA::default().with_tf32(true).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -303,9 +303,9 @@ impl CUDAExecutionProvider {
 	/// convolution-heavy models on Tensor core-enabled GPUs may provide a significant performance improvement.
 	///
 	/// ```
-	/// # use ort::{execution_providers::cuda::CUDAExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CUDAExecutionProvider::default().with_prefer_nhwc(true).build();
+	/// let ep = ep::CUDA::default().with_prefer_nhwc(true).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -328,16 +328,18 @@ impl CUDAExecutionProvider {
 	/// Configures the available backends used for `Attention` nodes.
 	///
 	/// ```
-	/// # use ort::{execution_providers::cuda::{CUDAExecutionProvider, CUDAAttentionBackend}, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CUDAExecutionProvider::default()
-	/// 	.with_attention_backend(CUDAAttentionBackend::FLASH_ATTENTION | CUDAAttentionBackend::TRT_FUSED_ATTENTION)
+	/// let ep = ep::CUDA::default()
+	/// 	.with_attention_backend(
+	/// 		ep::cuda::AttentionBackend::FLASH_ATTENTION | ep::cuda::AttentionBackend::TRT_FUSED_ATTENTION
+	/// 	)
 	/// 	.build();
 	/// # Ok(())
 	/// # }
 	/// ```
 	#[must_use]
-	pub fn with_attention_backend(mut self, flags: CUDAAttentionBackend) -> Self {
+	pub fn with_attention_backend(mut self, flags: AttentionBackend) -> Self {
 		self.options.set("sdpa_kernel", flags.0.to_string());
 		self
 	}
@@ -352,7 +354,7 @@ impl CUDAExecutionProvider {
 	// https://github.com/microsoft/onnxruntime/blob/fe8a10caa40f64a8fbd144e7049cf5b14c65542d/onnxruntime/core/providers/cuda/cuda_execution_provider_info.cc#L17
 }
 
-impl ExecutionProvider for CUDAExecutionProvider {
+impl ExecutionProvider for CUDA {
 	fn name(&self) -> &'static str {
 		"CUDAExecutionProvider"
 	}
@@ -435,16 +437,16 @@ pub const CUDNN_DYLIBS: &[&str] = &[
 ///
 /// ```
 /// # use std::path::Path;
-/// use ort::execution_providers::cuda;
+/// use ort::ep;
 ///
 /// let cuda_root = Path::new(r#"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\bin"#);
 /// let cudnn_root = Path::new(r#"D:\cudnn_9.8.0"#);
 ///
 /// // Load CUDA & cuDNN
-/// let _ = cuda::preload_dylibs(Some(cuda_root), Some(cudnn_root));
+/// let _ = ep::cuda::preload_dylibs(Some(cuda_root), Some(cudnn_root));
 ///
 /// // Only preload cuDNN
-/// let _ = cuda::preload_dylibs(None, Some(cudnn_root));
+/// let _ = ep::cuda::preload_dylibs(None, Some(cudnn_root));
 /// ```
 #[cfg_attr(docsrs, doc(cfg(any(feature = "preload-dylibs", feature = "load-dynamic"))))]
 #[cfg(feature = "preload-dylibs")]

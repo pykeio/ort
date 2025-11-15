@@ -52,11 +52,11 @@ ONNX Runtime must be compiled from source with support for each execution provid
 In order to configure sessions to use certain execution providers, you must **register** them when creating an environment or session. You can do this via the `SessionBuilder::with_execution_providers` method. For example, to register the CUDA execution provider for a session:
 
 ```rust
-use ort::{execution_providers::CUDAExecutionProvider, session::Session};
+use ort::{ep::CUDA, session::Session};
 
 fn main() -> anyhow::Result<()> {
     let session = Session::builder()?
-        .with_execution_providers([CUDAExecutionProvider::default().build()])?
+        .with_execution_providers([CUDA::default().build()])?
         .commit_from_file("model.onnx")?;
 
     Ok(())
@@ -66,21 +66,18 @@ fn main() -> anyhow::Result<()> {
 You can, of course, specify multiple execution providers. `ort` will register all EPs specified, in order. If an EP does not support a certain operator in a graph, it will fall back to the next successfully registered EP, or to the CPU if all else fails.
 
 ```rust
-use ort::{
-    execution_providers::{CoreMLExecutionProvider, CUDAExecutionProvider, DirectMLExecutionProvider, TensorRTExecutionProvider},
-    session::Session
-};
+use ort::{ep, session::Session};
 
 fn main() -> anyhow::Result<()> {
     let session = Session::builder()?
         .with_execution_providers([
             // Prefer TensorRT over CUDA.
-            TensorRTExecutionProvider::default().build(),
-            CUDAExecutionProvider::default().build(),
+            ep::TensorRT::default().build(),
+            ep::CUDA::default().build(),
             // Use DirectML on Windows if NVIDIA EPs are not available
-            DirectMLExecutionProvider::default().build(),
+            ep::DirectML::default().build(),
             // Or use ANE on Apple platforms
-            CoreMLExecutionProvider::default().build()
+            ep::CoreML::default().build()
         ])?
         .commit_from_file("model.onnx")?;
 
@@ -89,18 +86,18 @@ fn main() -> anyhow::Result<()> {
 ```
 
 ## Configuring EPs
-EPs have configuration options to control behavior or increase performance. Each `XXXExecutionProvider` struct returns a builder with configuration methods. See the [API reference](https://docs.rs/ort/2.0.0-rc.10/ort/execution_providers/index.html#reexports) for the EP structs for more information on which options are supported and what they do.
+EPs have configuration options to control behavior or increase performance. Each execution provider struct returns a builder with configuration methods. See the [API reference](https://docs.rs/ort/2.0.0-rc.10/ort/ep/index.html#reexports) for the EP structs for more information on which options are supported and what they do.
 
 ```rust
-use ort::{execution_providers::{coreml::CoreMLComputeUnits, CoreMLExecutionProvider}, session::Session};
+use ort::{ep, session::Session};
 
 fn main() -> anyhow::Result<()> {
     let session = Session::builder()?
         .with_execution_providers([
-            CoreMLExecutionProvider::default()
+            ep::CoreML::default()
                 // this model uses control flow operators, so enable CoreML on subgraphs too
                 .with_subgraphs()
-                .with_compute_units(CoreMLComputeUnits::CPUAndNeuralEngine)
+                .with_compute_units(ep::coreml::ComputeUnits::CPUAndNeuralEngine)
                 .build()
         ])?
         .commit_from_file("model.onnx")?;
@@ -114,12 +111,12 @@ fn main() -> anyhow::Result<()> {
 
 You can configure an EP to return an error on failure by adding `.error_on_failure()` after you `.build()` it. In this example, if CUDA doesn't register successfully, the program will exit with an error at `with_execution_providers`:
 ```rust
-use ort::{execution_providers::CoreMLExecutionProvider, session::Session};
+use ort::{ep, session::Session};
 
 fn main() -> anyhow::Result<()> {
     let session = Session::builder()?
         .with_execution_providers([
-            CUDAExecutionProvider::default().build().error_on_failure()
+            ep::CUDA::default().build().error_on_failure()
         ])?
         .commit_from_file("model.onnx")?;
 
@@ -131,14 +128,14 @@ If you require more complex error handling, you can also manually register execu
 
 ```rust
 use ort::{
-    execution_providers::{CUDAExecutionProvider, ExecutionProvider},
+    ep::{self, ExecutionProvider},
     session::Session
 };
 
 fn main() -> anyhow::Result<()> {
     let builder = Session::builder()?;
 
-    let cuda = CUDAExecutionProvider::default();
+    let cuda = ep::CUDA::default();
     if cuda.register(&builder).is_err() {
         eprintln!("Failed to register CUDA!");
         std::process::exit(1);
@@ -154,14 +151,14 @@ You can also check whether ONNX Runtime is even compiled with support for the ex
 
 ```rust
 use ort::{
-    execution_providers::{CoreMLExecutionProvider, ExecutionProvider},
+    ep::{self, ExecutionProvider},
     session::Session
 };
 
 fn main() -> anyhow::Result<()> {
     let builder = Session::builder()?;
 
-    let coreml = CoreMLExecutionProvider::default();
+    let coreml = ep::CoreML::default();
     if !coreml.is_available() {
         eprintln!("Please compile ONNX Runtime with CoreML!");
         std::process::exit(1);
@@ -180,11 +177,11 @@ fn main() -> anyhow::Result<()> {
 You can configure `ort` to attempt to register a list of execution providers for all sessions created in an environment.
 
 ```rust
-use ort::{execution_providers::CUDAExecutionProvider, session::Session};
+use ort::{ep, session::Session};
 
 fn main() -> anyhow::Result<()> {
     ort::init()
-        .with_execution_providers([CUDAExecutionProvider::default().build()])
+        .with_execution_providers([ep::CUDA::default().build()])
         .commit();
 
     let session = Session::builder()?.commit_from_file("model.onnx")?;

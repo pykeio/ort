@@ -9,10 +9,10 @@ use crate::{error::Result, session::builder::SessionBuilder};
 /// with dynamically sized inputs, you can override individual dimensions by constructing the session with
 /// [`SessionBuilder::with_dimension_override`]:
 /// ```no_run
-/// # use ort::{execution_providers::directml::DirectMLExecutionProvider, session::Session};
+/// # use ort::{ep, session::Session};
 /// # fn main() -> ort::Result<()> {
 /// let session = Session::builder()?
-/// 	.with_execution_providers([DirectMLExecutionProvider::default().build()])?
+/// 	.with_execution_providers([ep::DirectML::default().build()])?
 /// 	.with_dimension_override("batch", 1)?
 /// 	.with_dimension_override("seq_len", 512)?
 /// 	.commit_from_file("gpt2.onnx")?;
@@ -20,19 +20,19 @@ use crate::{error::Result, session::builder::SessionBuilder};
 /// # }
 /// ```
 #[derive(Debug, Default, Clone)]
-pub struct DirectMLExecutionProvider {
+pub struct DirectML {
 	device_id: i32
 }
 
-super::impl_ep!(DirectMLExecutionProvider);
+super::impl_ep!(DirectML);
 
-impl DirectMLExecutionProvider {
+impl DirectML {
 	/// Configures which device the EP should use.
 	///
 	/// ```
-	/// # use ort::{execution_providers::directml::DirectMLExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = DirectMLExecutionProvider::default().with_device_id(1).build();
+	/// let ep = ep::DirectML::default().with_device_id(1).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -43,7 +43,7 @@ impl DirectMLExecutionProvider {
 	}
 }
 
-impl ExecutionProvider for DirectMLExecutionProvider {
+impl ExecutionProvider for DirectML {
 	fn name(&self) -> &'static str {
 		"DmlExecutionProvider"
 	}

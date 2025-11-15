@@ -3,19 +3,19 @@ use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 
 /// The default CPU execution provider, powered by MLAS.
 #[derive(Debug, Default, Clone)]
-pub struct CPUExecutionProvider {
+pub struct CPU {
 	use_arena: bool
 }
 
-super::impl_ep!(CPUExecutionProvider);
+super::impl_ep!(CPU);
 
-impl CPUExecutionProvider {
+impl CPU {
 	/// Enable/disable the usage of the arena allocator.
 	///
 	/// ```
-	/// # use ort::{execution_providers::cpu::CPUExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CPUExecutionProvider::default().with_arena_allocator(true).build();
+	/// let ep = ep::CPU::default().with_arena_allocator(true).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -26,7 +26,7 @@ impl CPUExecutionProvider {
 	}
 }
 
-impl ExecutionProvider for CPUExecutionProvider {
+impl ExecutionProvider for CPU {
 	fn name(&self) -> &'static str {
 		"CPUExecutionProvider"
 	}

@@ -5,13 +5,13 @@ use super::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderOptions, Re
 use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Default, Clone)]
-pub struct ROCmExecutionProvider {
+pub struct ROCm {
 	options: ExecutionProviderOptions
 }
 
-super::impl_ep!(arbitrary; ROCmExecutionProvider);
+super::impl_ep!(arbitrary; ROCm);
 
-impl ROCmExecutionProvider {
+impl ROCm {
 	#[must_use]
 	pub fn with_device_id(mut self, device_id: i32) -> Self {
 		self.options.set("device_id", device_id.to_string());
@@ -86,7 +86,7 @@ impl ROCmExecutionProvider {
 	}
 }
 
-impl ExecutionProvider for ROCmExecutionProvider {
+impl ExecutionProvider for ROCm {
 	fn name(&self) -> &'static str {
 		"ROCMExecutionProvider"
 	}

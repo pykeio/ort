@@ -2,16 +2,16 @@ use super::{ExecutionProvider, RegisterError};
 use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Default, Clone)]
-pub struct NNAPIExecutionProvider {
+pub struct NNAPI {
 	use_fp16: bool,
 	use_nchw: bool,
 	disable_cpu: bool,
 	cpu_only: bool
 }
 
-super::impl_ep!(NNAPIExecutionProvider);
+super::impl_ep!(NNAPI);
 
-impl NNAPIExecutionProvider {
+impl NNAPI {
 	/// Use fp16 relaxation in NNAPI EP. This may improve performance but can also reduce accuracy due to the lower
 	/// precision.
 	#[must_use]
@@ -49,7 +49,7 @@ impl NNAPIExecutionProvider {
 	}
 }
 
-impl ExecutionProvider for NNAPIExecutionProvider {
+impl ExecutionProvider for NNAPI {
 	fn name(&self) -> &'static str {
 		"NnapiExecutionProvider"
 	}

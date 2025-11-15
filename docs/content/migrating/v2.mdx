@@ -12,7 +12,7 @@ To configure an `Environment`, you instead use the `ort::init` function, which r
 
 ```rust
 ort::init()
-    .with_execution_providers([CUDAExecutionProvider::default().build()])
+    .with_execution_providers([ep::CUDA::default().build()])
     .commit();
 ```
 
@@ -156,7 +156,7 @@ let l = outputs["latents"].try_extract_array::<f32>()?;
 ```
 
 ## Execution providers
-Execution provider structs with public fields have been replaced with builder pattern structs. See the [API reference](https://docs.rs/ort/2.0.0-rc.10/ort/execution_providers/index.html#reexports) and the [execution providers reference](/perf/execution-providers) for more information.
+Execution provider structs with public fields have been replaced with builder pattern structs. See the [API reference](https://docs.rs/ort/2.0.0-rc.10/ort/ep/index.html#reexports) and the [execution providers reference](/perf/execution-providers) for more information.
 
 ```diff
 -// v1.x
@@ -165,7 +165,7 @@ Execution provider structs with public fields have been replaced with builder pa
 -}))?;
 +// v2
 +builder = builder.with_execution_providers([
-+    DirectMLExecutionProvider::default()
++    ep::DirectML::default()
 +        .with_device_id(1)
 +        .build()
 +])?;

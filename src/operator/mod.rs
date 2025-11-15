@@ -36,7 +36,8 @@ pub trait Operator: Send {
 	/// Returns the name of the operator.
 	fn name(&self) -> &str;
 
-	/// Returns the execution provider this operator runs on, e.g. `CUDAExecutionProvider`.
+	/// Returns the internal name of the execution provider this operator runs on, e.g. `"CUDAExecutionProvider"` (see
+	/// [`ExecutionProvider::name`](crate::ep::ExecutionProvider::name)).
 	///
 	/// If the returned type is not `None`, and the execution provider used by the session matches this operator's
 	/// EP type, the value will not be copied to the CPU and you may use functions like [`Tensor::data_ptr`] to

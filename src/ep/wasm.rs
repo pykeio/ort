@@ -2,13 +2,13 @@ use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
 use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 
 #[derive(Debug, Default, Clone)]
-pub struct WASMExecutionProvider {
+pub struct WASM {
 	options: ExecutionProviderOptions
 }
 
-super::impl_ep!(arbitrary; WASMExecutionProvider);
+super::impl_ep!(arbitrary; WASM);
 
-impl ExecutionProvider for WASMExecutionProvider {
+impl ExecutionProvider for WASM {
 	fn name(&self) -> &'static str {
 		"WASMExecutionProvider"
 	}

@@ -2,9 +2,9 @@
 //!
 //! Environments can be configured via [`ort::init`](init):
 //! ```
-//! # use ort::execution_providers::CUDAExecutionProvider;
+//! # use ort::ep;
 //! # fn main() -> ort::Result<()> {
-//! ort::init().with_execution_providers([CUDAExecutionProvider::default().build()]).commit();
+//! ort::init().with_execution_providers([ep::CUDA::default().build()]).commit();
 //! # Ok(())
 //! # }
 //! ```
@@ -25,8 +25,8 @@ use smallvec::SmallVec;
 
 use crate::{
 	AsPointer,
+	ep::ExecutionProviderDispatch,
 	error::Result,
-	execution_providers::ExecutionProviderDispatch,
 	logging::{LogLevel, LoggerFunction},
 	ortsys,
 	util::{Mutex, OnceLock, STACK_EXECUTION_PROVIDERS, with_cstr}
@@ -430,9 +430,9 @@ impl EnvironmentBuilder {
 /// Creates an ONNX Runtime environment.
 ///
 /// ```
-/// # use ort::execution_providers::CUDAExecutionProvider;
+/// # use ort::ep;
 /// # fn main() -> ort::Result<()> {
-/// ort::init().with_execution_providers([CUDAExecutionProvider::default().build()]).commit();
+/// ort::init().with_execution_providers([ep::CUDA::default().build()]).commit();
 /// # Ok(())
 /// # }
 /// ```
@@ -456,11 +456,11 @@ pub fn init() -> EnvironmentBuilder {
 /// This must be called before any other `ort` APIs are used in order for the correct dynamic library to be loaded.
 ///
 /// ```no_run
-/// # use ort::execution_providers::CUDAExecutionProvider;
+/// # use ort::ep;
 /// # fn main() -> ort::Result<()> {
 /// let lib_path = std::env::current_exe().unwrap().parent().unwrap().join("lib");
 /// ort::init_from(lib_path.join("onnxruntime.dll"))?
-/// 	.with_execution_providers([CUDAExecutionProvider::default().build()])
+/// 	.with_execution_providers([ep::CUDA::default().build()])
 /// 	.commit();
 /// # Ok(())
 /// # }

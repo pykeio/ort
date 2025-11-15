@@ -1,5 +1,5 @@
 #[allow(unused)]
-use ort::execution_providers::*;
+use ort::ep::*;
 
 pub fn init() -> ort::Result<()> {
 	#[cfg(feature = "backend-candle")]
@@ -11,41 +11,41 @@ pub fn init() -> ort::Result<()> {
 	ort::init()
 		.with_execution_providers([
 			#[cfg(feature = "tensorrt")]
-			TensorRTExecutionProvider::default().build(),
+			TensorRT::default().build(),
 			#[cfg(feature = "cuda")]
-			CUDAExecutionProvider::default().build(),
+			CUDA::default().build(),
 			#[cfg(feature = "onednn")]
-			OneDNNExecutionProvider::default().build(),
+			OneDNN::default().build(),
 			#[cfg(feature = "acl")]
-			ACLExecutionProvider::default().build(),
+			ACL::default().build(),
 			#[cfg(feature = "openvino")]
-			OpenVINOExecutionProvider::default().build(),
+			OpenVINO::default().build(),
 			#[cfg(feature = "coreml")]
-			CoreMLExecutionProvider::default().build(),
+			CoreML::default().build(),
 			#[cfg(feature = "rocm")]
-			ROCmExecutionProvider::default().build(),
+			ROCm::default().build(),
 			#[cfg(feature = "cann")]
-			CANNExecutionProvider::default().build(),
+			CANN::default().build(),
 			#[cfg(feature = "directml")]
-			DirectMLExecutionProvider::default().build(),
+			DirectML::default().build(),
 			#[cfg(feature = "tvm")]
-			TVMExecutionProvider::default().build(),
+			TVM::default().build(),
 			#[cfg(feature = "nnapi")]
-			NNAPIExecutionProvider::default().build(),
+			NNAPI::default().build(),
 			#[cfg(feature = "qnn")]
-			QNNExecutionProvider::default().build(),
+			QNN::default().build(),
 			#[cfg(feature = "xnnpack")]
-			XNNPACKExecutionProvider::default().build(),
+			XNNPACK::default().build(),
 			#[cfg(feature = "armnn")]
-			ArmNNExecutionProvider::default().build(),
+			ArmNN::default().build(),
 			#[cfg(feature = "migraphx")]
-			MIGraphXExecutionProvider::default().build(),
+			MIGraphX::default().build(),
 			#[cfg(feature = "vitis")]
-			VitisAIExecutionProvider::default().build(),
+			VitisAI::default().build(),
 			#[cfg(feature = "rknpu")]
-			RKNPUExecutionProvider::default().build(),
+			RKNPU::default().build(),
 			#[cfg(feature = "webgpu")]
-			WebGPUExecutionProvider::default().build()
+			WebGPU::default().build()
 		])
 		.commit();
 

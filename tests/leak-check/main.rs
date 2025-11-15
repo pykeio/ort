@@ -1,6 +1,6 @@
 use ort::{
 	adapter::Adapter,
-	execution_providers::CPUExecutionProvider,
+	ep,
 	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
 	operator::{
 		Operator, OperatorDomain,
@@ -77,7 +77,7 @@ impl Operator for CustomOpTwo {
 }
 
 fn main() -> ort::Result<()> {
-	ort::init().with_execution_providers([CPUExecutionProvider::default().build()]).commit();
+	ort::init().with_execution_providers([ep::CPU::default().build()]).commit();
 
 	let mut session = Session::builder()?
 		.with_operators(OperatorDomain::new("test.customop")?.add(CustomOpOne)?.add(CustomOpTwo)?)?

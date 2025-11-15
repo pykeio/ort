@@ -35,12 +35,12 @@ use crate::{error::Result, session::builder::SessionBuilder};
 ///
 /// To use this model in `ort`:
 /// ```no_run
-/// # use ort::{execution_providers::azure::AzureExecutionProvider, session::Session, value::Tensor};
+/// # use ort::{ep, session::Session, value::Tensor};
 /// # fn main() -> ort::Result<()> {
 /// let mut session = Session::builder()?
 /// 	// note: session must be initialized with `onnxruntime-extensions`
 /// 	.with_extensions()?
-/// 	.with_execution_providers([AzureExecutionProvider::default().build()])?
+/// 	.with_execution_providers([ep::Azure::default().build()])?
 /// 	.commit_from_file("azure_chat.onnx")?;
 ///
 /// let auth_token = Tensor::from_string_array(([1], &*vec!["..."]))?;
@@ -65,13 +65,13 @@ use crate::{error::Result, session::builder::SessionBuilder};
 /// # }
 /// ```
 #[derive(Debug, Default, Clone)]
-pub struct AzureExecutionProvider {
+pub struct Azure {
 	options: ExecutionProviderOptions
 }
 
-super::impl_ep!(arbitrary; AzureExecutionProvider);
+super::impl_ep!(arbitrary; Azure);
 
-impl ExecutionProvider for AzureExecutionProvider {
+impl ExecutionProvider for Azure {
 	fn name(&self) -> &'static str {
 		"AzureExecutionProvider"
 	}

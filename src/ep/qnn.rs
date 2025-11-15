@@ -4,7 +4,7 @@ use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
 use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum QNNPerformanceMode {
+pub enum PerformanceMode {
 	Default,
 	Burst,
 	Balanced,
@@ -17,43 +17,43 @@ pub enum QNNPerformanceMode {
 	SustainedHighPerformance
 }
 
-impl QNNPerformanceMode {
+impl PerformanceMode {
 	#[must_use]
 	pub fn as_str(&self) -> &'static str {
 		match self {
-			QNNPerformanceMode::Default => "default",
-			QNNPerformanceMode::Burst => "burst",
-			QNNPerformanceMode::Balanced => "balanced",
-			QNNPerformanceMode::HighPerformance => "high_performance",
-			QNNPerformanceMode::HighPowerSaver => "high_power_saver",
-			QNNPerformanceMode::LowPowerSaver => "low_power_saver",
-			QNNPerformanceMode::LowBalanced => "low_balanced",
-			QNNPerformanceMode::PowerSaver => "power_saver",
-			QNNPerformanceMode::ExtremePowerSaver => "extreme_power_saver",
-			QNNPerformanceMode::SustainedHighPerformance => "sustained_high_performance"
+			PerformanceMode::Default => "default",
+			PerformanceMode::Burst => "burst",
+			PerformanceMode::Balanced => "balanced",
+			PerformanceMode::HighPerformance => "high_performance",
+			PerformanceMode::HighPowerSaver => "high_power_saver",
+			PerformanceMode::LowPowerSaver => "low_power_saver",
+			PerformanceMode::LowBalanced => "low_balanced",
+			PerformanceMode::PowerSaver => "power_saver",
+			PerformanceMode::ExtremePowerSaver => "extreme_power_saver",
+			PerformanceMode::SustainedHighPerformance => "sustained_high_performance"
 		}
 	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum QNNProfilingLevel {
+pub enum ProfilingLevel {
 	Off,
 	Basic,
 	Detailed
 }
 
-impl QNNProfilingLevel {
+impl ProfilingLevel {
 	pub fn as_str(&self) -> &'static str {
 		match self {
-			QNNProfilingLevel::Off => "off",
-			QNNProfilingLevel::Basic => "basic",
-			QNNProfilingLevel::Detailed => "detailed"
+			ProfilingLevel::Off => "off",
+			ProfilingLevel::Basic => "basic",
+			ProfilingLevel::Detailed => "detailed"
 		}
 	}
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum QNNContextPriority {
+pub enum ContextPriority {
 	Low,
 	#[default]
 	Normal,
@@ -61,25 +61,25 @@ pub enum QNNContextPriority {
 	High
 }
 
-impl QNNContextPriority {
+impl ContextPriority {
 	pub fn as_str(&self) -> &'static str {
 		match self {
-			QNNContextPriority::Low => "low",
-			QNNContextPriority::Normal => "normal",
-			QNNContextPriority::NormalHigh => "normal_high",
-			QNNContextPriority::High => "high"
+			ContextPriority::Low => "low",
+			ContextPriority::Normal => "normal",
+			ContextPriority::NormalHigh => "normal_high",
+			ContextPriority::High => "high"
 		}
 	}
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct QNNExecutionProvider {
+pub struct QNN {
 	options: ExecutionProviderOptions
 }
 
-super::impl_ep!(arbitrary; QNNExecutionProvider);
+super::impl_ep!(arbitrary; QNN);
 
-impl QNNExecutionProvider {
+impl QNN {
 	/// The file path to QNN backend library. On Linux/Android, this is `libQnnCpu.so` to use the CPU backend,
 	/// or `libQnnHtp.so` to use the accelerated backend.
 	#[must_use]
@@ -89,7 +89,7 @@ impl QNNExecutionProvider {
 	}
 
 	#[must_use]
-	pub fn with_profiling(mut self, level: QNNProfilingLevel) -> Self {
+	pub fn with_profiling(mut self, level: ProfilingLevel) -> Self {
 		self.options.set("profiling_level", level.as_str());
 		self
 	}
@@ -114,7 +114,7 @@ impl QNNExecutionProvider {
 	}
 
 	#[must_use]
-	pub fn with_performance_mode(mut self, mode: QNNPerformanceMode) -> Self {
+	pub fn with_performance_mode(mut self, mode: PerformanceMode) -> Self {
 		self.options.set("htp_performance_mode", mode.as_str());
 		self
 	}
@@ -126,7 +126,7 @@ impl QNNExecutionProvider {
 	}
 
 	#[must_use]
-	pub fn with_context_priority(mut self, priority: QNNContextPriority) -> Self {
+	pub fn with_context_priority(mut self, priority: ContextPriority) -> Self {
 		self.options.set("qnn_context_priority", priority.as_str());
 		self
 	}
@@ -174,7 +174,7 @@ impl QNNExecutionProvider {
 	}
 }
 
-impl ExecutionProvider for QNNExecutionProvider {
+impl ExecutionProvider for QNN {
 	fn name(&self) -> &'static str {
 		"QNNExecutionProvider"
 	}

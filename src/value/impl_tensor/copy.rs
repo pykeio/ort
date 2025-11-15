@@ -6,7 +6,7 @@ use core::ops::{Deref, DerefMut};
 
 use super::DefiniteTensorValueTypeMarker;
 use crate::{
-	Error, OnceLock, Result, execution_providers as ep,
+	Error, OnceLock, Result, ep,
 	io_binding::IoBinding,
 	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
 	session::{NoSelectedOutputs, RunOptions, Session, builder::GraphOptimizationLevel},
@@ -36,20 +36,20 @@ static IDENTITY_RUN_OPTIONS: OnceLock<RunOptions<NoSelectedOutputs>> = OnceLock:
 
 fn ep_for_device(device: AllocationDevice, device_id: i32) -> Result<ep::ExecutionProviderDispatch> {
 	Ok(match device {
-		AllocationDevice::CPU => ep::CPUExecutionProvider::default().with_arena_allocator(false).build(),
-		AllocationDevice::CUDA | AllocationDevice::CUDA_PINNED => ep::CUDAExecutionProvider::default()
+		AllocationDevice::CPU => ep::CPU::default().with_arena_allocator(false).build(),
+		AllocationDevice::CUDA | AllocationDevice::CUDA_PINNED => ep::CUDA::default()
 			.with_device_id(device_id)
 			.with_arena_extend_strategy(ep::ArenaExtendStrategy::SameAsRequested)
 			.with_conv_max_workspace(false)
-			.with_conv_algorithm_search(ep::cuda::CuDNNConvAlgorithmSearch::Default)
+			.with_conv_algorithm_search(ep::cuda::ConvAlgorithmSearch::Default)
 			.build(),
-		AllocationDevice::DIRECTML => ep::DirectMLExecutionProvider::default().with_device_id(device_id).build(),
-		AllocationDevice::CANN | AllocationDevice::CANN_PINNED => ep::CANNExecutionProvider::default()
+		AllocationDevice::DIRECTML => ep::DirectML::default().with_device_id(device_id).build(),
+		AllocationDevice::CANN | AllocationDevice::CANN_PINNED => ep::CANN::default()
 			.with_arena_extend_strategy(ep::ArenaExtendStrategy::SameAsRequested)
 			.with_cann_graph(false)
 			.with_device_id(device_id)
 			.build(),
-		AllocationDevice::OPENVINO_CPU | AllocationDevice::OPENVINO_GPU => ep::OpenVINOExecutionProvider::default()
+		AllocationDevice::OPENVINO_CPU | AllocationDevice::OPENVINO_GPU => ep::OpenVINO::default()
 			.with_num_threads(1)
 			.with_device_type(if device == AllocationDevice::OPENVINO_CPU {
 				"CPU".to_string()
@@ -57,7 +57,7 @@ fn ep_for_device(device: AllocationDevice, device_id: i32) -> Result<ep::Executi
 				format!("GPU.{device_id}")
 			})
 			.build(),
-		AllocationDevice::HIP | AllocationDevice::HIP_PINNED => ep::ROCmExecutionProvider::default()
+		AllocationDevice::HIP | AllocationDevice::HIP_PINNED => ep::ROCm::default()
 			.with_arena_extend_strategy(ep::ArenaExtendStrategy::SameAsRequested)
 			.with_hip_graph(false)
 			.with_exhaustive_conv_search(false)
@@ -388,13 +388,13 @@ mod tests {
 	#[cfg(feature = "cuda")]
 	fn test_copy_into_cuda() -> crate::Result<()> {
 		use crate::{
-			execution_providers::CUDAExecutionProvider,
+			ep,
 			memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
 			session::Session
 		};
 
 		let dummy_session = Session::builder()?
-			.with_execution_providers([CUDAExecutionProvider::default().build()])?
+			.with_execution_providers([ep::CUDA::default().build()])?
 			.commit_from_file("tests/data/upsample.ort")?;
 
 		let allocator = Allocator::new(&dummy_session, MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?)?;
@@ -412,13 +412,13 @@ mod tests {
 	#[cfg(feature = "cuda")]
 	fn test_copy_into_async_cuda() -> crate::Result<()> {
 		use crate::{
-			execution_providers::CUDAExecutionProvider,
+			ep,
 			memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
 			session::Session
 		};
 
 		let dummy_session = Session::builder()?
-			.with_execution_providers([CUDAExecutionProvider::default().build()])?
+			.with_execution_providers([ep::CUDA::default().build()])?
 			.commit_from_file("tests/data/upsample.ort")?;
 
 		let allocator = Allocator::new(&dummy_session, MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?)?;

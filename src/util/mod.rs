@@ -36,8 +36,8 @@ pub(crate) use self::{
 /// absolute path, then any subsequent requests to load a library called `foo` will use the `libfoo.so` we already
 /// loaded, instead of searching the system for a `foo` library.
 ///
-/// See also [`crate::execution_providers::cuda::preload_dylibs`], a helper that uses `preload_dylib` to load all
-/// required dependencies of the [CUDA execution provider](crate::execution_providers::CUDAExecutionProvider).
+/// See also [`crate::ep::cuda::preload_dylibs`], a helper that uses `preload_dylib` to load all required dependencies
+/// of the [CUDA execution provider](crate::ep::CUDA).
 ///
 /// ```
 /// use std::env;

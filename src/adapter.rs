@@ -63,14 +63,14 @@ impl Adapter {
 	/// ```
 	/// # use ort::{
 	/// # 	adapter::Adapter,
-	/// # 	execution_providers::CUDAExecutionProvider,
+	/// # 	ep,
 	/// # 	memory::DeviceType,
 	/// # 	session::{run_options::RunOptions, Session},
 	/// # 	value::Tensor
 	/// # };
 	/// # fn main() -> ort::Result<()> {
 	/// let mut model = Session::builder()?
-	/// 	.with_execution_providers([CUDAExecutionProvider::default().build()])?
+	/// 	.with_execution_providers([ep::CUDA::default().build()])?
 	/// 	.commit_from_file("tests/data/lora_model.onnx")?;
 	///
 	/// let allocator = model.allocator();
@@ -108,14 +108,14 @@ impl Adapter {
 	/// ```
 	/// # use ort::{
 	/// # 	adapter::Adapter,
-	/// # 	execution_providers::CUDAExecutionProvider,
+	/// # 	ep,
 	/// # 	memory::DeviceType,
 	/// # 	session::{run_options::RunOptions, Session},
 	/// # 	value::Tensor
 	/// # };
 	/// # fn main() -> ort::Result<()> {
 	/// let mut model = Session::builder()?
-	/// 	.with_execution_providers([CUDAExecutionProvider::default().build()])?
+	/// 	.with_execution_providers([ep::CUDA::default().build()])?
 	/// 	.commit_from_file("tests/data/lora_model.onnx")?;
 	///
 	/// let bytes = std::fs::read("tests/data/adapter.orl").unwrap();

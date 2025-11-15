@@ -3,11 +3,11 @@
 //! Sessions can be configured with execution providers via [`SessionBuilder::with_execution_providers`]:
 //!
 //! ```no_run
-//! use ort::{execution_providers::CUDAExecutionProvider, session::Session};
+//! use ort::{ep, session::Session};
 //!
 //! fn main() -> ort::Result<()> {
 //! 	let session = Session::builder()?
-//! 		.with_execution_providers([CUDAExecutionProvider::default().build()])?
+//! 		.with_execution_providers([ep::CUDA::default().build()])?
 //! 		.commit_from_file("model.onnx")?;
 //!
 //! 	Ok(())
@@ -24,47 +24,47 @@ use core::{
 use crate::{char_p_to_string, error::Result, ortsys, session::builder::SessionBuilder, util::MiniMap};
 
 pub mod cpu;
-pub use self::cpu::CPUExecutionProvider;
+pub use self::cpu::CPU;
 pub mod cuda;
-pub use self::cuda::CUDAExecutionProvider;
+pub use self::cuda::CUDA;
 pub mod tensorrt;
-pub use self::tensorrt::TensorRTExecutionProvider;
+pub use self::tensorrt::TensorRT;
 pub mod onednn;
-pub use self::onednn::OneDNNExecutionProvider;
+pub use self::onednn::OneDNN;
 pub mod acl;
-pub use self::acl::ACLExecutionProvider;
+pub use self::acl::ACL;
 pub mod openvino;
-pub use self::openvino::OpenVINOExecutionProvider;
+pub use self::openvino::OpenVINO;
 pub mod coreml;
-pub use self::coreml::CoreMLExecutionProvider;
+pub use self::coreml::CoreML;
 pub mod rocm;
-pub use self::rocm::ROCmExecutionProvider;
+pub use self::rocm::ROCm;
 pub mod cann;
-pub use self::cann::CANNExecutionProvider;
+pub use self::cann::CANN;
 pub mod directml;
-pub use self::directml::DirectMLExecutionProvider;
+pub use self::directml::DirectML;
 pub mod tvm;
-pub use self::tvm::TVMExecutionProvider;
+pub use self::tvm::TVM;
 pub mod nnapi;
-pub use self::nnapi::NNAPIExecutionProvider;
+pub use self::nnapi::NNAPI;
 pub mod qnn;
-pub use self::qnn::QNNExecutionProvider;
+pub use self::qnn::QNN;
 pub mod xnnpack;
-pub use self::xnnpack::XNNPACKExecutionProvider;
+pub use self::xnnpack::XNNPACK;
 pub mod armnn;
-pub use self::armnn::ArmNNExecutionProvider;
+pub use self::armnn::ArmNN;
 pub mod migraphx;
-pub use self::migraphx::MIGraphXExecutionProvider;
+pub use self::migraphx::MIGraphX;
 pub mod vitis;
-pub use self::vitis::VitisAIExecutionProvider;
+pub use self::vitis::Vitis;
 pub mod rknpu;
-pub use self::rknpu::RKNPUExecutionProvider;
+pub use self::rknpu::RKNPU;
 pub mod webgpu;
-pub use self::webgpu::WebGPUExecutionProvider;
+pub use self::webgpu::WebGPU;
 pub mod azure;
-pub use self::azure::AzureExecutionProvider;
+pub use self::azure::Azure;
 pub mod nvrtx;
-pub use self::nvrtx::NVRTXExecutionProvider;
+pub use self::nvrtx::NVRTX;
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
 #[cfg(target_arch = "wasm32")]
@@ -82,14 +82,14 @@ pub trait ExecutionProvider: Send + Sync {
 	/// Returns the identifier of this execution provider used internally by ONNX Runtime.
 	///
 	/// This is the same as what's used in ONNX Runtime's Python API to register this execution provider, i.e.
-	/// [`TVMExecutionProvider`]'s identifier is `TvmExecutionProvider`.
+	/// [`TVM`]'s identifier is `TvmExecutionProvider`.
 	fn name(&self) -> &'static str;
 
 	/// Returns whether this execution provider is supported on this platform.
 	///
 	/// For example, the CoreML execution provider implements this as:
 	/// ```ignore
-	/// impl ExecutionProvider for CoreMLExecutionProvider {
+	/// impl ExecutionProvider for CoreML {
 	/// 	fn supported_by_platform() -> bool {
 	/// 		cfg!(target_vendor = "apple")
 	/// 	}
@@ -321,9 +321,9 @@ pub(crate) use define_ep_register;
 
 macro_rules! impl_ep {
 	(arbitrary; $symbol:ident) => {
-		$crate::execution_providers::impl_ep!($symbol);
+		$crate::ep::impl_ep!($symbol);
 
-		impl $crate::execution_providers::ArbitrarilyConfigurableExecutionProvider for $symbol {
+		impl $crate::ep::ArbitrarilyConfigurableExecutionProvider for $symbol {
 			fn with_arbitrary_config(mut self, key: impl ::alloc::string::ToString, value: impl ::alloc::string::ToString) -> Self {
 				self.options.set(key.to_string(), value.to_string());
 				self
@@ -333,14 +333,14 @@ macro_rules! impl_ep {
 	($symbol:ident) => {
 		impl $symbol {
 			#[must_use]
-			pub fn build(self) -> $crate::execution_providers::ExecutionProviderDispatch {
+			pub fn build(self) -> $crate::ep::ExecutionProviderDispatch {
 				self.into()
 			}
 		}
 
-		impl From<$symbol> for $crate::execution_providers::ExecutionProviderDispatch {
+		impl From<$symbol> for $crate::ep::ExecutionProviderDispatch {
 			fn from(value: $symbol) -> Self {
-				$crate::execution_providers::ExecutionProviderDispatch::new(value)
+				$crate::ep::ExecutionProviderDispatch::new(value)
 			}
 		}
 	};
@@ -381,3 +381,75 @@ pub(crate) fn apply_execution_providers(session_builder: &mut SessionBuilder, ep
 	}
 	Ok(())
 }
+
+#[deprecated = "import `ort::ep::ACL` instead"]
+#[doc(hidden)]
+pub use self::acl::ACL as ACLExecutionProvider;
+#[deprecated = "import `ort::ep::ArmNN` instead"]
+#[doc(hidden)]
+pub use self::armnn::ArmNN as ArmNNExecutionProvider;
+#[deprecated = "import `ort::ep::Azure` instead"]
+#[doc(hidden)]
+pub use self::azure::Azure as AzureExecutionProvider;
+#[deprecated = "import `ort::ep::CANN` instead"]
+#[doc(hidden)]
+pub use self::cann::CANN as CANNExecutionProvider;
+#[deprecated = "import `ort::ep::CoreML` instead"]
+#[doc(hidden)]
+pub use self::coreml::CoreML as CoreMLExecutionProvider;
+#[deprecated = "import `ort::ep::CPU` instead"]
+#[doc(hidden)]
+pub use self::cpu::CPU as CPUExecutionProvider;
+#[deprecated = "import `ort::ep::CUDA` instead"]
+#[doc(hidden)]
+pub use self::cuda::CUDA as CUDAExecutionProvider;
+#[deprecated = "import `ort::ep::DirectML` instead"]
+#[doc(hidden)]
+pub use self::directml::DirectML as DirectMLExecutionProvider;
+#[deprecated = "import `ort::ep::MIGraphX` instead"]
+#[doc(hidden)]
+pub use self::migraphx::MIGraphX as MIGraphXExecutionProvider;
+#[deprecated = "import `ort::ep::NNAPI` instead"]
+#[doc(hidden)]
+pub use self::nnapi::NNAPI as NNAPIExecutionProvider;
+#[deprecated = "import `ort::ep::NVRTX` instead"]
+#[doc(hidden)]
+pub use self::nvrtx::NVRTX as NVRTXExecutionProvider;
+#[deprecated = "import `ort::ep::OneDNN` instead"]
+#[doc(hidden)]
+pub use self::onednn::OneDNN as OneDNNExecutionProvider;
+#[deprecated = "import `ort::ep::OpenVINO` instead"]
+#[doc(hidden)]
+pub use self::openvino::OpenVINO as OpenVINOExecutionProvider;
+#[deprecated = "import `ort::ep::QNN` instead"]
+#[doc(hidden)]
+pub use self::qnn::QNN as QNNExecutionProvider;
+#[deprecated = "import `ort::ep::RKNPU` instead"]
+#[doc(hidden)]
+pub use self::rknpu::RKNPU as RKNPUExecutionProvider;
+#[deprecated = "import `ort::ep::ROCm` instead"]
+#[doc(hidden)]
+pub use self::rocm::ROCm as ROCmExecutionProvider;
+#[deprecated = "import `ort::ep::TensorRT` instead"]
+#[doc(hidden)]
+pub use self::tensorrt::TensorRT as TensorRTExecutionProvider;
+#[deprecated = "import `ort::ep::TVM` instead"]
+#[doc(hidden)]
+pub use self::tvm::TVM as TVMExecutionProvider;
+#[deprecated = "import `ort::ep::Vitis` instead"]
+#[doc(hidden)]
+pub use self::vitis::Vitis as VitisAIExecutionProvider;
+#[deprecated = "import `ort::ep::WASM` instead"]
+#[doc(hidden)]
+#[cfg(target_arch = "wasm32")]
+pub use self::wasm::WASM as WASMExecutionProvider;
+#[deprecated = "import `ort::ep::WebGPU` instead"]
+#[doc(hidden)]
+pub use self::webgpu::WebGPU as WebGPUExecutionProvider;
+#[deprecated = "import `ort::ep::WebNN` instead"]
+#[doc(hidden)]
+#[cfg(target_arch = "wasm32")]
+pub use self::webnn::WebNN as WebNNExecutionProvider;
+#[deprecated = "import `ort::ep::XNNPACK` instead"]
+#[doc(hidden)]
+pub use self::xnnpack::XNNPACK as XNNPACKExecutionProvider;

@@ -13,8 +13,8 @@ use crate::util::path_to_os_char;
 use crate::{
 	AsPointer, Error, ErrorCode,
 	environment::{self, ThreadManager},
+	ep::{ExecutionProviderDispatch, apply_execution_providers},
 	error::Result,
-	execution_providers::{ExecutionProviderDispatch, apply_execution_providers},
 	logging::{LogLevel, LoggerFunction},
 	memory::MemoryInfo,
 	operator::OperatorDomain,
@@ -34,8 +34,8 @@ impl SessionBuilder {
 	/// ## Notes
 	///
 	/// - **Indiscriminate use of [`SessionBuilder::with_execution_providers`] in a library** (e.g. always enabling
-	///   `CUDAExecutionProvider`) **is discouraged** unless you allow the user to configure the execution providers by
-	///   providing a `Vec` of [`ExecutionProviderDispatch`]es.
+	///   CUDA) **is discouraged** unless you allow the user to configure the execution providers by providing a `Vec`
+	///   of [`ExecutionProviderDispatch`]es.
 	pub fn with_execution_providers(mut self, execution_providers: impl AsRef<[ExecutionProviderDispatch]>) -> Result<Self> {
 		apply_execution_providers(&mut self, execution_providers.as_ref(), "session options")?;
 		Ok(self)

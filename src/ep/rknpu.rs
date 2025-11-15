@@ -2,11 +2,11 @@ use super::{ExecutionProvider, RegisterError};
 use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Default, Clone)]
-pub struct RKNPUExecutionProvider {}
+pub struct RKNPU {}
 
-super::impl_ep!(RKNPUExecutionProvider);
+super::impl_ep!(RKNPU);
 
-impl ExecutionProvider for RKNPUExecutionProvider {
+impl ExecutionProvider for RKNPU {
 	fn name(&self) -> &'static str {
 		"RknpuExecutionProvider"
 	}

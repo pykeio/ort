@@ -4,7 +4,7 @@ use cudarc::driver::{CudaDevice, DevicePtr};
 use image::{GenericImageView, ImageBuffer, Rgba, imageops::FilterType};
 use ndarray::Array;
 use ort::{
-	execution_providers::CUDAExecutionProvider,
+	ep,
 	memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
 	session::Session,
 	tensor::Shape,
@@ -24,7 +24,7 @@ fn main() -> anyhow::Result<()> {
 	#[rustfmt::skip]
 	ort::init()
 		.with_execution_providers([
-			CUDAExecutionProvider::default()
+			ep::CUDA::default()
 				.build()
 				// exit the program with an error if the CUDA EP fails to register
 				.error_on_failure()

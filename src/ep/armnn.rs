@@ -4,19 +4,19 @@ use crate::{error::Result, session::builder::SessionBuilder};
 /// [Arm NN execution provider](https://onnxruntime.ai/docs/execution-providers/community-maintained/ArmNN-ExecutionProvider.html)
 /// for ARM platforms.
 #[derive(Debug, Default, Clone)]
-pub struct ArmNNExecutionProvider {
+pub struct ArmNN {
 	use_arena: bool
 }
 
-super::impl_ep!(ArmNNExecutionProvider);
+super::impl_ep!(ArmNN);
 
-impl ArmNNExecutionProvider {
+impl ArmNN {
 	/// Enable/disable the usage of the arena allocator.
 	///
 	/// ```
-	/// # use ort::{execution_providers::armnn::ArmNNExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = ArmNNExecutionProvider::default().with_arena_allocator(true).build();
+	/// let ep = ep::ArmNN::default().with_arena_allocator(true).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -27,7 +27,7 @@ impl ArmNNExecutionProvider {
 	}
 }
 
-impl ExecutionProvider for ArmNNExecutionProvider {
+impl ExecutionProvider for ArmNN {
 	fn name(&self) -> &'static str {
 		"ArmNNExecutionProvider"
 	}

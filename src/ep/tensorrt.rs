@@ -4,13 +4,13 @@ use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
 use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Default, Clone)]
-pub struct TensorRTExecutionProvider {
+pub struct TensorRT {
 	options: ExecutionProviderOptions
 }
 
-super::impl_ep!(arbitrary; TensorRTExecutionProvider);
+super::impl_ep!(arbitrary; TensorRT);
 
-impl TensorRTExecutionProvider {
+impl TensorRT {
 	#[must_use]
 	pub fn with_device_id(mut self, device_id: i32) -> Self {
 		self.options.set("device_id", device_id.to_string());
@@ -254,7 +254,7 @@ impl TensorRTExecutionProvider {
 	}
 }
 
-impl ExecutionProvider for TensorRTExecutionProvider {
+impl ExecutionProvider for TensorRT {
 	fn name(&self) -> &'static str {
 		"TensorrtExecutionProvider"
 	}

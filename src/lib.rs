@@ -3,6 +3,7 @@
 #![allow(clippy::tabs_in_doc_comments, clippy::arc_with_non_send_sync)]
 #![allow(clippy::macro_metavars_in_unsafe)]
 #![warn(clippy::unwrap_used)]
+#![deny(clippy::std_instead_of_alloc, clippy::std_instead_of_core)]
 #![cfg_attr(all(not(test), not(feature = "std")), no_std)]
 
 //! <div align=center>
@@ -28,8 +29,8 @@ pub mod adapter;
 pub mod compiler;
 pub mod editor;
 pub mod environment;
+pub mod ep;
 pub mod error;
-pub mod execution_providers;
 pub mod io_binding;
 pub mod logging;
 pub mod memory;
@@ -46,6 +47,13 @@ pub mod api {
 	#[cfg(feature = "training")]
 	pub use super::training::training_api as training;
 	pub use super::{api as ort, compiler::compile_api as compile, editor::editor_api as editor};
+}
+
+#[deprecated = "import execution providers from `ort::ep` instead"]
+#[doc(hidden)]
+pub mod execution_providers {
+	#[deprecated = "import execution providers from `ort::ep` instead"]
+	pub use super::ep::*;
 }
 
 use alloc::{borrow::ToOwned, boxed::Box, string::String};

@@ -4,20 +4,20 @@ use crate::{error::Result, session::builder::SessionBuilder};
 /// [Arm Compute Library execution provider](https://onnxruntime.ai/docs/execution-providers/community-maintained/ACL-ExecutionProvider.html)
 /// for ARM platforms.
 #[derive(Debug, Default, Clone)]
-pub struct ACLExecutionProvider {
+pub struct ACL {
 	fast_math: bool
 }
 
-super::impl_ep!(ACLExecutionProvider);
+super::impl_ep!(ACL);
 
-impl ACLExecutionProvider {
+impl ACL {
 	/// Enable/disable ACL's fast math mode. Enabling can improve performance at the cost of some accuracy for
 	/// `MatMul`/`Conv` nodes.
 	///
 	/// ```
-	/// # use ort::{execution_providers::acl::ACLExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = ACLExecutionProvider::default().with_fast_math(true).build();
+	/// let ep = ep::ACL::default().with_fast_math(true).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -28,7 +28,7 @@ impl ACLExecutionProvider {
 	}
 }
 
-impl ExecutionProvider for ACLExecutionProvider {
+impl ExecutionProvider for ACL {
 	fn name(&self) -> &'static str {
 		"ACLExecutionProvider"
 	}

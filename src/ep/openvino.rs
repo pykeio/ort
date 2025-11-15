@@ -6,22 +6,22 @@ use crate::{error::Result, session::builder::SessionBuilder};
 /// [OpenVINO execution provider](https://onnxruntime.ai/docs/execution-providers/OpenVINO-ExecutionProvider.html) for
 /// Intel CPUs/GPUs/NPUs.
 #[derive(Default, Debug, Clone)]
-pub struct OpenVINOExecutionProvider {
+pub struct OpenVINO {
 	options: ExecutionProviderOptions
 }
 
-super::impl_ep!(arbitrary; OpenVINOExecutionProvider);
+super::impl_ep!(arbitrary; OpenVINO);
 
-impl OpenVINOExecutionProvider {
+impl OpenVINO {
 	/// Overrides the accelerator hardware type and precision.
 	///
 	/// `device_type` should be in the format `CPU`, `NPU`, `GPU`, `GPU.0`, `GPU.1`, etc. Heterogenous combinations are
 	/// also supported in the format `HETERO:NPU,GPU`.
 	///
 	/// ```
-	/// # use ort::{execution_providers::openvino::OpenVINOExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = OpenVINOExecutionProvider::default().with_device_type("GPU.0").build();
+	/// let ep = ep::OpenVINO::default().with_device_type("GPU.0").build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -81,7 +81,7 @@ impl OpenVINOExecutionProvider {
 	}
 }
 
-impl ExecutionProvider for OpenVINOExecutionProvider {
+impl ExecutionProvider for OpenVINO {
 	fn name(&self) -> &'static str {
 		"OpenVINOExecutionProvider"
 	}

@@ -57,8 +57,8 @@ pub extern "C" fn detect_objects(ptr: *const u8, width: u32, height: u32) {
 
 	let use_webgpu = true; // TODO: Make `use_webgpu` a parameter of `detect_objects`? Or say in README to change it here.
 	if use_webgpu {
-		use ort::execution_providers::ExecutionProvider;
-		let ep = ort::execution_providers::WebGPUExecutionProvider::default();
+		use ort::ep::ExecutionProvider;
+		let ep = ort::ep::WebGPUExecutionProvider::default();
 		if ep.is_available().expect("Cannot check for availability of WebGPU ep.") {
 			ep.register(&mut builder).expect("Cannot register WebGPU ep.");
 		} else {

@@ -213,7 +213,7 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRef<'a, T> {
 	/// ```
 	///
 	/// When passing an [`ndarray`] type, the data **must** have a contiguous memory layout, or else an error will be
-	/// returned. See [`ndarray::ArrayBase::as_standard_layout`] to convert an array to a contiguous layout.
+	/// returned. See [`ndarray::ArrayRef::as_standard_layout`] to convert an array to a contiguous layout.
 	pub fn from_array_view(input: impl TensorArrayData<T> + 'a) -> Result<TensorRef<'a, T>> {
 		let (shape, data, guard) = input.ref_parts()?;
 		tensor_from_array(MemoryInfo::default(), shape, data.as_ptr() as *mut _, size_of::<T>(), T::into_tensor_element_type(), guard).map(|tensor| {
@@ -252,7 +252,7 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 	/// ```
 	///
 	/// When passing an [`ndarray`] type, the data **must** have a contiguous memory layout, or else an error will be
-	/// returned. See [`ndarray::ArrayBase::as_standard_layout`] to convert an array to a contiguous layout.
+	/// returned. See [`ndarray::ArrayRef::as_standard_layout`] to convert an array to a contiguous layout.
 	pub fn from_array_view_mut(mut input: impl TensorArrayDataMut<T>) -> Result<TensorRefMut<'a, T>> {
 		let (shape, data, guard) = input.ref_parts_mut()?;
 		tensor_from_array(MemoryInfo::default(), shape, data.as_ptr() as *mut _, size_of::<T>(), T::into_tensor_element_type(), guard).map(|tensor| {

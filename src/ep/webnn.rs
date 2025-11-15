@@ -4,56 +4,56 @@ use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
 use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WebNNPowerPreference {
+pub enum PowerPreference {
 	#[default]
 	Default,
 	HighPerformance,
 	LowPower
 }
 
-impl WebNNPowerPreference {
+impl PowerPreference {
 	#[must_use]
 	pub fn as_str(&self) -> &'static str {
 		match self {
-			WebNNPowerPreference::Default => "default",
-			WebNNPowerPreference::HighPerformance => "high-performance",
-			WebNNPowerPreference::LowPower => "low-power"
+			PowerPreference::Default => "default",
+			PowerPreference::HighPerformance => "high-performance",
+			PowerPreference::LowPower => "low-power"
 		}
 	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WebNNDeviceType {
+pub enum DeviceType {
 	CPU,
 	GPU,
 	NPU
 }
 
-impl WebNNDeviceType {
+impl DeviceType {
 	#[must_use]
 	pub fn as_str(&self) -> &'static str {
 		match self {
-			WebNNDeviceType::CPU => "cpu",
-			WebNNDeviceType::GPU => "gpu",
-			WebNNDeviceType::NPU => "npu"
+			DeviceType::CPU => "cpu",
+			DeviceType::GPU => "gpu",
+			DeviceType::NPU => "npu"
 		}
 	}
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct WebNNExecutionProvider {
+pub struct WebNN {
 	options: ExecutionProviderOptions
 }
 
-impl WebNNExecutionProvider {
+impl WebNN {
 	#[must_use]
-	pub fn with_device_type(mut self, device_type: WebNNDeviceType) -> Self {
+	pub fn with_device_type(mut self, device_type: DeviceType) -> Self {
 		self.options.set("deviceType", device_type.as_str());
 		self
 	}
 
 	#[must_use]
-	pub fn with_power_preference(mut self, pref: WebNNPowerPreference) -> Self {
+	pub fn with_power_preference(mut self, pref: PowerPreference) -> Self {
 		self.options.set("powerPreference", pref.as_str());
 		self
 	}
@@ -65,9 +65,9 @@ impl WebNNExecutionProvider {
 	}
 }
 
-super::impl_ep!(arbitrary; WebNNExecutionProvider);
+super::impl_ep!(arbitrary; WebNN);
 
-impl ExecutionProvider for WebNNExecutionProvider {
+impl ExecutionProvider for WebNN {
 	fn name(&self) -> &'static str {
 		"WebNNExecutionProvider"
 	}

@@ -4,13 +4,13 @@ use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
 use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Default, Clone)]
-pub struct VitisAIExecutionProvider {
+pub struct Vitis {
 	options: ExecutionProviderOptions
 }
 
-super::impl_ep!(arbitrary; VitisAIExecutionProvider);
+super::impl_ep!(arbitrary; Vitis);
 
-impl VitisAIExecutionProvider {
+impl Vitis {
 	pub fn with_config_file(mut self, config_file: impl ToString) -> Self {
 		self.options.set("config_file", config_file.to_string());
 		self
@@ -27,7 +27,7 @@ impl VitisAIExecutionProvider {
 	}
 }
 
-impl ExecutionProvider for VitisAIExecutionProvider {
+impl ExecutionProvider for Vitis {
 	fn name(&self) -> &'static str {
 		"VitisAIExecutionProvider"
 	}

@@ -6,7 +6,6 @@ use core::{
 	ffi::c_void,
 	marker::PhantomData,
 	mem::replace,
-	ops::Deref,
 	ptr::{self, NonNull}
 };
 #[cfg(feature = "std")]
@@ -23,8 +22,8 @@ use crate::error::{Error, ErrorCode};
 use crate::util::OsCharArray;
 use crate::{
 	AsPointer,
+	ep::apply_execution_providers,
 	error::Result,
-	execution_providers::apply_execution_providers,
 	memory::Allocator,
 	ortsys,
 	session::{InMemorySession, Input, Output, Session, SharedSessionInner, dangerous}
@@ -136,7 +135,7 @@ impl SessionBuilder {
 	}
 
 	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
-	fn commit_from_file_inner(mut self, model_path: &<OsCharArray as Deref>::Target) -> Result<Session> {
+	fn commit_from_file_inner(mut self, model_path: &<OsCharArray as core::ops::Deref>::Target) -> Result<Session> {
 		self.pre_commit()?;
 
 		let session_ptr = if let Some(prepacked_weights) = self.prepacked_weights.as_ref() {

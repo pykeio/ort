@@ -4,22 +4,22 @@ use super::{ExecutionProvider, RegisterError};
 use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TVMExecutorType {
+pub enum ExecutorType {
 	GraphExecutor,
 	VirtualMachine
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TVMTuningType {
+pub enum TuningType {
 	AutoTVM,
 	Ansor
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct TVMExecutionProvider {
+pub struct TVM {
 	/// Executor type used by TVM. There is a choice between two types, `GraphExecutor` and `VirtualMachine`. Default is
-	/// [`TVMExecutorType::VirtualMachine`].
-	pub executor: Option<TVMExecutorType>,
+	/// [`ExecutorType::VirtualMachine`].
+	pub executor: Option<ExecutorType>,
 	/// Path to folder with set of files (`.ro-`, `.so`/`.dll`-files and weights) obtained after model tuning.
 	pub so_folder: Option<String>,
 	/// Whether or not to perform a hash check on the model obtained in the `so_folder`.
@@ -34,7 +34,7 @@ pub struct TVMExecutionProvider {
 	/// `true` is recommended for best performance and is the default.
 	pub freeze_weights: Option<bool>,
 	pub to_nhwc: Option<bool>,
-	pub tuning_type: Option<TVMTuningType>,
+	pub tuning_type: Option<TuningType>,
 	/// Path to AutoTVM or Ansor tuning file which gives specifications for given model and target for the best
 	/// performance.
 	pub tuning_file_path: Option<String>,
@@ -42,9 +42,9 @@ pub struct TVMExecutionProvider {
 	pub input_shapes: Option<String>
 }
 
-super::impl_ep!(TVMExecutionProvider);
+super::impl_ep!(TVM);
 
-impl ExecutionProvider for TVMExecutionProvider {
+impl ExecutionProvider for TVM {
 	fn name(&self) -> &'static str {
 		"TvmExecutionProvider"
 	}
@@ -66,8 +66,8 @@ impl ExecutionProvider for TVMExecutionProvider {
 				option_string.push(format!(
 					"executor:{}",
 					match executor {
-						TVMExecutorType::GraphExecutor => "graph",
-						TVMExecutorType::VirtualMachine => "vm"
+						ExecutorType::GraphExecutor => "graph",
+						ExecutorType::VirtualMachine => "vm"
 					}
 				));
 			}

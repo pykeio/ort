@@ -37,7 +37,7 @@ use crate::{
 ///
 /// ```no_run
 /// # use ort::{
-/// # 	execution_providers::CUDAExecutionProvider,
+/// # 	ep,
 /// # 	io_binding::IoBinding,
 /// # 	memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType},
 /// # 	session::Session,
@@ -45,10 +45,10 @@ use crate::{
 /// # };
 /// # fn main() -> ort::Result<()> {
 /// let mut text_encoder = Session::builder()?
-/// 	.with_execution_providers([CUDAExecutionProvider::default().build()])?
+/// 	.with_execution_providers([ep::CUDA::default().build()])?
 /// 	.commit_from_file("text_encoder.onnx")?;
 /// let mut unet = Session::builder()?
-/// 	.with_execution_providers([CUDAExecutionProvider::default().build()])?
+/// 	.with_execution_providers([ep::CUDA::default().build()])?
 /// 	.commit_from_file("unet.onnx")?;
 ///
 /// let text_condition = text_encoder

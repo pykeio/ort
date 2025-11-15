@@ -4,7 +4,7 @@ use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
 use crate::{error::Result, session::builder::SessionBuilder};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CoreMLSpecializationStrategy {
+pub enum SpecializationStrategy {
 	/// The strategy that should work well for most applications.
 	Default,
 	/// Prefer the prediction latency at the potential cost of specialization time, memory footprint, and the disk space
@@ -12,7 +12,7 @@ pub enum CoreMLSpecializationStrategy {
 	FastPrediction
 }
 
-impl CoreMLSpecializationStrategy {
+impl SpecializationStrategy {
 	pub(crate) fn as_str(&self) -> &'static str {
 		match self {
 			Self::Default => "Default",
@@ -22,7 +22,7 @@ impl CoreMLSpecializationStrategy {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CoreMLComputeUnits {
+pub enum ComputeUnits {
 	/// Enable CoreML EP for all compatible Apple devices.
 	All,
 	/// Enable CoreML EP for Apple devices with a compatible Neural Engine (ANE).
@@ -33,7 +33,7 @@ pub enum CoreMLComputeUnits {
 	CPUOnly
 }
 
-impl CoreMLComputeUnits {
+impl ComputeUnits {
 	pub(crate) fn as_str(&self) -> &'static str {
 		match self {
 			Self::All => "ALL",
@@ -45,14 +45,14 @@ impl CoreMLComputeUnits {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CoreMLModelFormat {
+pub enum ModelFormat {
 	/// Requires Core ML 5 or later (iOS 15+ or macOS 12+).
 	MLProgram,
 	/// Default; requires Core ML 3 or later (iOS 13+ or macOS 10.15+).
 	NeuralNetwork
 }
 
-impl CoreMLModelFormat {
+impl ModelFormat {
 	pub(crate) fn as_str(&self) -> &'static str {
 		match self {
 			Self::MLProgram => "MLProgram",
@@ -64,20 +64,20 @@ impl CoreMLModelFormat {
 /// [CoreML execution provider](https://onnxruntime.ai/docs/execution-providers/CoreML-ExecutionProvider.html) for hardware
 /// acceleration on Apple devices.
 #[derive(Debug, Default, Clone)]
-pub struct CoreMLExecutionProvider {
+pub struct CoreML {
 	options: ExecutionProviderOptions
 }
 
-super::impl_ep!(arbitrary; CoreMLExecutionProvider);
+super::impl_ep!(arbitrary; CoreML);
 
-impl CoreMLExecutionProvider {
+impl CoreML {
 	/// Enable CoreML EP to run on a subgraph in the body of a control flow operator (i.e. a `Loop`, `Scan` or `If`
 	/// operator).
 	///
 	/// ```
-	/// # use ort::{execution_providers::coreml::CoreMLExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CoreMLExecutionProvider::default().with_subgraphs(true).build();
+	/// let ep = ep::CoreML::default().with_subgraphs(true).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -91,9 +91,9 @@ impl CoreMLExecutionProvider {
 	/// allow inputs with dynamic shapes, however performance may be negatively impacted by inputs with dynamic shapes.
 	///
 	/// ```
-	/// # use ort::{execution_providers::coreml::CoreMLExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CoreMLExecutionProvider::default().with_static_input_shapes(true).build();
+	/// let ep = ep::CoreML::default().with_static_input_shapes(true).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -105,19 +105,19 @@ impl CoreMLExecutionProvider {
 
 	/// Configures the format of the CoreML model created by the EP.
 	///
-	/// The default format, [NeuralNetwork](`CoreMLModelFormat::NeuralNetwork`), has better compatibility with older
-	/// versions of macOS/iOS. The newer [MLProgram](`CoreMLModelFormat::MLProgram`) format supports more operators,
+	/// The default format, [NeuralNetwork](`ModelFormat::NeuralNetwork`), has better compatibility with older
+	/// versions of macOS/iOS. The newer [MLProgram](`ModelFormat::MLProgram`) format supports more operators,
 	/// and may be more performant.
 	///
 	/// ```
-	/// # use ort::{execution_providers::coreml::{CoreMLExecutionProvider, CoreMLModelFormat}, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CoreMLExecutionProvider::default().with_model_format(CoreMLModelFormat::MLProgram).build();
+	/// let ep = ep::CoreML::default().with_model_format(ep::coreml::ModelFormat::MLProgram).build();
 	/// # Ok(())
 	/// # }
 	/// ```
 	#[must_use]
-	pub fn with_model_format(mut self, model_format: CoreMLModelFormat) -> Self {
+	pub fn with_model_format(mut self, model_format: ModelFormat) -> Self {
 		self.options.set("ModelFormat", model_format.as_str());
 		self
 	}
@@ -129,14 +129,16 @@ impl CoreMLExecutionProvider {
 	/// model for faster prediction, at the potential cost of session load time and memory footprint.
 	///
 	/// ```
-	/// # use ort::{execution_providers::coreml::{CoreMLExecutionProvider, CoreMLSpecializationStrategy}, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CoreMLExecutionProvider::default().with_specialization_strategy(CoreMLSpecializationStrategy::FastPrediction).build();
+	/// let ep = ep::CoreML::default()
+	/// 	.with_specialization_strategy(ep::coreml::SpecializationStrategy::FastPrediction)
+	/// 	.build();
 	/// # Ok(())
 	/// # }
 	/// ```
 	#[must_use]
-	pub fn with_specialization_strategy(mut self, strategy: CoreMLSpecializationStrategy) -> Self {
+	pub fn with_specialization_strategy(mut self, strategy: SpecializationStrategy) -> Self {
 		self.options.set("SpecializationStrategy", strategy.as_str());
 		self
 	}
@@ -144,16 +146,16 @@ impl CoreMLExecutionProvider {
 	/// Configures what hardware can be used by CoreML for acceleration.
 	///
 	/// ```
-	/// # use ort::{execution_providers::coreml::{CoreMLExecutionProvider, CoreMLComputeUnits}, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CoreMLExecutionProvider::default()
-	/// 	.with_compute_units(CoreMLComputeUnits::CPUAndNeuralEngine)
+	/// let ep = ep::CoreML::default()
+	/// 	.with_compute_units(ep::coreml::ComputeUnits::CPUAndNeuralEngine)
 	/// 	.build();
 	/// # Ok(())
 	/// # }
 	/// ```
 	#[must_use]
-	pub fn with_compute_units(mut self, units: CoreMLComputeUnits) -> Self {
+	pub fn with_compute_units(mut self, units: ComputeUnits) -> Self {
 		self.options.set("MLComputeUnits", units.as_str());
 		self
 	}
@@ -162,9 +164,9 @@ impl CoreMLExecutionProvider {
 	/// for debugging unexpected performance with CoreML.
 	///
 	/// ```
-	/// # use ort::{execution_providers::coreml::CoreMLExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CoreMLExecutionProvider::default().with_profile_compute_plan(true).build();
+	/// let ep = ep::CoreML::default().with_profile_compute_plan(true).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -177,9 +179,9 @@ impl CoreMLExecutionProvider {
 	/// Configures whether to allow low-precision (fp16) accumulation on GPU.
 	///
 	/// ```
-	/// # use ort::{execution_providers::coreml::CoreMLExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CoreMLExecutionProvider::default().with_low_precision_accumulation_on_gpu(true).build();
+	/// let ep = ep::CoreML::default().with_low_precision_accumulation_on_gpu(true).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -195,9 +197,9 @@ impl CoreMLExecutionProvider {
 	/// session. Setting this option allows the compiled model to be reused across session loads.
 	///
 	/// ```
-	/// # use ort::{execution_providers::coreml::CoreMLExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = CoreMLExecutionProvider::default().with_model_cache_dir("/path/to/cache").build();
+	/// let ep = ep::CoreML::default().with_model_cache_dir("/path/to/cache").build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -235,7 +237,7 @@ impl CoreMLExecutionProvider {
 	}
 }
 
-impl ExecutionProvider for CoreMLExecutionProvider {
+impl ExecutionProvider for CoreML {
 	fn name(&self) -> &'static str {
 		"CoreMLExecutionProvider"
 	}

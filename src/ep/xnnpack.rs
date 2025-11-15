@@ -13,12 +13,12 @@ use crate::{error::Result, session::builder::SessionBuilder};
 /// disable the session intra-op threadpool to reduce contention:
 /// ```no_run
 /// # use core::num::NonZeroUsize;
-/// # use ort::{execution_providers::xnnpack::XNNPACKExecutionProvider, session::Session};
+/// # use ort::{ep, session::Session};
 /// # fn main() -> ort::Result<()> {
 /// let session = Session::builder()?
 /// 	.with_intra_op_spinning(false)?
 /// 	.with_intra_threads(1)?
-/// 	.with_execution_providers([XNNPACKExecutionProvider::default()
+/// 	.with_execution_providers([ep::XNNPACK::default()
 /// 		.with_intra_op_num_threads(NonZeroUsize::new(4).unwrap())
 /// 		.build()])?
 /// 	.commit_from_file("model.onnx")?;
@@ -26,22 +26,20 @@ use crate::{error::Result, session::builder::SessionBuilder};
 /// # }
 /// ```
 #[derive(Debug, Default, Clone)]
-pub struct XNNPACKExecutionProvider {
+pub struct XNNPACK {
 	options: ExecutionProviderOptions
 }
 
-super::impl_ep!(arbitrary; XNNPACKExecutionProvider);
+super::impl_ep!(arbitrary; XNNPACK);
 
-impl XNNPACKExecutionProvider {
+impl XNNPACK {
 	/// Configures the number of threads to use for XNNPACK's internal intra-op threadpool.
 	///
 	/// ```
 	/// # use core::num::NonZeroUsize;
-	/// # use ort::{execution_providers::xnnpack::XNNPACKExecutionProvider, session::Session};
+	/// # use ort::{ep, session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let ep = XNNPACKExecutionProvider::default()
-	/// 	.with_intra_op_num_threads(NonZeroUsize::new(4).unwrap())
-	/// 	.build();
+	/// let ep = ep::XNNPACK::default().with_intra_op_num_threads(NonZeroUsize::new(4).unwrap()).build();
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -52,7 +50,7 @@ impl XNNPACKExecutionProvider {
 	}
 }
 
-impl ExecutionProvider for XNNPACKExecutionProvider {
+impl ExecutionProvider for XNNPACK {
 	fn name(&self) -> &'static str {
 		"XnnpackExecutionProvider"
 	}

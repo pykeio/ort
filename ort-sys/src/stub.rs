@@ -84,7 +84,7 @@ unsafe extern "system" fn DisableTelemetryEvents(env: *const OrtEnv) -> OrtStatu
 #[cfg(not(target_arch = "wasm32"))]
 unsafe extern "system" fn CreateSession(
 	env: *const OrtEnv,
-	model_path: *const ortchar,
+	model_path: *const os_char,
 	options: *const OrtSessionOptions,
 	out: *mut *mut OrtSession
 ) -> OrtStatusPtr {
@@ -139,7 +139,7 @@ unsafe extern "system" fn CreateSessionOptions(options: *mut *mut OrtSessionOpti
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn SetOptimizedModelFilePath(options: *mut OrtSessionOptions, optimized_model_filepath: *const ortchar) -> OrtStatusPtr {
+unsafe extern "system" fn SetOptimizedModelFilePath(options: *mut OrtSessionOptions, optimized_model_filepath: *const os_char) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -151,7 +151,7 @@ unsafe extern "system" fn SetSessionExecutionMode(options: *mut OrtSessionOption
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn EnableProfiling(options: *mut OrtSessionOptions, profile_file_prefix: *const ortchar) -> OrtStatusPtr {
+unsafe extern "system" fn EnableProfiling(options: *mut OrtSessionOptions, profile_file_prefix: *const os_char) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -925,7 +925,7 @@ unsafe extern "system" fn ReleasePrepackedWeightsContainer(input: *mut OrtPrepac
 
 unsafe extern "system" fn CreateSessionWithPrepackedWeightsContainer(
 	env: *const OrtEnv,
-	model_path: *const ortchar,
+	model_path: *const os_char,
 	options: *const OrtSessionOptions,
 	prepacked_weights_container: *mut OrtPrepackedWeightsContainer,
 	out: *mut *mut OrtSession
@@ -1321,7 +1321,7 @@ unsafe extern "system" fn SetGlobalIntraOpThreadAffinity(tp_options: *mut OrtThr
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn RegisterCustomOpsLibrary_V2(options: *mut OrtSessionOptions, library_name: *const ortchar) -> OrtStatusPtr {
+unsafe extern "system" fn RegisterCustomOpsLibrary_V2(options: *mut OrtSessionOptions, library_name: *const os_char) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -1425,7 +1425,7 @@ unsafe extern "system" fn Logger_LogMessage(
 	logger: *const OrtLogger,
 	log_severity_level: OrtLoggingLevel,
 	message: *const ::core::ffi::c_char,
-	file_path: *const ortchar,
+	file_path: *const os_char,
 	line_number: ::core::ffi::c_int,
 	func_name: *const ::core::ffi::c_char
 ) -> OrtStatusPtr {
@@ -1679,7 +1679,7 @@ unsafe extern "system" fn KernelInfoGetAllocator(info: *const OrtKernelInfo, mem
 
 unsafe extern "system" fn AddExternalInitializersFromMemory(
 	options: *mut OrtSessionOptions,
-	external_initializer_file_names: *const *const ortchar,
+	external_initializer_file_names: *const *const os_char,
 	external_initializer_file_buffer_array: *const *mut ::core::ffi::c_char,
 	external_initializer_file_lengths: *const usize,
 	num_external_initializer_files: usize
@@ -1687,7 +1687,7 @@ unsafe extern "system" fn AddExternalInitializersFromMemory(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-unsafe extern "system" fn CreateLoraAdapter(adapter_file_path: *const ortchar, allocator: *mut OrtAllocator, out: *mut *mut OrtLoraAdapter) -> OrtStatusPtr {
+unsafe extern "system" fn CreateLoraAdapter(adapter_file_path: *const os_char, allocator: *mut OrtAllocator, out: *mut *mut OrtLoraAdapter) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
@@ -1780,7 +1780,7 @@ unsafe extern "system" fn ReleaseKeyValuePairs(input: *mut OrtKeyValuePairs) {}
 unsafe extern "system" fn RegisterExecutionProviderLibrary(
 	env: *mut OrtEnv,
 	registration_name: *const ::core::ffi::c_char,
-	path: *const ortchar
+	path: *const os_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }

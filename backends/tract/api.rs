@@ -54,7 +54,7 @@ unsafe extern "system" fn DisableTelemetryEvents(_env: *const OrtEnv) -> OrtStat
 
 unsafe extern "system" fn CreateSession(
 	env: *const OrtEnv,
-	model_path: *const ortchar,
+	model_path: *const os_char,
 	options: *const OrtSessionOptions,
 	out: *mut *mut OrtSession
 ) -> OrtStatusPtr {

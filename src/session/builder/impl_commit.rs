@@ -199,7 +199,7 @@ impl SessionBuilder {
 		self.pre_commit()?;
 
 		let mut session_ptr = ptr::null_mut();
-		let status = ortsys![unsafe CreateSession(env.ptr(), model_url.as_ref(), self.ptr(), &mut session_ptr)].await;
+		let status = ortsys![unsafe CreateSession(self.environment.ptr(), model_url.as_ref(), self.ptr(), &mut session_ptr)].await;
 		unsafe { crate::error::status_to_result(status) }?;
 
 		let Some(session_ptr) = NonNull::new(session_ptr) else {
@@ -215,7 +215,7 @@ impl SessionBuilder {
 		self.pre_commit()?;
 
 		let mut session_ptr = ptr::null_mut();
-		let status = ortsys![unsafe CreateSessionFromArray(env.ptr(), model_bytes.as_ref(), self.ptr(), &mut session_ptr)].await;
+		let status = ortsys![unsafe CreateSessionFromArray(self.environment.ptr(), model_bytes.as_ref(), self.ptr(), &mut session_ptr)].await;
 		unsafe { crate::error::status_to_result(status) }?;
 
 		let Some(session_ptr) = NonNull::new(session_ptr) else {

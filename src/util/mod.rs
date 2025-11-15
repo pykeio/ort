@@ -75,7 +75,7 @@ pub(crate) fn path_to_os_char(path: impl AsRef<std::path::Path>) -> OsCharArray 
 	let path: Vec<c_char> = path
 		.as_encoded_bytes()
 		.iter()
-		.chain(std::iter::once(&b'\0'))
+		.chain(core::iter::once(&b'\0'))
 		.map(|b| *b as c_char)
 		.collect();
 	path

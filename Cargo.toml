@@ -61,7 +61,8 @@ tracing = [ "dep:tracing" ]
 
 fetch-models = [ "std", "dep:ureq", "dep:sha2" ]
 download-binaries = [ "ort-sys/download-binaries" ]
-load-dynamic = [ "std", "libloading", "ort-sys/disable-linking" ]
+preload-dylibs = [ "dep:libloading" ]
+load-dynamic = [ "std", "preload-dylibs", "ort-sys/disable-linking" ]
 copy-dylibs = [ "ort-sys/copy-dylibs" ]
 
 tls-rustls = [ "ort-sys/tls-rustls", "ureq?/rustls" ]

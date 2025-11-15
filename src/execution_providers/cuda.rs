@@ -391,6 +391,8 @@ impl ExecutionProvider for CUDAExecutionProvider {
 	}
 }
 
+// Take care in how these are ordered, since some of them depend on each other. Dependencies need to be loaded before
+// their dependents.
 #[cfg(windows)]
 pub const CUDA_DYLIBS: &[&str] = &["cudart64_12.dll", "cublasLt64_12.dll", "cublas64_12.dll", "cufft64_11.dll"];
 #[cfg(not(windows))]
@@ -444,8 +446,8 @@ pub const CUDNN_DYLIBS: &[&str] = &[
 /// // Only preload cuDNN
 /// let _ = cuda::preload_dylibs(None, Some(cudnn_root));
 /// ```
-#[cfg(feature = "load-dynamic")]
-#[cfg_attr(docsrs, doc(cfg(feature = "load-dynamic")))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "preload-dylibs", feature = "load-dynamic"))))]
+#[cfg(feature = "preload-dylibs")]
 pub fn preload_dylibs(cuda_root_dir: Option<&std::path::Path>, cudnn_root_dir: Option<&std::path::Path>) -> Result<()> {
 	use crate::util::preload_dylib;
 	if let Some(cuda_root_dir) = cuda_root_dir {

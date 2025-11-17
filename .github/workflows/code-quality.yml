@@ -35,7 +35,7 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install Rust
         uses: dtolnay/rust-toolchain@nightly
         with:
@@ -51,7 +51,7 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install Rust
         uses: dtolnay/rust-toolchain@nightly
         with:
@@ -83,7 +83,7 @@ jobs:
       RUSTDOCFLAGS: -Dwarnings
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install Rust
         uses: dtolnay/rust-toolchain@nightly
         with:

@@ -33,7 +33,7 @@ jobs:
           - os: ubuntu-latest
           - os: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install protoc
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
@@ -60,7 +60,7 @@ jobs:
           - os: windows-latest
           - os: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install stable Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:

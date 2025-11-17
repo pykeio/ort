@@ -1,6 +1,6 @@
 use std::{
 	fs,
-	io::{self, BufRead, BufReader},
+	io::{BufRead, BufReader},
 	path::Path
 };
 
@@ -94,20 +94,14 @@ fn squeezenet_mushroom() -> ort::Result<()> {
 }
 
 fn get_imagenet_labels() -> ort::Result<Vec<String>> {
-	// Download the ImageNet class labels, matching SqueezeNet's classes.
-	let labels_path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("synset.txt");
-	if !labels_path.exists() {
-		let url = "https://s3.amazonaws.com/onnx-model-zoo/synset.txt";
-		println!("Downloading {:?} to {:?}...", url, labels_path);
-		let resp = ureq::get(url).call().map_err(Error::wrap)?;
-
-		let mut reader = resp.into_body().into_reader();
-		let f = fs::File::create(&labels_path).unwrap();
-		let mut writer = io::BufWriter::new(f);
-
-		io::copy(&mut reader, &mut writer).unwrap();
-	}
-
-	let file = BufReader::new(fs::File::open(labels_path).unwrap());
+	let file = BufReader::new(
+		fs::File::open(
+			Path::new(env!("CARGO_MANIFEST_DIR"))
+				.join("tests")
+				.join("data")
+				.join("imagenet-classes.txt")
+		)
+		.unwrap()
+	);
 	file.lines().map(|line| line.map_err(Error::wrap)).collect()
 }

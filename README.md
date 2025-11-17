@@ -21,9 +21,8 @@ When you need to deploy a PyTorch/TensorFlow/Keras/scikit-learn/PaddlePaddle mod
 - [Migrating from v1.x to v2.0](https://ort.pyke.io/migrating/v2)
 
 ## 🤔 Support
-- [Discord: `#💬｜ort-discussions`](https://discord.gg/uQtsNu2xMa)
+- [Discord: `#🦀｜ort-general`](https://discord.gg/uQtsNu2xMa)
 - [GitHub Discussions](https://github.com/pykeio/ort/discussions)
-- [Email](mailto:contact@pyke.io)
 
 ## 🌠 Sponsor `ort`
 <a href="https://opencollective.com/pyke-osai">

@@ -76,3 +76,18 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
+  docs-rs:
+    name: docs.rs build
+    runs-on: ubuntu-24.04
+    env:
+      RUSTDOCFLAGS: -Dwarnings
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly-2025-09-28
+      - name: Install cargo-docs-rs
+        uses: dtolnay/install@cargo-docs-rs
+      - run: cargo docs-rs

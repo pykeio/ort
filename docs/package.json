@@ -3,26 +3,26 @@
 	"name": "ort-docs",
 	"version": "0.0.0",
 	"scripts": {
-		"dev": "next dev --turbopack",
+		"dev": "next dev",
 		"build": "next build",
 		"start": "next start",
 		"postbuild": "pagefind --site .next/server/app --output-path out/_pagefind"
 	},
 	"dependencies": {
-		"next": "^15.2.4",
-		"nextra": "^4.2.17",
-		"nextra-theme-docs": "^4.2.17",
-		"react": "^19.1.0",
-		"react-dom": "^19.1.0"
+		"next": "^16.0.3",
+		"nextra": "^4.6.0",
+		"nextra-theme-docs": "^4.6.0",
+		"react": "^19.2.0",
+		"react-dom": "^19.2.0"
 	},
 	"devDependencies": {
-		"@types/node": "^22.14.0",
-		"@types/react": "^19.1.0",
-		"@types/react-dom": "^19.1.1",
-		"pagefind": "^1.3.0",
-		"typescript": "^5.8.2"
+		"@types/node": "^22.19.1",
+		"@types/react": "^19.2.6",
+		"@types/react-dom": "^19.2.3",
+		"pagefind": "^1.4.0",
+		"typescript": "^5.9.3"
 	},
-	"packageManager": "pnpm@10.6.5+sha512.cdf928fca20832cd59ec53826492b7dc25dc524d4370b6b4adbf65803d32efaa6c1c88147c0ae4e8d579a6c9eec715757b50d4fa35eea179d868eada4ed043af",
+	"packageManager": "pnpm@10.22.0+sha512.bf049efe995b28f527fd2b41ae0474ce29186f7edcb3bf545087bd61fbbebb2bf75362d1307fda09c2d288e1e499787ac12d4fcb617a974718a6051f2eee741c",
 	"pnpm": {
 		"onlyBuiltDependencies": [
 			"sharp"

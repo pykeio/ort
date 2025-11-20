@@ -26,9 +26,9 @@ When you need to deploy a PyTorch/TensorFlow/Keras/scikit-learn/PaddlePaddle mod
 
 ## 🌠 Sponsor `ort`
 <a href="https://opencollective.com/pyke-osai">
-<img src="https://opencollective.com/pyke-osai/sponsors.svg" height="64" />
+<img src="https://opencollective.com/pyke-osai/sponsors.svg" />
 <br />
-<img src="https://opencollective.com/pyke-osai/backers.svg" height="64" />
+<img src="https://opencollective.com/pyke-osai/backers.svg" />
 </a>
 
 ## 💖 FOSS projects using `ort`

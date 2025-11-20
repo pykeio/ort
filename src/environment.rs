@@ -274,7 +274,7 @@ impl EnvironmentBuilder {
 	/// Typically, only Windows builds of ONNX Runtime provided by Microsoft will have telemetry enabled.
 	/// Pre-built binaries provided by pyke, or binaries compiled from source, won't have telemetry enabled.
 	///
-	/// The exact kind of telemetry data sent can be found [here](https://github.com/microsoft/onnxruntime/blob/v1.23.1/onnxruntime/core/platform/windows/telemetry.cc).
+	/// The exact kind of telemetry data sent can be found [here](https://github.com/microsoft/onnxruntime/blob/v1.23.2/onnxruntime/core/platform/windows/telemetry.cc).
 	/// Currently, this includes (but is not limited to): ONNX graph version, model producer name & version, whether or
 	/// not FP16 is used, operator domains & versions, model graph name & custom metadata, execution provider names,
 	/// error messages, and the total number & time of session inference runs. The ONNX Runtime team uses this data to

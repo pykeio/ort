@@ -68,6 +68,7 @@ impl Clone for SessionBuilder {
 				.expect("error cloning session options");
 			nonNull(session_options_ptr)
 		];
+		crate::logging::create!(SessionBuilder, session_options_ptr);
 		Self {
 			session_options_ptr,
 			memory_info: self.memory_info.clone(),
@@ -87,6 +88,7 @@ impl Clone for SessionBuilder {
 impl Drop for SessionBuilder {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleaseSessionOptions(self.ptr_mut())];
+		crate::logging::drop!(SessionBuilder, self.ptr());
 	}
 }
 
@@ -108,6 +110,7 @@ impl SessionBuilder {
 
 		let mut session_options_ptr: *mut ort_sys::OrtSessionOptions = ptr::null_mut();
 		ortsys![unsafe CreateSessionOptions(&mut session_options_ptr)?; nonNull(session_options_ptr)];
+		crate::logging::create!(SessionBuilder, session_options_ptr);
 
 		Ok(Self {
 			session_options_ptr,

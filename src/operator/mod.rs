@@ -94,7 +94,7 @@ impl ShapeInferenceContext {
 		})?;
 
 		let mut len = 0;
-		let _ = ortsys![unsafe ReadOpAttr(attr, T::attr_type(), ptr::null_mut(), 0, &mut len)];
+		ortsys![unsafe ReadOpAttr(attr, T::attr_type(), ptr::null_mut(), 0, &mut len)?];
 
 		unsafe { T::from_op_attr(attr, len) }
 	}
@@ -131,6 +131,7 @@ impl OperatorDomain {
 		let name = CString::new(name.as_ref())?;
 		let mut ptr: *mut ort_sys::OrtCustomOpDomain = ptr::null_mut();
 		ortsys![unsafe CreateCustomOpDomain(name.as_ptr(), &mut ptr)?; nonNull(ptr)];
+		crate::logging::create!(OperatorDomain, ptr);
 		Ok(Self {
 			ptr,
 			_name: name,
@@ -162,5 +163,6 @@ impl AsPointer for OperatorDomain {
 impl Drop for OperatorDomain {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleaseCustomOpDomain(self.ptr.as_ptr())];
+		crate::logging::drop!(OperatorDomain, self.ptr);
 	}
 }

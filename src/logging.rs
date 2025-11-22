@@ -78,6 +78,19 @@ pub(crate) use info;
 pub(crate) use trace;
 pub(crate) use warning;
 
+macro_rules! create {
+	($name:ident, $ptr:expr) => {
+		$crate::trace!(target: "ort::lifetime", "+NEW {} @ {:p}", stringify!($name), $ptr);
+	};
+}
+macro_rules! drop {
+	($name:ident, $ptr:expr) => {
+		$crate::trace!(target: "ort::lifetime", "-DROP {} @ {:p}", stringify!($name), $ptr);
+	};
+}
+pub(crate) use create;
+pub(crate) use drop;
+
 pub fn default_log_level() -> ort_sys::OrtLoggingLevel {
 	#[cfg(feature = "std")]
 	match std::env::var("ORT_LOG").as_deref() {

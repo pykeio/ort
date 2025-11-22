@@ -138,15 +138,15 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized + 'static> Value<Se
 			nonNull(value_ptr)
 		];
 		Ok(Value {
-			inner: Arc::new(ValueInner {
-				ptr: value_ptr,
+			inner: ValueInner::new_backed(
+				value_ptr,
 				// 1. `CreateValue` enforces that we have at least 1 value
 				// 2. `CreateValue` internally uses the first value to determine the element type, so we do the same here
-				dtype: ValueType::Sequence(Box::new(values[0].inner.dtype.clone())),
-				drop: true,
-				memory_info: None,
-				_backing: Some(Box::new(values))
-			}),
+				ValueType::Sequence(Box::new(values[0].inner.dtype.clone())),
+				None,
+				true,
+				Box::new(values)
+			),
 			_markers: PhantomData
 		})
 	}

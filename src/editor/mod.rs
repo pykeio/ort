@@ -58,6 +58,7 @@ impl Outlet {
 			ortsys![@editor: unsafe CreateValueInfo(name.as_ptr(), type_info, &mut ptr)?; nonNull(ptr)];
 			Ok(ptr)
 		})?;
+		crate::logging::create!(Outlet, ptr);
 		Ok(Self(ptr))
 	}
 
@@ -76,6 +77,7 @@ impl AsPointer for Outlet {
 impl Drop for Outlet {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleaseValueInfo(self.0.as_ptr())];
+		crate::logging::drop!(Outlet, self.0);
 	}
 }
 
@@ -113,6 +115,7 @@ impl Node {
 								)?;
 								nonNull(out)
 							];
+							crate::logging::create!(Node, out);
 							Ok(Self(out))
 						})
 					})
@@ -136,6 +139,7 @@ impl AsPointer for Node {
 impl Drop for Node {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleaseNode(self.0.as_ptr())];
+		crate::logging::drop!(Node, self.0);
 	}
 }
 
@@ -145,6 +149,7 @@ impl Graph {
 	pub fn new() -> Result<Self> {
 		let mut out = ptr::null_mut();
 		ortsys![@editor: unsafe CreateGraph(&mut out)?];
+		crate::logging::create!(Graph, out);
 		Ok(Self(out))
 	}
 
@@ -172,7 +177,7 @@ impl Graph {
 		let Some(value_inner) = Arc::get_mut(&mut initializer.inner) else {
 			return Err(Error::new("Initializers must be unique"))?;
 		};
-		if value_inner._backing.is_some() {
+		if value_inner.is_backed() {
 			// `AddInitializerToGraph` wants to take ownership of the value, so the memory needs to be managed by ONNX Runtime.
 			// The documentation technically recommends using non-managed memory when `as_external = true`, but it doesn't seem like
 			// that matters.
@@ -208,6 +213,7 @@ impl AsPointer for Graph {
 impl Drop for Graph {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleaseGraph(self.0)];
+		crate::logging::drop!(Graph, self.0);
 	}
 }
 
@@ -219,7 +225,12 @@ pub struct Opset {
 
 impl Opset {
 	pub fn new(domain_name: impl AsRef<str>, version: u32) -> Result<Self> {
-		let domain_name = CString::new(domain_name.as_ref())?;
+		let mut domain_name = domain_name.as_ref();
+		if domain_name == "ai.onnx" {
+			domain_name = ONNX_DOMAIN;
+		}
+
+		let domain_name = CString::new(domain_name)?;
 		Ok(Self { domain_name, version })
 	}
 }
@@ -236,6 +247,7 @@ impl Model {
 
 		let mut ptr = ptr::null_mut();
 		ortsys![@editor: unsafe CreateModel(domain_names.as_ptr(), opset_versions.as_ptr(), opsets.len(), &mut ptr)?; nonNull(ptr)];
+		crate::logging::create!(Model, ptr);
 		Ok(Self(ptr))
 	}
 
@@ -270,5 +282,6 @@ impl AsPointer for Model {
 impl Drop for Model {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleaseModel(self.0.as_ptr())];
+		crate::logging::drop!(Model, self.0);
 	}
 }

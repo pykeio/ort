@@ -119,6 +119,8 @@ impl Trainer {
 		let train_input_names = extract_io_names(ptr, &allocator, api.TrainingSessionGetTrainingModelInputCount, api.TrainingSessionGetTrainingModelInputName)?;
 		let eval_input_names = extract_io_names(ptr, &allocator, api.TrainingSessionGetEvalModelInputCount, api.TrainingSessionGetEvalModelInputName)?;
 
+		crate::logging::create!(Trainer, ptr);
+
 		Ok(Self {
 			ptr,
 			train_output_names,
@@ -297,7 +299,7 @@ impl AsPointer for Trainer {
 
 impl Drop for Trainer {
 	fn drop(&mut self) {
-		crate::trace!("dropping trainer");
+		crate::logging::drop!(Trainer, self.ptr);
 		ortsys![@training: unsafe ReleaseTrainingSession(self.ptr.as_ptr())];
 	}
 }

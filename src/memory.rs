@@ -117,7 +117,12 @@ impl Allocator {
 				.Alloc
 				.unwrap_or_else(|| unreachable!("Allocator method `Alloc` is null"))(self.ptr.as_ptr(), (len * mem::size_of::<T>()) as _)
 		};
-		if !ptr.is_null() { Some(AllocatedBlock { ptr, allocator: self }) } else { None }
+		if !ptr.is_null() {
+			crate::logging::create!(AllocatedBlock, ptr);
+			Some(AllocatedBlock { ptr, allocator: self })
+		} else {
+			None
+		}
 	}
 
 	/// Frees an object allocated by this allocator, given the object's C pointer.
@@ -155,10 +160,11 @@ impl Allocator {
 	/// Creates a new [`Allocator`] for the given session, to allocate memory on the device described in the
 	/// [`MemoryInfo`].
 	pub fn new(session: &Session, memory_info: MemoryInfo) -> Result<Self> {
-		let mut allocator_ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
-		ortsys![unsafe CreateAllocator(session.ptr(), memory_info.ptr.as_ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
+		let mut ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
+		ortsys![unsafe CreateAllocator(session.ptr(), memory_info.ptr.as_ptr(), &mut ptr)?; nonNull(ptr)];
+		crate::logging::create!(Allocator, ptr);
 		Ok(Self {
-			ptr: allocator_ptr,
+			ptr,
 			is_default: false,
 			_session_inner: Some(session.inner()),
 			_info: Some(memory_info)
@@ -201,6 +207,7 @@ impl Drop for Allocator {
 	fn drop(&mut self) {
 		if !self.is_default {
 			ortsys![unsafe ReleaseAllocator(self.ptr.as_ptr())];
+			crate::logging::drop!(Allocator, self.ptr);
 		}
 	}
 }
@@ -246,6 +253,7 @@ impl AllocatedBlock<'_> {
 impl Drop for AllocatedBlock<'_> {
 	fn drop(&mut self) {
 		unsafe { self.allocator.free(self.ptr) };
+		crate::logging::drop!(AllocatedBlock, self.ptr);
 	}
 }
 
@@ -395,15 +403,13 @@ impl MemoryInfo {
 	/// # }
 	/// ```
 	pub fn new(allocation_device: AllocationDevice, device_id: c_int, allocator_type: AllocatorType, memory_type: MemoryType) -> Result<Self> {
-		let mut memory_info_ptr: *mut ort_sys::OrtMemoryInfo = ptr::null_mut();
+		let mut ptr: *mut ort_sys::OrtMemoryInfo = ptr::null_mut();
 		ortsys![
-			unsafe CreateMemoryInfo(allocation_device.as_str().as_ptr().cast(), allocator_type.into(), device_id, memory_type.into(), &mut memory_info_ptr)?;
-			nonNull(memory_info_ptr)
+			unsafe CreateMemoryInfo(allocation_device.as_str().as_ptr().cast(), allocator_type.into(), device_id, memory_type.into(), &mut ptr)?;
+			nonNull(ptr)
 		];
-		Ok(Self {
-			ptr: memory_info_ptr,
-			should_release: true
-		})
+		crate::logging::create!(MemoryInfo, ptr);
+		Ok(Self { ptr, should_release: true })
 	}
 
 	pub(crate) unsafe fn from_value(value_ptr: NonNull<ort_sys::OrtValue>) -> Option<Self> {
@@ -539,6 +545,7 @@ impl Drop for MemoryInfo {
 	fn drop(&mut self) {
 		if self.should_release {
 			ortsys![unsafe ReleaseMemoryInfo(self.ptr.as_ptr())];
+			crate::logging::drop!(MemoryInfo, self.ptr);
 		}
 	}
 }

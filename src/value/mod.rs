@@ -56,7 +56,35 @@ pub(crate) struct ValueInner {
 	pub(crate) dtype: ValueType,
 	pub(crate) memory_info: Option<MemoryInfo>,
 	pub(crate) drop: bool,
-	pub(crate) _backing: Option<Box<dyn Any>>
+	_backing: Option<Box<dyn Any>>
+}
+
+impl ValueInner {
+	pub fn new(ptr: NonNull<ort_sys::OrtValue>, dtype: ValueType, memory_info: Option<MemoryInfo>, drop: bool) -> Arc<Self> {
+		crate::logging::create!(Value, ptr);
+		Arc::new(Self {
+			ptr,
+			dtype,
+			memory_info,
+			drop,
+			_backing: None
+		})
+	}
+
+	pub fn new_backed(ptr: NonNull<ort_sys::OrtValue>, dtype: ValueType, memory_info: Option<MemoryInfo>, drop: bool, backing: Box<dyn Any>) -> Arc<Self> {
+		crate::logging::create!(Value, ptr);
+		Arc::new(Self {
+			ptr,
+			dtype,
+			memory_info,
+			drop,
+			_backing: Some(backing)
+		})
+	}
+
+	pub(crate) fn is_backed(&self) -> bool {
+		self._backing.is_some()
+	}
 }
 
 impl AsPointer for ValueInner {
@@ -70,9 +98,8 @@ impl AsPointer for ValueInner {
 impl Drop for ValueInner {
 	fn drop(&mut self) {
 		if self.drop {
-			let ptr = self.ptr_mut();
-			crate::trace!("dropping value at {ptr:p}");
-			ortsys![unsafe ReleaseValue(ptr)];
+			ortsys![unsafe ReleaseValue(self.ptr_mut())];
+			crate::logging::drop!(Value, self.ptr());
 		}
 	}
 }
@@ -323,14 +350,15 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	pub unsafe fn from_ptr(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value<Type> {
 		let mut typeinfo_ptr = ptr::null_mut();
 		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
+
+		let dtype = unsafe { ValueType::from_type_info(typeinfo_ptr) };
+		let memory_info = unsafe { MemoryInfo::from_value(ptr) };
+
 		Value {
-			inner: Arc::new(ValueInner {
-				ptr,
-				memory_info: unsafe { MemoryInfo::from_value(ptr) },
-				dtype: unsafe { ValueType::from_type_info(typeinfo_ptr) },
-				drop: true,
-				_backing: session.map(|v| Box::new(v) as Box<dyn Any>)
-			}),
+			inner: match session {
+				Some(session) => ValueInner::new_backed(ptr, dtype, memory_info, true, Box::new(session)),
+				None => ValueInner::new(ptr, dtype, memory_info, true)
+			},
 			_markers: PhantomData
 		}
 	}
@@ -341,14 +369,15 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	pub(crate) unsafe fn from_ptr_nodrop(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value<Type> {
 		let mut typeinfo_ptr = ptr::null_mut();
 		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
+
+		let dtype = unsafe { ValueType::from_type_info(typeinfo_ptr) };
+		let memory_info = unsafe { MemoryInfo::from_value(ptr) };
+
 		Value {
-			inner: Arc::new(ValueInner {
-				ptr,
-				memory_info: unsafe { MemoryInfo::from_value(ptr) },
-				dtype: unsafe { ValueType::from_type_info(typeinfo_ptr) },
-				drop: false,
-				_backing: session.map(|v| Box::new(v) as Box<dyn Any>)
-			}),
+			inner: match session {
+				Some(session) => ValueInner::new_backed(ptr, dtype, memory_info, false, Box::new(session)),
+				None => ValueInner::new(ptr, dtype, memory_info, false)
+			},
 			_markers: PhantomData
 		}
 	}

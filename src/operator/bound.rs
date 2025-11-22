@@ -74,6 +74,7 @@ impl BoundOperator {
 		kernel_ptr: *mut *mut ort_sys::c_void
 	) -> ort_sys::OrtStatusPtr {
 		let safe = Self::safe(op);
+
 		let kernel = match safe
 			.operator
 			.create_kernel(&KernelAttributes::from_ptr(NonNull::new(info.cast_mut()).expect("infallible"), false))
@@ -82,6 +83,8 @@ impl BoundOperator {
 			e => return e.into_status()
 		};
 		unsafe { *kernel_ptr = (Box::leak(Box::new(kernel)) as *mut Box<dyn Kernel>).cast() };
+		crate::logging::create!(Kernel, unsafe { *kernel_ptr });
+
 		Ok(()).into_status()
 	}
 
@@ -92,6 +95,7 @@ impl BoundOperator {
 
 	pub(crate) extern "system" fn destroy_kernel(op_kernel: *mut ort_sys::c_void) {
 		drop(unsafe { Box::from_raw(op_kernel.cast::<Box<dyn Kernel>>()) });
+		crate::logging::drop!(Kernel, op_kernel);
 	}
 
 	pub(crate) extern "system" fn get_name(op: *const ort_sys::OrtCustomOp) -> *const ort_sys::c_char {
@@ -163,7 +167,7 @@ impl BoundOperator {
 			.and_then(|c| c.variadic_min_arity)
 			.unwrap_or(1)
 			.try_into()
-			.expect("input minimum arity overflows i32")
+			.expect("input minimum arity shouldn't overflow i32")
 	}
 
 	pub(crate) extern "system" fn get_variadic_input_homogeneity(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {
@@ -184,7 +188,7 @@ impl BoundOperator {
 			.and_then(|c| c.variadic_min_arity)
 			.unwrap_or(1)
 			.try_into()
-			.expect("output minimum arity overflows i32")
+			.expect("output minimum arity shouldn't overflow i32")
 	}
 
 	pub(crate) extern "system" fn get_variadic_output_homogeneity(op: *const ort_sys::OrtCustomOp) -> ort_sys::c_int {

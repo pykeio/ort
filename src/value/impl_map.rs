@@ -267,16 +267,16 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq + 'static, V: IntoTens
 			nonNull(value_ptr)
 		];
 		Ok(Value {
-			inner: Arc::new(ValueInner {
-				ptr: value_ptr,
-				dtype: ValueType::Map {
+			inner: ValueInner::new_backed(
+				value_ptr,
+				ValueType::Map {
 					key: K::into_tensor_element_type(),
 					value: V::into_tensor_element_type()
 				},
-				drop: true,
-				memory_info: None,
-				_backing: Some(Box::new(values))
-			}),
+				None,
+				true,
+				Box::new(values)
+			),
 			_markers: PhantomData
 		})
 	}

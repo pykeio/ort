@@ -393,6 +393,7 @@ unsafe impl Sync for PrepackedWeightsInner {}
 impl Drop for PrepackedWeightsInner {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleasePrepackedWeightsContainer(self.0)];
+		crate::logging::drop!(PrepackedWeights, self.0);
 	}
 }
 
@@ -405,7 +406,8 @@ impl PrepackedWeights {
 	#[allow(clippy::new_without_default)]
 	pub fn new() -> Self {
 		let mut ptr: *mut ort_sys::OrtPrepackedWeightsContainer = ptr::null_mut();
-		ortsys![unsafe CreatePrepackedWeightsContainer(&mut ptr).expect("")];
+		ortsys![unsafe CreatePrepackedWeightsContainer(&mut ptr).expect("Failed to create prepacked weights container")];
+		crate::logging::create!(PrepackedWeights, ptr);
 		Self {
 			inner: Arc::new(PrepackedWeightsInner(ptr))
 		}

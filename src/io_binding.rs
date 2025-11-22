@@ -104,6 +104,7 @@ impl IoBinding {
 	pub(crate) fn new(session: &Session) -> Result<Self> {
 		let mut ptr: *mut ort_sys::OrtIoBinding = ptr::null_mut();
 		ortsys![unsafe CreateIoBinding(session.ptr().cast_mut(), &mut ptr)?; nonNull(ptr)];
+		crate::logging::create!(IoBinding, ptr);
 		Ok(Self {
 			ptr,
 			held_inputs: MiniMap::new(),
@@ -229,6 +230,7 @@ impl AsPointer for IoBinding {
 impl Drop for IoBinding {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleaseIoBinding(self.ptr_mut())];
+		crate::logging::drop!(IoBinding, self.ptr());
 	}
 }
 

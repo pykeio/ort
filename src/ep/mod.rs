@@ -21,7 +21,13 @@ use core::{
 	ptr
 };
 
-use crate::{char_p_to_string, error::Result, ortsys, session::builder::SessionBuilder, util::MiniMap};
+use crate::{
+	char_p_to_string,
+	error::Result,
+	ortsys,
+	session::builder::SessionBuilder,
+	util::{MiniMap, run_on_drop}
+};
 
 pub mod cpu;
 pub use self::cpu::CPU;
@@ -118,21 +124,20 @@ pub trait ExecutionProvider: Send + Sync {
 			return Ok(false);
 		}
 
+		let _guard = run_on_drop(|| ortsys![unsafe ReleaseAvailableProviders(providers, num_providers).expect("infallible")]);
+
 		for i in 0..num_providers {
 			let avail = match char_p_to_string(unsafe { *providers.offset(i as isize) }) {
 				Ok(avail) => avail,
 				Err(e) => {
-					let _ = ortsys![unsafe ReleaseAvailableProviders(providers, num_providers)];
 					return Err(e);
 				}
 			};
 			if self.name() == avail {
-				let _ = ortsys![unsafe ReleaseAvailableProviders(providers, num_providers)];
 				return Ok(true);
 			}
 		}
 
-		let _ = ortsys![unsafe ReleaseAvailableProviders(providers, num_providers)];
 		Ok(false)
 	}
 
@@ -165,8 +170,6 @@ pub enum ArenaExtendStrategy {
 ///
 /// See [`ExecutionProvider`] for more info on execution providers.
 #[derive(Clone)]
-#[allow(missing_docs)]
-#[non_exhaustive]
 pub struct ExecutionProviderDispatch {
 	pub(crate) inner: Arc<dyn ExecutionProvider>,
 	error_on_failure: bool

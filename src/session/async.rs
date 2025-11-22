@@ -119,6 +119,8 @@ pub(crate) extern "system" fn async_callback(user_data: *mut c_void, _: *mut *mu
 		drop(unsafe { CString::from_raw(p.cast_mut().cast()) });
 	}
 
+	crate::logging::drop!(AsyncInferenceContext, user_data);
+
 	if let Err(e) = unsafe { crate::error::status_to_result(status) } {
 		ctx.inner.emplace_value(Err(e));
 		ctx.inner.wake();

@@ -269,6 +269,8 @@ impl SessionBuilder {
 			extras.push(Box::new(logger) as Box<dyn Any>); // Box<Arc<Box<dyn ...>>>!
 		}
 
+		crate::logging::create!(Session, ptr);
+
 		Ok(Session {
 			inner: Arc::new(SharedSessionInner {
 				session_ptr: ptr,

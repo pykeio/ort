@@ -26,7 +26,7 @@ use smallvec::SmallVec;
 use crate::{
 	AsPointer,
 	ep::ExecutionProviderDispatch,
-	error::Result,
+	error::{Result, status_to_result},
 	logging::{LogLevel, LoggerFunction},
 	ortsys,
 	util::{Mutex, OnceLock, STACK_EXECUTION_PROVIDERS, with_cstr}
@@ -84,8 +84,8 @@ impl AsPointer for Environment {
 
 impl Drop for Environment {
 	fn drop(&mut self) {
-		crate::debug!(ptr = ?self.ptr(), "Releasing environment");
 		ortsys![unsafe ReleaseEnv(self.ptr_mut())];
+		crate::logging::drop!(Environment, self.ptr());
 	}
 }
 
@@ -117,6 +117,7 @@ impl Default for GlobalThreadPoolOptions {
 	fn default() -> Self {
 		let mut ptr = ptr::null_mut();
 		ortsys![unsafe CreateThreadingOptions(&mut ptr).expect("failed to create threading options")];
+		crate::logging::create!(GlobalThreadPoolOptions, ptr);
 		Self { ptr, thread_manager: None }
 	}
 }
@@ -172,6 +173,7 @@ impl AsPointer for GlobalThreadPoolOptions {
 impl Drop for GlobalThreadPoolOptions {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleaseThreadingOptions(self.ptr)];
+		crate::logging::drop!(GlobalThreadPoolOptions, self.ptr);
 	}
 }
 
@@ -401,14 +403,20 @@ impl EnvironmentBuilder {
 
 			(env_ptr, None, false)
 		};
-		crate::debug!(env_ptr = alloc::format!("{env_ptr:?}").as_str(), "Environment created");
 
-		if self.telemetry {
-			ortsys![unsafe EnableTelemetryEvents(env_ptr.as_ptr())?];
-		} else {
-			ortsys![unsafe DisableTelemetryEvents(env_ptr.as_ptr())?];
+		#[allow(unused_unsafe)]
+		if let Err(e) = unsafe {
+			status_to_result(if self.telemetry {
+				ortsys![unsafe EnableTelemetryEvents(env_ptr.as_ptr())]
+			} else {
+				ortsys![unsafe DisableTelemetryEvents(env_ptr.as_ptr())]
+			})
+		} {
+			ortsys![unsafe ReleaseEnv(env_ptr.as_ptr())];
+			return Err(e);
 		}
 
+		crate::logging::create!(Environment, env_ptr);
 		Ok(Environment {
 			execution_providers: self.execution_providers.clone(),
 			ptr: env_ptr,

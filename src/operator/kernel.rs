@@ -121,12 +121,10 @@ impl KernelAttributes {
 
 impl Clone for KernelAttributes {
 	fn clone(&self) -> Self {
-		let mut out = ptr::null_mut();
-		ortsys![unsafe CopyKernelInfo(self.ptr.as_ptr(), &mut out).expect("failed to clone KernelAttributes")];
-		Self {
-			ptr: NonNull::new(out).expect("failed to clone KernelAttributes"),
-			should_release: true
-		}
+		let mut ptr = ptr::null_mut();
+		ortsys![unsafe CopyKernelInfo(self.ptr.as_ptr(), &mut ptr).expect("failed to clone KernelAttributes"); nonNull(ptr)];
+		crate::logging::create!(KernelAttributes, ptr);
+		Self { ptr, should_release: true }
 	}
 }
 
@@ -142,6 +140,7 @@ impl Drop for KernelAttributes {
 	fn drop(&mut self) {
 		if self.should_release {
 			ortsys![unsafe ReleaseKernelInfo(self.ptr.as_ptr())];
+			crate::logging::drop!(KernelAttributes, self.ptr);
 		}
 	}
 }
@@ -175,6 +174,7 @@ impl<T> Drop for ScratchBuffer<T> {
 		unsafe {
 			self.allocator.free(self.buffer);
 		}
+		crate::logging::drop!(ScratchBuffer, self.buffer);
 	}
 }
 

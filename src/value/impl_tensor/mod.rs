@@ -132,17 +132,16 @@ impl DynTensor {
 		}
 
 		Ok(Value {
-			inner: Arc::new(ValueInner {
-				ptr: value_ptr,
-				dtype: ValueType::Tensor {
+			inner: ValueInner::new(
+				value_ptr,
+				ValueType::Tensor {
 					ty: data_type,
 					shape,
 					dimension_symbols: SymbolicDimensions::empty(shape_len)
 				},
-				drop: true,
-				memory_info: Some(memory_info),
-				_backing: None
-			}),
+				Some(memory_info),
+				true
+			),
 			_markers: PhantomData
 		})
 	}

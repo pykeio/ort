@@ -198,11 +198,12 @@ unsafe impl Sync for RunOptions<NoSelectedOutputs> {}
 impl RunOptions {
 	/// Creates a new [`RunOptions`] struct.
 	pub fn new() -> Result<RunOptions<NoSelectedOutputs>> {
-		let mut run_options_ptr: *mut ort_sys::OrtRunOptions = ptr::null_mut();
-		ortsys![unsafe CreateRunOptions(&mut run_options_ptr)?; nonNull(run_options_ptr)];
+		let mut ptr: *mut ort_sys::OrtRunOptions = ptr::null_mut();
+		ortsys![unsafe CreateRunOptions(&mut ptr)?; nonNull(ptr)];
+		crate::logging::create!(RunOptions, ptr);
 		Ok(RunOptions {
 			inner: UntypedRunOptions {
-				ptr: run_options_ptr,
+				ptr,
 				outputs: OutputSelector::default(),
 				adapters: Vec::new()
 			},
@@ -387,5 +388,6 @@ impl<O: SelectedOutputMarker> AsPointer for RunOptions<O> {
 impl<O: SelectedOutputMarker> Drop for RunOptions<O> {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleaseRunOptions(self.inner.ptr.as_ptr())];
+		crate::logging::drop!(RunOptions, self.inner.ptr);
 	}
 }

@@ -72,17 +72,16 @@ impl Tensor<String> {
 		ortsys![unsafe FillStringTensor(value_ptr.as_ptr(), string_pointers.as_ptr(), string_pointers.len())?];
 
 		Ok(Value {
-			inner: Arc::new(ValueInner {
-				ptr: value_ptr,
-				dtype: ValueType::Tensor {
+			inner: ValueInner::new(
+				value_ptr,
+				ValueType::Tensor {
 					ty: TensorElementType::String,
 					shape,
 					dimension_symbols: SymbolicDimensions::empty(shape_len)
 				},
-				memory_info: unsafe { MemoryInfo::from_value(value_ptr) },
-				drop: true,
-				_backing: None
-			}),
+				unsafe { MemoryInfo::from_value(value_ptr) },
+				true
+			),
 			_markers: PhantomData
 		})
 	}
@@ -168,18 +167,17 @@ fn tensor_from_array(
 		nonNull(value_ptr)
 	];
 
+	let dtype = ValueType::Tensor {
+		ty: element_type,
+		dimension_symbols: SymbolicDimensions::empty(shape.len()),
+		shape
+	};
+
 	Ok(DynTensor {
-		inner: Arc::new(ValueInner {
-			ptr: value_ptr,
-			dtype: ValueType::Tensor {
-				ty: element_type,
-				dimension_symbols: SymbolicDimensions::empty(shape.len()),
-				shape
-			},
-			drop: true,
-			memory_info: Some(memory_info),
-			_backing: guard
-		}),
+		inner: match guard {
+			Some(backing) => ValueInner::new_backed(value_ptr, dtype, Some(memory_info), true, backing),
+			None => ValueInner::new(value_ptr, dtype, Some(memory_info), true)
+		},
 		_markers: PhantomData
 	})
 }

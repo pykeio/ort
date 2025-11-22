@@ -23,6 +23,7 @@ impl AsPointer for AdapterInner {
 impl Drop for AdapterInner {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleaseLoraAdapter(self.ptr.as_ptr())];
+		crate::logging::drop!(Adapter, self.ptr);
 	}
 }
 
@@ -94,6 +95,7 @@ impl Adapter {
 		let allocator_ptr = allocator.map(|c| c.ptr().cast_mut()).unwrap_or_else(ptr::null_mut);
 		let mut ptr = ptr::null_mut();
 		ortsys![unsafe CreateLoraAdapter(path.as_ptr(), allocator_ptr, &mut ptr)?; nonNull(ptr)];
+		crate::logging::create!(Adapter, ptr);
 		Ok(Adapter {
 			inner: Arc::new(AdapterInner { ptr })
 		})
@@ -137,6 +139,7 @@ impl Adapter {
 		let allocator_ptr = allocator.map(|c| c.ptr().cast_mut()).unwrap_or_else(ptr::null_mut);
 		let mut ptr = ptr::null_mut();
 		ortsys![unsafe CreateLoraAdapterFromArray(bytes.as_ptr().cast(), bytes.len(), allocator_ptr, &mut ptr)?; nonNull(ptr)];
+		crate::logging::create!(Adapter, ptr);
 		Ok(Adapter {
 			inner: Arc::new(AdapterInner { ptr })
 		})

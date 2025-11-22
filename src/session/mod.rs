@@ -82,8 +82,8 @@ impl AsPointer for SharedSessionInner {
 
 impl Drop for SharedSessionInner {
 	fn drop(&mut self) {
-		crate::debug!(ptr = ?self.session_ptr.as_ptr(), "dropping SharedSessionInner");
 		ortsys![unsafe ReleaseSession(self.session_ptr.as_ptr())];
+		crate::logging::drop!(Session, self.session_ptr);
 	}
 }
 
@@ -459,20 +459,25 @@ impl Session {
 
 		let async_inner = Arc::new(InferenceFutInner::new());
 
-		// AsyncInferenceContext can get pretty huge so we should see if we can bump MSRV to 1.82 and use `Box::new_uninit()`
-		// if it causes problems
-		let ctx = Box::leak(Box::new(AsyncInferenceContext {
-			inner: Arc::clone(&async_inner),
-			// everything allocated within `run_inner_async` needs to be kept alive until we are certain inference has completed and ONNX Runtime no longer
-			// needs the data - i.e. when `async_callback` is called. `async_callback` will free all of this data just like we do in `run_inner`
-			input_ort_values,
-			_input_inner_holders: input_inner_holders,
-			input_name_ptrs,
-			output_name_ptrs,
-			output_names,
-			output_value_ptrs: output_tensor_ptrs,
-			session_inner: &self.inner
-		}));
+		// Avoid creating AsyncInferenceContext on the stack since it is a very large struct. Instead, create it on the heap and
+		// then fill it with values.
+		let mut ctx = Box::<AsyncInferenceContext>::new_uninit();
+		unsafe {
+			let ctx = ctx.assume_init_mut();
+			ctx.inner = Arc::clone(&async_inner);
+			// everything allocated within `run_inner_async` needs to be kept alive until we are certain inference has completed and
+			// ONNX Runtime no longer needs the data - i.e. when `async_callback` is called. `async_callback` will free all of
+			// this data just like we do in `run_inner`
+			ctx.input_ort_values = input_ort_values;
+			ctx._input_inner_holders = input_inner_holders;
+			ctx.input_name_ptrs = input_name_ptrs;
+			ctx.output_name_ptrs = output_name_ptrs;
+			ctx.output_names = output_names;
+			ctx.output_value_ptrs = output_tensor_ptrs;
+			ctx.session_inner = &self.inner;
+		};
+		let ctx = Box::leak(unsafe { ctx.assume_init() });
+		crate::logging::create!(AsyncInferenceContext, ctx);
 
 		ortsys![
 			unsafe RunAsync(
@@ -659,8 +664,6 @@ pub enum WorkloadType {
 
 // https://github.com/microsoft/onnxruntime/issues/114
 unsafe impl Send for Session {}
-// Allowing `Sync` segfaults with CUDA, DirectML, and seemingly any EP other than the CPU EP. I'm not certain if it's a
-// temporary bug in ONNX Runtime or a wontfix. Maybe this impl should be removed just to be safe?
 unsafe impl Sync for Session {}
 
 impl AsPointer for Session {

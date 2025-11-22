@@ -56,6 +56,7 @@ impl<'i> ModelCompiler<'i> {
 			)?;
 			nonNull(ptr)
 		];
+		crate::logging::create!(ModelCompiler, ptr);
 		Ok(Self {
 			ptr,
 			session_options: options,
@@ -138,6 +139,7 @@ impl<'i> ModelCompiler<'i> {
 			)?
 		];
 		ortsys![@compile: unsafe CompileModel(self.session_options.environment.ptr(), self.ptr.as_ptr())?];
+		crate::logging::create!(CompiledModel, ptr);
 		Ok(CompiledModel { ptr, size, allocator })
 	}
 }
@@ -152,6 +154,7 @@ impl AsPointer for ModelCompiler<'_> {
 impl Drop for ModelCompiler<'_> {
 	fn drop(&mut self) {
 		ortsys![@compile: unsafe ReleaseModelCompilationOptions(self.ptr.as_ptr())];
+		crate::logging::drop!(ModelCompiler, self.ptr);
 	}
 }
 
@@ -177,5 +180,6 @@ impl Deref for CompiledModel {
 impl Drop for CompiledModel {
 	fn drop(&mut self) {
 		unsafe { self.allocator.free(self.ptr) };
+		crate::logging::drop!(CompiledModel, self.ptr);
 	}
 }

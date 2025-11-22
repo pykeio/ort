@@ -70,12 +70,14 @@ impl Checkpoint {
 		let path = crate::util::path_to_os_char(path);
 		let mut ptr: *mut ort_sys::OrtCheckpointState = ptr::null_mut();
 		ortsys![@training: unsafe LoadCheckpoint(path.as_ptr(), &mut ptr)?; nonNull(ptr)];
+		crate::logging::create!(Checkpoint, ptr);
 		Ok(Checkpoint { ptr })
 	}
 
 	pub fn load_from_buffer(buffer: &[u8]) -> Result<Self> {
 		let mut ptr: *mut ort_sys::OrtCheckpointState = ptr::null_mut();
 		ortsys![@training: unsafe LoadCheckpointFromBuffer(buffer.as_ptr().cast(), buffer.len(), &mut ptr)?; nonNull(ptr)];
+		crate::logging::create!(Checkpoint, ptr);
 		Ok(Checkpoint { ptr })
 	}
 
@@ -198,7 +200,7 @@ impl AsPointer for Checkpoint {
 
 impl Drop for Checkpoint {
 	fn drop(&mut self) {
-		crate::trace!("dropping checkpoint");
+		crate::logging::drop!(Checkpoint, self.ptr);
 		ortsys![@training: unsafe ReleaseCheckpointState(self.ptr.as_ptr())];
 	}
 }

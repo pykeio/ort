@@ -18,13 +18,18 @@ pub struct Attribute(NonNull<ort_sys::OrtOpAttr>);
 
 impl Attribute {
 	pub fn new(name: impl AsRef<str>, value: impl ToAttribute) -> Result<Self> {
-		with_cstr(name.as_ref().as_bytes(), &|name| unsafe { value.to_attribute(name.as_ptr()) }.map(Self))
+		with_cstr(name.as_ref().as_bytes(), &|name| {
+			let ptr = unsafe { value.to_attribute(name.as_ptr()) }?;
+			crate::logging::create!(Attribute, ptr);
+			Ok(Self(ptr))
+		})
 	}
 }
 
 impl Drop for Attribute {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleaseOpAttr(self.0.as_ptr())];
+		crate::logging::drop!(Attribute, self.0);
 	}
 }
 
@@ -84,7 +89,7 @@ impl FromOpAttr for f32 {
 	{
 		let mut out = 0.0_f32;
 		ortsys![unsafe ReadOpAttr(attr, ort_sys::OrtOpAttrType::ORT_OP_ATTR_FLOAT, (&mut out as *mut f32).cast(), size_of::<f32>(), &mut len)?];
-		assert_eq!(len, size_of::<f32>());
+		debug_assert_eq!(len, size_of::<f32>(), "float attribute is smaller/larger than expected");
 		Ok(out)
 	}
 
@@ -137,7 +142,7 @@ impl FromOpAttr for i64 {
 	{
 		let mut out = 0_i64;
 		ortsys![unsafe ReadOpAttr(attr, ort_sys::OrtOpAttrType::ORT_OP_ATTR_INT, (&mut out as *mut i64).cast(), size_of::<i64>(), &mut len)?];
-		assert_eq!(len, size_of::<i64>());
+		debug_assert_eq!(len, size_of::<i64>(), "int attribute is smaller/larger than expected");
 		Ok(out)
 	}
 
@@ -175,6 +180,7 @@ impl FromKernelAttributes<'_> for String {
 		ortsys![unsafe KernelInfoGetAttribute_string(info, name, ptr::null_mut(), &mut size)?];
 		let mut out = vec![0u8; size];
 		ortsys![unsafe KernelInfoGetAttribute_string(info, name, out.as_mut_ptr().cast::<c_char>(), &mut size)?];
+
 		let string = CString::from_vec_with_nul(out)?;
 		Ok(string.into_string()?)
 	}
@@ -191,12 +197,12 @@ impl FromOpAttr for String {
 	where
 		Self: Sized
 	{
-		let mut out = vec![0_u8; len / size_of::<u8>()];
+		let mut out = vec![0_u8; len];
 		ortsys![unsafe ReadOpAttr(attr, ort_sys::OrtOpAttrType::ORT_OP_ATTR_STRING, out.as_mut_ptr().cast(), len, &mut len)?];
-		assert_eq!(out.len(), len / size_of::<u8>());
+		debug_assert_eq!(out.len(), len, "int attribute is smaller/larger than expected");
 		CString::from_vec_with_nul(out)
-			.map_err(|_| Error::new("invalid string"))
-			.and_then(|f| f.into_string().map_err(|_| Error::new("invalid string")))
+			.map_err(|_| Error::new("invalid string attribute contents"))
+			.and_then(|f| f.into_string().map_err(|_| Error::new("invalid string attribute contents")))
 	}
 
 	private_impl!();
@@ -250,9 +256,10 @@ impl FromOpAttr for Vec<f32> {
 	where
 		Self: Sized
 	{
-		let mut out = vec![0.0_f32; len / size_of::<f32>()];
+		let num_els = len / size_of::<f32>();
+		let mut out = vec![0.0_f32; num_els];
 		ortsys![unsafe ReadOpAttr(attr, ort_sys::OrtOpAttrType::ORT_OP_ATTR_FLOATS, out.as_mut_ptr().cast(), len, &mut len)?];
-		assert_eq!(out.len(), len / size_of::<f32>());
+		debug_assert_eq!(out.len(), num_els, "float array attribute is smaller/larger than expected");
 		Ok(out)
 	}
 
@@ -316,9 +323,10 @@ impl FromOpAttr for Vec<i64> {
 	where
 		Self: Sized
 	{
-		let mut out = vec![0_i64; len / size_of::<i64>()];
+		let num_els = len / size_of::<i64>();
+		let mut out = vec![0_i64; num_els];
 		ortsys![unsafe ReadOpAttr(attr, ort_sys::OrtOpAttrType::ORT_OP_ATTR_INTS, out.as_mut_ptr().cast(), len, &mut len)?];
-		assert_eq!(out.len(), len / size_of::<i64>());
+		debug_assert_eq!(out.len(), num_els, "int array attribute is smaller/larger than expected");
 		Ok(out)
 	}
 

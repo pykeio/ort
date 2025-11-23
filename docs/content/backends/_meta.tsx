@@ -1,5 +1,5 @@
 export default {
 	index: 'Alternative backends',
-	candle: 'ort-candle',
-	tract: 'ort-tract'
+	candle: <span style={{ fontFamily: '"Monaspace Neon"' }}>ort-candle</span>,
+	tract: <span style={{ fontFamily: '"Monaspace Neon"' }}>ort-tract</span>
 };

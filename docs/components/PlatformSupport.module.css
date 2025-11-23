@@ -1,0 +1,15 @@
+.osIcon {
+	display: inline;
+	vertical-align: middle;
+	margin-top: -2px;
+	margin-right: 4px;
+}
+
+.noteContainer {
+	align-self: stretch;
+	max-width: 530px;
+}
+
+.noteContainer > div {
+	margin-top: 0 !important;
+}

@@ -9,13 +9,18 @@
 		"postbuild": "pagefind --site .next/server/app --output-path out/_pagefind"
 	},
 	"dependencies": {
+		"@radix-ui/themes": "^3.2.1",
+		"canvas-confetti": "^1.9.4",
 		"next": "^16.0.3",
 		"nextra": "^4.6.0",
 		"nextra-theme-docs": "^4.6.0",
 		"react": "^19.2.0",
-		"react-dom": "^19.2.0"
+		"react-dom": "^19.2.0",
+		"react-icons": "^5.5.0",
+		"zustand": "^5.0.8"
 	},
 	"devDependencies": {
+		"@types/canvas-confetti": "^1.9.0",
 		"@types/node": "^22.19.1",
 		"@types/react": "^19.2.6",
 		"@types/react-dom": "^19.2.3",

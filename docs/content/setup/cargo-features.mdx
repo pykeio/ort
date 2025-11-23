@@ -9,6 +9,7 @@ title: Cargo features
 - ✅ **`ndarray`**: Enables tensors to be created from/extracted to [`ndarray`](https://crates.io/crates/ndarray) multi-dimensional arrays. We highly recommend this feature if you need to do a lot of complex pre/post-processing requiring multi-dimensional array access, but for something like an LLM, omitting this feature won't require too much extra work but will save a fair amount of compile time.
 - ✅ **`download-binaries`**: Downloads prebuilt binaries from pyke's CDN service for supported platforms. Disabling this means you'll need to compile ONNX Runtime from source yourself, and [link `ort` to it](/setup/linking).
 - ✅ **`copy-dylibs`**: In case dynamic libraries are used (like with the CUDA execution provider), creates a symlink to them in the relevant places in the `target` folder to make [compile-time dynamic linking](/setup/linking#compile-time-dynamic-linking) work.
+- ✅ **`tracing`**; Log messages through [`tracing`](https://crates.io/crates/tracing).
 - ⚒️ **`half`**: Enables support for creating & extracting float16/bfloat16 tensors via the [`half`](https://crates.io/crates/half) crate. ONNX models that are converted to 16-bit precision will typically convert to/from 32-bit floats at the input/output, so you will likely never actually need to interact with a 16-bit tensor on the Rust side.
 - ⚒️ **`num-complex`**: Enables support for creating & extracting complex32/complex64 tensors via the [`num-complex`](https://crates.io/crates/num-complex) crate.
 - ⚒️ **`preload-dylibs`**: Enables [dynamic library preloading](https://docs.rs/ort/2.0.0-rc.10/ort/util/fn.preload_dylib.html); useful if you want to ship CUDA alongside your application instead of requiring the user to install it themselves.
@@ -17,23 +18,4 @@ title: Cargo features
 - ⚒️ **`fetch-models`**: Enables the [`SessionBuilder::commit_from_url`](https://docs.rs/ort/2.0.0-rc.10/ort/session/builder/struct.SessionBuilder.html#method.commit_from_url) method, allowing you to quickly download & run a model from a URL. This should only be used for quick testing.
 
 ## Execution providers
-Each [execution provider](/perf/execution-providers) is also gated behind a Cargo feature.
-- **NVIDIA CUDA**: `cuda`
-- **NVIDIA TensorRT**: `tensorrt`
-- **Microsoft DirectML**: `directml`
-- **Apple CoreML**: `coreml`
-- **AMD ROCm**: `rocm`
-- **Intel OpenVINO**: `openvino`
-- **Intel oneDNN**: `onednn`
-- **XNNPACK**: `xnnpack`
-- **Qualcomm QNN**: `qnn`
-- **Huawei CANN**: `cann`
-- **Android NNAPI**: `nnapi`
-- **Apache TVM**: `tvm`
-- **Arm ACL**: `acl`
-- **ArmNN**: `armnn`
-- **AMD MIGraphX**: `migraphx`
-- **AMD Vitis AI**: `vitis`
-- **Rockchip RKNPU**: `rknpu`
-- **WebGPU**: `webgpu`
-- **Microsoft Azure**: `azure`
+Each [execution provider](/perf/execution-providers) is also gated behind a Cargo feature. Each EP's Cargo feature must be enabled for it to be usable; see the linked page for details & the full list of EP features.

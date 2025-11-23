@@ -3,18 +3,20 @@ title: Introduction
 ---
 
 import Image from 'next/image';
-import { Callout, Card, Cards, Steps } from 'nextra/components';
+import { Callout, Card, Cards, Steps, Code } from 'nextra/components';
+import Ort from '../components/Ort';
+import { CRATE_VERSION } from '../constants';
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
     <img src="/assets/trend-banner.png" style={{ maxHeight: '360px' }} />
-    <p style={{ fontSize: '1.5rem', textAlign: 'center', marginTop: 0 }}><code>ort</code> is an open-source Rust binding for <a href="https://onnxruntime.ai/">ONNX Runtime</a>.</p>
+    <h3 style={{ fontSize: '1.5rem', textAlign: 'center', marginTop: 0 }}><Ort/> is an open-source Rust binding for <a href="https://onnxruntime.ai/">ONNX Runtime</a>.</h3>
 </div>
 
 <Callout type='warning'>
-    These docs are for the latest alpha version of `ort`, `2.0.0-rc.10`. This version is production-ready (just not API stable) and we recommend new & existing projects use it.
+    These docs are for the latest alpha version of <Ort/>, <Code>{CRATE_VERSION}</Code>. This version is production-ready (just not API stable) and we recommend new & existing projects use it.
 </Callout>
 
-`ort` makes it easy to deploy your machine learning models to production via [ONNX Runtime](https://onnxruntime.ai/), a hardware-accelerated inference engine. With `ort` + ONNX Runtime, you can run almost any ML model (including ResNet, YOLOv8, BERT, LLaMA) on almost any hardware, often far faster than PyTorch, and with the added bonus of Rust's efficiency.
+<Ort/> makes it easy to deploy your machine learning models to production via [ONNX Runtime](https://onnxruntime.ai/), a hardware-accelerated inference engine. With <Ort/> + ONNX Runtime, you can run almost any ML model (including ResNet, YOLOv8, BERT, LLaMA) on almost any hardware, often far faster than PyTorch, and with the added bonus of Rust's efficiency.
 
 [ONNX](https://onnx.ai/) is an interoperable neural network specification. Your ML framework of choice -- PyTorch, TensorFlow, Keras, PaddlePaddle, etc. -- turns your model into an ONNX graph comprised of basic operations like `MatMul` or `Add`. This graph can then be converted into a model in another framework, or **inferenced directly with ONNX Runtime**.
 
@@ -22,19 +24,19 @@ import { Callout, Card, Cards, Steps } from 'nextra/components';
 
 Converting a neural network to a graph representation like ONNX opens the door to more optimizations and broader acceleration hardware support. ONNX Runtime can significantly improve the inference speed/latency of most models and enable acceleration with NVIDIA CUDA & TensorRT, Intel OpenVINO, Qualcomm QNN, Huawei CANN, and [much more](/perf/execution-providers).
 
-`ort` is the Rust gateway to ONNX Runtime, allowing you to infer your ONNX models via an easy-to-use and ergonomic API. Many commercial, open-source, & research projects use `ort` in some pretty serious production scenarios to boost inference performance:
-- [**Bloop**](https://bloop.ai/)'s semantic code search feature is powered by `ort`.
-- [**SurrealDB**](https://surrealdb.com/)'s powerful SurrealQL query language supports calling ML models, including ONNX graphs through `ort`.
-- [**Google's Magika**](https://github.com/google/magika) file type detection library is powered by `ort`.
-- [**Wasmtime**](https://github.com/bytecodealliance/wasmtime), an open-source WebAssembly runtime, supports ONNX inference for the [WASI-NN standard](https://github.com/WebAssembly/wasi-nn) via `ort`.
-- [**`rust-bert`**](https://github.com/guillaume-be/rust-bert) implements many ready-to-use NLP pipelines in Rust à la Hugging Face Transformers with both [`tch`](https://crates.io/crates/tch) & `ort` backends.
-- [**Supabase**](https://supabase.com)'s edge functions AI compatibility is powered by `ort`.
+<Ort/> is the Rust gateway to ONNX Runtime, allowing you to infer your ONNX models via an easy-to-use and ergonomic API. Many commercial, open-source, & research projects use <Ort/> in some pretty serious production scenarios to boost inference performance:
+- [**Bloop**](https://bloop.ai/)'s semantic code search feature is powered by <Ort/>.
+- [**SurrealDB**](https://surrealdb.com/)'s powerful SurrealQL query language supports calling ML models, including ONNX graphs through <Ort/>.
+- [**Google's Magika**](https://github.com/google/magika) file type detection library is powered by <Ort/>.
+- [**Wasmtime**](https://github.com/bytecodealliance/wasmtime), an open-source WebAssembly runtime, supports ONNX inference for the [WASI-NN standard](https://github.com/WebAssembly/wasi-nn) via <Ort/>.
+- [**`rust-bert`**](https://github.com/guillaume-be/rust-bert) implements many ready-to-use NLP pipelines in Rust à la Hugging Face Transformers with both [`tch`](https://crates.io/crates/tch) & <Ort/> backends.
+- [**Supabase**](https://supabase.com)'s edge functions AI compatibility is powered by <Ort/>.
 
 # Getting started
 <Steps>
 
-### Add ort to your Cargo.toml
-If you have a [supported platform](/setup/platforms) (and you probably do), installing `ort` couldn't be any simpler! Just add it to your Cargo dependencies:
+### Add <Ort/> to your Cargo.toml
+If you have a [supported platform](/setup/platforms) (and you probably do), installing <Ort/> couldn't be any simpler! Just add it to your Cargo dependencies:
 ```toml
 [dependencies]
 ort = "=2.0.0-rc.10"
@@ -49,7 +51,7 @@ Your model will need to be converted to an ONNX graph before you can use it.
 - For PaddlePaddle: [`Paddle2ONNX`](https://github.com/PaddlePaddle/Paddle2ONNX)
 
 ### Load your model
-Once you've got a model, load it via `ort` by creating a [`Session`](/fundamentals/session):
+Once you've got a model, load it in <Ort/> by creating a [`Session`](/fundamentals/session):
 
 ```rust
 use ort::session::{builder::GraphOptimizationLevel, Session};
@@ -69,7 +71,7 @@ let predictions = outputs["output0"].try_extract_array::<f32>()?;
 ...
 ```
 
-<Callout type='info'>There are some more useful examples [in the `ort` repo](https://github.com/pykeio/ort/tree/main/examples)!</Callout>
+<Callout type='info'>There are some more useful examples [in the <Ort/> repo](https://github.com/pykeio/ort/tree/main/examples)!</Callout>
 
 </Steps>
 
@@ -83,9 +85,9 @@ Use [execution providers](/perf/execution-providers) to enable hardware accelera
 Control where and when inputs/outputs end up with [`IoBinding`](/perf/io-binding) to maximize I/O efficiency.
 
 ### Go beyond ONNX Runtime
-Deploy your application to WASM with `ort`'s [`tract`](/backends/tract) or [`candle`](/backends/candle) backends.
+Deploy your application to WASM with <Ort/>'s [`tract`](/backends/tract) or [`candle`](/backends/candle) backends.
 
 ### Show off your project!
-We'd love to see what you've made with `ort`! Show off your project in [GitHub Discussions](https://github.com/pykeio/ort/discussions/categories/show-and-tell) or on our [Discord](https://discord.gg/uQtsNu2xMa).
+We'd love to see what you've made with <Ort/>! Show off your project in [GitHub Discussions](https://github.com/pykeio/ort/discussions/categories/show-and-tell) or on our [Discord](https://discord.gg/uQtsNu2xMa).
 
 </Steps>

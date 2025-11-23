@@ -5,37 +5,12 @@ description: "`ort` supports a wide variety of platforms. For most desktop users
 
 import { Callout } from 'nextra/components';
 
+import PlatformSupport from '../../components/PlatformSupport';
+import Ort from '../../components/Ort';
+
 # Platform compatibility with ONNX Runtime
 
-Here are the supported platforms and binary availability status, as of v2.0.0-rc.10.
+This handy widget will show you which platforms <Ort /> supports with the default ONNX Runtime backend!
+<br />
 
-* 🟢 - Supported. Binaries provided by pyke.
-* 🔷 - Supported. Precompiled binaries not available.
-* ❌ - Not supported.
-
-| Platform | x86 | x86-64 | ARMv7 | ARM64 |
-|:-------- |:------- |:------ |:------ |:------ |
-| **Windows** | 🔷 | 🟢<sup>\*</sup> | 🔷 | 🟢<sup>\*</sup> |
-| **Linux** | 🔷 | 🟢† | 🔷 | 🟢† |
-| **macOS** | ❌ | ❌ | ❌ | 🟢§ |
-| **iOS** | ❌ | ❌ | ❌ | 🟢‡ |
-| **Android** | ❌ | ❌ | 🔷 | 🟢⹋ |
-
-<div style={{ opacity: 0.5, display: 'flex', flexDirection: 'column', fontSize: '0.75rem' }}>
-<p>\* A recent version of Windows 11 & Visual Studio 2022 (≥ 17.14) are required for pyke binaries.</p>
-<p>† glibc ≥ 2.39 & libstdc++ >= 13.2 (Ubuntu ≥ 24.04, Debian ≥ 13 'Trixie') required for pyke binaries.</p>
-<p>§ macOS ≥ 13.4 required.</p>
-<p>‡ Supports iOS >= 15.1.</p>
-<p>⹋ Supports Android >= 7.0 (API 24).</p>
-</div>
-
-If your platform is marked as 🟢, you're in luck! Almost no setup will be required to get `ort` up and running.
-
-For platforms marked as 🔷, you'll need to [compile ONNX Runtime from source](https://onnxruntime.ai/docs/build/) and then [link `ort` to your custom binaries](/setup/linking) (but don't worry, we made this setup as simple as possible too!)
-
-<Callout type='info'>
-    Certain execution providers may not have binaries available. You can check EP binary support in the [Execution providers](/perf/execution-providers) documentation.
-</Callout>
-
-## Alternative backends & WebAssembly
-`ort`'s [alternative backends](/backends) typically have far more lax platform requirements. If you're looking to deploy your application to WASM, or a platform not supported by ONNX Runtime, it's worth giving one of them a shot!
+<PlatformSupport />

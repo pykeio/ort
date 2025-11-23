@@ -1,13 +1,31 @@
 @font-face {
 	font-family: 'TASA Orbiter';
-	src: url("https://parcel.pyke.io/v2/cdn/3rdparty/tasa-orbiter/TASAOrbiterVF.woff2") format("woff");
+	src: url("https://cdn.pyke.io/0/pyke:identity/fonts@0.0.0/tasa-orbiter.woff2") format("woff");
+}
+@font-face {
+	font-family: 'TASA Explorer';
+	src: url("https://cdn.pyke.io/0/pyke:identity/fonts@0.0.0/tasa-explorer.woff2") format("woff");
+}
+@font-face {
+	font-family: 'Monaspace Neon';
+	src: url("https://cdn.pyke.io/0/pyke:identity/fonts@0.0.0/monaspace-neon.woff2") format("woff");
 }
 
 html {
-	font-family: 'TASA Orbiter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" !important;
-
 	--nextra-primary-hue: 20deg !important;
 	--nextra-primary-saturation: 100% !important;
+
+	--x-default-mono-font-family: 'Monaspace Neon';
+}
+
+.radix-themes {
+	--default-font-family: 'TASA Orbiter';
+	--code-font-family: 'Monaspace Neon';
+}
+
+h1, h2, h3 {
+	font-family: 'TASA Explorer' !important;
+	font-weight: 800;
 }
 
 a[href="https://opencollective.com/pyke-osai"] {
@@ -20,4 +38,21 @@ a[href="https://opencollective.com/pyke-osai"] {
 
 .dark a[href="https://opencollective.com/pyke-osai"] {
 	color: #000 !important;
+}
+
+.sidebar-icon {
+	display: inline;
+	width: 18px;
+	height: 18px;
+	margin-top: 1px;
+	margin-right: 4px;
+}
+
+.sidebar-icon-small {
+	display: inline;
+	width: 14px;
+	height: 14px;
+	margin-top: -4px;
+	margin-right: 2px !important;
+	color: var(--x-color-primary-500);
 }

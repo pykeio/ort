@@ -7,46 +7,25 @@ description: Learn how to enable execution providers to leverage hardware accele
 
 import { Callout, Tabs } from 'nextra/components';
 
-Execution providers (EPs) enable ONNX Runtime to execute ONNX graphs with hardware acceleration. If you have specialized hardware like a GPU or NPU, execution providers can provide a massive performance boost to your `ort` applications. For more information on the intricacies of execution providers, see the [ONNX Runtime docs](https://onnxruntime.ai/docs/execution-providers/).
+import ExecutionProviders from '../../components/ExecutionProviders';
+import Ort from '../../components/Ort';
 
-ONNX Runtime must be compiled from source with support for each execution provider, though pyke provides precompiled binaries for some of the most common EPs, so all you have to do is enable the respective Cargo feature! Below is a table showing available EPs, their support in `ort`, and their binary availability status.
+Execution providers (EPs) enable ONNX Runtime to execute ONNX graphs with hardware acceleration. If you have specialized hardware like a GPU or NPU, execution providers can provide a massive performance boost to your <Ort/> applications. For more information on the intricacies of execution providers, see the [ONNX Runtime docs](https://onnxruntime.ai/docs/execution-providers/).
 
-* 🔷 - Supported by `ort`.
-* ✅ - Static binaries provided by pyke.
+Not all platforms support all execution providers, of course. This handy widget will show you which EPs are supported on your platform, and which ones have binaries available (and are thus ready to use in <Ort />!)
 
-| EP | Cargo feature | Supported | Binaries |
-|:-------- |:------- |:-------:|:------:|
-| [NVIDIA CUDA](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html) | `cuda` | 🔷 | ✅ |
-| [NVIDIA TensorRT](https://onnxruntime.ai/docs/execution-providers/TensorRT-ExecutionProvider.html) | `tensorrt` | 🔷 | ✅ |
-| [NVIDIA TensorRT RTX](https://onnxruntime.ai/docs/execution-providers/TensorRTRTX-ExecutionProvider.html) (NVRTX) | `nvrtx` | 🔷 | ✅ |
-| [Microsoft DirectML](https://onnxruntime.ai/docs/execution-providers/DirectML-ExecutionProvider.html) | `directml` | 🔷 | ✅ |
-| [Apple CoreML](https://onnxruntime.ai/docs/execution-providers/CoreML-ExecutionProvider.html) | `coreml` | 🔷 | ✅ |
-| [AMD ROCm](https://onnxruntime.ai/docs/execution-providers/ROCm-ExecutionProvider.html) | `rocm` | 🔷 | ❌ |
-| [Intel OpenVINO](https://onnxruntime.ai/docs/execution-providers/OpenVINO-ExecutionProvider.html) | `openvino` | 🔷 | ❌ |
-| [Intel oneDNN](https://onnxruntime.ai/docs/execution-providers/oneDNN-ExecutionProvider.html) | `onednn` | 🔷 | ❌ |
-| [XNNPACK](https://onnxruntime.ai/docs/execution-providers/Xnnpack-ExecutionProvider.html) | `xnnpack` | 🔷 | ✅ |
-| [Qualcomm QNN](https://onnxruntime.ai/docs/execution-providers/QNN-ExecutionProvider.html) | `qnn` | 🔷 | ❌ |
-| [Huawei CANN](https://onnxruntime.ai/docs/execution-providers/community-maintained/CANN-ExecutionProvider.html) | `cann` | 🔷 | ❌ |
-| [Android NNAPI](https://onnxruntime.ai/docs/execution-providers/NNAPI-ExecutionProvider.html) | `nnapi` | 🔷 | ❌ |
-| [Apache TVM](https://onnxruntime.ai/docs/execution-providers/community-maintained/TVM-ExecutionProvider.html) | `tvm` | 🔷 | ❌ |
-| [Arm ACL](https://onnxruntime.ai/docs/execution-providers/community-maintained/ACL-ExecutionProvider.html) | `acl` | 🔷 | ❌ |
-| [ArmNN](https://onnxruntime.ai/docs/execution-providers/community-maintained/ArmNN-ExecutionProvider.html) | `armnn` | 🔷 | ❌ |
-| [AMD MIGraphX](https://onnxruntime.ai/docs/execution-providers/MIGraphX-ExecutionProvider.html) | `migraphx` | 🔷 | ❌ |
-| [AMD Vitis AI](https://onnxruntime.ai/docs/execution-providers/Vitis-AI-ExecutionProvider.html) | `vitis` | 🔷 | ❌ |
-| [Rockchip RKNPU](https://onnxruntime.ai/docs/execution-providers/community-maintained/RKNPU-ExecutionProvider.html) | `rknpu` | 🔷 | ❌ |
-| WebGPU | `webgpu` | 🔷 | ✅ |
-| [Microsoft Azure](https://onnxruntime.ai/docs/execution-providers/Azure-ExecutionProvider.html) | `azure` | 🔷 | ❌ |
+<ExecutionProviders />
 
 ## Registering execution providers
 <Callout type='info'>
-    To use an execution provider with `ort`, you'll need to enable its respective Cargo feature, e.g. the `cuda` feature to use CUDA, or the `coreml` feature to use CoreML.
+    To enable the use of an execution provider inside <Ort/>, you'll need to enable its respective Cargo feature, e.g. the `cuda` feature to use CUDA, or the `coreml` feature to use CoreML.
 
     ```toml Cargo.toml
     [dependencies]
     ort = { version = "2.0", features = [ "cuda" ] }
     ```
 
-    See the table at the top of the page for the full list of EPs and their corresponding Cargo feature.
+    See the widget above for the full list of EPs and their corresponding Cargo features.
 </Callout>
 
 In order to configure sessions to use certain execution providers, you must **register** them when creating an environment or session. You can do this via the `SessionBuilder::with_execution_providers` method. For example, to register the CUDA execution provider for a session:

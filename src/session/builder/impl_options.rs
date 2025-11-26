@@ -370,7 +370,9 @@ pub enum GraphOptimizationLevel {
 	Level2,
 	/// Level 3 optimizations include memory layout optimizations, which may optimize the graph to use the NCHWc memory
 	/// layout rather than NCHW to improve spatial locality for some targets.
-	Level3
+	Level3,
+	/// Enable all optimizations.
+	All
 }
 
 impl From<GraphOptimizationLevel> for ort_sys::GraphOptimizationLevel {
@@ -379,7 +381,8 @@ impl From<GraphOptimizationLevel> for ort_sys::GraphOptimizationLevel {
 			GraphOptimizationLevel::Disable => ort_sys::GraphOptimizationLevel::ORT_DISABLE_ALL,
 			GraphOptimizationLevel::Level1 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_BASIC,
 			GraphOptimizationLevel::Level2 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_EXTENDED,
-			GraphOptimizationLevel::Level3 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_ALL
+			GraphOptimizationLevel::Level3 => ort_sys::GraphOptimizationLevel::ORT_ENABLE_LAYOUT,
+			GraphOptimizationLevel::All => ort_sys::GraphOptimizationLevel::ORT_ENABLE_ALL
 		}
 	}
 }

@@ -21,6 +21,7 @@ impl TensorRT {
 	/// The provided `stream` must outlive the environment/session created with the execution provider.
 	#[must_use]
 	pub unsafe fn with_compute_stream(mut self, stream: *mut ()) -> Self {
+		self.options.set("has_user_compute_stream", "1");
 		self.options.set("user_compute_stream", (stream as usize).to_string());
 		self
 	}

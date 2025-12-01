@@ -10,6 +10,8 @@
 //! # }
 //! ```
 
+#[cfg(feature = "std")]
+use alloc::ffi::CString;
 use alloc::{boxed::Box, format, string::String, sync::Arc, vec::Vec};
 use core::{
 	any::Any,
@@ -20,8 +22,6 @@ use core::{
 	ptr::{self, NonNull},
 	slice
 };
-#[cfg(feature = "std")]
-use std::ffi::CString;
 
 use smallvec::SmallVec;
 

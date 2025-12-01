@@ -37,11 +37,8 @@ authors = [
 ]
 include = [ "/src/", "/LICENSE-APACHE", "/LICENSE-MIT", "/README.md" ]
 
-[profile.release]
-opt-level = 3
-lto = true
-strip = true
-codegen-units = 1
+[badges.maintenance]
+status = "actively-developed"
 
 [package.metadata.docs.rs]
 features = [ "std", "ndarray", "half", "num-complex", "training", "fetch-models", "load-dynamic", "copy-dylibs" ]
@@ -95,11 +92,11 @@ nvrtx = [ "ort-sys/nvrtx" ]
 
 [dependencies]
 ort-sys = { version = "=2.0.0-rc.10", path = "ort-sys", default-features = false }
-smallvec = { version = "=2.0.0-alpha.11", default-features = false }
+smallvec = { version = "=2.0.0-alpha.12", default-features = false }
 
 ndarray = { version = "0.17", default-features = false, optional = true }
-libloading = { version = "0.8", optional = true }
-ureq = { version = "3", optional = true, default-features = false }
+libloading = { version = "0.9", optional = true }
+ureq = { version = "3.1", optional = true, default-features = false }
 sha2 = { version = "0.10", optional = true }
 tracing = { version = "0.1", optional = true, default-features = false }
 half = { version = "2.1", default-features = false, optional = true }

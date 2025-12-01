@@ -49,7 +49,7 @@ pub(crate) use self::{
 /// ```
 #[cfg_attr(docsrs, doc(cfg(any(feature = "preload-dylibs", feature = "load-dynamic"))))]
 #[cfg(feature = "preload-dylibs")]
-pub fn preload_dylib<P: AsRef<std::ffi::OsStr>>(path: P) -> Result<(), libloading::Error> {
+pub fn preload_dylib<P: libloading::AsFilename>(path: P) -> Result<(), libloading::Error> {
 	let library = unsafe { libloading::Library::new(path) }?;
 	// Do not run `FreeLibrary` so the library remains in the loaded modules list.
 	let _ = ManuallyDrop::new(library);

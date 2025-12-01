@@ -16,6 +16,9 @@ authors = [
 include = [ "src/", "build/", "LICENSE-APACHE", "LICENSE-MIT" ]
 build = "build/main.rs"
 
+[badges.maintenance]
+status = "actively-developed"
+
 [features]
 default = [ "std" ]
 std = []

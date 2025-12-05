@@ -2,6 +2,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(clippy::type_complexity)]
+#![allow(clippy::missing_safety_doc)]
 #![cfg_attr(all(not(test), not(feature = "std")), no_std)]
 
 extern crate alloc;

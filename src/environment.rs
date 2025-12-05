@@ -92,10 +92,10 @@ impl Drop for Environment {
 /// Gets a reference to the global environment, creating one if an environment does not yet exist.
 pub fn get_environment() -> Result<Arc<Environment>> {
 	let mut env_lock = G_ENV.lock();
-	if let Some(env) = env_lock.as_ref() {
-		if let Some(upgraded) = Weak::upgrade(env) {
-			return Ok(upgraded);
-		}
+	if let Some(env) = env_lock.as_ref()
+		&& let Some(upgraded) = Weak::upgrade(env)
+	{
+		return Ok(upgraded);
 	}
 
 	let options = G_ENV_OPTIONS.get_or_init(EnvironmentBuilder::new);

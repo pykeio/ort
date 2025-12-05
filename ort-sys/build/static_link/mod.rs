@@ -323,11 +323,11 @@ pub fn static_link(base_lib_dir: &Path) -> bool {
 				for entry in glob::glob(&pattern).unwrap() {
 					match entry {
 						Ok(path) => {
-							if let Some(lib_name) = path.file_name() {
-								if let Some(lib_name_str) = lib_name.to_str() {
-									let lib_name = lib_name_str.trim_start_matches("lib").trim_end_matches(".a");
-									println!("cargo:rustc-link-lib=static={}", lib_name);
-								}
+							if let Some(lib_name) = path.file_name()
+								&& let Some(lib_name_str) = lib_name.to_str()
+							{
+								let lib_name = lib_name_str.trim_start_matches("lib").trim_end_matches(".a");
+								println!("cargo:rustc-link-lib=static={}", lib_name);
 							}
 						}
 						Err(e) => eprintln!("error matching file: {}", e)

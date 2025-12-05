@@ -13,10 +13,10 @@ impl EvaluationStrategy {
 	pub(crate) fn should_fire(&self, _global_step: usize, iter_step: usize, dataloader_size: Option<usize>) -> bool {
 		match self {
 			Self::None => false,
-			Self::Steps(steps) => iter_step > 0 && iter_step % steps == 0,
+			Self::Steps(steps) => iter_step > 0 && iter_step.is_multiple_of(*steps),
 			Self::Epochs(epochs) => {
 				if let Some(dataloader_size) = dataloader_size {
-					iter_step > 0 && iter_step % (dataloader_size * epochs) == 0
+					iter_step > 0 && iter_step.is_multiple_of(dataloader_size * epochs)
 				} else {
 					false
 				}
@@ -35,10 +35,10 @@ impl CheckpointStrategy {
 	pub(crate) fn should_fire(&self, _global_step: usize, iter_step: usize, dataloader_size: Option<usize>) -> bool {
 		match self {
 			Self::None => false,
-			Self::Steps(steps) => iter_step > 0 && iter_step % steps == 0,
+			Self::Steps(steps) => iter_step > 0 && iter_step.is_multiple_of(*steps),
 			Self::Epochs(epochs) => {
 				if let Some(dataloader_size) = dataloader_size {
-					iter_step > 0 && iter_step % (dataloader_size * epochs) == 0
+					iter_step > 0 && iter_step.is_multiple_of(dataloader_size * epochs)
 				} else {
 					false
 				}

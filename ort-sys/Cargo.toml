@@ -24,7 +24,7 @@ default = [ "std" ]
 std = []
 pkg-config = [ "dep:pkg-config" ]
 training = []
-download-binaries = [ "dep:ureq", "dep:flate2", "dep:hmac-sha256" ]
+download-binaries = [ "dep:ureq", "dep:lzma-rust2", "dep:hmac-sha256" ]
 copy-dylibs = []
 
 disable-linking = []
@@ -58,7 +58,8 @@ __tls = []
 
 [build-dependencies]
 ureq = { version = "3", optional = true, default-features = false, features = [ "socks-proxy" ] }
-flate2 = { version = "1.0", optional = true, default-features = false, features = [ "zlib-rs" ] }
+# The `optimization` feature enables the use of unsafe code, which is unfortunate, but LZMA is so slow we kinda need all the speed we can get.
+lzma-rust2 = { version = "0.15", optional = true, default-features = false, features = [ "std", "optimization" ] }
 hmac-sha256 = { version = "1.1", optional = true }
 pkg-config = { version = "0.3", optional = true }
 glob = { version = "0.3", optional = true }

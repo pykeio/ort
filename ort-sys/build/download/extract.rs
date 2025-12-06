@@ -67,7 +67,7 @@ impl TarHeader {
 }
 
 pub fn extract_tgz<R: Read>(reader: &mut R, output: &Path) -> Result<(), Error> {
-	let mut tar = flate2::read::GzDecoder::new(reader);
+	let mut tar = lzma_rust2::Lzma2Reader::new(reader, 1 << 26, None);
 	let mut pad_container = [0; 512];
 
 	loop {

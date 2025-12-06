@@ -138,7 +138,7 @@ cargo::error= | Alternatively, try a different backend like `ort-tract`; see htt
 				return;
 			}
 
-			let (calculated_hash, _) = verified_reader.finalize();
+			let (calculated_hash, _) = verified_reader.finalize().expect("Failed to finalize read");
 			if calculated_hash[..] != download::hex_str_to_bytes(dist.hash) {
 				println!(
 					r"cargo::error=⚠️ The hash of the file downloaded from `{}` does not match the expected hash. ⚠️

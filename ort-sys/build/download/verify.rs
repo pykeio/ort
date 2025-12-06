@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::io::{self, Read};
 
 use hmac_sha256::Hash;
 
@@ -35,8 +35,12 @@ impl<R: Read> VerifyReader<R> {
 		Self { reader, state: Hash::new() }
 	}
 
-	pub fn finalize(self) -> ([u8; 32], R) {
-		(self.state.finalize(), self.reader)
+	pub fn finalize(mut self) -> io::Result<([u8; 32], R)> {
+		// For whatever reason, `lzma-rust2` leaves some data unread at the end of the stream. Make sure all of the stream is
+		// consumed so we get the correct hash.
+		io::copy(&mut self, &mut io::sink())?;
+
+		Ok((self.state.finalize(), self.reader))
 	}
 }
 

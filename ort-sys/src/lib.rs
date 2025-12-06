@@ -14,6 +14,9 @@ pub mod internal;
 pub mod stub;
 mod version;
 
+#[cfg(link_error)]
+mod link_error;
+
 pub use core::ffi::{c_char, c_int, c_ulong, c_ulonglong, c_ushort, c_void};
 
 pub use self::version::ORT_API_VERSION;

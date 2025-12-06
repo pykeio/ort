@@ -20,6 +20,8 @@ mod internal;
 use crate::static_link::BinariesSource;
 
 fn main() {
+	println!("cargo:rustc-check-cfg=cfg(link_error)");
+
 	if env::var("DOCS_RS").is_ok() || cfg!(feature = "disable-linking") {
 		// On docs.rs, A) we don't need to link, and B) we don't have network, so we couldn't download anything if we wanted to.
 		// If `disable-linking` is specified, either:
@@ -67,24 +69,8 @@ fn main() {
 	#[cfg(feature = "download-binaries")]
 	let should_skip = self::download::should_skip();
 	if should_skip {
-		println!(
-			r#"cargo::error=ort-sys could not link to ONNX Runtime because:
-  - `libonnxruntime` is not configured via `pkg-config`
-  - {}
-  - Neither `{}` or `{}` were set to link to custom binaries
-
-  To rectify this:
-  - Compile ONNX Runtime from source and manually configure linking (see https://ort.pyke.io/setup/linking for more information)
-  - Enable the `download-binaries` feature if the target is supported
-  - Enable `ort`'s `alternative-backend` feature if you intend to use a different backend (or `ort-sys`'s `disable-linking` feature if you use this crate directly)"#,
-			if cfg!(feature = "download-binaries") {
-				"ort-sys was instructed not to download prebuilt binaries (`cargo build --offline`)"
-			} else {
-				"The `download-binaries` feature is not enabled, so prebuilt binaries can't be fetched"
-			},
-			vars::SYSTEM_LIB_LOCATION,
-			vars::IOS_ONNX_XCFWK_LOCATION
-		);
+		// Defer the error to the linking step so `cargo check` still works when `default-features = false`.
+		println!("cargo:rustc-cfg=link_error");
 		return;
 	}
 

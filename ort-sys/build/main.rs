@@ -52,7 +52,7 @@ fn main() {
 
 		if !self::static_link::static_link(&lib_dir) {
 			println!(
-				"cargo:error=ort-sys could not link to the ONNX Runtime build in `{}`\nrerun the build with `cargo build -vv | grep ort-sys` to see debug messages",
+				"cargo::error=ort-sys could not link to the ONNX Runtime build in `{}`\ncargo::error= | rerun the build with `cargo build -vv | grep ort-sys` to see debug messages",
 				lib_dir.display()
 			);
 		} else {
@@ -68,15 +68,15 @@ fn main() {
 	let should_skip = self::download::should_skip();
 	if should_skip {
 		println!(
-			r#"cargo:error=ort-sys could not link to ONNX Runtime because:
-- `libonnxruntime` is not configured via `pkg-config`
-- {}
-- Neither `{}` or `{}` were set to link to custom binaries
+			r#"cargo::error=ort-sys could not link to ONNX Runtime because:
+  - `libonnxruntime` is not configured via `pkg-config`
+  - {}
+  - Neither `{}` or `{}` were set to link to custom binaries
 
-To rectify this:
-- Compile ONNX Runtime from source and manually configure linking (see https://ort.pyke.io/setup/linking for more information)
-- Enable the `download-binaries` feature if the target is supported
-- Enable `ort`'s `alternative-backend` feature if you intend to use a different backend (or `ort-sys`'s `disable-linking` feature if you use this crate directly)"#,
+  To rectify this:
+  - Compile ONNX Runtime from source and manually configure linking (see https://ort.pyke.io/setup/linking for more information)
+  - Enable the `download-binaries` feature if the target is supported
+  - Enable `ort`'s `alternative-backend` feature if you intend to use a different backend (or `ort-sys`'s `disable-linking` feature if you use this crate directly)"#,
 			if cfg!(feature = "download-binaries") {
 				"ort-sys was instructed not to download prebuilt binaries (`cargo build --offline`)"
 			} else {
@@ -100,9 +100,9 @@ To rectify this:
 			Ok(dist) => dist,
 			Err(feature_set) => {
 				println!(
-					r"cargo:error=ort does not provide prebuilt binaries for the target `{}` with feature set {}.
-You may have to compile ONNX Runtime from source and link `ort` to your custom build; see https://ort.pyke.io/setup/linking
-Alternatively, try a different backend like `ort-tract`; see https://ort.pyke.io/backends",
+					r"cargo::error=ort does not provide prebuilt binaries for the target `{}` with feature set {}.
+cargo::error= | You may have to compile ONNX Runtime from source and link `ort` to your custom build; see https://ort.pyke.io/setup/linking
+cargo::error= | Alternatively, try a different backend like `ort-tract`; see https://ort.pyke.io/backends",
 					target,
 					feature_set.unwrap_or_else(|| String::from("(no features)"))
 				);
@@ -119,7 +119,7 @@ Alternatively, try a different backend like `ort-tract`; see https://ort.pyke.io
 			let mut verified_reader = match download::fetch_file(dist.url) {
 				Ok(reader) => download::VerifyReader::new(reader),
 				Err(e) => {
-					println!(r"cargo:error=ort-sys failed to download prebuilt binaries from `{}`: {e}", dist.url);
+					println!(r"cargo::error=ort-sys failed to download prebuilt binaries from `{}`: {e}", dist.url);
 					return;
 				}
 			};
@@ -134,17 +134,17 @@ Alternatively, try a different backend like `ort-tract`; see https://ort.pyke.io
 				should_rename = false;
 			}
 			if let Err(e) = self::download::extract_tgz(&mut verified_reader, &temp_extract_dir) {
-				println!(r"cargo:error=Extraction of prebuilt binaries downloaded from `{}` failed: {e}", dist.url);
+				println!(r"cargo::error=Extraction of prebuilt binaries downloaded from `{}` failed: {e}", dist.url);
 				return;
 			}
 
 			let (calculated_hash, _) = verified_reader.finalize();
 			if calculated_hash[..] != download::hex_str_to_bytes(dist.hash) {
 				println!(
-					r"cargo:error=⚠️ The hash of the file downloaded from `{}` does not match the expected hash. ⚠️
-Got {}, expected {}
-If you're using a proxy, make sure it's not doing something weird. Otherwise, report this incident to https://github.com/pykeio/ort/issues & email contact@pyke.io.
-The downloaded binaries are available to inspect at: {}",
+					r"cargo::error=⚠️ The hash of the file downloaded from `{}` does not match the expected hash. ⚠️
+cargo::error= | Got {}, expected {}
+cargo::error= | If you're using a proxy, make sure it's not doing something weird. Otherwise, report this incident to https://github.com/pykeio/ort/issues & email contact@pyke.io.
+cargo::error= | The downloaded binaries are available to inspect at: {}",
 					dist.url,
 					download::bytes_to_hex_str(&calculated_hash),
 					dist.hash,

@@ -425,7 +425,7 @@ impl Session {
 		&'s self,
 		input_names: SmallVec<&str, { STACK_SESSION_INPUTS }>,
 		input_values: SmallVec<&SessionInputValue<'v>, { STACK_SESSION_INPUTS }>,
-		run_options: &'r UntypedRunOptions
+		run_options: &'r Arc<UntypedRunOptions>
 	) -> Result<InferenceFut<'r, 'v>> {
 		let input_name_ptrs = input_names
 			.into_iter()
@@ -457,7 +457,7 @@ impl Session {
 			})
 			.collect();
 
-		let async_inner = Arc::new(InferenceFutInner::new());
+		let async_inner = Arc::new(InferenceFutInner::new(Arc::clone(run_options)));
 
 		// Avoid creating AsyncInferenceContext on the stack since it is a very large struct. Instead, create it on the heap and
 		// then fill it with values.
@@ -496,7 +496,7 @@ impl Session {
 			)?
 		];
 
-		Ok(InferenceFut::new(async_inner, run_options))
+		Ok(InferenceFut::new(async_inner))
 	}
 
 	/// Run input data through the ONNX graph, performing inference.

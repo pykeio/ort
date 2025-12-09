@@ -161,6 +161,13 @@ impl UntypedRunOptions {
 // https://onnxruntime.ai/docs/api/c/struct_ort_api.html#ac2a08cac0a657604bd5899e0d1a13675
 unsafe impl Send for UntypedRunOptions {}
 
+impl Drop for UntypedRunOptions {
+	fn drop(&mut self) {
+		ortsys![unsafe ReleaseRunOptions(self.ptr.as_ptr())];
+		crate::logging::drop!(RunOptions, self.ptr);
+	}
+}
+
 /// Allows for finer control over session inference.
 ///
 /// [`RunOptions`] provides three main features:
@@ -186,10 +193,11 @@ unsafe impl Send for UntypedRunOptions {}
 /// [`Session::run_binding_with_options`]: crate::session::Session::run_binding_with_options
 #[derive(Debug)]
 pub struct RunOptions<O: SelectedOutputMarker = NoSelectedOutputs> {
-	pub(crate) inner: UntypedRunOptions,
+	pub(crate) inner: Arc<UntypedRunOptions>,
 	_marker: PhantomData<O>
 }
 
+unsafe impl<O: SelectedOutputMarker> Send for RunOptions<O> {}
 // Only allow `Sync` if we don't have (potentially pre-allocated) outputs selected.
 // Allowing `Sync` here would mean a single pre-allocated `Value` could be mutated simultaneously in different threads -
 // a brazen crime against crabkind.
@@ -202,11 +210,11 @@ impl RunOptions {
 		ortsys![unsafe CreateRunOptions(&mut ptr)?; nonNull(ptr)];
 		crate::logging::create!(RunOptions, ptr);
 		Ok(RunOptions {
-			inner: UntypedRunOptions {
+			inner: Arc::new(UntypedRunOptions {
 				ptr,
 				outputs: OutputSelector::default(),
 				adapters: Vec::new()
-			},
+			}),
 			_marker: PhantomData
 		})
 	}
@@ -240,7 +248,10 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// # }
 	/// ```
 	pub fn with_outputs(mut self, outputs: OutputSelector) -> RunOptions<HasSelectedOutputs> {
-		self.inner.outputs = outputs;
+		let Some(inner) = Arc::get_mut(&mut self.inner) else {
+			panic!("Expected RunOptions to have exclusive access");
+		};
+		inner.outputs = outputs;
 		unsafe { mem::transmute(self) }
 	}
 
@@ -345,8 +356,11 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	}
 
 	pub fn add_adapter(&mut self, adapter: &Adapter) -> Result<()> {
-		ortsys![unsafe RunOptionsAddActiveLoraAdapter(self.inner.ptr.as_ptr(), adapter.ptr())?];
-		self.inner.adapters.push(Arc::clone(&adapter.inner));
+		let Some(inner) = Arc::get_mut(&mut self.inner) else {
+			panic!("Expected RunOptions to have exclusive access");
+		};
+		ortsys![unsafe RunOptionsAddActiveLoraAdapter(inner.ptr.as_ptr(), adapter.ptr())?];
+		inner.adapters.push(Arc::clone(&adapter.inner));
 		Ok(())
 	}
 
@@ -382,12 +396,5 @@ impl<O: SelectedOutputMarker> AsPointer for RunOptions<O> {
 
 	fn ptr(&self) -> *const Self::Sys {
 		self.inner.ptr.as_ptr()
-	}
-}
-
-impl<O: SelectedOutputMarker> Drop for RunOptions<O> {
-	fn drop(&mut self) {
-		ortsys![unsafe ReleaseRunOptions(self.inner.ptr.as_ptr())];
-		crate::logging::drop!(RunOptions, self.inner.ptr);
 	}
 }

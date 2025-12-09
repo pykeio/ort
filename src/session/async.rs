@@ -22,14 +22,16 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct InferenceFutInner<'r> {
 	value: UnsafeCell<Option<Result<SessionOutputs<'r>>>>,
-	waker: Mutex<Option<Waker>>
+	waker: Mutex<Option<Waker>>,
+	run_options: Arc<UntypedRunOptions>
 }
 
 impl<'r> InferenceFutInner<'r> {
-	pub(crate) fn new() -> Self {
+	pub(crate) fn new(run_options: Arc<UntypedRunOptions>) -> Self {
 		InferenceFutInner {
 			waker: Mutex::new(None),
-			value: UnsafeCell::new(None)
+			value: UnsafeCell::new(None),
+			run_options
 		}
 	}
 
@@ -57,7 +59,6 @@ unsafe impl Sync for InferenceFutInner<'_> {}
 
 pub struct InferenceFut<'r, 'v> {
 	inner: Arc<InferenceFutInner<'r>>,
-	run_options: &'r UntypedRunOptions,
 	did_receive: bool,
 	_inputs: PhantomData<&'v ()>
 }
@@ -65,10 +66,9 @@ pub struct InferenceFut<'r, 'v> {
 unsafe impl Send for InferenceFut<'_, '_> {}
 
 impl<'r> InferenceFut<'r, '_> {
-	pub(crate) fn new(inner: Arc<InferenceFutInner<'r>>, run_options: &'r UntypedRunOptions) -> Self {
+	pub(crate) fn new(inner: Arc<InferenceFutInner<'r>>) -> Self {
 		Self {
 			inner,
-			run_options,
 			did_receive: false,
 			_inputs: PhantomData
 		}
@@ -94,7 +94,7 @@ impl<'r> Future for InferenceFut<'r, '_> {
 impl Drop for InferenceFut<'_, '_> {
 	fn drop(&mut self) {
 		if !self.did_receive {
-			let _ = self.run_options.terminate();
+			let _ = self.inner.run_options.terminate();
 			self.inner.set_waker(None);
 		}
 	}

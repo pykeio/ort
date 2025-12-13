@@ -26,14 +26,14 @@ use core::{
 use smallvec::SmallVec;
 
 use crate::{
-	AsPointer, char_p_to_string,
+	AsPointer,
 	environment::Environment,
 	error::{Error, ErrorCode, Result, status_to_result},
 	io_binding::IoBinding,
 	memory::Allocator,
 	ortsys,
-	util::{STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS, with_cstr, with_cstr_ptr_array},
-	value::{DynValue, Value, ValueType}
+	util::{AllocatedString, STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS, with_cstr, with_cstr_ptr_array},
+	value::{DynValue, Outlet, Value, ValueType}
 };
 
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
@@ -101,10 +101,8 @@ impl Drop for SharedSessionInner {
 #[derive(Debug)]
 pub struct Session {
 	pub(crate) inner: Arc<SharedSessionInner>,
-	/// Information about the graph's inputs.
-	pub inputs: Vec<Input>,
-	/// Information about the graph's outputs.
-	pub outputs: Vec<Output>
+	inputs: Vec<Outlet>,
+	outputs: Vec<Outlet>
 }
 
 /// A [`Session`] where the graph data is stored in memory.
@@ -128,25 +126,15 @@ impl DerefMut for InMemorySession<'_> {
 	}
 }
 
-/// Information about a [`Session`] input.
-#[derive(Debug)]
-pub struct Input {
-	/// Name of the input.
-	pub name: String,
-	/// Type of the input's elements.
-	pub input_type: ValueType
-}
-
-/// Information about a [`Session`] output.
-#[derive(Debug)]
-pub struct Output {
-	/// Name of the output.
-	pub name: String,
-	/// Type of the output's elements.
-	pub output_type: ValueType
-}
-
 impl Session {
+	pub fn inputs(&self) -> &[Outlet] {
+		&self.inputs
+	}
+
+	pub fn outputs(&self) -> &[Outlet] {
+		&self.outputs
+	}
+
 	/// Creates a new [`SessionBuilder`].
 	pub fn builder() -> Result<SessionBuilder> {
 		SessionBuilder::new()
@@ -212,10 +200,10 @@ impl Session {
 	pub fn run<'s, 'i, 'v: 'i, const N: usize>(&'s mut self, input_values: impl Into<SessionInputs<'i, 'v, N>>) -> Result<SessionOutputs<'s>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
-				self.run_inner(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), None)
+				self.run_inner(self.inputs.iter().map(|input| input.name()).collect(), input_values.iter().collect(), None)
 			}
 			SessionInputs::ValueArray(input_values) => {
-				self.run_inner(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), None)
+				self.run_inner(self.inputs.iter().map(|input| input.name()).collect(), input_values.iter().collect(), None)
 			}
 			SessionInputs::ValueMap(input_values) => {
 				self.run_inner(input_values.iter().map(|(k, _)| k.as_ref()).collect(), input_values.iter().map(|(_, v)| v).collect(), None)
@@ -257,10 +245,10 @@ impl Session {
 	) -> Result<SessionOutputs<'r>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
-				self.run_inner(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), Some(&run_options.inner))
+				self.run_inner(self.inputs.iter().map(|input| input.name()).collect(), input_values.iter().collect(), Some(&run_options.inner))
 			}
 			SessionInputs::ValueArray(input_values) => {
-				self.run_inner(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), Some(&run_options.inner))
+				self.run_inner(self.inputs.iter().map(|input| input.name()).collect(), input_values.iter().collect(), Some(&run_options.inner))
 			}
 			SessionInputs::ValueMap(input_values) => {
 				self.run_inner(input_values.iter().map(|(k, _)| k.as_ref()).collect(), input_values.iter().map(|(_, v)| v).collect(), Some(&run_options.inner))
@@ -288,7 +276,7 @@ impl Session {
 
 		let (output_names, mut output_tensors) = match run_options {
 			Some(r) => r.outputs.resolve_outputs(&self.outputs),
-			None => (self.outputs.iter().map(|o| o.name.as_str()).collect(), iter::repeat_with(|| None).take(self.outputs.len()).collect())
+			None => (self.outputs.iter().map(|o| o.name()).collect(), iter::repeat_with(|| None).take(self.outputs.len()).collect())
 		};
 		let output_value_ptrs: SmallVec<*mut ort_sys::OrtValue, { STACK_SESSION_OUTPUTS }> = output_tensors
 			.iter_mut()
@@ -409,10 +397,10 @@ impl Session {
 	) -> Result<InferenceFut<'r, 'v>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
-				self.run_inner_async(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), &run_options.inner)
+				self.run_inner_async(self.inputs.iter().map(|input| input.name()).collect(), input_values.iter().collect(), &run_options.inner)
 			}
 			SessionInputs::ValueArray(input_values) => {
-				self.run_inner_async(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), &run_options.inner)
+				self.run_inner_async(self.inputs.iter().map(|input| input.name()).collect(), input_values.iter().collect(), &run_options.inner)
 			}
 			SessionInputs::ValueMap(input_values) => {
 				self.run_inner_async(input_values.iter().map(|(k, _)| k.as_ref()).collect(), input_values.iter().map(|(_, v)| v).collect(), &run_options.inner)
@@ -612,7 +600,7 @@ impl Session {
 	pub fn end_profiling(&mut self) -> Result<String> {
 		let mut profiling_name: *mut c_char = ptr::null_mut();
 		ortsys![unsafe SessionEndProfiling(self.inner.session_ptr.as_ptr(), self.inner.allocator.ptr().cast_mut(), &mut profiling_name)?; nonNull(profiling_name)];
-		dangerous::raw_pointer_to_string(&self.inner.allocator, profiling_name.as_ptr())
+		unsafe { AllocatedString::from_ptr(profiling_name.as_ptr(), &self.inner.allocator) }.map(|x| x.to_string())
 	}
 
 	/// Sets this session's [workload type][`WorkloadType`] to instruct execution providers to prioritize performance or
@@ -692,20 +680,10 @@ impl OverridableInitializer {
 	}
 }
 
-mod dangerous {
+pub(crate) mod io {
 	use super::*;
 
-	pub(super) fn extract_inputs_count(session_ptr: NonNull<ort_sys::OrtSession>) -> Result<usize> {
-		let f = ortsys![SessionGetInputCount];
-		extract_io_count(f, session_ptr)
-	}
-
-	pub(super) fn extract_outputs_count(session_ptr: NonNull<ort_sys::OrtSession>) -> Result<usize> {
-		let f = ortsys![SessionGetOutputCount];
-		extract_io_count(f, session_ptr)
-	}
-
-	fn extract_io_count(
+	pub(super) fn extract_io_count(
 		f: unsafe extern "system" fn(*const ort_sys::OrtSession, *mut usize) -> ort_sys::OrtStatusPtr,
 		session_ptr: NonNull<ort_sys::OrtSession>
 	) -> Result<usize> {
@@ -713,28 +691,6 @@ mod dangerous {
 		let status = unsafe { f(session_ptr.as_ptr(), &mut num_nodes) };
 		unsafe { status_to_result(status) }?;
 		Ok(num_nodes)
-	}
-
-	fn extract_input_name(session_ptr: NonNull<ort_sys::OrtSession>, allocator: &Allocator, i: usize) -> Result<String> {
-		let f = ortsys![SessionGetInputName];
-		extract_io_name(f, session_ptr, allocator, i)
-	}
-
-	fn extract_output_name(session_ptr: NonNull<ort_sys::OrtSession>, allocator: &Allocator, i: usize) -> Result<String> {
-		let f = ortsys![SessionGetOutputName];
-		extract_io_name(f, session_ptr, allocator, i)
-	}
-
-	pub(crate) fn raw_pointer_to_string(allocator: &Allocator, c_str: *mut c_char) -> Result<String> {
-		let name = match char_p_to_string(c_str) {
-			Ok(name) => name,
-			Err(e) => {
-				unsafe { allocator.free(c_str) };
-				return Err(e);
-			}
-		};
-		unsafe { allocator.free(c_str) };
-		Ok(name)
 	}
 
 	fn extract_io_name(
@@ -752,21 +708,7 @@ mod dangerous {
 			return Err(crate::Error::new("expected `name_ptr` to not be null"));
 		}
 
-		raw_pointer_to_string(allocator, name_ptr)
-	}
-
-	pub(super) fn extract_input(session_ptr: NonNull<ort_sys::OrtSession>, allocator: &Allocator, i: usize) -> Result<Input> {
-		let input_name = extract_input_name(session_ptr, allocator, i)?;
-		let f = ortsys![SessionGetInputTypeInfo];
-		let input_type = extract_io(f, session_ptr, i)?;
-		Ok(Input { name: input_name, input_type })
-	}
-
-	pub(super) fn extract_output(session_ptr: NonNull<ort_sys::OrtSession>, allocator: &Allocator, i: usize) -> Result<Output> {
-		let output_name = extract_output_name(session_ptr, allocator, i)?;
-		let f = ortsys![SessionGetOutputTypeInfo];
-		let output_type = extract_io(f, session_ptr, i)?;
-		Ok(Output { name: output_name, output_type })
+		unsafe { AllocatedString::from_ptr(name_ptr, allocator) }.map(|x| x.to_string())
 	}
 
 	fn extract_io(
@@ -783,5 +725,17 @@ mod dangerous {
 			return Err(crate::Error::new("expected `typeinfo_ptr` to not be null"));
 		};
 		Ok(unsafe { ValueType::from_type_info(typeinfo_ptr) })
+	}
+
+	pub(super) fn extract_input(session_ptr: NonNull<ort_sys::OrtSession>, allocator: &Allocator, i: usize) -> Result<Outlet> {
+		let name = extract_io_name(ortsys![SessionGetInputName], session_ptr, allocator, i)?;
+		let dtype = extract_io(ortsys![SessionGetInputTypeInfo], session_ptr, i)?;
+		Ok(Outlet::new(name, dtype))
+	}
+
+	pub(super) fn extract_output(session_ptr: NonNull<ort_sys::OrtSession>, allocator: &Allocator, i: usize) -> Result<Outlet> {
+		let name = extract_io_name(ortsys![SessionGetOutputName], session_ptr, allocator, i)?;
+		let dtype = extract_io(ortsys![SessionGetOutputTypeInfo], session_ptr, i)?;
+		Ok(Outlet::new(name, dtype))
 	}
 }

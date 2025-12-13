@@ -14,7 +14,7 @@ use crate::{
 	error::Result,
 	logging::LogLevel,
 	ortsys,
-	session::Output,
+	session::Outlet,
 	util::{MiniMap, STACK_SESSION_OUTPUTS, with_cstr},
 	value::{DynValue, Value, ValueTypeMarker}
 };
@@ -28,7 +28,7 @@ use crate::{
 /// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// let input = Tensor::<f32>::new(&Allocator::default(), [1_usize, 64, 64, 3])?;
 ///
-/// let output0 = session.outputs[0].name.as_str();
+/// let output0 = session.outputs()[0].name();
 /// let options = RunOptions::new()?.with_outputs(
 /// 	// Disable all outputs...
 /// 	OutputSelector::no_default()
@@ -107,7 +107,7 @@ impl OutputSelector {
 	/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = Tensor::<f32>::new(&Allocator::default(), [1_usize, 64, 64, 3])?;
 	///
-	/// let output0 = session.outputs[0].name.as_str();
+	/// let output0 = session.outputs()[0].name();
 	/// let options = RunOptions::new()?.with_outputs(
 	/// 	OutputSelector::default()
 	/// 		.preallocate(output0, Tensor::<f32>::new(&Allocator::default(), [1_usize, 128, 128, 3])?)
@@ -124,13 +124,13 @@ impl OutputSelector {
 
 	pub(crate) fn resolve_outputs<'a, 's: 'a>(
 		&'a self,
-		outputs: &'s [Output]
+		outputs: &'s [Outlet]
 	) -> (SmallVec<&'a str, { STACK_SESSION_OUTPUTS }>, SmallVec<Option<DynValue>, { STACK_SESSION_OUTPUTS }>) {
 		if self.use_defaults { outputs.iter() } else { [].iter() }
-			.map(|o| &o.name)
-			.filter(|n| !self.default_blocklist.contains(n))
-			.chain(self.allowlist.iter())
-			.map(|n| (n.as_str(), self.preallocated_outputs.get(n).map(DynValue::clone_of)))
+			.map(|o| o.name())
+			.filter(|n| !self.default_blocklist.iter().any(|e| e == n))
+			.chain(self.allowlist.iter().map(|x| x.as_str()))
+			.map(|n| (n, self.preallocated_outputs.get(n).map(DynValue::clone_of)))
 			.unzip()
 	}
 }
@@ -232,7 +232,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = Tensor::<f32>::new(&Allocator::default(), [1_usize, 64, 64, 3])?;
 	///
-	/// let output0 = session.outputs[0].name.as_str();
+	/// let output0 = session.outputs()[0].name();
 	/// let options = RunOptions::new()?.with_outputs(
 	/// 	// Disable all outputs...
 	/// 	OutputSelector::no_default()

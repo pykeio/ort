@@ -9,14 +9,14 @@ use ort_sys::c_char;
 
 use super::{Checkpoint, Optimizer, training_api};
 use crate::{
-	AsPointer, char_p_to_string,
+	AsPointer,
 	environment::Environment,
 	error::{Result, status_to_result},
 	memory::Allocator,
 	ortsys,
 	session::{RunOptions, SessionInputValue, SessionInputs, SessionOutputs, builder::SessionBuilder},
 	tensor::IntoTensorElementType,
-	util::with_cstr_ptr_array,
+	util::{char_p_to_string, with_cstr_ptr_array},
 	value::{Tensor, Value}
 };
 

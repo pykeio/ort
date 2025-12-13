@@ -55,12 +55,8 @@ pub mod execution_providers {
 	pub use super::ep::*;
 }
 
-use alloc::{borrow::ToOwned, boxed::Box, string::String};
-use core::{
-	ffi::{CStr, c_char},
-	ptr::NonNull,
-	str
-};
+use alloc::boxed::Box;
+use core::{ffi::CStr, ptr::NonNull, str};
 
 pub use ort_sys as sys;
 
@@ -289,26 +285,4 @@ macro_rules! ortsys {
 	(@$api:ident: unsafe $method:ident($($n:expr),*) as Result) => {
 		$crate::api::$api().and_then(|api| unsafe { $crate::error::status_to_result((api.$method)($($n),+)) })
 	};
-}
-
-pub(crate) fn char_p_to_string(raw: *const c_char) -> Result<String> {
-	if raw.is_null() {
-		return Ok(String::new());
-	}
-	let c_string = unsafe { CStr::from_ptr(raw.cast_mut()).to_owned() };
-	Ok(c_string.to_string_lossy().into())
-}
-
-#[cfg(test)]
-mod test {
-	use alloc::ffi::CString;
-
-	use super::*;
-
-	#[test]
-	fn test_char_p_to_string() {
-		let s = CString::new("foo").unwrap_or_else(|_| unreachable!());
-		let ptr = s.as_c_str().as_ptr();
-		assert_eq!("foo", char_p_to_string(ptr).expect("failed to convert string"));
-	}
 }

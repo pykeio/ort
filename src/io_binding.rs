@@ -283,8 +283,9 @@ mod tests {
 		let array = get_image();
 
 		let mut binding = session.create_binding()?;
-		binding.bind_input(&session.inputs[0].name, &Tensor::from_array(array)?)?;
-		binding.bind_output_to_device(&session.outputs[0].name, &MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::CPUOutput)?)?;
+		binding.bind_input(session.inputs()[0].name(), &Tensor::from_array(array)?)?;
+		binding
+			.bind_output_to_device(session.outputs()[0].name(), &MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::CPUOutput)?)?;
 
 		let outputs = session.run_binding(&binding)?;
 		let probabilities = extract_probabilities(&outputs[0])?;
@@ -301,10 +302,10 @@ mod tests {
 		let array = get_image();
 
 		let mut binding = session.create_binding()?;
-		binding.bind_input(&session.inputs[0].name, &Tensor::from_array(array)?)?;
+		binding.bind_input(session.inputs()[0].name(), &Tensor::from_array(array)?)?;
 
 		let output = Array2::from_shape_simple_fn((1, 10), || 0.0_f32);
-		binding.bind_output(&session.outputs[0].name, Tensor::from_array(output)?)?;
+		binding.bind_output(session.outputs()[0].name(), Tensor::from_array(output)?)?;
 
 		let outputs = session.run_binding(&binding)?;
 		let probabilities = extract_probabilities(&outputs[0])?;
@@ -322,10 +323,10 @@ mod tests {
 
 		let mut binding = session.create_binding()?;
 		let output = Array2::from_shape_simple_fn((1, 10), || 0.0_f32);
-		binding.bind_output(&session.outputs[0].name, Tensor::from_array(output)?)?;
+		binding.bind_output(session.outputs()[0].name(), Tensor::from_array(output)?)?;
 
 		let probabilities = std::thread::spawn(move || {
-			binding.bind_input(&session.inputs[0].name, &Tensor::from_array(array)?)?;
+			binding.bind_input(session.inputs()[0].name(), &Tensor::from_array(array)?)?;
 			let outputs = session.run_binding(&binding)?;
 			let probabilities = extract_probabilities(&outputs[0])?;
 			Ok::<Vec<(usize, f32)>, crate::Error>(probabilities)
@@ -340,16 +341,16 @@ mod tests {
 
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
-	fn test_mnist_clear_bounds() -> Result<()> {
+	fn test_mnist_clear_binds() -> Result<()> {
 		let mut session = Session::builder()?.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/mnist.onnx")?;
 
 		let array = get_image();
 
 		let mut binding = session.create_binding()?;
-		binding.bind_input(&session.inputs[0].name, &Tensor::from_array(array)?)?;
+		binding.bind_input(session.inputs()[0].name(), &Tensor::from_array(array)?)?;
 
 		let output = Array2::from_shape_simple_fn((1, 10), || 0.0_f32);
-		binding.bind_output(&session.outputs[0].name, Tensor::from_array(output)?)?;
+		binding.bind_output(session.outputs()[0].name(), Tensor::from_array(output)?)?;
 
 		{
 			let outputs = session.run_binding(&binding)?;
@@ -358,7 +359,8 @@ mod tests {
 		}
 
 		binding.clear_outputs();
-		binding.bind_output_to_device(&session.outputs[0].name, &MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::CPUOutput)?)?;
+		binding
+			.bind_output_to_device(session.outputs()[0].name(), &MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::CPUOutput)?)?;
 
 		{
 			let outputs = session.run_binding(&binding)?;

@@ -12,8 +12,8 @@ use crate::{
 	operator::attribute::Attribute,
 	ortsys,
 	session::{Session, builder::SessionBuilder},
-	util::{run_on_drop, with_cstr, with_cstr_ptr_array},
-	value::{TensorValueTypeMarker, Value, ValueType}
+	util::{with_cstr, with_cstr_ptr_array},
+	value::{Outlet, TensorValueTypeMarker, Value}
 };
 
 #[cfg(test)]
@@ -46,41 +46,6 @@ pub fn editor_api() -> Result<&'static ort_sys::OrtModelEditorApi> {
 
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct Outlet(NonNull<ort_sys::OrtValueInfo>);
-
-impl Outlet {
-	pub fn new(name: impl AsRef<str>, dtype: &ValueType) -> Result<Self> {
-		let type_info = dtype.to_type_info()?;
-		let _guard = run_on_drop(|| ortsys![unsafe ReleaseTypeInfo(type_info)]);
-
-		let ptr = with_cstr(name.as_ref().as_bytes(), &|name| {
-			let mut ptr: *mut ort_sys::OrtValueInfo = ptr::null_mut();
-			ortsys![@editor: unsafe CreateValueInfo(name.as_ptr(), type_info, &mut ptr)?; nonNull(ptr)];
-			Ok(ptr)
-		})?;
-		crate::logging::create!(Outlet, ptr);
-		Ok(Self(ptr))
-	}
-
-	pub(crate) fn consume(self) -> NonNull<ort_sys::OrtValueInfo> {
-		ManuallyDrop::new(self).0
-	}
-}
-
-impl AsPointer for Outlet {
-	type Sys = ort_sys::OrtValueInfo;
-	fn ptr(&self) -> *const Self::Sys {
-		self.0.as_ptr()
-	}
-}
-
-impl Drop for Outlet {
-	fn drop(&mut self) {
-		ortsys![unsafe ReleaseValueInfo(self.0.as_ptr())];
-		crate::logging::drop!(Outlet, self.0);
-	}
-}
-
 pub struct Node(NonNull<ort_sys::OrtNode>);
 
 impl Node {
@@ -154,15 +119,15 @@ impl Graph {
 	}
 
 	pub fn set_inputs(&mut self, inputs: impl IntoIterator<Item = Outlet>) -> Result<()> {
-		let inputs: SmallVec<NonNull<ort_sys::OrtValueInfo>, 4> = inputs.into_iter().map(|input| input.consume()).collect();
-		// no need to drop consumed pointers since this only errors on null pointers
+		let inputs: SmallVec<NonNull<ort_sys::OrtValueInfo>, 4> = inputs.into_iter().map(|input| input.into_editor_value_info()).collect::<Result<_>>()?;
+		// this takes ownership of the OrtValueInfos so no need to free those
 		ortsys![@editor: unsafe SetGraphInputs(self.0, inputs.as_ptr() as *mut _, inputs.len())?];
 		Ok(())
 	}
 
 	pub fn set_outputs(&mut self, outputs: impl IntoIterator<Item = Outlet>) -> Result<()> {
-		let outputs: SmallVec<NonNull<ort_sys::OrtValueInfo>, 4> = outputs.into_iter().map(|output| output.consume()).collect();
-		// no need to drop consumed pointers since this only errors on null pointers
+		let outputs: SmallVec<NonNull<ort_sys::OrtValueInfo>, 4> = outputs.into_iter().map(|input| input.into_editor_value_info()).collect::<Result<_>>()?;
+		// this takes ownership of the OrtValueInfos so no need to free those
 		ortsys![@editor: unsafe SetGraphOutputs(self.0, outputs.as_ptr() as *mut _, outputs.len())?];
 		Ok(())
 	}

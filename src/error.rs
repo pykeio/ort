@@ -5,7 +5,10 @@ use alloc::{
 };
 use core::{convert::Infallible, error::Error as CoreError, ffi::c_char, fmt, ptr};
 
-use crate::{char_p_to_string, ortsys, util::with_cstr};
+use crate::{
+	ortsys,
+	util::{char_p_to_string, with_cstr}
+};
 
 /// Type alias for the Result type returned by ORT functions.
 pub type Result<T, E = Error> = core::result::Result<T, E>;

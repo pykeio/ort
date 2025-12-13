@@ -22,11 +22,10 @@ use core::{
 };
 
 use crate::{
-	char_p_to_string,
 	error::Result,
 	ortsys,
 	session::builder::SessionBuilder,
-	util::{MiniMap, run_on_drop}
+	util::{MiniMap, char_p_to_string, run_on_drop}
 };
 
 pub mod cpu;

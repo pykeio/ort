@@ -40,7 +40,7 @@ pub use self::{
 		DefiniteTensorValueTypeMarker, DynTensor, DynTensorRef, DynTensorRefMut, DynTensorValueType, OwnedTensorArrayData, Tensor, TensorArrayData,
 		TensorArrayDataMut, TensorArrayDataParts, TensorRef, TensorRefMut, TensorValueType, TensorValueTypeMarker, ToShape
 	},
-	r#type::ValueType
+	r#type::{Outlet, ValueType}
 };
 use crate::{
 	AsPointer,

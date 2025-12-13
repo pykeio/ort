@@ -12,10 +12,9 @@ use crate::{
 	logging::Logger,
 	memory::{Allocator, MemoryInfo, MemoryType},
 	ortsys,
-	session::{Input, Output},
 	tensor::Shape,
 	util::with_cstr,
-	value::{DowncastableTarget, DynValue, Value, ValueRef, ValueRefMut, ValueType}
+	value::{DowncastableTarget, DynValue, Outlet, Value, ValueRef, ValueRefMut, ValueType}
 };
 
 pub trait Kernel {
@@ -45,7 +44,7 @@ impl KernelAttributes {
 		with_cstr(name.as_ref().as_bytes(), &|name| unsafe { T::from_info(self.ptr.as_ptr(), name.as_ptr()) }).ok()
 	}
 
-	pub fn inputs(&self) -> Result<Vec<Input>> {
+	pub fn inputs(&self) -> Result<Vec<Outlet>> {
 		let mut num_inputs = 0;
 		ortsys![unsafe KernelInfo_GetInputCount(self.ptr.as_ptr(), &mut num_inputs)?];
 
@@ -58,13 +57,13 @@ impl KernelAttributes {
 			let name = CString::from_vec_with_nul(name)?.into_string()?;
 			let mut type_info = ptr::null_mut();
 			ortsys![unsafe KernelInfo_GetInputTypeInfo(self.ptr.as_ptr(), idx, &mut type_info)?; nonNull(type_info)];
-			let input_type = unsafe { ValueType::from_type_info(type_info) };
-			inputs.push(Input { name, input_type })
+			let dtype = unsafe { ValueType::from_type_info(type_info) };
+			inputs.push(Outlet::new(name, dtype))
 		}
 		Ok(inputs)
 	}
 
-	pub fn outputs(&self) -> Result<Vec<Output>> {
+	pub fn outputs(&self) -> Result<Vec<Outlet>> {
 		let mut num_outputs = 0;
 		ortsys![unsafe KernelInfo_GetOutputCount(self.ptr.as_ptr(), &mut num_outputs)?];
 
@@ -77,8 +76,8 @@ impl KernelAttributes {
 			let name = CString::from_vec_with_nul(name)?.into_string()?;
 			let mut type_info = ptr::null_mut();
 			ortsys![unsafe KernelInfo_GetOutputTypeInfo(self.ptr.as_ptr(), idx, &mut type_info)?; nonNull(type_info)];
-			let output_type = unsafe { ValueType::from_type_info(type_info) };
-			outputs.push(Output { name, output_type })
+			let dtype = unsafe { ValueType::from_type_info(type_info) };
+			outputs.push(Outlet::new(name, dtype))
 		}
 		Ok(outputs)
 	}

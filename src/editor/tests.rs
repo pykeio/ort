@@ -12,20 +12,20 @@ fn test_model_editor() -> Result<()> {
 	let mut graph = Graph::new()?;
 	graph.set_inputs([Outlet::new(
 		"input",
-		&ValueType::Tensor {
+		ValueType::Tensor {
 			ty: TensorElementType::Float32,
 			shape: Shape::new([]),
 			dimension_symbols: SymbolicDimensions::empty(0)
 		}
-	)?])?;
+	)])?;
 	graph.set_outputs([Outlet::new(
 		"output",
-		&ValueType::Tensor {
+		ValueType::Tensor {
 			ty: TensorElementType::Float32,
 			shape: Shape::new([]),
 			dimension_symbols: SymbolicDimensions::empty(0)
 		}
-	)?])?;
+	)])?;
 	graph.add_node(Node::new("Identity", ONNX_DOMAIN, "identity", ["input"], ["output"], [])?)?;
 
 	let mut model = Model::new([Opset::new(ONNX_DOMAIN, 22)?])?;

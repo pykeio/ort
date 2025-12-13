@@ -13,7 +13,7 @@ use smallvec::{SmallVec, smallvec};
 use crate::{
 	Result, ortsys,
 	tensor::{Shape, SymbolicDimensions, TensorElementType},
-	util::{self, with_cstr_ptr_array}
+	util::{self, run_on_drop, with_cstr, with_cstr_ptr_array}
 };
 
 /// The type of a [`Value`][super::Value], or a session input/output.
@@ -24,8 +24,8 @@ use crate::{
 /// # fn main() -> ort::Result<()> {
 /// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// // `ValueType`s can be obtained from session inputs/outputs:
-/// let input = &session.inputs[0];
-/// assert_eq!(input.input_type, ValueType::Tensor {
+/// let input = &session.inputs()[0];
+/// assert_eq!(input.dtype(), &ValueType::Tensor {
 /// 	ty: TensorElementType::Float32,
 /// 	// Our model's input has 3 dynamic dimensions, represented by -1
 /// 	shape: Shape::new([-1, -1, -1, 3]),
@@ -282,6 +282,42 @@ impl fmt::Display for ValueType {
 			ValueType::Sequence(inner) => write!(f, "Sequence<{inner}>"),
 			ValueType::Optional(inner) => write!(f, "Option<{inner}>")
 		}
+	}
+}
+
+/// The input/output to a [session](crate::session::Session), [node](crate::editor::Node), or
+/// [operator](crate::operator::Operator), consisting of a name and expected [data type](ValueType).
+#[derive(Debug)]
+pub struct Outlet {
+	name: String,
+	dtype: ValueType
+}
+
+impl Outlet {
+	pub fn new<S: Into<String>>(name: S, dtype: ValueType) -> Self {
+		Self { name: name.into(), dtype }
+	}
+
+	#[inline]
+	pub fn name(&self) -> &str {
+		&self.name
+	}
+
+	#[inline]
+	pub fn dtype(&self) -> &ValueType {
+		&self.dtype
+	}
+
+	pub(crate) fn into_editor_value_info(self) -> Result<NonNull<ort_sys::OrtValueInfo>> {
+		let type_info = self.dtype.to_type_info()?;
+		let _guard = run_on_drop(|| ortsys![unsafe ReleaseTypeInfo(type_info)]);
+
+		let ptr = with_cstr(self.name.as_bytes(), &|name| {
+			let mut ptr: *mut ort_sys::OrtValueInfo = ptr::null_mut();
+			ortsys![@editor: unsafe CreateValueInfo(name.as_ptr(), type_info, &mut ptr)?; nonNull(ptr)];
+			Ok(ptr)
+		})?;
+		Ok(ptr)
 	}
 }
 

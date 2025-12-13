@@ -26,7 +26,7 @@ use crate::{
 	error::Result,
 	memory::Allocator,
 	ortsys,
-	session::{InMemorySession, Input, Output, Session, SharedSessionInner, dangerous}
+	session::{InMemorySession, Outlet, Session, SharedSessionInner, io}
 };
 
 impl SessionBuilder {
@@ -249,14 +249,14 @@ impl SessionBuilder {
 		};
 
 		// Extract input and output properties
-		let num_input_nodes = dangerous::extract_inputs_count(ptr)?;
-		let num_output_nodes = dangerous::extract_outputs_count(ptr)?;
-		let inputs = (0..num_input_nodes)
-			.map(|i| dangerous::extract_input(ptr, &allocator, i))
-			.collect::<Result<Vec<Input>>>()?;
-		let outputs = (0..num_output_nodes)
-			.map(|i| dangerous::extract_output(ptr, &allocator, i))
-			.collect::<Result<Vec<Output>>>()?;
+		let num_inputs = io::extract_io_count(ortsys![SessionGetInputCount], ptr)?;
+		let num_outputs = io::extract_io_count(ortsys![SessionGetOutputCount], ptr)?;
+		let inputs = (0..num_inputs)
+			.map(|i| io::extract_input(ptr, &allocator, i))
+			.collect::<Result<Vec<Outlet>>>()?;
+		let outputs = (0..num_outputs)
+			.map(|i| io::extract_output(ptr, &allocator, i))
+			.collect::<Result<Vec<Outlet>>>()?;
 
 		let mut extras: SmallVec<Box<dyn Any>, 4> = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>).collect();
 		if let Some(prepacked_weights) = self.prepacked_weights.take() {

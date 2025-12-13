@@ -10,11 +10,11 @@ use core::{
 };
 
 use crate::{
-	AsPointer, char_p_to_string,
+	AsPointer,
 	error::Result,
 	memory::Allocator,
 	ortsys,
-	util::{AllocatedString, with_cstr}
+	util::{AllocatedString, char_p_to_string, with_cstr}
 };
 
 /// Container for model metadata, including name & producer information.

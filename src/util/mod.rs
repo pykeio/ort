@@ -119,6 +119,14 @@ pub(crate) fn run_on_drop<F: FnOnce()>(f: F) -> RunOnDrop<F> {
 	RunOnDrop { runner: ManuallyDrop::new(f) }
 }
 
+pub(crate) fn char_p_to_string(raw: *const c_char) -> Result<String> {
+	if raw.is_null() {
+		return Ok(String::new());
+	}
+	let c_string = unsafe { CStr::from_ptr(raw.cast_mut()).to_owned() };
+	Ok(c_string.to_string_lossy().into())
+}
+
 /// A string allocated by an ONNX Runtime [`Allocator`].
 pub(crate) struct AllocatedString<'a, 'p> {
 	data: &'p str,
@@ -166,11 +174,11 @@ impl<'a, 'p> Drop for AllocatedString<'a, 'p> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-	use alloc::sync::Arc;
+	use alloc::{ffi::CString, sync::Arc};
 	use core::ffi::CStr;
 	use std::thread;
 
-	use super::{MiniMap, Mutex, run_on_drop, with_cstr, with_cstr_ptr_array};
+	use super::{MiniMap, Mutex, char_p_to_string, run_on_drop, with_cstr, with_cstr_ptr_array};
 
 	#[test]
 	fn test_mutex_sanity() {
@@ -299,5 +307,12 @@ mod tests {
 
 		assert_eq!(map.drain().next(), Some(("meaning", 24)));
 		assert_eq!(map.len(), 0);
+	}
+
+	#[test]
+	fn test_char_p_to_string() {
+		let s = CString::new("foo").unwrap_or_else(|_| unreachable!());
+		let ptr = s.as_c_str().as_ptr();
+		assert_eq!("foo", char_p_to_string(ptr).expect("failed to convert string"));
 	}
 }

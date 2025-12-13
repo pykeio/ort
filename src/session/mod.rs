@@ -31,7 +31,6 @@ use crate::{
 	error::{Error, ErrorCode, Result, status_to_result},
 	io_binding::IoBinding,
 	memory::Allocator,
-	metadata::ModelMetadata,
 	ortsys,
 	util::{STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS, with_cstr, with_cstr_ptr_array},
 	value::{DynValue, Value, ValueType}
@@ -41,13 +40,14 @@ use crate::{
 mod r#async;
 pub mod builder;
 pub mod input;
+pub mod metadata;
 pub mod output;
 pub mod run_options;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 pub use self::r#async::InferenceFut;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 use self::r#async::{AsyncInferenceContext, InferenceFutInner};
-use self::{builder::SessionBuilder, run_options::UntypedRunOptions};
+use self::{builder::SessionBuilder, metadata::ModelMetadata, run_options::UntypedRunOptions};
 pub use self::{
 	input::{SessionInputValue, SessionInputs},
 	output::SessionOutputs,

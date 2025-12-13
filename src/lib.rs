@@ -34,7 +34,6 @@ pub mod error;
 pub mod io_binding;
 pub mod logging;
 pub mod memory;
-pub mod metadata;
 pub mod operator;
 pub mod session;
 pub mod tensor;

@@ -55,13 +55,10 @@ pub enum ValueType {
 		/// Element type of the tensor.
 		ty: TensorElementType,
 		/// Shape of the tensor. If an exact dimension is not known (i.e. a dynamic dimension as part of an
-		/// [`Input`]/[`Output`]), the dimension will be `-1`.
+		/// [`Outlet`]), the dimension will be `-1`.
 		///
-		/// Actual tensor values (i.e. not [`Input`] or [`Output`] definitions), which have a known dimension, will
+		/// Actual tensor values (i.e. not [`Outlet`] definitions), which have a known dimension, will
 		/// always have non-negative dimensions.
-		///
-		/// [`Input`]: crate::session::Input
-		/// [`Output`]: crate::session::Output
 		shape: Shape,
 		dimension_symbols: SymbolicDimensions
 	},

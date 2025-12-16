@@ -12,7 +12,13 @@
 
 #[cfg(feature = "std")]
 use alloc::ffi::CString;
-use alloc::{boxed::Box, format, string::String, sync::Arc, vec::Vec};
+use alloc::{
+	boxed::Box,
+	format,
+	string::{String, ToString},
+	sync::Arc,
+	vec::Vec
+};
 use core::{
 	any::Any,
 	ffi::{CStr, c_char},

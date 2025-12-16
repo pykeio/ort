@@ -16,6 +16,7 @@
 
 use alloc::{ffi::CString, string::ToString, sync::Arc, vec::Vec};
 use core::{
+	any::Any,
 	ffi::c_char,
 	fmt::{self, Debug},
 	ptr
@@ -77,13 +78,7 @@ pub mod webnn;
 #[cfg(target_arch = "wasm32")]
 pub use self::{wasm::WASM, webnn::WebNN};
 
-/// ONNX Runtime works with different hardware acceleration libraries through its extensible **Execution Providers**
-/// (EP) framework to optimally execute the ONNX models on the hardware platform. This interface enables flexibility for
-/// the AP application developer to deploy their ONNX models in different environments in the cloud and the edge and
-/// optimize the execution by taking advantage of the compute capabilities of the platform.
-///
-/// ![](https://www.onnxruntime.ai/images/ONNX_Runtime_EP1.png)
-pub trait ExecutionProvider: Send + Sync {
+pub trait ExecutionProvider: Any + Send + Sync {
 	/// Returns the identifier of this execution provider used internally by ONNX Runtime.
 	///
 	/// This is the same as what's used in ONNX Runtime's Python API to register this execution provider, i.e.
@@ -116,28 +111,7 @@ pub trait ExecutionProvider: Send + Sync {
 	/// enabled), you'll instead want to manually register this EP via [`ExecutionProvider::register`] and detect
 	/// and handle any errors returned by that function.
 	fn is_available(&self) -> Result<bool> {
-		let mut providers: *mut *mut c_char = ptr::null_mut();
-		let mut num_providers = 0;
-		ortsys![unsafe GetAvailableProviders(&mut providers, &mut num_providers)?];
-		if providers.is_null() {
-			return Ok(false);
-		}
-
-		let _guard = run_on_drop(|| ortsys![unsafe ReleaseAvailableProviders(providers, num_providers).expect("infallible")]);
-
-		for i in 0..num_providers {
-			let avail = match char_p_to_string(unsafe { *providers.offset(i as isize) }) {
-				Ok(avail) => avail,
-				Err(e) => {
-					return Err(e);
-				}
-			};
-			if self.name() == avail {
-				return Ok(true);
-			}
-		}
-
-		Ok(false)
+		is_ep_available(self.name())
 	}
 
 	/// Attempts to register this execution provider on the given session.
@@ -195,6 +169,11 @@ impl ExecutionProviderDispatch {
 	pub fn error_on_failure(mut self) -> Self {
 		self.error_on_failure = true;
 		self
+	}
+
+	/// Attempt to downcast this execution provider to a concrete type `E`.
+	pub fn downcast_ref<E: ExecutionProvider>(&self) -> Option<&E> {
+		<dyn Any>::downcast_ref(&*self.inner)
 	}
 }
 
@@ -382,6 +361,31 @@ pub(crate) fn apply_execution_providers(session_builder: &mut SessionBuilder, ep
 		crate::warn!("No execution providers from {source} registered successfully; may fall back to CPU.");
 	}
 	Ok(())
+}
+
+fn is_ep_available(name: &str) -> Result<bool> {
+	let mut providers: *mut *mut c_char = ptr::null_mut();
+	let mut num_providers = 0;
+	ortsys![unsafe GetAvailableProviders(&mut providers, &mut num_providers)?];
+	if providers.is_null() {
+		return Ok(false);
+	}
+
+	let _guard = run_on_drop(|| ortsys![unsafe ReleaseAvailableProviders(providers, num_providers).expect("infallible")]);
+
+	for i in 0..num_providers {
+		let avail = match char_p_to_string(unsafe { *providers.offset(i as isize) }) {
+			Ok(avail) => avail,
+			Err(e) => {
+				return Err(e);
+			}
+		};
+		if name == avail {
+			return Ok(true);
+		}
+	}
+
+	Ok(false)
 }
 
 #[deprecated = "import `ort::ep::ACL` instead"]

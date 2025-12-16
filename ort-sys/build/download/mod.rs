@@ -12,7 +12,7 @@ use ureq::{
 	tls::{RootCerts, TlsConfig, TlsProvider}
 };
 
-use crate::{Error, log, vars};
+use crate::{error::Error, log, vars};
 
 mod extract;
 mod resolve;

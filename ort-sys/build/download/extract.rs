@@ -10,7 +10,7 @@ use std::{
 	str
 };
 
-use crate::{Error, ResultExt};
+use crate::error::{Error, ResultExt};
 
 fn parse_octal(bytes: &[u8]) -> io::Result<u64> {
 	let s = bytes.iter().take_while(|v| **v != 0).map(|v| *v as char).collect::<String>();

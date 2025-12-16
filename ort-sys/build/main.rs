@@ -1,12 +1,10 @@
-use std::{
-	env,
-	fmt::{self, Display},
-	path::PathBuf
-};
+use std::{env, path::PathBuf};
 
 #[cfg(feature = "download-binaries")]
 mod download;
 mod dynamic_link;
+#[cfg(feature = "download-binaries")]
+mod error;
 mod log;
 #[cfg(feature = "pkg-config")]
 mod pkg_config;
@@ -160,38 +158,5 @@ cargo::error= | The downloaded binaries are available to inspect at: {}",
 
 		println!("cargo:rustc-link-search=native={}", bin_extract_dir.display());
 		println!("cargo:rustc-link-lib=static=onnxruntime");
-	}
-}
-
-#[derive(Debug)]
-struct Error {
-	message: String
-}
-
-impl Error {
-	pub fn new(message: impl Into<String>) -> Self {
-		Self { message: message.into() }
-	}
-}
-
-impl Display for Error {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		f.write_str(&self.message)
-	}
-}
-
-impl<E: std::error::Error> From<E> for Error {
-	fn from(value: E) -> Self {
-		Self { message: value.to_string() }
-	}
-}
-
-trait ResultExt<T, E> {
-	fn with_context<S: fmt::Display, F: FnOnce() -> S>(self, ctx: F) -> Result<T, Error>;
-}
-
-impl<T, E: fmt::Display> ResultExt<T, E> for Result<T, E> {
-	fn with_context<S: fmt::Display, F: FnOnce() -> S>(self, ctx: F) -> Result<T, Error> {
-		self.map_err(|e| Error::new(format!("{}: {}", ctx(), e)))
 	}
 }

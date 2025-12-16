@@ -1,4 +1,4 @@
-use alloc::{format, string::String, vec::Vec};
+use alloc::{borrow::ToOwned, format, string::String, vec::Vec};
 use core::{
 	ffi::{CStr, c_char},
 	mem::ManuallyDrop,

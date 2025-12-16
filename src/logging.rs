@@ -1,6 +1,4 @@
 use alloc::sync::Arc;
-#[cfg(feature = "tracing")]
-use core::ptr;
 use core::{
 	ffi::{self, CStr},
 	marker::PhantomData,
@@ -115,11 +113,12 @@ pub(crate) extern "system" fn tracing_logger(
 	code_location: *const ffi::c_char,
 	message: *const ffi::c_char
 ) {
-	assert_ne!(code_location, ptr::null());
+	assert!(!code_location.is_null());
+	assert!(!message.is_null());
+	assert!(!id.is_null());
+
 	let code_location = unsafe { CStr::from_ptr(code_location) }.to_str().unwrap_or("<decode error>");
-	assert_ne!(message, ptr::null());
 	let message = unsafe { CStr::from_ptr(message) }.to_str().unwrap_or("<decode error>");
-	assert_ne!(id, ptr::null());
 	let id = unsafe { CStr::from_ptr(id) }.to_str().unwrap_or("<decode error>");
 
 	let span = tracing::span!(tracing::Level::TRACE, "ort", id = id, location = code_location);

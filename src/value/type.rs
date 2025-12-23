@@ -329,7 +329,7 @@ pub(crate) unsafe fn extract_data_type_from_tensor_info(info_ptr: NonNull<ort_sy
 	let mut node_dims = Shape::empty(num_dims);
 	ortsys![unsafe GetDimensions(info_ptr.as_ptr(), node_dims.as_mut_ptr(), num_dims).expect("infallible")];
 
-	let mut symbolic_dims: SmallVec<_, 4> = smallvec![ptr::null(); num_dims];
+	let mut symbolic_dims: SmallVec<[_; 4]> = smallvec![ptr::null(); num_dims];
 	ortsys![unsafe GetSymbolicDimensions(info_ptr.as_ptr(), symbolic_dims.as_mut_ptr(), num_dims).expect("infallible")];
 
 	let dimension_symbols = symbolic_dims

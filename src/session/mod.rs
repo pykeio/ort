@@ -68,10 +68,10 @@ pub use self::{
 pub struct SharedSessionInner {
 	session_ptr: NonNull<ort_sys::OrtSession>,
 	pub(crate) allocator: Allocator,
-	_initializers: SmallVec<Arc<DynValue>, 4>,
+	_initializers: SmallVec<[Arc<DynValue>; 4]>,
 	/// Additional things we may need to hold onto for the duration of this session, like `OperatorDomain`s and
 	/// DLL handles for operator libraries.
-	_extras: SmallVec<Box<dyn Any>, 4>,
+	_extras: SmallVec<[Box<dyn Any>; 4]>,
 	_environment: Arc<Environment>
 }
 
@@ -265,8 +265,8 @@ impl Session {
 	#[cfg(not(target_arch = "wasm32"))]
 	fn run_inner<'i, 'r, 's: 'r, 'v: 'i>(
 		&'s self,
-		input_names: SmallVec<&str, { STACK_SESSION_INPUTS }>,
-		input_values: SmallVec<&'i SessionInputValue<'v>, { STACK_SESSION_INPUTS }>,
+		input_names: SmallVec<[&str; STACK_SESSION_INPUTS]>,
+		input_values: SmallVec<[&'i SessionInputValue<'v>; STACK_SESSION_INPUTS]>,
 		run_options: Option<&'r UntypedRunOptions>
 	) -> Result<SessionOutputs<'r>> {
 		if input_values.len() > input_names.len() {
@@ -284,14 +284,14 @@ impl Session {
 			Some(r) => r.outputs.resolve_outputs(&self.outputs),
 			None => (self.outputs.iter().map(|o| o.name()).collect(), iter::repeat_with(|| None).take(self.outputs.len()).collect())
 		};
-		let output_value_ptrs: SmallVec<*mut ort_sys::OrtValue, { STACK_SESSION_OUTPUTS }> = output_tensors
+		let output_value_ptrs: SmallVec<[*mut ort_sys::OrtValue; STACK_SESSION_OUTPUTS]> = output_tensors
 			.iter_mut()
 			.map(|c| match c {
 				Some(v) => v.ptr_mut(),
 				None => ptr::null_mut()
 			})
 			.collect();
-		let input_value_ptrs: SmallVec<*const ort_sys::OrtValue, { STACK_SESSION_INPUTS }> = input_values.iter().map(|c| c.ptr()).collect();
+		let input_value_ptrs: SmallVec<[*const ort_sys::OrtValue; STACK_SESSION_INPUTS]> = input_values.iter().map(|c| c.ptr()).collect();
 
 		let run_options_ptr = if let Some(run_options) = &run_options { run_options.ptr.as_ptr() } else { ptr::null() };
 
@@ -417,14 +417,14 @@ impl Session {
 	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 	fn run_inner_async<'i, 'r, 's: 'r, 'v: 'i + 's>(
 		&'s self,
-		input_names: SmallVec<&str, { STACK_SESSION_INPUTS }>,
-		input_values: SmallVec<&SessionInputValue<'v>, { STACK_SESSION_INPUTS }>,
+		input_names: SmallVec<[&str; STACK_SESSION_INPUTS]>,
+		input_values: SmallVec<[&SessionInputValue<'v>; STACK_SESSION_INPUTS]>,
 		run_options: &'r Arc<UntypedRunOptions>
 	) -> Result<InferenceFut<'r, 'v>> {
 		let input_name_ptrs = input_names
 			.into_iter()
 			.map(|name| CString::new(name.as_bytes()).map(|s| s.into_raw().cast_const()))
-			.collect::<Result<SmallVec<*const c_char, { STACK_SESSION_INPUTS }>, _>>()?;
+			.collect::<Result<SmallVec<[*const c_char; STACK_SESSION_INPUTS]>, _>>()?;
 
 		let mut input_inner_holders = SmallVec::with_capacity(input_values.len());
 		let mut input_ort_values = SmallVec::with_capacity(input_values.len());

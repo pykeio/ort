@@ -228,10 +228,10 @@ impl SessionBuilder {
 	pub(crate) fn pre_commit(&mut self) -> Result<()> {
 		if !self.no_env_eps {
 			let env = Arc::clone(&self.environment); // dumb borrowck hack
-			apply_execution_providers(self, &env.execution_providers, "environment")?;
+			apply_execution_providers(self, env.execution_providers(), "environment")?;
 		}
 
-		if self.environment.has_global_threadpool && !self.no_global_thread_pool {
+		if self.environment.has_global_threadpool() && !self.no_global_thread_pool {
 			ortsys![unsafe DisablePerSessionThreads(self.ptr_mut())?];
 		}
 
@@ -258,7 +258,7 @@ impl SessionBuilder {
 			.map(|i| io::extract_output(ptr, &allocator, i))
 			.collect::<Result<Vec<Outlet>>>()?;
 
-		let mut extras: SmallVec<Box<dyn Any>, 4> = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>).collect();
+		let mut extras: SmallVec<[Box<dyn Any>; 4]> = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>).collect();
 		if let Some(prepacked_weights) = self.prepacked_weights.take() {
 			extras.push(Box::new(prepacked_weights) as Box<dyn Any>);
 		}

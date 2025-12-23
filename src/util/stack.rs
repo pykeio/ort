@@ -55,10 +55,10 @@ where
 	T: AsRef<str>
 {
 	fn run_with_heap_cstr_array<T: AsRef<str>, R>(strings: &[T], f: &dyn Fn(&[*const c_char]) -> Result<R>) -> Result<R> {
-		let strings: SmallVec<*const c_char, STACK_CSTR_ARRAY_MAX_ELEMENTS> = strings
+		let strings: SmallVec<[*const c_char; STACK_CSTR_ARRAY_MAX_ELEMENTS]> = strings
 			.iter()
 			.map(|s| CString::new(s.as_ref()).map(|s| s.into_raw().cast_const()))
-			.collect::<Result<SmallVec<*const c_char, STACK_CSTR_ARRAY_MAX_ELEMENTS>, NulError>>()?;
+			.collect::<Result<SmallVec<[*const c_char; STACK_CSTR_ARRAY_MAX_ELEMENTS]>, NulError>>()?;
 		let res = f(&strings);
 		for string in strings {
 			drop(unsafe { CString::from_raw(string.cast_mut()) });
@@ -70,7 +70,7 @@ where
 		let mut buf = MaybeUninit::<[c_char; STACK_CSTR_ARRAY_MAX_TOTAL]>::uninit();
 		let mut buf_ptr = buf.as_mut_ptr() as *mut c_char;
 
-		let strings: SmallVec<*const c_char, STACK_CSTR_ARRAY_MAX_ELEMENTS> = strings
+		let strings: SmallVec<[*const c_char; STACK_CSTR_ARRAY_MAX_ELEMENTS]> = strings
 			.iter()
 			.map(|s| {
 				let s = s.as_ref();

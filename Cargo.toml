@@ -92,7 +92,7 @@ nvrtx = [ "ort-sys/nvrtx" ]
 
 [dependencies]
 ort-sys = { version = "=2.0.0-rc.10", path = "ort-sys", default-features = false }
-smallvec = { version = "=2.0.0-alpha.12", default-features = false }
+smallvec = { version = "1.15", default-features = false, features = [ "const_generics" ] }
 
 ndarray = { version = "0.17", default-features = false, optional = true }
 libloading = { version = "0.9", optional = true }

@@ -125,7 +125,7 @@ impl OutputSelector {
 	pub(crate) fn resolve_outputs<'a, 's: 'a>(
 		&'a self,
 		outputs: &'s [Outlet]
-	) -> (SmallVec<&'a str, { STACK_SESSION_OUTPUTS }>, SmallVec<Option<DynValue>, { STACK_SESSION_OUTPUTS }>) {
+	) -> (SmallVec<[&'a str; STACK_SESSION_OUTPUTS]>, SmallVec<[Option<DynValue>; STACK_SESSION_OUTPUTS]>) {
 		if self.use_defaults { outputs.iter() } else { [].iter() }
 			.map(|o| o.name())
 			.filter(|n| !self.default_blocklist.iter().any(|e| e == n))

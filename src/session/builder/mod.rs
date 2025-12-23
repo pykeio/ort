@@ -49,9 +49,9 @@ pub use self::{
 pub struct SessionBuilder {
 	session_options_ptr: NonNull<ort_sys::OrtSessionOptions>,
 	memory_info: Option<Arc<MemoryInfo>>,
-	operator_domains: SmallVec<Arc<OperatorDomain>, 4>,
-	initializers: SmallVec<Arc<DynValue>, 4>,
-	external_initializer_buffers: SmallVec<Cow<'static, [u8]>, 4>,
+	operator_domains: SmallVec<[Arc<OperatorDomain>; 4]>,
+	initializers: SmallVec<[Arc<DynValue>; 4]>,
+	external_initializer_buffers: SmallVec<[Cow<'static, [u8]>; 4]>,
 	prepacked_weights: Option<PrepackedWeights>,
 	thread_manager: Option<Arc<dyn Any>>,
 	logger: Option<Arc<LoggerFunction>>,

@@ -35,15 +35,15 @@ use crate::{
 /// [`Session`]: crate::session::Session
 #[derive(Debug)]
 pub struct SessionOutputs<'r> {
-	keys: SmallVec<&'r str, { STACK_SESSION_OUTPUTS }>,
-	values: SmallVec<DynValue, { STACK_SESSION_OUTPUTS }>,
+	keys: SmallVec<[&'r str; STACK_SESSION_OUTPUTS]>,
+	values: SmallVec<[DynValue; STACK_SESSION_OUTPUTS]>,
 	effective_len: usize
 }
 
 unsafe impl Send for SessionOutputs<'_> {}
 
 impl<'r> SessionOutputs<'r> {
-	pub(crate) fn new(output_names: SmallVec<&'r str, { STACK_SESSION_OUTPUTS }>, output_values: SmallVec<DynValue, { STACK_SESSION_OUTPUTS }>) -> Self {
+	pub(crate) fn new(output_names: SmallVec<[&'r str; STACK_SESSION_OUTPUTS]>, output_values: SmallVec<[DynValue; STACK_SESSION_OUTPUTS]>) -> Self {
 		debug_assert_eq!(output_names.len(), output_values.len());
 		Self {
 			effective_len: output_names.len(),
@@ -381,8 +381,8 @@ impl ExactSizeIterator for IterMut<'_, '_> {}
 impl FusedIterator for IterMut<'_, '_> {}
 
 pub struct IntoIter<'r> {
-	keys: smallvec::IntoIter<&'r str, { STACK_SESSION_OUTPUTS }>,
-	values: smallvec::IntoIter<DynValue, { STACK_SESSION_OUTPUTS }>,
+	keys: smallvec::IntoIter<[&'r str; STACK_SESSION_OUTPUTS]>,
+	values: smallvec::IntoIter<[DynValue; STACK_SESSION_OUTPUTS]>,
 	effective_len: usize
 }
 

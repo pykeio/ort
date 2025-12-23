@@ -5,7 +5,7 @@ use smallvec::SmallVec;
 // generally as performant or faster than HashMap<K, V> for <50 items. good enough for #[no_std]
 #[derive(Clone, PartialEq, Eq)]
 pub(crate) struct MiniMap<K, V> {
-	values: SmallVec<(K, V), 6>
+	values: SmallVec<[(K, V); 6]>
 }
 
 impl<K, V> Default for MiniMap<K, V> {
@@ -15,7 +15,7 @@ impl<K, V> Default for MiniMap<K, V> {
 }
 
 impl<K, V> MiniMap<K, V> {
-	pub const fn new() -> Self {
+	pub fn new() -> Self {
 		Self { values: SmallVec::new() }
 	}
 }

@@ -102,13 +102,13 @@ impl Drop for InferenceFut<'_, '_> {
 
 pub(crate) struct AsyncInferenceContext<'r, 's> {
 	pub(crate) inner: Arc<InferenceFutInner<'r>>,
-	pub(crate) input_ort_values: SmallVec<*const ort_sys::OrtValue, { STACK_SESSION_INPUTS }>,
-	pub(crate) _input_inner_holders: SmallVec<Arc<ValueInner>, { STACK_SESSION_INPUTS }>,
-	pub(crate) input_name_ptrs: SmallVec<*const c_char, { STACK_SESSION_INPUTS }>,
-	pub(crate) output_name_ptrs: SmallVec<*const c_char, { STACK_SESSION_OUTPUTS }>,
+	pub(crate) input_ort_values: SmallVec<[*const ort_sys::OrtValue; STACK_SESSION_INPUTS]>,
+	pub(crate) _input_inner_holders: SmallVec<[Arc<ValueInner>; STACK_SESSION_INPUTS]>,
+	pub(crate) input_name_ptrs: SmallVec<[*const c_char; STACK_SESSION_INPUTS]>,
+	pub(crate) output_name_ptrs: SmallVec<[*const c_char; STACK_SESSION_OUTPUTS]>,
 	pub(crate) session_inner: &'s Arc<SharedSessionInner>,
-	pub(crate) output_names: SmallVec<&'r str, { STACK_SESSION_OUTPUTS }>,
-	pub(crate) output_value_ptrs: SmallVec<*mut ort_sys::OrtValue, { STACK_SESSION_OUTPUTS }>
+	pub(crate) output_names: SmallVec<[&'r str; STACK_SESSION_OUTPUTS]>,
+	pub(crate) output_value_ptrs: SmallVec<[*mut ort_sys::OrtValue; STACK_SESSION_OUTPUTS]>
 }
 
 pub(crate) extern "system" fn async_callback(user_data: *mut c_void, _: *mut *mut ort_sys::OrtValue, _: usize, status: ort_sys::OrtStatusPtr) {

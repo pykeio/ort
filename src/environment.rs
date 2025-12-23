@@ -50,9 +50,8 @@ static G_ENV_OPTIONS: OnceLock<EnvironmentBuilder> = OnceLock::new();
 /// For ease of use, and since sessions require an environment to be created, `ort` will automatically create an
 /// environment if one is not configured via [`init`] (or [`init_from`]).
 pub struct Environment {
-	pub(crate) execution_providers: SmallVec<ExecutionProviderDispatch, { STACK_EXECUTION_PROVIDERS }>,
+	execution_providers: SmallVec<[ExecutionProviderDispatch; STACK_EXECUTION_PROVIDERS]>,
 	ptr: NonNull<ort_sys::OrtEnv>,
-	pub(crate) has_global_threadpool: bool,
 	_thread_manager: Option<Arc<dyn Any>>,
 	_logger: Option<LoggerFunction>
 }
@@ -65,6 +64,16 @@ impl Environment {
 		// technically this method should take `&mut self`, but it isn't enough of an issue to warrant putting
 		// environments behind a mutex and the performance hit that comes with that
 		ortsys![unsafe UpdateEnvWithCustomLogLevel(self.ptr().cast_mut(), level.into()).expect("infallible")];
+	}
+
+	/// Returns the execution providers configured by [`EnvironmentBuilder::with_execution_providers`].
+	pub fn execution_providers(&self) -> &[ExecutionProviderDispatch] {
+		&self.execution_providers
+	}
+
+	#[inline]
+	pub(crate) fn has_global_threadpool(&self) -> bool {
+		self._thread_manager.is_some()
 	}
 }
 
@@ -245,7 +254,7 @@ pub(crate) unsafe extern "system" fn thread_join<T: ThreadManager + Any>(ort_cus
 pub struct EnvironmentBuilder {
 	name: String,
 	telemetry: bool,
-	execution_providers: SmallVec<ExecutionProviderDispatch, { STACK_EXECUTION_PROVIDERS }>,
+	execution_providers: SmallVec<[ExecutionProviderDispatch; STACK_EXECUTION_PROVIDERS]>,
 	global_thread_pool_options: Option<GlobalThreadPoolOptions>,
 	logger: Option<LoggerFunction>
 }
@@ -339,10 +348,11 @@ impl EnvironmentBuilder {
 		#[cfg(feature = "tracing")]
 		let logger = logger.or(Some((crate::logging::tracing_logger, ptr::null_mut())));
 
-		let (env_ptr, thread_manager, has_global_threadpool) = if let Some(thread_pool_options) = self.global_thread_pool_options.as_ref() {
-			let env_ptr = with_cstr(self.name.as_bytes(), &|name| {
-				Ok(if let Some((log_fn, log_ptr)) = logger {
-					let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
+		let env_ptr = with_cstr(self.name.as_bytes(), &|name| {
+			let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
+			#[allow(clippy::collapsible_else_if)]
+			if let Some(thread_pool_options) = self.global_thread_pool_options.as_ref() {
+				if let Some((log_fn, log_ptr)) = logger {
 					ortsys![
 						unsafe CreateEnvWithCustomLoggerAndGlobalThreadPools(
 							log_fn,
@@ -354,9 +364,8 @@ impl EnvironmentBuilder {
 						)?;
 						nonNull(env_ptr)
 					];
-					env_ptr
+					Ok(env_ptr)
 				} else {
-					let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
 					ortsys![
 						unsafe CreateEnvWithGlobalThreadPools(
 							crate::logging::default_log_level(),
@@ -366,16 +375,10 @@ impl EnvironmentBuilder {
 						)?;
 						nonNull(env_ptr)
 					];
-					env_ptr
-				})
-			})?;
-
-			let thread_manager = thread_pool_options.thread_manager.clone();
-			(env_ptr, thread_manager, true)
-		} else {
-			let env_ptr = with_cstr(self.name.as_bytes(), &|name| {
-				Ok(if let Some((log_fn, log_ptr)) = logger {
-					let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
+					Ok(env_ptr)
+				}
+			} else {
+				if let Some((log_fn, log_ptr)) = logger {
 					ortsys![
 						unsafe CreateEnvWithCustomLogger(
 							log_fn,
@@ -386,9 +389,8 @@ impl EnvironmentBuilder {
 						)?;
 						nonNull(env_ptr)
 					];
-					env_ptr
+					Ok(env_ptr)
 				} else {
-					let mut env_ptr: *mut ort_sys::OrtEnv = ptr::null_mut();
 					ortsys![
 						unsafe CreateEnv(
 							crate::logging::default_log_level(),
@@ -397,31 +399,29 @@ impl EnvironmentBuilder {
 						)?;
 						nonNull(env_ptr)
 					];
-					env_ptr
-				})
-			})?;
+					Ok(env_ptr)
+				}
+			}
+		})?;
 
-			(env_ptr, None, false)
-		};
+		let _guard = run_on_drop(|| ortsys![unsafe ReleaseEnv(env_ptr.as_ptr())]);
 
-		#[allow(unused_unsafe)]
-		if let Err(e) = unsafe {
-			status_to_result(if self.telemetry {
-				ortsys![unsafe EnableTelemetryEvents(env_ptr.as_ptr())]
-			} else {
-				ortsys![unsafe DisableTelemetryEvents(env_ptr.as_ptr())]
-			})
-		} {
-			ortsys![unsafe ReleaseEnv(env_ptr.as_ptr())];
-			return Err(e);
+		if self.telemetry {
+			ortsys![unsafe EnableTelemetryEvents(env_ptr.as_ptr())?];
+		} else {
+			ortsys![unsafe DisableTelemetryEvents(env_ptr.as_ptr())?];
 		}
+
+		forget(_guard);
 
 		crate::logging::create!(Environment, env_ptr);
 		Ok(Environment {
 			execution_providers: self.execution_providers.clone(),
 			ptr: env_ptr,
-			has_global_threadpool,
-			_thread_manager: thread_manager,
+			_thread_manager: self
+				.global_thread_pool_options
+				.as_ref()
+				.and_then(|options| options.thread_manager.clone()),
 			_logger: self.logger.clone()
 		})
 	}

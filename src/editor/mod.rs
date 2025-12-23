@@ -119,14 +119,14 @@ impl Graph {
 	}
 
 	pub fn set_inputs(&mut self, inputs: impl IntoIterator<Item = Outlet>) -> Result<()> {
-		let inputs: SmallVec<NonNull<ort_sys::OrtValueInfo>, 4> = inputs.into_iter().map(|input| input.into_editor_value_info()).collect::<Result<_>>()?;
+		let inputs: SmallVec<[NonNull<ort_sys::OrtValueInfo>; 4]> = inputs.into_iter().map(|input| input.into_editor_value_info()).collect::<Result<_>>()?;
 		// this takes ownership of the OrtValueInfos so no need to free those
 		ortsys![@editor: unsafe SetGraphInputs(self.0, inputs.as_ptr() as *mut _, inputs.len())?];
 		Ok(())
 	}
 
 	pub fn set_outputs(&mut self, outputs: impl IntoIterator<Item = Outlet>) -> Result<()> {
-		let outputs: SmallVec<NonNull<ort_sys::OrtValueInfo>, 4> = outputs.into_iter().map(|input| input.into_editor_value_info()).collect::<Result<_>>()?;
+		let outputs: SmallVec<[NonNull<ort_sys::OrtValueInfo>; 4]> = outputs.into_iter().map(|input| input.into_editor_value_info()).collect::<Result<_>>()?;
 		// this takes ownership of the OrtValueInfos so no need to free those
 		ortsys![@editor: unsafe SetGraphOutputs(self.0, outputs.as_ptr() as *mut _, outputs.len())?];
 		Ok(())
@@ -207,8 +207,8 @@ pub struct Model(NonNull<ort_sys::OrtModel>);
 impl Model {
 	pub fn new(opsets: impl AsRef<[Opset]>) -> Result<Self> {
 		let opsets = opsets.as_ref();
-		let domain_names: SmallVec<*const c_char, 4> = opsets.iter().map(|p| p.domain_name.as_ptr()).collect();
-		let opset_versions: SmallVec<i32, 4> = opsets.iter().map(|p| p.version as i32).collect();
+		let domain_names: SmallVec<[*const c_char; 4]> = opsets.iter().map(|p| p.domain_name.as_ptr()).collect();
+		let opset_versions: SmallVec<[i32; 4]> = opsets.iter().map(|p| p.version as i32).collect();
 
 		let mut ptr = ptr::null_mut();
 		ortsys![@editor: unsafe CreateModel(domain_names.as_ptr(), opset_versions.as_ptr(), opsets.len(), &mut ptr)?; nonNull(ptr)];

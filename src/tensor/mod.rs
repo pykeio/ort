@@ -18,7 +18,7 @@ pub use self::types::{IntoTensorElementType, PrimitiveTensorElementType, TensorE
 
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct Shape {
-	inner: SmallVec<i64, 4>
+	inner: SmallVec<[i64; 4]>
 }
 
 impl Shape {
@@ -94,7 +94,7 @@ impl<const N: usize> From<[usize; N]> for Shape {
 
 impl<const N: usize> From<[i64; N]> for Shape {
 	fn from(value: [i64; N]) -> Self {
-		Self { inner: SmallVec::from(value) }
+		Self { inner: SmallVec::from_slice(&value) }
 	}
 }
 
@@ -126,7 +126,7 @@ impl DerefMut for Shape {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SymbolicDimensions(SmallVec<String, 4>);
+pub struct SymbolicDimensions(SmallVec<[String; 4]>);
 
 impl SymbolicDimensions {
 	pub fn new(dims: impl IntoIterator<Item = String>) -> Self {

@@ -18,6 +18,7 @@ use core::{
 	any::Any,
 	ffi::c_void,
 	fmt,
+	mem::forget,
 	ptr::{self, NonNull}
 };
 
@@ -26,10 +27,10 @@ use smallvec::SmallVec;
 use crate::{
 	AsPointer,
 	ep::ExecutionProviderDispatch,
-	error::{Result, status_to_result},
+	error::Result,
 	logging::{LogLevel, LoggerFunction},
 	ortsys,
-	util::{Mutex, OnceLock, STACK_EXECUTION_PROVIDERS, with_cstr}
+	util::{Mutex, OnceLock, STACK_EXECUTION_PROVIDERS, run_on_drop, with_cstr}
 };
 
 /// Hold onto a weak reference here so that the environment is dropped when all sessions under it are. Statics don't run
@@ -186,24 +187,54 @@ impl Drop for GlobalThreadPoolOptions {
 	}
 }
 
-pub struct ThreadWorker {
-	data: *mut c_void,
-	worker: ort_sys::OrtThreadWorkerFn
-}
-
-unsafe impl Send for ThreadWorker {}
-
-impl ThreadWorker {
-	pub fn work(self) {
-		unsafe { (self.worker)(self.data) }
-	}
-}
-
+/// Used for customizing the thread spawning process of a [global thread pool](GlobalThreadPoolOptions) or [session
+/// thread pool][session]. Could be used to add additional initialization/cleanup code to inference threads for
+/// better debugging/error handling.
+///
+/// Threads spawned by `ThreadManager` should be *real* threads, spawned directly via the operating system; they
+/// shouldn't be spawned in another thread pool like [`rayon`](https://crates.io/crates/rayon) because sessions have
+/// their own (interfering) thread pool logic.
+///
+/// A very simple thread manager would be:
+/// ```
+/// use std::thread::{self, JoinHandle};
+///
+/// use ort::environment::ThreadManager;
+///
+/// struct StdThreadManager;
+///
+/// impl ThreadManager for StdThreadManager {
+/// 	type Thread = JoinHandle<()>;
+///
+/// 	fn create(&self, work: impl FnOnce() + Send + 'static) -> ort::Result<Self::Thread> {
+/// 		Ok(thread::spawn(move || {
+/// 			// ... maybe optional initialization code ...
+///
+/// 			// threads must call work() to actually do the work the runtime needs
+/// 			work();
+///
+/// 			// ... maybe optional destructor code ...
+/// 		}))
+/// 	}
+///
+/// 	fn join(thread: Self::Thread) -> ort::Result<()> {
+/// 		let _ = thread.join();
+/// 		Ok(())
+/// 	}
+/// }
+/// ```
+///
+/// [session]: crate::session::builder::SessionBuilder::with_thread_manager
 pub trait ThreadManager {
+	/// A handle to a spawned thread; used to [`join`](ThreadManager::join) it later.
 	type Thread;
 
-	fn create(&self, worker: ThreadWorker) -> crate::Result<Self::Thread>;
+	/// Spawns a thread.
+	///
+	/// The newly spawned thread must call `work()`.
+	fn create(&self, work: impl FnOnce() + Send + 'static) -> crate::Result<Self::Thread>;
 
+	/// Wait for the thread to finish, like [`std::thread::JoinHandle::join`].
 	fn join(thread: Self::Thread) -> crate::Result<()>;
 }
 
@@ -212,14 +243,17 @@ pub(crate) unsafe extern "system" fn thread_create<T: ThreadManager + Any>(
 	ort_thread_worker_fn: ort_sys::OrtThreadWorkerFn,
 	ort_worker_fn_param: *mut c_void
 ) -> ort_sys::OrtCustomThreadHandle {
-	let thread_worker = ThreadWorker {
-		data: ort_worker_fn_param,
-		worker: ort_thread_worker_fn
-	};
+	struct SendablePtr(*mut c_void);
+	unsafe impl Send for SendablePtr {}
+
+	let ort_worker_fn_param = SendablePtr(ort_worker_fn_param);
 
 	let runner = || {
 		let manager = unsafe { &mut *ort_custom_thread_creation_options.cast::<T>() };
-		<T as ThreadManager>::create(manager, thread_worker)
+		<T as ThreadManager>::create(manager, move || {
+			let p = ort_worker_fn_param;
+			unsafe { (ort_thread_worker_fn)(p.0) }
+		})
 	};
 	#[cfg(not(feature = "std"))]
 	let res = Result::<_, crate::Error>::Ok(runner()); // dumb hack

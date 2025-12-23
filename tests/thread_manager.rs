@@ -7,7 +7,7 @@ use std::{
 };
 
 use ort::{
-	environment::{GlobalThreadPoolOptions, ThreadManager, ThreadWorker},
+	environment::{GlobalThreadPoolOptions, ThreadManager},
 	session::Session
 };
 
@@ -21,8 +21,8 @@ struct StdThread {
 }
 
 impl StdThread {
-	pub fn spawn(worker: ThreadWorker, stats: &Arc<ThreadStats>) -> Self {
-		let join_handle = thread::spawn(move || worker.work());
+	pub fn spawn(work: impl FnOnce() + Send + 'static, stats: &Arc<ThreadStats>) -> Self {
+		let join_handle = thread::spawn(work);
 		stats.active_threads.fetch_add(1, Ordering::AcqRel);
 		Self {
 			stats: Arc::clone(stats),
@@ -43,8 +43,8 @@ struct StdThreadManager {
 impl ThreadManager for StdThreadManager {
 	type Thread = StdThread;
 
-	fn create(&self, worker: ThreadWorker) -> ort::Result<Self::Thread> {
-		Ok(StdThread::spawn(worker, &self.stats))
+	fn create(&self, work: impl FnOnce() + Send + 'static) -> ort::Result<Self::Thread> {
+		Ok(StdThread::spawn(work, &self.stats))
 	}
 
 	fn join(thread: Self::Thread) -> ort::Result<()> {

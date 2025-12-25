@@ -89,6 +89,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # Ok(())
 	/// # }
 	/// ```
+	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn to(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
 		self.copy_to_inner(device, device_id, |identity_session| {
 			let target_memory_info = MemoryInfo::new(device, device_id, AllocatorType::Device, MemoryType::Default)?;
@@ -122,6 +123,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # Ok(())
 	/// # }
 	/// ```
+	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn to_async(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
 		self.copy_to_inner(device, device_id, |identity_session| {
 			let target_memory_info = MemoryInfo::new(device, device_id, AllocatorType::Device, MemoryType::Default)?;
@@ -161,6 +163,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # Ok(())
 	/// # }
 	/// ```
+	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn copy_into(&self, target: &mut Value<Type>) -> Result<()> {
 		if self.dtype() != target.dtype() {
 			return Err(Error::new("target data type does not match source data type"));
@@ -199,6 +202,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # Ok(())
 	/// # }
 	/// ```
+	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn copy_into_async(&self, target: &mut Value<Type>) -> Result<()> {
 		if self.dtype() != target.dtype() {
 			return Err(Error::new("target data type does not match source data type"));
@@ -232,6 +236,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	}
 }
 
+#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Clone for Value<Type> {
 	/// Creates a copy of this tensor and its data on the same device it resides on.
 	///
@@ -252,6 +257,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Clone for Value<Type> {
 	/// # 	Ok(())
 	/// # }
 	/// ```
+	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	fn clone(&self) -> Self {
 		let memory_info = self.memory_info();
 		self.to(memory_info.allocation_device(), memory_info.device_id())

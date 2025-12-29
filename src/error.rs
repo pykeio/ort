@@ -10,7 +10,7 @@ use crate::{
 	util::{char_p_to_string, with_cstr}
 };
 
-/// Type alias for the Result type returned by ORT functions.
+/// Type alias for the `Result` type returned by `ort` functions.
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 pub(crate) trait IntoStatus {
@@ -185,25 +185,31 @@ impl From<ErrorCode> for ort_sys::OrtErrorCode {
 /// # Safety
 /// The value contained in `status` must be a valid [`ort_sys::OrtStatus`] pointer, or a null pointer (in which case the
 /// result will be `Ok`).
+#[inline]
 pub unsafe fn status_to_result(status: ort_sys::OrtStatusPtr) -> Result<(), Error> {
 	let status = status.0;
 	if status.is_null() {
 		Ok(())
 	} else {
-		let code = ErrorCode::from(ortsys![unsafe GetErrorCode(status)]);
-		let raw: *const c_char = ortsys![unsafe GetErrorMessage(status)];
-		match char_p_to_string(raw) {
-			Ok(msg) => {
-				ortsys![unsafe ReleaseStatus(status)];
-				Err(Error { code, msg })
-			}
-			Err(err) => {
-				ortsys![unsafe ReleaseStatus(status)];
-				Err(Error {
-					code,
-					msg: format!("(failed to convert UTF-8: {err})")
-				})
+		#[cold]
+		fn status_to_error(status: *mut ort_sys::OrtStatus) -> Error {
+			let code = ErrorCode::from(ortsys![unsafe GetErrorCode(status)]);
+			let raw: *const c_char = ortsys![unsafe GetErrorMessage(status)];
+			match char_p_to_string(raw) {
+				Ok(msg) => {
+					ortsys![unsafe ReleaseStatus(status)];
+					Error { code, msg }
+				}
+				Err(err) => {
+					ortsys![unsafe ReleaseStatus(status)];
+					Error {
+						code,
+						msg: format!("(failed to convert UTF-8: {err})")
+					}
+				}
 			}
 		}
+
+		Err(status_to_error(status))
 	}
 }

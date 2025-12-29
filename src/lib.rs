@@ -150,6 +150,7 @@ static G_ORT_API: OnceLock<ApiPointer> = OnceLock::new();
 /// - The `alternative-backend` feature is enabled and [`set_api`] was not yet called.
 /// - Getting the `OrtApi` struct fails, due to `ort` loading an unsupported version of ONNX Runtime.
 /// - Loading the ONNX Runtime dynamic library fails if the `load-dynamic` feature is enabled.
+#[inline]
 pub fn api() -> &'static ort_sys::OrtApi {
 	#[cfg(feature = "alternative-backend")]
 	let ptr = G_ORT_API
@@ -159,40 +160,42 @@ pub fn api() -> &'static ort_sys::OrtApi {
 		)
 		.0;
 	#[cfg(not(feature = "alternative-backend"))]
-	let ptr = G_ORT_API
-		.get_or_init(|| {
-			#[cfg(feature = "load-dynamic")]
-			let base = unsafe {
-				let dylib = if let Some(handle) = G_ORT_LIB.get() {
-					handle
-				} else {
-					let path: std::path::PathBuf = match std::env::var("ORT_DYLIB_PATH") {
-						Ok(s) if !s.is_empty() => s,
-						#[cfg(target_os = "windows")]
-						_ => "onnxruntime.dll".to_owned(),
-						#[cfg(any(target_os = "linux", target_os = "android"))]
-						_ => "libonnxruntime.so".to_owned(),
-						#[cfg(any(target_os = "macos", target_os = "ios"))]
-						_ => "libonnxruntime.dylib".to_owned()
-					}
-					.into();
-					load_dylib_from_path(&path).expect("Failed to load ONNX Runtime dylib");
-					G_ORT_LIB.get_unchecked()
-				};
-				let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const ort_sys::OrtApiBase> = dylib
-					.get(b"OrtGetApiBase")
-					.expect("`OrtGetApiBase` must be present in ONNX Runtime dylib");
-				base_getter()
-			};
-			#[cfg(not(feature = "load-dynamic"))]
-			let base = unsafe { ort_sys::OrtGetApiBase() };
-
-			assert!(!base.is_null());
-			let api: *const ort_sys::OrtApi = unsafe { ((*base).GetApi)(ort_sys::ORT_API_VERSION) };
-			ApiPointer(NonNull::new(api.cast_mut()).expect("Failed to initialize ORT API"))
-		})
-		.0;
+	let ptr = G_ORT_API.get_or_init(setup_api).0;
 	unsafe { ptr.as_ref() }
+}
+
+#[cfg(not(feature = "alternative-backend"))]
+#[cold]
+fn setup_api() -> ApiPointer {
+	#[cfg(feature = "load-dynamic")]
+	let base = unsafe {
+		let dylib = if let Some(handle) = G_ORT_LIB.get() {
+			handle
+		} else {
+			let path: std::path::PathBuf = match std::env::var("ORT_DYLIB_PATH") {
+				Ok(s) if !s.is_empty() => s,
+				#[cfg(target_os = "windows")]
+				_ => "onnxruntime.dll".to_owned(),
+				#[cfg(any(target_os = "linux", target_os = "android"))]
+				_ => "libonnxruntime.so".to_owned(),
+				#[cfg(any(target_os = "macos", target_os = "ios"))]
+				_ => "libonnxruntime.dylib".to_owned()
+			}
+			.into();
+			load_dylib_from_path(&path).expect("Failed to load ONNX Runtime dylib");
+			G_ORT_LIB.get_unchecked()
+		};
+		let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const ort_sys::OrtApiBase> = dylib
+			.get(b"OrtGetApiBase")
+			.expect("`OrtGetApiBase` must be present in ONNX Runtime dylib");
+		base_getter()
+	};
+	#[cfg(not(feature = "load-dynamic"))]
+	let base = unsafe { ort_sys::OrtGetApiBase() };
+
+	assert!(!base.is_null());
+	let api: *const ort_sys::OrtApi = unsafe { ((*base).GetApi)(ort_sys::ORT_API_VERSION) };
+	ApiPointer(NonNull::new(api.cast_mut()).expect("Failed to initialize ORT API"))
 }
 
 /// Sets the global [`ort_sys::OrtApi`] interface used by `ort` in order to use alternative backends, or a custom

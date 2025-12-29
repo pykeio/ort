@@ -12,5 +12,5 @@ fn test_memory_info_apis() {
 	assert_eq!(memory_info.device_id(), 0);
 
 	let memory_info_clone = memory_info.clone();
-	assert_eq!(memory_info, memory_info_clone);
+	assert_eq!(memory_info, &memory_info_clone);
 }

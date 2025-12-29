@@ -154,7 +154,7 @@ fn main() -> ort::Result<()> {
 		let mut binding = session.create_binding()?;
 		binding.bind_input("input_1", &value1)?;
 		binding.bind_input("input_2", &value2)?;
-		binding.bind_output_to_device("output", &Allocator::default().memory_info())?;
+		binding.bind_output_to_device("output", Allocator::default().memory_info())?;
 		let _ = session.run_binding(&binding)?;
 	}
 

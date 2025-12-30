@@ -81,6 +81,7 @@ pub(crate) fn path_to_os_char(path: impl AsRef<std::path::Path>) -> OsCharArray 
 	path
 }
 
+#[allow(unused)]
 pub(crate) fn str_to_os_char(string: &str) -> OsCharArray {
 	#[cfg(target_family = "windows")]
 	let os_char = string.encode_utf16().chain(core::iter::once(0)).collect();

@@ -7,7 +7,7 @@ edition = "2024"
 [package.metadata.winresource]
 ProductName = "ONNX Runtime (candle)"
 FileDescription = "API-compatible ONNX Runtime implementation using candle"
-LegalCopyright = "Copyright ©️ 2025 pyke.io"
+LegalCopyright = "Copyright ©️ 2026 pyke.io"
 OriginalFilename = "onnxruntime+candle.dll"
 
 [lib]

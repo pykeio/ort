@@ -9,17 +9,17 @@ const FEATURES_ALL = FEATURES_WEBGL | FEATURES_WEBGPU;
  * @typedef {Object} Dist
  * @property {string} baseUrl
  * @property {string} scriptName
- * @property {string} binaryName
- * @property {string} [wrapperName] defaults to `binaryName` s/\.wasm$/.mjs
- * @property {Record<'main' | 'wrapper' | 'binary', string>} integrities
+ * @property {string | null} [binaryName]
+ * @property {string | null} [wrapperName] defaults to `binaryName` s/\.wasm$/.mjs
+ * @property {Record<'main' | 'wrapper' | 'binary', string> | null} integrities
  */
 
-const DIST_BASE = 'https://cdn.pyke.io/0/pyke:ort-rs/web@1.23.0/';
+const DEFAULT_DIST_BASE = 'https://cdn.pyke.io/0/pyke:ort-rs/web@1.23.0/';
 
 /** @type {Record<number, Dist>} */
-const DIST = {
+const DEFAULT_DIST = {
 	[FEATURES_NONE]: {
-		baseUrl: DIST_BASE,
+		baseUrl: DEFAULT_DIST_BASE,
 		scriptName: 'ort.wasm.min.js',
 		binaryName: 'ort-wasm-simd-threaded.wasm',
 		integrities: {
@@ -29,7 +29,7 @@ const DIST = {
 		}
 	},
 	[FEATURES_WEBGL]: {
-		baseUrl: DIST_BASE,
+		baseUrl: DEFAULT_DIST_BASE,
 		scriptName: 'ort.webgl.min.js',
 		binaryName: 'ort-wasm-simd-threaded.wasm',
 		integrities: {
@@ -39,7 +39,7 @@ const DIST = {
 		}
 	},
 	[FEATURES_WEBGPU]: {
-		baseUrl: DIST_BASE,
+		baseUrl: DEFAULT_DIST_BASE,
 		scriptName: 'ort.webgpu.min.js',
 		binaryName: 'ort-wasm-simd-threaded.jsep.wasm',
 		integrities: {
@@ -49,7 +49,7 @@ const DIST = {
 		}
 	},
 	[FEATURES_ALL]: {
-		baseUrl: DIST_BASE,
+		baseUrl: DEFAULT_DIST_BASE,
 		scriptName: 'ort.all.min.js',
 		binaryName: 'ort-wasm-simd-threaded.jsep.wasm',
 		integrities: {
@@ -64,7 +64,7 @@ const DIST = {
  * @param {string} url
  * @param {'fetch' | 'script' | 'module'} as
  * @param {string} [type]
- * @param {string} [integrity]
+ * @param {string | null} [integrity]
  */
 function preload(url, as, type, integrity) {
 	const el = document.createElement('link');
@@ -87,41 +87,47 @@ function preload(url, as, type, integrity) {
 
 /**
  * @param {number} features
+ * @param {Dist} [dist]
  * @returns {Promise<boolean>}
  */
-export function initRuntime(features) {
+export function initRuntime(features, dist) {
 	if ('ort' in window && /** @type {any} */(window).ort[INIT_SYMBOL]) {
 		return Promise.resolve(false);
 	}
 
-	if (!(features in DIST)) {
-		return Promise.reject(new Error('Unsupported feature set'));
+	if (!dist) {
+		if (!(features in DEFAULT_DIST)) {
+			return Promise.reject(new Error('Unsupported feature set'));
+		}
+
+		dist = DEFAULT_DIST[features];
 	}
 
-	const dist = DIST[features];
 	/** @param {string} file */
 	const relative = file => new URL(file, dist.baseUrl).toString();
 
 	return new Promise((resolve, reject) => {
 		// since the order is load main script -> imports wrapper script -> fetches wasm, now would be a good time to
 		// start fetching those
-		preload(
-			relative(dist.binaryName),
-			'fetch',
-			'application/wasm',
-			dist.integrities.binary
-		);
-		preload(
-			relative(dist.wrapperName || dist.binaryName.replace(/\.wasm$/, '.mjs')),
-			'module',
-			undefined,
-			dist.integrities.wrapper
-		);
+		if (dist.binaryName) {
+			preload(
+				relative(dist.binaryName),
+				'fetch',
+				'application/wasm',
+				dist.integrities && dist.integrities.binary
+			);
+			preload(
+				relative(dist.wrapperName || dist.binaryName.replace(/\.wasm$/, '.mjs')),
+				'module',
+				undefined,
+				dist.integrities && dist.integrities.wrapper
+			);
+		}
 
 		const script = document.createElement('script');
 		script.src = new URL(dist.scriptName, dist.baseUrl).toString();
-		if (dist.integrities.main) {
-			script.setAttribute('integrity', `sha384-${dist.integrities.main}`);
+		if (dist.integrities && dist.integrities.main) {
+			script.setAttribute('integrity', `sha384-${dist.integrities && dist.integrities.main}`);
 		}
 		script.setAttribute('crossorigin', 'anonymous');
 		script.addEventListener('load', () => {

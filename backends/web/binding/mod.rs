@@ -31,7 +31,7 @@ pub enum DataType {
 #[wasm_bindgen(module = "/_loader.js")]
 extern "C" {
 	#[wasm_bindgen(catch, js_name = "initRuntime")]
-	pub async fn init_runtime(features: u8) -> Result<Boolean, JsValue>;
+	pub async fn init_runtime(features: u8, dist: JsValue) -> Result<Boolean, JsValue>;
 }
 
 #[wasm_bindgen(module = "/_telemetry.js")]

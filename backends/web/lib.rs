@@ -2,8 +2,11 @@
 //!
 //! # Usage
 //! ## CORS
-//! Make sure `cdn.pyke.io` is accessible via CORS if you have that configured. `ort-web` dynamically fetches the
-//! required scripts & WASM binary from this domain at runtime.
+//! `ort-web` dynamically fetches the required scripts & WASM binary at runtime. By default, it will fetch the build
+//! from the `cdn.pyke.io` domain, so make sure it is accessible via CORS if you have that configured.
+//!
+//! You can also use a self-hosted build with [`Dist`]; see the [`api`](fn@api) function for an example. The scripts &
+//! binary can be acquired from the `dist` folder of the [`onnxruntime-web` npm package](https://npmjs.com/package/onnxruntime-web).
 //!
 //! ### Telemetry
 //! `ort-web` collects telemetry data by default and sends it to `signal.pyke.io`. This telemetry data helps us
@@ -86,6 +89,7 @@ extern crate core;
 use alloc::string::String;
 use core::fmt;
 
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use crate::util::value_to_string;
@@ -147,12 +151,13 @@ pub const FEATURE_WEBGPU: u8 = 1 << 1;
 /// See: <https://webmachinelearning.github.io/webnn-status/>
 pub const FEATURE_WEBNN: u8 = FEATURE_WEBGPU;
 
-/// Loads ONNX Runtime with the requested feature set.
+/// Loads an `ort`-compatible ONNX Runtime API from `config`.
 ///
 /// Returns an error if:
 /// - The requested feature set is not supported by `ort-web`.
 /// - The JavaScript/WASM modules fail to load.
 ///
+/// `config` can be a feature set, in which case the default pyke-hosted builds will be used:
 /// ```no_run
 /// use ort::session::Session;
 /// use ort_web::{FEATURE_WEBGL, FEATURE_WEBGPU};
@@ -165,7 +170,110 @@ pub const FEATURE_WEBNN: u8 = FEATURE_WEBGPU;
 /// 	Ok(session)
 /// }
 /// ```
-pub async fn api(features: u8) -> Result<ort_sys::OrtApi> {
-	binding::init_runtime(features).await?;
+///
+/// You can also use [`Dist`] to self-host the build:
+/// ```no_run
+/// use ort::session::Session;
+/// use ort_web::Dist;
+///
+/// async fn init_model() -> anyhow::Result<Session> {
+/// 	let dist = Dist::new("https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/")
+/// 		// load the WebGPU build
+/// 		.with_script_name("ort.webgpu.min.js");
+/// 	ort::set_api(ort_web::api(dist).await?);
+/// }
+/// ```
+pub async fn api<L: Loadable>(config: L) -> Result<ort_sys::OrtApi> {
+	let (features, dist) = config.into_features_and_dist()?;
+	binding::init_runtime(features, dist).await?;
+
 	Ok(self::api::api())
+}
+
+pub trait Loadable {
+	#[doc(hidden)]
+	fn into_features_and_dist(self) -> Result<(u8, JsValue)>;
+}
+
+impl Loadable for u8 {
+	fn into_features_and_dist(self) -> Result<(u8, JsValue)> {
+		Ok((self, JsValue::null()))
+	}
+}
+
+impl Loadable for Dist {
+	fn into_features_and_dist(self) -> Result<(u8, JsValue)> {
+		Ok((0, serde_wasm_bindgen::to_value(&self).map_err(|e| Error::new(e.to_string()))?))
+	}
+}
+
+#[derive(Default, Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Integrities {
+	main: Option<String>,
+	wrapper: Option<String>,
+	binary: Option<String>
+}
+
+impl Integrities {
+	/// Set the SHA-384 SRI hash for the main (entrypoint) script.
+	pub fn set_main(&mut self, hash: impl Into<String>) {
+		self.main = Some(hash.into());
+	}
+
+	/// Set the SHA-384 SRI hash for the Emscripten wrapper script.
+	pub fn set_wrapper(&mut self, hash: impl Into<String>) {
+		self.wrapper = Some(hash.into());
+	}
+
+	/// Set the SHA-384 SRI hash for the WASM binary.
+	pub fn set_binary(&mut self, hash: impl Into<String>) {
+		self.binary = Some(hash.into());
+	}
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Dist {
+	base_url: String,
+	script_name: String,
+	binary_name: Option<String>,
+	wrapper_name: Option<String>,
+	integrities: Integrities
+}
+
+impl Dist {
+	pub fn new(base_url: impl Into<String>) -> Self {
+		Self {
+			base_url: base_url.into(),
+			script_name: "ort.wasm.min.js".to_string(),
+			binary_name: None,
+			wrapper_name: None,
+			integrities: Integrities::default()
+		}
+	}
+
+	/// Configures the name of the entrypoint script file; defaults to `"ort.wasm.min.js"`.
+	pub fn with_script_name(mut self, name: impl Into<String>) -> Self {
+		self.script_name = name.into();
+		self
+	}
+
+	/// Enables preloading the WASM binary loaded by the entrypoint script.
+	pub fn with_binary_name(mut self, name: impl Into<String>) -> Self {
+		self.binary_name = Some(name.into());
+		self
+	}
+
+	/// Configures the name of the Emscripten wrapper script preloaded along with the WASM binary, if preloading is
+	/// enabled. Defaults to the binary name with the `.wasm` extension replaced with `.mjs`.
+	pub fn with_wrapper_name(mut self, name: impl Into<String>) -> Self {
+		self.wrapper_name = Some(name.into());
+		self
+	}
+
+	/// Modify Subresource Integrity (SRI) hashes.
+	pub fn integrities(&mut self) -> &mut Integrities {
+		&mut self.integrities
+	}
 }

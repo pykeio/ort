@@ -1,0 +1,44 @@
+[workspace]
+resolver = "2"
+
+[package]
+name = "ort-web"
+description = "ONNX Runtime on the web 🌐 - An alternative backend for ort"
+version = "0.1.0+1.23"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/pykeio/ort"
+homepage = "https://ort.pyke.io/backends/web"
+keywords = [ "machine-learning", "ai", "ml", "web", "wasm" ]
+categories = [ "algorithms", "mathematics", "science", "web-programming", "wasm" ]
+authors = [
+	"pyke.io <contact@pyke.io>"
+]
+
+[lib]
+name = "ort_web"
+path = "lib.rs"
+
+[dependencies]
+js-sys = "0.3"
+ort = { path = "../../", version = "=2.0.0-rc.10", default-features = false, features = [ "alternative-backend" ] }
+ort-sys = { path = "../../ort-sys", version = "=2.0.0-rc.10", default-features = false, features = [ "disable-linking" ] }
+serde = { version = "1.0", features = [ "derive" ] }
+serde-wasm-bindgen = "0.6"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+	"console",
+	"ImageData",
+	"HtmlImageElement",
+	"ImageBitmap",
+	"WebGlTexture",
+	"GpuBuffer"
+]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [ 'cfg(web_sys_unstable_apis)' ] }

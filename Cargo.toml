@@ -5,6 +5,7 @@ default-members = [ '.' ]
 exclude = [
 	'backends/candle',
 	'backends/tract',
+	'backends/web',
 	'examples/async-gpt2-api',
 	'examples/cudarc',
 	'examples/custom-ops',

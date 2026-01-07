@@ -1,3 +1,43 @@
+//! Provides [`ModelCompiler`], which optimizes and creates EP graphs for an ONNX model ahead-of-time to greatly reduce
+//! startup time.
+//!
+//! Many [execution providers](crate::ep) use a third-party graph-based neural network API (like
+//! CoreML, DirectML, CUDA graphs, TensorRT, etc.). The EPs must convert the ONNX graph to these device-native graphs,
+//! which can take a lot of work - especially when you consider that both ONNX Runtime and the EP backend are doing
+//! their own optimizations on their respective graphs! The end result is that [sessions](crate::session) can often take
+//! a very long time to initialize - often multiple seconds and, in the case of more complex models, upwards of minutes.
+//! This is unacceptable for many applications, hence the need for [`ModelCompiler`].
+//!
+//! [`ModelCompiler`] is created like a normal [`Session`](crate::session::Session), except instead of ever performing
+//! inference on the model, [`ModelCompiler`] only:
+//! - optimizes the ONNX model;
+//! - creates the EP graph(s);
+//! - saves EP states in a new model.
+//!
+//! Loading a compiled model like one would with any other `.onnx` model (using the same EPs & options used to compile
+//! it) will greatly reduce the time required for the EP graph step. The model must be compiled on the end user's
+//! system; you can't distribute pre-compiled models.
+//!
+//! ```no_run
+//! # use std::path::PathBuf;
+//! # use ort::{compiler::ModelCompiler, session::Session, ep};
+//! # fn main() -> ort::Result<()> {
+//! let session_options = Session::builder()?.with_execution_providers([ep::CoreML::default()
+//! 	.with_model_format(ep::coreml::ModelFormat::MLProgram)
+//! 	.build()])?;
+//!
+//! let compiled_path = PathBuf::from("model-coreml.compiled.onnx");
+//! if !compiled_path.exists() {
+//! 	ModelCompiler::new(session_options.clone())?
+//! 		.with_model_from_file("model.onnx")?
+//! 		.compile_to_file(&compiled_path)?;
+//! }
+//!
+//! let session = session_options.commit_from_file(&compiled_path)?;
+//! # Ok(())
+//! # }
+//! ```
+
 use core::{
 	ffi::c_void,
 	marker::PhantomData,
@@ -18,7 +58,7 @@ use crate::{
 };
 
 /// Returns a pointer to the global [`ort_sys::OrtCompileApi`] object, or errors if the Compile API is not
-/// supported.
+/// supported by this backend.
 pub fn compile_api() -> Result<&'static ort_sys::OrtCompileApi> {
 	struct CompileApiPointer(*const ort_sys::OrtCompileApi);
 	unsafe impl Send for CompileApiPointer {}
@@ -88,16 +128,26 @@ impl<'i> ModelCompiler<'i> {
 		Ok(unsafe { mem::transmute::<ModelCompiler<'i>, ModelCompiler<'i2>>(self) })
 	}
 
-	pub fn with_embed_ep_context(self, enable: bool) -> Result<Self> {
+	/// Embed the execution provider context in the model.
+	///
+	/// This context typically includes binary data to be used by the execution provider, like weights. The default
+	/// behavior (when this option is not enabled) is for the execution provider to place context data in a
+	/// temporary path, and store that path in the compiled model. Enabling this option will instead embed that data
+	/// directly in the compiled model, meaning it won't rely on other files on the system.
+	pub fn with_embed_ep_context(self) -> Result<Self> {
 		ortsys![@compile:
 			unsafe ModelCompilationOptions_SetEpContextEmbedMode(
 				self.ptr.as_ptr(),
-				enable
+				true
 			)?
 		];
 		Ok(self)
 	}
 
+	/// Store uncompiled initializers over a given `threshold` in a separate file at `path`.
+	///
+	/// Initializers present in the original model that 1) are not used in the compiled graph, and 2) are larger than
+	/// `threshold` bytes, will be stored in the file.
 	#[cfg(feature = "std")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn with_external_initializers<P: AsRef<Path>>(self, threshold: usize, path: P) -> Result<Self> {

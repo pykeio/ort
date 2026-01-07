@@ -19,11 +19,17 @@ use crate::{
 #[cfg(test)]
 mod tests;
 
+/// The domain used for builtin ONNX operators under the canonical `ai.onnx` domain.
+///
+/// Note that, currently, this is an empty string, because that is what ONNX Runtime uses internally to denote `ai.onnx`
+/// operators. This behavior may change in the future, so when [creating nodes](Node::new) or [adding
+/// opsets](Opset::new), this constant should be used instead of `ai.onnx`.
 pub const ONNX_DOMAIN: &str = "";
+/// The domain used for builtin ONNX ML operators under the canonical `ai.onnx.ml` domain.
 pub const ONNX_ML_DOMAIN: &str = "ai.onnx.ml";
 
 /// Returns a pointer to the global [`ort_sys::OrtModelEditorApi`] object, or errors if the Model Editor API is not
-/// supported.
+/// supported by this backend.
 pub fn editor_api() -> Result<&'static ort_sys::OrtModelEditorApi> {
 	struct ModelEditorApiPointer(*const ort_sys::OrtModelEditorApi);
 	unsafe impl Send for ModelEditorApiPointer {}
@@ -44,11 +50,42 @@ pub fn editor_api() -> Result<&'static ort_sys::OrtModelEditorApi> {
 	Ok(unsafe { ptr.as_ref() })
 }
 
+/// A single node in a [`Graph`] that performs a specific operation on its inputs.
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Node(NonNull<ort_sys::OrtNode>);
 
 impl Node {
+	/// Creates a new node in a [`Graph`].
+	///
+	/// - `operator_name` is the name of the operator, i.e. `Add`, `Conv`, `LayerNorm`.
+	/// - `domain_name` is the domain of the operator; usually [`ONNX_DOMAIN`] for builtin ONNX operators, but can also
+	///   refer to a [custom operator domain](crate::operator::OperatorDomain).
+	/// - `node_name` is a graph-unique name used to identify this node.
+	/// - `inputs` is an array of inputs to the operator. This could be a [graph input](Outlet), an
+	///   [initializer](Graph::add_initializer), or the name of another node's output.
+	/// - `outputs` is an array of names to assign to the operator's outputs.
+	/// - `attributes` is an array of attributes used to configure the operator, e.g. `strides` for `Conv` nodes.
+	///
+	/// ```
+	/// # use ort::{editor::{Node, ONNX_DOMAIN}, operator::attribute::Attribute};
+	/// # fn main() -> ort::Result<()> {
+	/// let node = Node::new(
+	/// 	"Conv",
+	/// 	ONNX_DOMAIN,
+	/// 	"layers.0.conv_in",
+	/// 	["image", "layers.0.conv_in.weight"],
+	/// 	["layers.0.conv_in.output"],
+	/// 	[
+	/// 		Attribute::new("strides", vec![3_i64])?,
+	/// 		Attribute::new("dilations", vec![1_i64])?,
+	/// 		Attribute::new("group", 1i64)?,
+	/// 		Attribute::new("kernel_shape", vec![1_i64])?
+	/// 	]
+	/// )?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	pub fn new<I: AsRef<str>, O: AsRef<str>>(
 		operator_name: impl AsRef<str>,
 		domain_name: impl AsRef<str>,
@@ -108,6 +145,10 @@ impl Drop for Node {
 	}
 }
 
+/// A single graph in a [`Model`], comprised of [`Node`]s (and optional initializers, aka weights), and describing its
+/// inputs/outputs.
+#[derive(Debug)]
+#[repr(transparent)]
 pub struct Graph(*mut ort_sys::OrtGraph);
 
 impl Graph {

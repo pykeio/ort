@@ -12,10 +12,10 @@ title: Cargo features
 - ✅ **`tracing`**; Log messages through [`tracing`](https://crates.io/crates/tracing).
 - ⚒️ **`half`**: Enables support for creating & extracting float16/bfloat16 tensors via the [`half`](https://crates.io/crates/half) crate. ONNX models that are converted to 16-bit precision will typically convert to/from 32-bit floats at the input/output, so you will likely never actually need to interact with a 16-bit tensor on the Rust side.
 - ⚒️ **`num-complex`**: Enables support for creating & extracting complex32/complex64 tensors via the [`num-complex`](https://crates.io/crates/num-complex) crate.
-- ⚒️ **`preload-dylibs`**: Enables [dynamic library preloading](https://docs.rs/ort/2.0.0-rc.10/ort/util/fn.preload_dylib.html); useful if you want to ship CUDA alongside your application instead of requiring the user to install it themselves.
+- ⚒️ **`preload-dylibs`**: Enables [dynamic library preloading](https://docs.rs/ort/2.0.0-rc.11/ort/util/fn.preload_dylib.html); useful if you want to ship CUDA alongside your application instead of requiring the user to install it themselves.
 - ⚒️ **`load-dynamic`**: Enables [runtime dynamic linking](/setup/linking#runtime-loading-with-load-dynamic), which alleviates many of the troubles with compile-time dynamic linking and offers greater flexibility.
 - ⚒️ **`alternative-backend`**: Disables linking to ONNX Runtime, allowing you to instead configure an [alternative backend](/backends).
-- ⚒️ **`fetch-models`**: Enables the [`SessionBuilder::commit_from_url`](https://docs.rs/ort/2.0.0-rc.10/ort/session/builder/struct.SessionBuilder.html#method.commit_from_url) method, allowing you to quickly download & run a model from a URL. This should only be used for quick testing.
+- ⚒️ **`fetch-models`**: Enables the [`SessionBuilder::commit_from_url`](https://docs.rs/ort/2.0.0-rc.11/ort/session/builder/struct.SessionBuilder.html#method.commit_from_url) method, allowing you to quickly download & run a model from a URL. This should only be used for quick testing.
 
 ## Execution providers
 Each [execution provider](/perf/execution-providers) is also gated behind a Cargo feature. Each EP's Cargo feature must be enabled for it to be usable; see the linked page for details & the full list of EP features.

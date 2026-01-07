@@ -6,7 +6,7 @@ title: Alternative backends
 
 import { Callout, Steps } from 'nextra/components';
 
-Since [ONNX Runtime](https://onnxruntime.ai/) is written in C++, linking troubles often arise when attempting to use it in a Rust project - especially with WASM. `v2.0.0-rc.10` of `ort` introduced support for **alternative backends** -- that is, ONNX executors that do not use ONNX Runtime.
+Since [ONNX Runtime](https://onnxruntime.ai/) is written in C++, linking troubles often arise when attempting to use it in a Rust project - especially with WASM. `v2.0.0-rc.11` of `ort` introduced support for **alternative backends** -- that is, ONNX executors that do not use ONNX Runtime.
 
 As the Rust ML scene has evolved, many exciting new inference engines supporting ONNX models have popped up, like 🤗 Hugging Face's [`candle`](https://github.com/huggingface/candle), [Burn](https://github.com/tracel-ai/burn), and [`tract`](https://github.com/sonos/tract). These libraries, being written in pure Rust (minus some GPU kernels) play much nicer when it comes to linking, and often support any platform Rust's standard library does. They're also, of course, memory safe and 🦀blazingly🔥fast🚀!
 
@@ -36,7 +36,7 @@ This instructs `ort` to not try to download/link to ONNX Runtime.
 
 ```toml filename="Cargo.toml"
 [dependencies.ort]
-version = "=2.0.0-rc.10"
+version = "=2.0.0-rc.11"
 default-features = false # Disables the `download-binaries` feature since we don't need it
 features = [
     "alternative-backend"

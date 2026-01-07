@@ -1,13 +1,42 @@
-//! An [`Environment`] is a process-global structure, under which [`Session`](crate::session::Session)s are created.
+//! The [`Environment`] is a process-global configuration under which [`Session`](crate::session::Session)s are created.
 //!
-//! Environments can be configured via [`ort::init`](init):
+//! With it, you can configure [default execution providers], enable/disable [telemetry], share a [global thread pool]
+//! across all sessions, or add a [custom logger].
+//!
+//! Environments can be set up via [`ort::init`](init):
 //! ```
 //! # use ort::ep;
 //! # fn main() -> ort::Result<()> {
 //! ort::init().with_execution_providers([ep::CUDA::default().build()]).commit();
+//!
+//! // ... do other ort things now that our environment is set up...
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! With the `load-dynamic` feature, you can also load the runtime from a direct path to a DLL with
+//! [`ort::init_from`](init_from):
+//!
+//! ```ignore
+//! # use ort::ep;
+//! # fn main() -> ort::Result<()> {
+//! let lib_path = std::env::current_exe().unwrap().parent().unwrap().join("lib");
+//! ort::init_from(lib_path.join("onnxruntime.dll"))?
+//! 	.with_execution_providers([ep::CUDA::default().build()])
+//! 	.commit();
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! If you don't configure an environment, one will be created with default settings at the first creation of a session.
+//! The environment can't be re-configured after one is committed, so it's important `ort::init` come before any other
+//! `ort` API for the config to take effect. Authors of libraries using `ort` should **never** have the library
+//! configure the environment itself; allow the application developer to do that themselves if they wish.
+//!
+//! [default execution providers]: EnvironmentBuilder::with_execution_providers
+//! [telemetry]: EnvironmentBuilder::with_telemetry
+//! [global thread pool]: EnvironmentBuilder::with_global_thread_pool
+//! [custom logger]: EnvironmentBuilder::with_logger
 
 use alloc::{
 	boxed::Box,
@@ -41,15 +70,10 @@ static G_ENV: Mutex<Option<Weak<Environment>>> = Mutex::new(None);
 
 static G_ENV_OPTIONS: OnceLock<EnvironmentBuilder> = OnceLock::new();
 
-/// An `Environment` is a process-global structure, under which [`Session`](crate::session::Session)s are created.
+/// Holds shared global configuration for all [`Session`](crate::session::Session)s in the process.
 ///
-/// Environments can be used to [configure global thread pools](EnvironmentBuilder::with_global_thread_pool), in
-/// which all sessions share threads from the environment's pool, and configuring [default execution
-/// providers](EnvironmentBuilder::with_execution_providers) for all sessions. In the context of `ort` specifically,
-/// environments are also used to configure ONNX Runtime to send log messages through the [`tracing`] crate in Rust.
-///
-/// For ease of use, and since sessions require an environment to be created, `ort` will automatically create an
-/// environment if one is not configured via [`init`] (or [`init_from`]).
+/// See the [module-level documentation][self] for more information on environments. To create an environment, see
+/// [`ort::init`](init) & [`ort::init_from`](init_from).
 pub struct Environment {
 	execution_providers: SmallVec<[ExecutionProviderDispatch; STACK_EXECUTION_PROVIDERS]>,
 	ptr: NonNull<ort_sys::OrtEnv>,
@@ -61,6 +85,17 @@ unsafe impl Send for Environment {}
 unsafe impl Sync for Environment {}
 
 impl Environment {
+	/// Sets the global log level.
+	///
+	/// ```
+	/// # fn main() -> ort::Result<()> {
+	/// # use ort::logging::LogLevel;
+	/// let env = ort::environment::get_environment()?;
+	///
+	/// env.set_log_level(LogLevel::Warning);
+	/// # Ok(())
+	/// # }
+	/// ```
 	pub fn set_log_level(&self, level: LogLevel) {
 		// technically this method should take `&mut self`, but it isn't enough of an issue to warrant putting
 		// environments behind a mutex and the performance hit that comes with that
@@ -99,7 +134,8 @@ impl Drop for Environment {
 	}
 }
 
-/// Gets a reference to the global environment, creating one if an environment does not yet exist.
+/// Returns a reference to the currently active `Environment`. If one has not yet been committed (or an old environment
+/// has fallen out of usage), a new environment will be created & committed.
 pub fn get_environment() -> Result<Arc<Environment>> {
 	let mut env_lock = G_ENV.lock();
 	if let Some(env) = env_lock.as_ref()
@@ -133,16 +169,30 @@ impl Default for GlobalThreadPoolOptions {
 }
 
 impl GlobalThreadPoolOptions {
+	/// Configure the number of threads used for parallelization *between operations*.
+	///
+	/// This only affects sessions created with [`with_parallel_execution(true)`][wpe], and models with
+	/// parallelizable branches.
+	///
+	/// [wpe]: crate::session::builder::SessionBuilder::with_parallel_execution
 	pub fn with_inter_threads(mut self, num_threads: usize) -> Result<Self> {
 		ortsys![unsafe SetGlobalInterOpNumThreads(self.ptr_mut(), num_threads as _)?];
 		Ok(self)
 	}
 
+	/// Configure the number of threads used for parallelization *within a single operation*.
+	///
+	/// A value of `0` will use the default thread count (likely determined by the logical core count of the system).
 	pub fn with_intra_threads(mut self, num_threads: usize) -> Result<Self> {
 		ortsys![unsafe SetGlobalIntraOpNumThreads(self.ptr_mut(), num_threads as _)?];
 		Ok(self)
 	}
 
+	/// Allow/disallow threads in the pool to [spin](https://en.wikipedia.org/wiki/Busy_waiting) when their work queues
+	/// are empty.
+	///
+	/// If there is always work to do (i.e. if sessions are constantly running inference non-stop), allowing spinning is
+	/// faster. Otherwise, spinning increases CPU usage, so it is recommended to disable it when use is infrequent.
 	pub fn with_spin_control(mut self, spin_control: bool) -> Result<Self> {
 		ortsys![unsafe SetGlobalSpinControl(self.ptr_mut(), if spin_control { 1 } else { 0 })?];
 		Ok(self)
@@ -157,11 +207,18 @@ impl GlobalThreadPoolOptions {
 		Ok(self)
 	}
 
+	/// Disables subnormal floats by enabling the denormals-are-zero and flush-to-zero flags for all threads in the
+	/// pool.
+	///
+	/// [Subnormal floats](https://en.wikipedia.org/wiki/Subnormal_number) are extremely small numbers very close to zero.
+	/// Operations involving subnormal numbers can be very slow; enabling this flag will instead treat them as `0.0`,
+	/// giving faster & more consistent performance, but lower accuracy (in cases where subnormals are involved).
 	pub fn with_flush_to_zero(mut self) -> Result<Self> {
 		ortsys![unsafe SetGlobalDenormalAsZero(self.ptr_mut())?];
 		Ok(self)
 	}
 
+	/// Use a custom [thread manager](ThreadManager) to spawn threads for the global thread pool.
 	pub fn with_thread_manager<T: ThreadManager + Any + 'static>(mut self, manager: T) -> Result<Self> {
 		let manager = Arc::new(manager);
 		ortsys![unsafe SetGlobalCustomThreadCreationOptions(self.ptr_mut(), (&*manager as *const T as *mut T).cast())?];
@@ -314,16 +371,24 @@ impl EnvironmentBuilder {
 		self
 	}
 
-	/// Enable or disable sending telemetry events to Microsoft.
+	/// Enable or disable sending telemetry data.
 	///
 	/// Typically, only Windows builds of ONNX Runtime provided by Microsoft will have telemetry enabled.
-	/// Pre-built binaries provided by pyke, or binaries compiled from source, won't have telemetry enabled.
+	/// Pre-built binaries provided by pyke, binaries compiled from source, and most alternative backends won't have
+	/// telemetry enabled.
 	///
-	/// The exact kind of telemetry data sent can be found [here](https://github.com/microsoft/onnxruntime/blob/v1.23.2/onnxruntime/core/platform/windows/telemetry.cc).
+	/// The exact kind of telemetry data sent by ONNX Runtime can be found [here][etw].
 	/// Currently, this includes (but is not limited to): ONNX graph version, model producer name & version, whether or
 	/// not FP16 is used, operator domains & versions, model graph name & custom metadata, execution provider names,
 	/// error messages, and the total number & time of session inference runs. The ONNX Runtime team uses this data to
 	/// better understand how customers use ONNX Runtime and where performance can be improved.
+	///
+	/// ## `ort-web`
+	///
+	/// The `ort-web` alternative backend collects telemetry data by default. This telemetry data is sent to pyke.
+	/// More details can be found in the `_telemetry.js` file in the root of the `ort-web` crate.
+	///
+	/// [etw]: https://github.com/microsoft/onnxruntime/blob/v1.23.2/onnxruntime/core/platform/windows/telemetry.cc
 	#[must_use = "commit() must be called in order for the environment to take effect"]
 	pub fn with_telemetry(mut self, enable: bool) -> Self {
 		self.telemetry = enable;

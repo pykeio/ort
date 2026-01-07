@@ -36,6 +36,10 @@ a[href="https://opencollective.com/pyke-osai"] {
 	color: #fff !important;
 }
 
+.nextra-sidebar-footer {
+	background-color: transparent;
+}
+
 .dark a[href="https://opencollective.com/pyke-osai"] {
 	color: #000 !important;
 }

@@ -63,6 +63,8 @@ pub use ort_sys as sys;
 #[cfg(feature = "load-dynamic")]
 pub use self::environment::init_from;
 pub(crate) use self::logging::{debug, error, info, trace, warning as warn};
+#[cfg(test)]
+pub(crate) mod test_util;
 use self::util::OnceLock;
 pub use self::{
 	environment::init,
@@ -70,6 +72,10 @@ pub use self::{
 };
 
 /// The minor version of ONNX Runtime used by this version of `ort`.
+///
+/// This is equal to the version of the ONNX Runtime API used by `ort` (available in [`ort-sys`][ort_sys] as
+/// [`ORT_API_VERSION`](ort_sys::ORT_API_VERSION)). `ort` requires that the backend supports *at least* this version of
+/// the API.
 pub const MINOR_VERSION: u32 = ort_sys::ORT_API_VERSION;
 
 #[cfg(feature = "load-dynamic")]
@@ -94,7 +100,7 @@ pub(crate) fn load_dylib_from_path(path: &std::path::Path) -> Result<bool> {
 			unsafe { libloading::Library::new(&absolute_path) }.map_err(|e| Error::new(format!("failed to load from `{}`: {e}", absolute_path.display())))?;
 
 		let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const ort_sys::OrtApiBase> =
-			unsafe { lib.get(b"OrtGetApiBase") }.map_err(|_| Error::new("expected `OrtGetApiBase` to be present in dylib"))?;
+			unsafe { lib.get(b"OrtGetApiBase") }.map_err(|_| Error::new("expected `OrtGetApiBase` to be present in libonnxruntime"))?;
 		let base: *const ort_sys::OrtApiBase = unsafe { base_getter() };
 		assert!(!base.is_null());
 
@@ -105,13 +111,13 @@ pub(crate) fn load_dylib_from_path(path: &std::path::Path) -> Result<bool> {
 		match lib_minor_version.cmp(&MINOR_VERSION) {
 			Ordering::Less => {
 				return Err(Error::new(format!(
-					"ort {} is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
+					"ort {} is not compatible with the ONNX Runtime binary found at `{}`; expected version >= '1.{MINOR_VERSION}.x', but got '{version_string}'",
 					env!("CARGO_PKG_VERSION"),
 					absolute_path.display()
 				)));
 			}
-			Ordering::Greater => crate::warn!(
-				"ort {} may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
+			Ordering::Greater => crate::info!(
+				"ort {} was designed for ONNX Runtime '1.{MINOR_VERSION}.x' and may have compatibility issues with the ONNX Runtime binary found at `{}`, which is version '{version_string}'",
 				env!("CARGO_PKG_VERSION"),
 				absolute_path.display()
 			),
@@ -156,7 +162,7 @@ pub fn api() -> &'static ort_sys::OrtApi {
 	let ptr = G_ORT_API
 		.get()
 		.expect(
-			"attempted to use `ort` APIs before initializing a backend\nwhen the `alternative-backend` feature is enabled, `ort::set_api` must be called to configure the `OrtApi` used by the library"
+			"attempted to use `ort` APIs before initializing a backend\nwhen the `alternative-backend` feature is enabled, `ort::set_api` must be called first to configure the `OrtApi` used by the library"
 		)
 		.0;
 	#[cfg(not(feature = "alternative-backend"))]
@@ -201,10 +207,15 @@ fn setup_api() -> ApiPointer {
 /// Sets the global [`ort_sys::OrtApi`] interface used by `ort` in order to use alternative backends, or a custom
 /// loading scheme.
 ///
-/// When using `alternative-backend`, this must be called before using any other `ort` API.
+/// When using an alternative backend, this must be called before using any other `ort` API.
 ///
-/// Returns `true` if successful (i.e. no API has been set up to this point). This function will not override the API if
-/// one was already set.
+/// Returns `true` if successful, meaning this API will take effect. If an API was already set prior, it will not be
+/// overridden, and this function will return `false`.
+///
+/// ```no_run
+/// # use ort_sys::stub as ort_tract;
+/// ort::set_api(ort_tract::api());
+/// ```
 pub fn set_api(api: ort_sys::OrtApi) -> bool {
 	G_ORT_API.try_insert_with(|| ApiPointer(unsafe { NonNull::new_unchecked(Box::leak(Box::new(api))) }))
 }

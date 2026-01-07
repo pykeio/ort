@@ -1,4 +1,80 @@
 //! Enables binding of session inputs and/or outputs to pre-allocated memory.
+//!
+//! [`IoBinding`] minimizes copies between a device (like a GPU) and the host (CPU) by allowing you to bind a
+//! certain input/output to a pre-allocated value on a specific device.
+//!
+//! [`IoBinding`] is most suitable for:
+//! - An ensemble of models in which the output from one model is the input to another and does not need to pass through
+//!   the CPU to perform additional processing.
+//! - Situations where an output should stay on a device (e.g. to perform additional hardware-accelerated processing).
+//! - Models that accept an input that does not change for multiple subsequent runs (like the conditional embedding for
+//!   a diffusion model).
+//!
+//! [`IoBinding`] will not provide any meaningful benefit for:
+//! - Models where every input changes with each invocation, such as a causal language model or object recognition
+//!   model.
+//! - Pipelines that go straight from CPU -> GPU -> CPU.
+//!
+//! # Example
+//! A diffusion model which takes a text condition input.
+//!
+//! ```no_run
+//! # use ort::{
+//! # 	ep,
+//! # 	io_binding::IoBinding,
+//! # 	memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType},
+//! # 	session::Session,
+//! # 	value::Tensor
+//! # };
+//! # fn main() -> ort::Result<()> {
+//! let mut text_encoder = Session::builder()?
+//! 	.with_execution_providers([ep::CUDA::default().build()])?
+//! 	.commit_from_file("text_encoder.onnx")?;
+//! let mut unet = Session::builder()?
+//! 	.with_execution_providers([ep::CUDA::default().build()])?
+//! 	.commit_from_file("unet.onnx")?;
+//!
+//! let text_condition = text_encoder
+//! 	.run(ort::inputs![Tensor::<i64>::from_array((
+//! 		vec![27],
+//! 		vec![
+//! 			23763, 15460, 473, 68, 312, 265, 17463, 4098, 304, 1077, 283, 198, 7676, 5976, 272, 285, 3609, 435,
+//! 			21680, 321, 265, 300, 1689, 64, 285, 4763, 64
+//! 		]
+//! 	))?])?
+//! 	.remove("output0")
+//! 	.unwrap();
+//!
+//! let input_allocator = Allocator::new(
+//! 	&unet,
+//! 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
+//! )?;
+//! let mut latents = Tensor::<f32>::new(&input_allocator, [1_usize, 4, 64, 64])?;
+//!
+//! let mut io_binding = unet.create_binding()?;
+//! io_binding.bind_input("condition", &text_condition)?;
+//!
+//! let output_allocator = Allocator::new(
+//! 	&unet,
+//! 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUOutput)?
+//! )?;
+//! io_binding.bind_output("noise_pred", Tensor::<f32>::new(&output_allocator, [1_usize, 4, 64, 64])?)?;
+//!
+//! for _ in 0..20 {
+//! 	io_binding.bind_input("latents", &latents)?;
+//! 	let noise_pred = unet.run_binding(&io_binding)?.remove("noise_pred").unwrap();
+//!
+//! 	let mut latents = latents.extract_array_mut();
+//! 	latents += &noise_pred.try_extract_array::<f32>()?;
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! [`IoBinding`] may provide a decent speedup in this example since the `condition` tensor is unchanging between runs.
+//! If we were to use normal session inference, the `condition` tensor would be needlessly copied with each invocation
+//! of `unet.run()`, and this copying can come with significant latency & overhead. With [`IoBinding`], the `condition`
+//! tensor is only copied to the device once instead of 20 times.
 
 use alloc::{string::String, sync::Arc};
 use core::{
@@ -18,80 +94,9 @@ use crate::{
 
 /// Enables binding of session inputs and/or outputs to pre-allocated memory.
 ///
-/// [`IoBinding`] minimizes copies between a device (like a GPU) and the host (CPU) by allowing the user to bind a
-/// certain input/output to a pre-allocated value on a specific device.
+/// An `IoBinding` can be created from a [`Session`] with [`Session::create_binding`].
 ///
-/// [`IoBinding`] is most suitable for:
-/// - An ensemble of models in which the output from one model is the input of another and does not need to pass through
-///   the CPU to perform additional processing.
-/// - Situations where the output should stay on a device (e.g. to perform additional processing with CUDA).
-/// - Diffusion models, for instance, that accept an unchanging embedding for conditioning.
-///
-/// [`IoBinding`] will not provide any meaningful benefit for:
-/// - Models where every input changes with each invocation, such as a causal language model or object recognition
-///   model.
-/// - Pipelines that go straight from CPU -> GPU -> CPU.
-///
-/// # Example
-/// A diffusion model which takes a text condition input.
-///
-/// ```no_run
-/// # use ort::{
-/// # 	ep,
-/// # 	io_binding::IoBinding,
-/// # 	memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType},
-/// # 	session::Session,
-/// # 	value::Tensor
-/// # };
-/// # fn main() -> ort::Result<()> {
-/// let mut text_encoder = Session::builder()?
-/// 	.with_execution_providers([ep::CUDA::default().build()])?
-/// 	.commit_from_file("text_encoder.onnx")?;
-/// let mut unet = Session::builder()?
-/// 	.with_execution_providers([ep::CUDA::default().build()])?
-/// 	.commit_from_file("unet.onnx")?;
-///
-/// let text_condition = text_encoder
-/// 	.run(ort::inputs![Tensor::<i64>::from_array((
-/// 		vec![27],
-/// 		vec![
-/// 			23763, 15460, 473, 68, 312, 265, 17463, 4098, 304, 1077, 283, 198, 7676, 5976, 272, 285, 3609, 435,
-/// 			21680, 321, 265, 300, 1689, 64, 285, 4763, 64
-/// 		]
-/// 	))?])?
-/// 	.remove("output0")
-/// 	.unwrap();
-///
-/// let input_allocator = Allocator::new(
-/// 	&unet,
-/// 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
-/// )?;
-/// let mut latents = Tensor::<f32>::new(&input_allocator, [1_usize, 4, 64, 64])?;
-///
-/// let mut io_binding = unet.create_binding()?;
-/// io_binding.bind_input("condition", &text_condition)?;
-///
-/// let output_allocator = Allocator::new(
-/// 	&unet,
-/// 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUOutput)?
-/// )?;
-/// io_binding.bind_output("noise_pred", Tensor::<f32>::new(&output_allocator, [1_usize, 4, 64, 64])?)?;
-///
-/// for _ in 0..20 {
-/// 	io_binding.bind_input("latents", &latents)?;
-/// 	let noise_pred = unet.run_binding(&io_binding)?.remove("noise_pred").unwrap();
-///
-/// 	let mut latents = latents.extract_array_mut();
-/// 	latents += &noise_pred.try_extract_array::<f32>()?;
-/// }
-/// # Ok(())
-/// # }
-/// ```
-///
-/// [`IoBinding`] may provide a decent speedup in this example since the `condition` tensor is unchanging between runs.
-/// If we were to use normal session inference, the `condition` tensor would be needlessly copied with each invocation
-/// of `unet.run()`, and this copying can come with significant latency & overhead. With [`IoBinding`], the `condition`
-/// tensor is only copied to the device once instead of 20 times.
+/// See the [module-level documentation][self] for more information.
 #[derive(Debug)]
 pub struct IoBinding {
 	ptr: NonNull<ort_sys::OrtIoBinding>,
@@ -162,10 +167,10 @@ impl IoBinding {
 	/// Bind a session output to a device which is specified by `mem_info`. Used when the shape of the output is
 	/// unknown.
 	///
-	/// Note that the same output buffer will be reused across runs, so the output must be `.clone()`d to avoid race
-	/// conditions.
+	/// Note that the same output buffer will be reused across runs, so the output must be
+	/// [`.clone()`](crate::value::Tensor::clone)d to avoid race conditions.
 	///
-	/// Alternatively, if the shape of the output is known, use [`IoBinding::bind_output`] instead.
+	/// If the shape of the output is known, prefer [`IoBinding::bind_output`] instead.
 	pub fn bind_output_to_device<S: Into<String>>(&mut self, name: S, mem_info: &MemoryInfo) -> Result<()> {
 		let name: String = name.into();
 		let ptr = self.ptr_mut();
@@ -236,51 +241,25 @@ impl Drop for IoBinding {
 
 #[cfg(test)]
 mod tests {
-	use core::cmp::Ordering;
-
-	use image::{ImageBuffer, Luma, Pixel};
 	#[cfg(feature = "ndarray")]
-	use ndarray::{Array2, Array4, Axis};
+	use ndarray::Array2;
 
 	#[cfg(feature = "ndarray")]
-	use crate::tensor::ArrayExtensions;
+	use crate::test_util::mnist;
 	use crate::{
 		Result,
 		memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
 		session::Session,
-		value::{Tensor, TensorValueTypeMarker, Value}
+		value::Tensor
 	};
-
-	#[cfg(feature = "ndarray")]
-	fn get_image() -> Array4<f32> {
-		let image_buffer: ImageBuffer<Luma<u8>, Vec<u8>> = image::open("tests/data/mnist_5.jpg").expect("failed to load image").to_luma8();
-		ndarray::Array::from_shape_fn((1, 1, 28, 28), |(_, c, j, i)| {
-			let pixel = image_buffer.get_pixel(i as u32, j as u32);
-			let channels = pixel.channels();
-			(channels[c] as f32) / 255.0
-		})
-	}
-
-	#[cfg(feature = "ndarray")]
-	fn extract_probabilities<T: TensorValueTypeMarker>(output: &Value<T>) -> Result<Vec<(usize, f32)>> {
-		let mut probabilities: Vec<(usize, f32)> = output
-			.try_extract_array()?
-			.softmax(Axis(1))
-			.iter()
-			.copied()
-			.enumerate()
-			.collect::<Vec<_>>();
-		probabilities.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
-		Ok(probabilities)
-	}
 
 	// not terribly useful since CI is CPU-only, but it at least ensures the API won't segfault or something silly
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_mnist_input_bound() -> Result<()> {
-		let mut session = Session::builder()?.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/mnist.onnx")?;
+		let mut session = Session::builder()?.commit_from_url(mnist::MODEL_URL)?;
 
-		let array = get_image();
+		let array = mnist::get_image();
 
 		let mut binding = session.create_binding()?;
 		binding.bind_input(session.inputs()[0].name(), &Tensor::from_array(array)?)?;
@@ -288,7 +267,7 @@ mod tests {
 			.bind_output_to_device(session.outputs()[0].name(), &MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::CPUOutput)?)?;
 
 		let outputs = session.run_binding(&binding)?;
-		let probabilities = extract_probabilities(&outputs[0])?;
+		let probabilities = mnist::extract_probabilities(&outputs[0])?;
 		assert_eq!(probabilities[0].0, 5);
 
 		Ok(())
@@ -297,9 +276,9 @@ mod tests {
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_mnist_input_output_bound() -> Result<()> {
-		let mut session = Session::builder()?.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/mnist.onnx")?;
+		let mut session = Session::builder()?.commit_from_url(mnist::MODEL_URL)?;
 
-		let array = get_image();
+		let array = mnist::get_image();
 
 		let mut binding = session.create_binding()?;
 		binding.bind_input(session.inputs()[0].name(), &Tensor::from_array(array)?)?;
@@ -308,7 +287,7 @@ mod tests {
 		binding.bind_output(session.outputs()[0].name(), Tensor::from_array(output)?)?;
 
 		let outputs = session.run_binding(&binding)?;
-		let probabilities = extract_probabilities(&outputs[0])?;
+		let probabilities = mnist::extract_probabilities(&outputs[0])?;
 		assert_eq!(probabilities[0].0, 5);
 
 		Ok(())
@@ -317,9 +296,9 @@ mod tests {
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_send_iobinding() -> Result<()> {
-		let mut session = Session::builder()?.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/mnist.onnx")?;
+		let mut session = Session::builder()?.commit_from_url(mnist::MODEL_URL)?;
 
-		let array = get_image();
+		let array = mnist::get_image();
 
 		let mut binding = session.create_binding()?;
 		let output = Array2::from_shape_simple_fn((1, 10), || 0.0_f32);
@@ -328,7 +307,7 @@ mod tests {
 		let probabilities = std::thread::spawn(move || {
 			binding.bind_input(session.inputs()[0].name(), &Tensor::from_array(array)?)?;
 			let outputs = session.run_binding(&binding)?;
-			let probabilities = extract_probabilities(&outputs[0])?;
+			let probabilities = mnist::extract_probabilities(&outputs[0])?;
 			Ok::<Vec<(usize, f32)>, crate::Error>(probabilities)
 		})
 		.join()
@@ -342,9 +321,9 @@ mod tests {
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_mnist_clear_binds() -> Result<()> {
-		let mut session = Session::builder()?.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/mnist.onnx")?;
+		let mut session = Session::builder()?.commit_from_url(mnist::MODEL_URL)?;
 
-		let array = get_image();
+		let array = mnist::get_image();
 
 		let mut binding = session.create_binding()?;
 		binding.bind_input(session.inputs()[0].name(), &Tensor::from_array(array)?)?;
@@ -354,7 +333,7 @@ mod tests {
 
 		{
 			let outputs = session.run_binding(&binding)?;
-			let probabilities = extract_probabilities(&outputs[0])?;
+			let probabilities = mnist::extract_probabilities(&outputs[0])?;
 			assert_eq!(probabilities[0].0, 5);
 		}
 
@@ -364,7 +343,7 @@ mod tests {
 
 		{
 			let outputs = session.run_binding(&binding)?;
-			let probabilities = extract_probabilities(&outputs[0])?;
+			let probabilities = mnist::extract_probabilities(&outputs[0])?;
 			assert_eq!(probabilities[0].0, 5);
 		}
 

@@ -1,12 +1,14 @@
 import { Theme } from '@radix-ui/themes';
 import type { Metadata } from 'next';
-import { Footer as NextraFooter, Layout, Navbar } from 'nextra-theme-docs';
+import { Layout, Navbar, Footer as NextraFooter } from 'nextra-theme-docs';
 import { Head } from 'nextra/components';
 import { getPageMap } from 'nextra/page-map';
 
 import '@radix-ui/themes/styles.css';
 import 'nextra-theme-docs/style.css';
 import './globals.css';
+
+import FooterEmoji from '../components/FooterEmoji';
 
 export const metadata: Metadata = {
 	metadataBase: new URL('https://ort.pyke.io'),
@@ -43,12 +45,11 @@ export const metadata: Metadata = {
 };
 
 function Footer() {
-	const emojis = [ '💜', '🩷', '💜', '🩷', '💜', '🩷', '💜', '🩷', '☕', '👽', '🦀', '🌈', '🏳️‍⚧️' ];
 	return <NextraFooter style={{ paddingTop: '18px', paddingBottom: '18px' }}>
 		<div style={{ display: 'flex', flexDirection: 'column', width: '100%', alignItems: 'center', fontFamily: '"TASA Explorer"' }}>
 			<span style={{ fontSize: '32px', fontWeight: '800', color: '#f74c00' }}>ort</span>
 			<p style={{ fontWeight: '600' }}>
-				made with {emojis[Math.floor(Math.random() * emojis.length)]} by
+				made with <FooterEmoji /> by
 				<a target="_blank" href="https://pyke.io/">
 					<svg height='12' viewBox='0 0 21 10' style={{ display: 'inline', marginLeft: '5px', marginTop: '-4px' }}>
 						<rect width='10' height='10' fill='#00BDFF' />

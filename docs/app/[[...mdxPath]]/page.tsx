@@ -14,7 +14,13 @@ export async function generateMetadata(props): Promise<Metadata> {
 		title: metadata.title,
 		description: metadata.description,
 		openGraph: {
-			images: `https://ort.pyke.io/og/${hash(`/${params.mdxPath?.join('/') ?? ''}`)}.png`,
+			images: [
+				{
+					url: `https://ort.pyke.io/og/${hash(`/${params.mdxPath?.join('/') ?? ''}`)}.png`,
+					width: 1200,
+					height: 630
+				}
+			],
 			description: metadata.description ?? undefined
 		}
 	};

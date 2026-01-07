@@ -23,7 +23,7 @@ exclude = [
 [package]
 name = "ort"
 description = "A safe Rust wrapper for ONNX Runtime 1.23 - Optimize and accelerate machine learning inference & training"
-version = "2.0.0-rc.10"
+version = "2.0.0-rc.11"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
@@ -62,6 +62,7 @@ download-binaries = [ "ort-sys/download-binaries" ]
 preload-dylibs = [ "dep:libloading" ]
 load-dynamic = [ "std", "preload-dylibs", "ort-sys/disable-linking" ]
 copy-dylibs = [ "ort-sys/copy-dylibs" ]
+pkg-config = [ "ort-sys/pkg-config" ]
 
 tls-rustls = [ "ort-sys/tls-rustls", "ureq?/rustls" ]
 tls-rustls-no-provider = [ "ort-sys/tls-rustls-no-provider", "ureq?/rustls-no-provider" ]
@@ -92,7 +93,7 @@ azure = [ "ort-sys/azure" ]
 nvrtx = [ "ort-sys/nvrtx" ]
 
 [dependencies]
-ort-sys = { version = "=2.0.0-rc.10", path = "ort-sys", default-features = false }
+ort-sys = { version = "=2.0.0-rc.11", path = "ort-sys", default-features = false }
 smallvec = { version = "1.15", default-features = false, features = [ "const_generics" ] }
 
 ndarray = { version = "0.17", default-features = false, optional = true }

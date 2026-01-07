@@ -12,7 +12,7 @@
 //! </div>
 //!
 //! `ort` is a Rust binding for [ONNX Runtime](https://onnxruntime.ai/). For information on how to get started with `ort`,
-//! see <https://ort.pyke.io/introduction>.
+//! see <https://ort.pyke.io/>.
 
 extern crate alloc;
 extern crate core;

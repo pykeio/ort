@@ -1,11 +1,11 @@
 use alloc::ffi::CString;
 
 use super::{ExecutionProvider, RegisterError};
-use crate::{error::Result, session::builder::SessionBuilder};
+use crate::{ep::ArenaExtendStrategy, error::Result, session::builder::SessionBuilder};
 
 /// [MIGraphX execution provider](https://onnxruntime.ai/docs/execution-providers/MIGraphX-ExecutionProvider.html) for
 /// hardware acceleration with AMD GPUs.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct MIGraphX {
 	device_id: i32,
 	enable_fp16: bool,
@@ -14,7 +14,26 @@ pub struct MIGraphX {
 	int8_calibration_table_name: Option<CString>,
 	save_model_path: Option<CString>,
 	load_model_path: Option<CString>,
-	exhaustive_tune: bool
+	exhaustive_tune: bool,
+	memory_limit: usize,
+	arena_extend_strategy: ArenaExtendStrategy
+}
+
+impl Default for MIGraphX {
+	fn default() -> Self {
+		Self {
+			device_id: 0,
+			enable_fp16: false,
+			enable_int8: false,
+			use_native_calibration_table: false,
+			int8_calibration_table_name: None,
+			save_model_path: None,
+			load_model_path: None,
+			exhaustive_tune: false,
+			memory_limit: usize::MAX,
+			arena_extend_strategy: ArenaExtendStrategy::NextPowerOfTwo
+		}
+	}
 }
 
 super::impl_ep!(MIGraphX);
@@ -132,6 +151,18 @@ impl MIGraphX {
 		self.exhaustive_tune = enable;
 		self
 	}
+
+	#[must_use]
+	pub fn with_mem_limit(mut self, bytes: usize) -> Self {
+		self.memory_limit = bytes;
+		self
+	}
+
+	#[must_use]
+	pub fn with_arena_extend_strategy(mut self, strategy: ArenaExtendStrategy) -> Self {
+		self.arena_extend_strategy = strategy;
+		self
+	}
 }
 
 impl ExecutionProvider for MIGraphX {
@@ -161,7 +192,12 @@ impl ExecutionProvider for MIGraphX {
 				migraphx_load_model_path: self.load_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null),
 				migraphx_save_compiled_model: self.save_model_path.is_some().into(),
 				migraphx_save_model_path: self.save_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null),
-				migraphx_exhaustive_tune: self.exhaustive_tune
+				migraphx_exhaustive_tune: self.exhaustive_tune,
+				migraphx_mem_limit: self.memory_limit as _,
+				migraphx_arena_extend_strategy: match self.arena_extend_strategy {
+					ArenaExtendStrategy::NextPowerOfTwo => 0,
+					ArenaExtendStrategy::SameAsRequested => 1
+				}
 			};
 			ortsys![unsafe SessionOptionsAppendExecutionProvider_MIGraphX(session_builder.ptr_mut(), &options)?];
 			return Ok(());

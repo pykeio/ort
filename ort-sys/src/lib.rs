@@ -539,7 +539,9 @@ pub struct OrtMIGraphXProviderOptions {
 	pub migraphx_save_model_path: *const core::ffi::c_char,
 	pub migraphx_load_compiled_model: core::ffi::c_int,
 	pub migraphx_load_model_path: *const core::ffi::c_char,
-	pub migraphx_exhaustive_tune: bool
+	pub migraphx_exhaustive_tune: bool,
+	pub migraphx_mem_limit: usize,
+	pub migraphx_arena_extend_strategy: core::ffi::c_int
 }
 #[doc = " \\brief OpenVINO Provider Options\n\n \\see OrtApi::SessionOptionsAppendExecutionProvider_OpenVINO"]
 #[repr(C)]

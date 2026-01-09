@@ -8,7 +8,7 @@
 
 | 💖 Sponsored by | |
 |:------------:|---|
-| <a href="https://rime.ai/" target="_blank"><img src="https://cdn.pyke.io/0/pyke:ort-rs/docs@0.0.0/sponsor-identity/rime.svg?_0" alt="Rime.ai"/></a> | On-prem and cloud TTS for IVAs and agents people actually want to talk to. |
+| <a href="https://rime.ai/" target="_blank"><img src="https://cdn.pyke.io/0/pyke:ort-rs/docs@0.0.0/sponsor-identity/rime.svg?_0" alt="Rime.ai"/></a> | Authentic AI voice models for enterprise. |
 
 </div>
 

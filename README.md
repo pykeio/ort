@@ -1,9 +1,15 @@
 <div align=center>
-    <img src="https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/docs/trend-banner.png" width="350px">
-    <hr />
-    <a href="https://app.codecov.io/gh/pykeio/ort" target="_blank"><img alt="Coverage Results" src="https://img.shields.io/codecov/c/gh/pykeio/ort?style=for-the-badge"></a> <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/d/ort?style=for-the-badge"></a> <a href="https://opencollective.com/pyke-osai" target="_blank"><img alt="Open Collective backers and sponsors" src="https://img.shields.io/opencollective/all/pyke-osai?style=for-the-badge&label=sponsors"></a>
-    <br />
-    <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/v/ort?style=for-the-badge&label=ort&logo=rust"></a> <img alt="ONNX Runtime" src="https://img.shields.io/badge/onnxruntime-v1.23.2-blue?style=for-the-badge&logo=cplusplus">
+<img src="https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/docs/trend-banner.png" width="350px">
+<hr />
+<a href="https://app.codecov.io/gh/pykeio/ort" target="_blank"><img alt="Coverage Results" src="https://img.shields.io/codecov/c/gh/pykeio/ort?style=for-the-badge"></a> <a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/d/ort?style=for-the-badge"></a> <a href="https://opencollective.com/pyke-osai" target="_blank"><img alt="Open Collective backers and sponsors" src="https://img.shields.io/opencollective/all/pyke-osai?style=for-the-badge&label=sponsors"></a>
+<br />
+<a href="https://crates.io/crates/ort" target="_blank"><img alt="Crates.io" src="https://img.shields.io/crates/v/ort?style=for-the-badge&label=ort&logo=rust"></a> <img alt="ONNX Runtime" src="https://img.shields.io/badge/onnxruntime-v1.23.2-blue?style=for-the-badge&logo=cplusplus">
+<br />
+
+| 💖 Sponsored by | |
+|:------------:|---|
+| <a href="https://rime.ai/" target="_blank"><img src="https://cdn.pyke.io/0/pyke:ort-rs/docs@0.0.0/sponsor-identity/rime.svg?_0" alt="Rime.ai"/></a> | On-prem and cloud TTS for IVAs and agents people actually want to talk to. |
+
 </div>
 
 `ort` is a Rust interface for performing hardware-accelerated inference & training on machine learning models in the [Open Neural Network Exchange](https://onnx.ai/) (ONNX) format.
@@ -24,10 +30,8 @@ When you need to deploy a PyTorch/TensorFlow/Keras/scikit-learn/PaddlePaddle mod
 - [Discord: `#🦀｜ort-general`](https://discord.gg/uQtsNu2xMa)
 - [GitHub Discussions](https://github.com/pykeio/ort/discussions)
 
-## 🌠 Sponsor `ort`
+## 🌠 Backers
 <a href="https://opencollective.com/pyke-osai">
-<img src="https://opencollective.com/pyke-osai/sponsors.svg" />
-<br />
 <img src="https://opencollective.com/pyke-osai/backers.svg" />
 </a>
 

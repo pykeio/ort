@@ -532,6 +532,7 @@ pub struct OrtTensorRTProviderOptions {
 pub struct OrtMIGraphXProviderOptions {
 	pub device_id: core::ffi::c_int,
 	pub migraphx_fp16_enable: core::ffi::c_int,
+	pub migraphx_fp8_enable: core::ffi::c_int,
 	pub migraphx_int8_enable: core::ffi::c_int,
 	pub migraphx_use_native_calibration_table: core::ffi::c_int,
 	pub migraphx_int8_calibration_table_name: *const core::ffi::c_char,

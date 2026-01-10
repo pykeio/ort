@@ -9,6 +9,7 @@ use crate::{ep::ArenaExtendStrategy, error::Result, session::builder::SessionBui
 pub struct MIGraphX {
 	device_id: i32,
 	enable_fp16: bool,
+	enable_fp8: bool,
 	enable_int8: bool,
 	use_native_calibration_table: bool,
 	int8_calibration_table_name: Option<CString>,
@@ -24,6 +25,7 @@ impl Default for MIGraphX {
 		Self {
 			device_id: 0,
 			enable_fp16: false,
+			enable_fp8: false,
 			enable_int8: false,
 			use_native_calibration_table: false,
 			int8_calibration_table_name: None,
@@ -66,6 +68,21 @@ impl MIGraphX {
 	#[must_use]
 	pub fn with_fp16(mut self, enable: bool) -> Self {
 		self.enable_fp16 = enable;
+		self
+	}
+
+	/// Enable FP8 quantization for the model.
+	///
+	/// ```
+	/// # use ort::{ep, session::Session};
+	/// # fn main() -> ort::Result<()> {
+	/// let ep = ep::MIGraphX::default().with_fp8(true).build();
+	/// # Ok(())
+	/// # }
+	/// ```
+	#[must_use]
+	pub fn with_fp8(mut self, enable: bool) -> Self {
+		self.enable_fp8 = enable;
 		self
 	}
 
@@ -185,6 +202,7 @@ impl ExecutionProvider for MIGraphX {
 			let options = ort_sys::OrtMIGraphXProviderOptions {
 				device_id: self.device_id,
 				migraphx_fp16_enable: self.enable_fp16.into(),
+				migraphx_fp8_enable: self.enable_fp8.into(),
 				migraphx_int8_enable: self.enable_int8.into(),
 				migraphx_use_native_calibration_table: self.use_native_calibration_table.into(),
 				migraphx_int8_calibration_table_name: self.int8_calibration_table_name.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null),

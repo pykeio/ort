@@ -14,14 +14,32 @@ export async function generateMetadata(props): Promise<Metadata> {
 		title: metadata.title,
 		description: metadata.description,
 		openGraph: {
+			type: 'website',
+			siteName: 'ort Docs',
+			title: metadata.title,
+			description: metadata.description ?? undefined,
+			locale: 'en_US',
 			images: [
 				{
 					url: `https://ort.pyke.io/og/${hash(`/${params.mdxPath?.join('/') ?? ''}`)}.png`,
 					width: 1200,
-					height: 630
+					height: 630,
+					type: 'image/png'
 				}
-			],
-			description: metadata.description ?? undefined
+			]
+		},
+		twitter: {
+			card: 'summary_large_image',
+			title: metadata.title,
+			description: metadata.description ?? undefined,
+			images: [
+				{
+					url: `https://ort.pyke.io/og/${hash(`/${params.mdxPath?.join('/') ?? ''}`)}.png`,
+					width: 1200,
+					height: 630,
+					type: 'image/png'
+				}
+			]
 		}
 	};
 }

@@ -1,11 +1,7 @@
 use ort::{
 	ep,
 	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
-	operator::{
-		Operator, OperatorDomain,
-		io::{OperatorInput, OperatorOutput},
-		kernel::{Kernel, KernelAttributes, KernelContext}
-	},
+	operator::{Kernel, KernelAttributes, KernelContext, Operator, OperatorDomain, OperatorInput, OperatorOutput},
 	session::{Adapter, RunOptions, Session},
 	value::{Tensor, TensorElementType}
 };

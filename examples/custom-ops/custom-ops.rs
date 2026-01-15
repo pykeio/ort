@@ -1,9 +1,5 @@
 use ort::{
-	operator::{
-		Operator, OperatorDomain,
-		io::{OperatorInput, OperatorOutput},
-		kernel::{Kernel, KernelAttributes, KernelContext}
-	},
+	operator::{Kernel, KernelAttributes, KernelContext, Operator, OperatorDomain, OperatorInput, OperatorOutput},
 	session::Session,
 	value::{Tensor, TensorElementType}
 };

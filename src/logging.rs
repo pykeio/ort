@@ -210,7 +210,7 @@ impl<'a> AsPointer for Logger<'a> {
 /// Logs a message to a given [`Logger`].
 ///
 /// ```
-/// # use ort::operator::kernel::{Kernel, KernelContext};
+/// # use ort::operator::{Kernel, KernelContext};
 /// struct MyKernel;
 ///
 /// impl Kernel for MyKernel {

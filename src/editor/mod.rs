@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 
 use crate::{
 	AsPointer, Error, OnceLock, Result,
-	operator::attribute::Attribute,
+	operator::Attribute,
 	ortsys,
 	session::{Session, builder::SessionBuilder},
 	util::{with_cstr, with_cstr_ptr_array},
@@ -68,7 +68,7 @@ impl Node {
 	/// - `attributes` is an array of attributes used to configure the operator, e.g. `strides` for `Conv` nodes.
 	///
 	/// ```
-	/// # use ort::{editor::{Node, ONNX_DOMAIN}, operator::attribute::Attribute};
+	/// # use ort::{editor::{Node, ONNX_DOMAIN}, operator::Attribute};
 	/// # fn main() -> ort::Result<()> {
 	/// let node = Node::new(
 	/// 	"Conv",

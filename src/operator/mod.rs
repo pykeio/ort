@@ -3,18 +3,18 @@
 use alloc::{boxed::Box, ffi::CString, vec::Vec};
 use core::ptr::{self, NonNull};
 
-pub mod attribute;
+mod attribute;
 pub(crate) mod bound;
-pub mod io;
-pub mod kernel;
+mod io;
+mod kernel;
 #[cfg(test)]
 mod tests;
 
-use self::{
-	attribute::FromOpAttr,
-	bound::BoundOperator,
-	io::{OperatorInput, OperatorOutput},
-	kernel::{Kernel, KernelAttributes}
+use self::bound::BoundOperator;
+pub use self::{
+	attribute::{Attribute, FromKernelAttributes, FromOpAttr, ToAttribute},
+	io::{InputOutputCharacteristic, OperatorInput, OperatorOutput},
+	kernel::{Kernel, KernelAttributes, KernelContext, ScratchBuffer}
 };
 use crate::{
 	AsPointer, Error,
@@ -45,7 +45,7 @@ pub trait Operator: Send {
 	/// stream.
 	///
 	/// [`Tensor::data_ptr`]: crate::value::Tensor::data_ptr
-	/// [`KernelContext::compute_stream`]: crate::operator::kernel::KernelContext::compute_stream
+	/// [`KernelContext::compute_stream`]: crate::operator::KernelContext::compute_stream
 	fn execution_provider_type(&self) -> Option<&str> {
 		None
 	}

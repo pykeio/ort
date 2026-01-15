@@ -89,7 +89,7 @@ macro_rules! drop {
 pub(crate) use create;
 pub(crate) use drop;
 
-pub fn default_log_level() -> ort_sys::OrtLoggingLevel {
+pub(crate) fn default_log_level() -> ort_sys::OrtLoggingLevel {
 	#[cfg(feature = "std")]
 	match std::env::var("ORT_LOG").as_deref() {
 		Ok("fatal") => ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_FATAL,

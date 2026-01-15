@@ -1,7 +1,9 @@
 #[cfg(not(target_arch = "wasm32"))] // `ort-web` does not support synchronous `Run`, which `.clone()` depends on.
 mod copy;
 mod create;
+mod element;
 mod extract;
+mod shape;
 
 use alloc::sync::Arc;
 use core::{
@@ -11,14 +13,17 @@ use core::{
 	ptr::{self}
 };
 
-pub use self::create::{OwnedTensorArrayData, TensorArrayData, TensorArrayDataMut, TensorArrayDataParts, ToShape};
+pub use self::{
+	create::{OwnedTensorArrayData, TensorArrayData, TensorArrayDataMut, TensorArrayDataParts, ToShape},
+	element::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType, Utf8Data},
+	shape::{Shape, SymbolicDimensions}
+};
 use super::{DowncastableTarget, DynValue, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker};
 use crate::{
 	AsPointer,
 	error::Result,
 	memory::{Allocator, MemoryInfo},
-	ortsys,
-	tensor::{IntoTensorElementType, Shape, SymbolicDimensions, TensorElementType}
+	ortsys
 };
 
 pub trait TensorValueTypeMarker: ValueTypeMarker {
@@ -86,7 +91,7 @@ impl DynTensor {
 	/// This can be used to create a tensor with data on a certain device. For example, to create a tensor with pinned
 	/// (CPU) memory for use with CUDA:
 	/// ```no_run
-	/// # use ort::{memory::{Allocator, MemoryInfo, MemoryType, AllocationDevice, AllocatorType}, session::Session, tensor::TensorElementType, value::DynTensor};
+	/// # use ort::{memory::{Allocator, MemoryInfo, MemoryType, AllocationDevice, AllocatorType}, session::Session, value::{DynTensor, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
 	/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let allocator = Allocator::new(
@@ -345,10 +350,9 @@ mod tests {
 	#[cfg(feature = "ndarray")]
 	use ndarray::{ArcArray1, Array1, CowArray};
 
-	use super::Tensor;
+	use super::{Shape, SymbolicDimensions, Tensor, TensorElementType};
 	use crate::{
 		memory::Allocator,
-		tensor::{Shape, SymbolicDimensions, TensorElementType},
 		value::{TensorRef, ValueType}
 	};
 

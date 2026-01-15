@@ -8,8 +8,7 @@ use ort::{
 		kernel::{Kernel, KernelAttributes, KernelContext}
 	},
 	session::{RunOptions, Session},
-	tensor::TensorElementType,
-	value::Tensor
+	value::{Tensor, TensorElementType}
 };
 
 struct CustomOpOne;

@@ -11,13 +11,12 @@ use core::{
 #[cfg(feature = "ndarray")]
 use ndarray::{ArcArray, Array, ArrayView, ArrayViewMut, CowArray, Dimension};
 
-use super::{DynTensor, Tensor, TensorRef, TensorRefMut};
+use super::{DynTensor, PrimitiveTensorElementType, Shape, SymbolicDimensions, Tensor, TensorElementType, TensorRef, TensorRefMut, Utf8Data};
 use crate::{
 	AsPointer,
 	error::{Error, ErrorCode, Result},
 	memory::{Allocator, MemoryInfo},
 	ortsys,
-	tensor::{PrimitiveTensorElementType, Shape, SymbolicDimensions, TensorElementType, Utf8Data},
 	value::{Value, ValueInner, ValueType}
 };
 

@@ -37,8 +37,9 @@ pub use self::{
 		DynSequence, DynSequenceRef, DynSequenceRefMut, DynSequenceValueType, Sequence, SequenceRef, SequenceRefMut, SequenceValueType, SequenceValueTypeMarker
 	},
 	impl_tensor::{
-		DefiniteTensorValueTypeMarker, DynTensor, DynTensorRef, DynTensorRefMut, DynTensorValueType, OwnedTensorArrayData, Tensor, TensorArrayData,
-		TensorArrayDataMut, TensorArrayDataParts, TensorRef, TensorRefMut, TensorValueType, TensorValueTypeMarker, ToShape
+		DefiniteTensorValueTypeMarker, DynTensor, DynTensorRef, DynTensorRefMut, DynTensorValueType, IntoTensorElementType, OwnedTensorArrayData,
+		PrimitiveTensorElementType, Shape, SymbolicDimensions, Tensor, TensorArrayData, TensorArrayDataMut, TensorArrayDataParts, TensorElementType, TensorRef,
+		TensorRefMut, TensorValueType, TensorValueTypeMarker, ToShape, Utf8Data
 	},
 	r#type::{Outlet, ValueType}
 };
@@ -481,7 +482,6 @@ impl<Type: ValueTypeMarker + ?Sized> AsPointer for Value<Type> {
 #[cfg(test)]
 mod tests {
 	use super::{DynTensorValueType, Map, Sequence, Tensor, TensorRef, TensorRefMut, TensorValueType};
-	use crate::memory::Allocator;
 
 	#[test]
 	fn test_casting_tensor() -> crate::Result<()> {

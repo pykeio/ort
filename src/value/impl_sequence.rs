@@ -109,8 +109,9 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized + 'static> Value<Se
 	/// This `Value<T>` must be either a [`Tensor`] or [`Map`].
 	///
 	/// ```
-	/// # use ort::value::{Sequence, Tensor};
+	/// # use ort::{memory:: Allocator, value::{Sequence, Tensor}};
 	/// # fn main() -> ort::Result<()> {
+	/// # let allocator = Allocator::default();
 	/// let tensor1 = Tensor::<f32>::new(&allocator, [1_usize, 128, 128, 3])?;
 	/// let tensor2 = Tensor::<f32>::new(&allocator, [1_usize, 224, 224, 3])?;
 	/// let value = Sequence::new([tensor1, tensor2])?;

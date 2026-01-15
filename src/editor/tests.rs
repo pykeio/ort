@@ -5,8 +5,7 @@ use crate::{
 	inputs,
 	memory::Allocator,
 	session::builder::SessionBuilder,
-	tensor::{Shape, SymbolicDimensions, TensorElementType},
-	value::{Tensor, ValueType}
+	value::{Shape, SymbolicDimensions, Tensor, TensorElementType, ValueType}
 };
 
 #[test]

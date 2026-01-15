@@ -4,7 +4,7 @@ use image::{ImageBuffer, Luma, Pixel, imageops::FilterType};
 use ort::{
 	inputs,
 	session::{Session, builder::GraphOptimizationLevel},
-	tensor::ArrayExtensions,
+	util::ArrayExt,
 	value::TensorRef
 };
 

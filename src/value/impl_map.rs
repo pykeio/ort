@@ -13,14 +13,13 @@ use std::collections::HashMap;
 
 use super::{
 	DowncastableTarget, DynValue, Value, ValueInner, ValueRef, ValueRefMut, ValueType, ValueTypeMarker,
-	impl_tensor::{DynTensor, Tensor}
+	impl_tensor::{DynTensor, IntoTensorElementType, PrimitiveTensorElementType, Tensor, TensorElementType}
 };
 use crate::{
 	AsPointer, ErrorCode,
 	error::{Error, Result},
 	memory::Allocator,
-	ortsys,
-	tensor::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType}
+	ortsys
 };
 
 pub trait MapValueTypeMarker: ValueTypeMarker {

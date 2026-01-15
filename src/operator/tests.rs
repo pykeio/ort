@@ -6,8 +6,7 @@ use crate::{
 		kernel::{Kernel, KernelAttributes, KernelContext}
 	},
 	session::Session,
-	tensor::TensorElementType,
-	value::Tensor
+	value::{Tensor, TensorElementType}
 };
 
 struct CustomOpOne;

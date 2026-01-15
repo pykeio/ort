@@ -1,10 +1,8 @@
-//! Helper traits to extend [`ndarray`] functionality.
-
 /// Trait extending [`ndarray::ArrayBase`](https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html)
 /// with useful tensor operations.
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-pub trait ArrayExtensions<S, T, D> {
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+pub trait ArrayExt<S, T, D> {
 	/// Calculate the [softmax](https://en.wikipedia.org/wiki/Softmax_function) of the tensor along a given axis.
 	fn softmax(&self, axis: ndarray::Axis) -> ndarray::Array<T, D>
 	where
@@ -14,9 +12,9 @@ pub trait ArrayExtensions<S, T, D> {
 		T: ndarray::NdFloat + core::ops::SubAssign + core::ops::DivAssign;
 }
 
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-impl<S, T, D> ArrayExtensions<S, T, D> for ndarray::ArrayBase<S, D>
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+impl<S, T, D> ArrayExt<S, T, D> for ndarray::ArrayBase<S, D>
 where
 	D: ndarray::RemoveAxis,
 	S: ndarray::RawData + ndarray::Data + ndarray::RawData<Elem = T>,

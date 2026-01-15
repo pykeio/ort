@@ -36,7 +36,6 @@ pub mod logging;
 pub mod memory;
 pub mod operator;
 pub mod session;
-pub mod tensor;
 #[cfg(feature = "training")]
 #[cfg_attr(docsrs, doc(cfg(feature = "training")))]
 pub mod training;

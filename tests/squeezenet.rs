@@ -9,7 +9,7 @@ use ndarray::s;
 use ort::{
 	Error, inputs,
 	session::{Session, builder::GraphOptimizationLevel},
-	tensor::ArrayExtensions,
+	util::ArrayExt,
 	value::TensorRef
 };
 

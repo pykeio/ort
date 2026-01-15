@@ -1,9 +1,5 @@
 //! Traits and types related to [`Tensor`](crate::value::Tensor)s.
 
-#[cfg(feature = "ndarray")]
-mod ndarray;
-mod types;
-
 use alloc::{string::String, vec::Vec};
 use core::{
 	fmt,
@@ -11,10 +7,6 @@ use core::{
 };
 
 use smallvec::{SmallVec, smallvec};
-
-#[cfg(all(feature = "ndarray", feature = "std"))]
-pub use self::ndarray::ArrayExtensions;
-pub use self::types::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType, Utf8Data};
 
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct Shape {

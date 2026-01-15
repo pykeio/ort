@@ -15,9 +15,8 @@ use crate::{
 	memory::Allocator,
 	ortsys,
 	session::{RunOptions, SessionInputValue, SessionInputs, SessionOutputs, builder::SessionBuilder},
-	tensor::IntoTensorElementType,
 	util::{char_p_to_string, with_cstr_ptr_array},
-	value::{Tensor, Value}
+	value::{IntoTensorElementType, Tensor, Value}
 };
 
 #[derive(Debug)]

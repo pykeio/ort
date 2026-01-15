@@ -5,7 +5,7 @@ pub mod mnist {
 
 	use crate::{
 		Result,
-		tensor::ArrayExtensions,
+		util::ArrayExt,
 		value::{TensorValueTypeMarker, Value}
 	};
 

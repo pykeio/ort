@@ -11,12 +11,11 @@ use core::{
 	slice
 };
 
-use super::{DynTensor, Tensor, TensorValueTypeMarker};
+use super::{DynTensor, PrimitiveTensorElementType, Shape, Tensor, TensorElementType, TensorValueTypeMarker};
 use crate::{
 	AsPointer,
 	error::{Error, ErrorCode, Result},
 	ortsys,
-	tensor::{PrimitiveTensorElementType, Shape, TensorElementType},
 	value::{Value, ValueType}
 };
 

@@ -24,6 +24,11 @@ pub(crate) use self::{
 	once_lock::OnceLock,
 	stack::*
 };
+#[cfg(feature = "ndarray")]
+mod ndarray;
+#[cfg(feature = "ndarray")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
+pub use self::ndarray::ArrayExt;
 
 /// Preloads the dynamic library at the given `path`.
 ///

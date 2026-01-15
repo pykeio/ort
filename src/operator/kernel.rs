@@ -12,9 +12,8 @@ use crate::{
 	logging::Logger,
 	memory::{Allocator, MemoryInfo, MemoryType},
 	ortsys,
-	tensor::Shape,
 	util::with_cstr,
-	value::{DowncastableTarget, DynValue, Outlet, Value, ValueRef, ValueRefMut, ValueType}
+	value::{DowncastableTarget, DynValue, Outlet, Shape, Value, ValueRef, ValueRefMut, ValueType}
 };
 
 pub trait Kernel {

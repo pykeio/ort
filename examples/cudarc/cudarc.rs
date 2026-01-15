@@ -7,8 +7,7 @@ use ort::{
 	ep,
 	memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
 	session::Session,
-	tensor::Shape,
-	value::TensorRefMut
+	value::{Shape, TensorRefMut}
 };
 use show_image::{AsImageView, WindowOptions, event};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};

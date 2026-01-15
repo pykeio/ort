@@ -194,7 +194,7 @@ impl Session {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{run_options::RunOptions, Session}, tensor::TensorElementType, value::{Value, ValueType, TensorRef}};
+	/// # use ort::{session::{run_options::RunOptions, Session}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
 	/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
@@ -223,7 +223,7 @@ impl Session {
 	/// ```no_run
 	/// # // no_run because upsample.onnx is too simple of a model for the termination signal to be reliable enough
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef}, tensor::TensorElementType};
+	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
@@ -385,7 +385,7 @@ impl Session {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef}, tensor::TensorElementType};
+	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> { tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
 	/// let mut session = Session::builder()?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
@@ -501,7 +501,7 @@ impl Session {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef}, tensor::TensorElementType};
+	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> { tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
 	/// let mut session = Session::builder()?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
@@ -614,7 +614,7 @@ impl Session {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{run_options::RunOptions, Session, WorkloadType}, tensor::TensorElementType, value::{Value, ValueType, TensorRef}};
+	/// # use ort::{session::{run_options::RunOptions, Session, WorkloadType}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
 	/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// session.set_workload_type(WorkloadType::Efficient)?;

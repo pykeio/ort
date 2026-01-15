@@ -12,39 +12,45 @@ use smallvec::{SmallVec, smallvec};
 
 use crate::{
 	Result, ortsys,
-	tensor::{Shape, SymbolicDimensions, TensorElementType},
-	util::{self, run_on_drop, with_cstr, with_cstr_ptr_array}
+	util::{self, run_on_drop, with_cstr, with_cstr_ptr_array},
+	value::{Shape, SymbolicDimensions, TensorElementType}
 };
 
 /// The type of a [`Value`][super::Value], or a session input/output.
 ///
 /// ```
 /// # use std::sync::Arc;
-/// # use ort::{session::Session, tensor::{Shape, SymbolicDimensions}, value::{ValueType, Tensor}, tensor::TensorElementType};
+/// # use ort::{session::Session, value::{ValueType, Tensor, Shape, SymbolicDimensions, TensorElementType}};
 /// # fn main() -> ort::Result<()> {
 /// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// // `ValueType`s can be obtained from session inputs/outputs:
 /// let input = &session.inputs()[0];
-/// assert_eq!(input.dtype(), &ValueType::Tensor {
-/// 	ty: TensorElementType::Float32,
-/// 	// Our model's input has 3 dynamic dimensions, represented by -1
-/// 	shape: Shape::new([-1, -1, -1, 3]),
-/// 	// Dynamic dimensions may also have names.
-/// 	dimension_symbols: SymbolicDimensions::new([
-/// 		"unk__31".to_string(),
-/// 		"unk__32".to_string(),
-/// 		"unk__33".to_string(),
-/// 		String::default()
-/// 	])
-/// });
+/// assert_eq!(
+/// 	input.dtype(),
+/// 	&ValueType::Tensor {
+/// 		ty: TensorElementType::Float32,
+/// 		// Our model's input has 3 dynamic dimensions, represented by -1
+/// 		shape: Shape::new([-1, -1, -1, 3]),
+/// 		// Dynamic dimensions may also have names.
+/// 		dimension_symbols: SymbolicDimensions::new([
+/// 			"unk__31".to_string(),
+/// 			"unk__32".to_string(),
+/// 			"unk__33".to_string(),
+/// 			String::default()
+/// 		])
+/// 	}
+/// );
 ///
 /// // ...or by `Value`s created in Rust or output by a session.
 /// let value = Tensor::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
-/// assert_eq!(value.dtype(), &ValueType::Tensor {
-/// 	ty: TensorElementType::Int64,
-/// 	shape: Shape::new([5]),
-/// 	dimension_symbols: SymbolicDimensions::new([String::default()])
-/// });
+/// assert_eq!(
+/// 	value.dtype(),
+/// 	&ValueType::Tensor {
+/// 		ty: TensorElementType::Int64,
+/// 		shape: Shape::new([5]),
+/// 		dimension_symbols: SymbolicDimensions::new([String::default()])
+/// 	}
+/// );
 /// # 	Ok(())
 /// # }
 /// ```
@@ -215,7 +221,7 @@ impl ValueType {
 	/// Returns the element type of this value type if it is a tensor, or `None` if it is a sequence or map.
 	///
 	/// ```
-	/// # use ort::{tensor::TensorElementType, value::Tensor};
+	/// # use ort::value::{Tensor, TensorElementType};
 	/// # fn main() -> ort::Result<()> {
 	/// let value = Tensor::from_array(([5usize], vec![1_i64, 2, 3, 4, 5].into_boxed_slice()))?;
 	/// assert_eq!(value.dtype().tensor_type(), Some(TensorElementType::Int64));
@@ -374,7 +380,7 @@ mod tests {
 	use super::ValueType;
 	use crate::{
 		ortsys,
-		tensor::{Shape, SymbolicDimensions, TensorElementType}
+		value::{Shape, SymbolicDimensions, TensorElementType}
 	};
 
 	#[test]

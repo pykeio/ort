@@ -42,6 +42,7 @@ pub mod tensor;
 pub mod training;
 pub mod util;
 pub mod value;
+#[doc(hidden)]
 pub mod api {
 	#[cfg(feature = "training")]
 	pub use super::training::training_api as training;

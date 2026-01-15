@@ -77,6 +77,7 @@ static G_ENV_OPTIONS: OnceLock<EnvironmentBuilder> = OnceLock::new();
 pub struct Environment {
 	execution_providers: SmallVec<[ExecutionProviderDispatch; STACK_EXECUTION_PROVIDERS]>,
 	ptr: NonNull<ort_sys::OrtEnv>,
+	has_global_threadpool: bool,
 	_thread_manager: Option<Arc<dyn Any>>,
 	_logger: Option<LoggerFunction>
 }
@@ -109,7 +110,7 @@ impl Environment {
 
 	#[inline]
 	pub(crate) fn has_global_threadpool(&self) -> bool {
-		self._thread_manager.is_some()
+		self.has_global_threadpool
 	}
 }
 
@@ -517,6 +518,7 @@ impl EnvironmentBuilder {
 		Ok(Environment {
 			execution_providers: self.execution_providers.clone(),
 			ptr: env_ptr,
+			has_global_threadpool: self.global_thread_pool_options.is_some(),
 			_thread_manager: self
 				.global_thread_pool_options
 				.as_ref()

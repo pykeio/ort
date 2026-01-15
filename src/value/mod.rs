@@ -536,7 +536,7 @@ mod tests {
 		let map_contents = [("meaning".to_owned(), 42.0), ("pi".to_owned(), core::f32::consts::PI)];
 		let value = Sequence::new([Map::<String, f32>::new(map_contents)?])?;
 
-		for map in value.extract_sequence(&Allocator::default()) {
+		for map in value.extract_sequence() {
 			let map = map.extract_key_values().into_iter().collect::<std::collections::HashMap<_, _>>();
 			assert_eq!(map["meaning"], 42.0);
 			assert_eq!(map["pi"], core::f32::consts::PI);

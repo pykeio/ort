@@ -10,7 +10,8 @@ use crate::{
 	AsPointer, ErrorCode,
 	error::{Error, Result},
 	memory::Allocator,
-	ortsys
+	ortsys,
+	value::DynValueTypeMarker
 };
 
 pub trait SequenceValueTypeMarker: ValueTypeMarker {
@@ -73,22 +74,17 @@ pub type SequenceRef<'v, T> = ValueRef<'v, SequenceValueType<T>>;
 pub type SequenceRefMut<'v, T> = ValueRefMut<'v, SequenceValueType<T>>;
 
 impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
-	pub fn try_extract_sequence<OtherType: ValueTypeMarker + DowncastableTarget + Debug + Sized>(
-		&self,
-		allocator: &Allocator
-	) -> Result<Vec<ValueRef<'_, OtherType>>> {
+	pub fn try_extract_sequence<'s, OtherType: ValueTypeMarker + DowncastableTarget + Debug + Sized>(&'s self) -> Result<Vec<ValueRef<'s, OtherType>>> {
 		match self.dtype() {
 			ValueType::Sequence(_) => {
+				let allocator = Allocator::default();
+
 				let mut len = 0;
 				ortsys![unsafe GetValueCount(self.ptr(), &mut len)?];
 
 				let mut vec = Vec::with_capacity(len);
 				for i in 0..len {
-					let mut value_ptr = ptr::null_mut();
-					ortsys![unsafe GetValue(self.ptr(), i as _, allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
-
-					let mut value = ValueRef::new(unsafe { Value::from_ptr(value_ptr, None) });
-					value.upgradable = false;
+					let value = extract_from_sequence(self.ptr(), i, &allocator)?;
 
 					let value_type = value.dtype();
 					if !OtherType::can_downcast(value.dtype()) {
@@ -98,7 +94,7 @@ impl<Type: SequenceValueTypeMarker + Sized> Value<Type> {
 						));
 					}
 
-					vec.push(value);
+					vec.push(value.downcast()?);
 				}
 				Ok(vec)
 			}
@@ -113,14 +109,13 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized + 'static> Value<Se
 	/// This `Value<T>` must be either a [`Tensor`] or [`Map`].
 	///
 	/// ```
-	/// # use ort::{memory::Allocator, value::{Sequence, Tensor}};
+	/// # use ort::value::{Sequence, Tensor};
 	/// # fn main() -> ort::Result<()> {
-	/// # 	let allocator = Allocator::default();
 	/// let tensor1 = Tensor::<f32>::new(&allocator, [1_usize, 128, 128, 3])?;
 	/// let tensor2 = Tensor::<f32>::new(&allocator, [1_usize, 224, 224, 3])?;
 	/// let value = Sequence::new([tensor1, tensor2])?;
 	///
-	/// for tensor in value.extract_sequence(&allocator) {
+	/// for tensor in value.extract_sequence() {
 	/// 	println!("{:?}", tensor.shape());
 	/// }
 	/// # 	Ok(())
@@ -153,8 +148,28 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized + 'static> Value<Se
 }
 
 impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized> Value<SequenceValueType<T>> {
-	pub fn extract_sequence(&self, allocator: &Allocator) -> Vec<ValueRef<'_, T>> {
-		self.try_extract_sequence(allocator).expect("Failed to extract sequence")
+	pub fn extract_sequence<'s>(&'s self) -> Vec<ValueRef<'s, T>> {
+		self.try_extract_sequence().expect("Failed to extract sequence")
+	}
+
+	#[inline]
+	pub fn len(&self) -> usize {
+		let mut len = 0;
+		ortsys![unsafe GetValueCount(self.ptr(), &mut len).expect("infallible")];
+		len
+	}
+
+	#[inline]
+	pub fn is_empty(&self) -> bool {
+		let mut len = 0;
+		ortsys![unsafe GetValueCount(self.ptr(), &mut len).expect("infallible")];
+		len == 0
+	}
+
+	pub fn get(&self, index: usize) -> Option<ValueRef<'_, T>> {
+		extract_from_sequence(self.ptr(), index, &Allocator::default())
+			.ok()
+			.and_then(|x| x.downcast().ok())
 	}
 
 	/// Converts from a strongly-typed [`Sequence<T>`] to a type-erased [`DynSequence`].
@@ -180,4 +195,13 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized> Value<SequenceValu
 			_markers: PhantomData
 		})
 	}
+}
+
+fn extract_from_sequence<'s>(ptr: *const ort_sys::OrtValue, i: usize, allocator: &Allocator) -> Result<ValueRef<'s, DynValueTypeMarker>> {
+	let mut value_ptr = ptr::null_mut();
+	ortsys![unsafe GetValue(ptr, i as _, allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
+
+	let mut value = ValueRef::new(unsafe { Value::from_ptr(value_ptr, None) });
+	value.upgradable = false;
+	Ok(value)
 }

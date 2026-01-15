@@ -46,6 +46,3 @@ jobs:
       - name: Run tests
         run: |
           cargo test -p ort --verbose --features fetch-models,tls-rustls -- --test-threads 1
-        env:
-          RUSTFLAGS: ${{ startsWith(matrix.platform.os, 'macos') && '-Clink-arg=-fapple-link-rtlib' || '' }}
-          RUSTDOCFLAGS: ${{ startsWith(matrix.platform.os, 'macos') && '-Clink-arg=-fapple-link-rtlib' || '' }}

@@ -1,4 +1,4 @@
-use alloc::string::String;
+use alloc::{borrow::Cow, string::String, sync::Arc};
 use core::fmt;
 
 /// Enum mapping ONNX Runtime's supported tensor data types.
@@ -240,6 +240,18 @@ impl Utf8Data for String {
 }
 
 impl Utf8Data for &str {
+	fn as_utf8_bytes(&self) -> &[u8] {
+		self.as_bytes()
+	}
+}
+
+impl Utf8Data for Cow<'_, str> {
+	fn as_utf8_bytes(&self) -> &[u8] {
+		self.as_bytes()
+	}
+}
+
+impl Utf8Data for Arc<str> {
 	fn as_utf8_bytes(&self) -> &[u8] {
 		self.as_bytes()
 	}

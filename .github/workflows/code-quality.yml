@@ -39,7 +39,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: nightly-2025-09-28
+          toolchain: nightly-2025-12-21
           components: rustfmt, clippy
       - name: Check fmt
         run: cargo fmt --all -- --check
@@ -55,7 +55,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: nightly-2025-09-28
+          toolchain: nightly-2025-12-21
       - name: Get Rust version
         id: rust-version
         run: echo "::set-output name=version::$(cargo --version | cut -d ' ' -f 2)"
@@ -87,7 +87,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: nightly-2025-09-28
+          toolchain: nightly-2025-12-21
       - name: Install cargo-docs-rs
         uses: dtolnay/install@cargo-docs-rs
       - run: cargo docs-rs

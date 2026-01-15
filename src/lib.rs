@@ -25,13 +25,11 @@ pub mod __private {
 #[macro_use]
 pub(crate) mod private;
 
-pub mod adapter;
 pub mod compiler;
 pub mod editor;
 pub mod environment;
 pub mod ep;
 pub mod error;
-pub mod io_binding;
 pub mod logging;
 pub mod memory;
 pub mod operator;

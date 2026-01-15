@@ -3,7 +3,7 @@ use std::path::Path;
 use super::TrainingArguments;
 use crate::{
 	error::Result,
-	session::input::SessionInputs,
+	session::SessionInputs,
 	training::{Checkpoint, Optimizer, Trainer}
 };
 

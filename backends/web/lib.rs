@@ -77,7 +77,7 @@
 //! though.
 //!
 //! ## Limitations
-//! - [`OutputSelector`](ort::session::run_options::OutputSelector) is not currently implemented.
+//! - [`OutputSelector`](ort::session::OutputSelector) is not currently implemented.
 //! - [`IoBinding`](ort::io_binding) is not supported by ONNX Runtime on the web.
 
 #![deny(clippy::panic, clippy::panicking_unwrap)]

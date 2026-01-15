@@ -7,9 +7,8 @@ use core::ops::{Deref, DerefMut};
 use super::DefiniteTensorValueTypeMarker;
 use crate::{
 	Error, OnceLock, Result, ep,
-	io_binding::IoBinding,
 	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
-	session::{NoSelectedOutputs, RunOptions, Session, builder::GraphOptimizationLevel},
+	session::{IoBinding, NoSelectedOutputs, RunOptions, Session, builder::GraphOptimizationLevel},
 	util::{MiniMap, Mutex, MutexGuard},
 	value::{DynTensor, Value}
 };

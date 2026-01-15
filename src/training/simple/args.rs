@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use super::{DataLoader, TrainerCallbacks};
-use crate::session::input::SessionInputs;
+use crate::session::SessionInputs;
 
 pub enum EvaluationStrategy {
 	None,

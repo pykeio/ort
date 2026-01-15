@@ -35,30 +35,34 @@ use crate::{
 	AsPointer,
 	environment::Environment,
 	error::{Error, ErrorCode, Result, status_to_result},
-	io_binding::IoBinding,
 	memory::Allocator,
 	ortsys,
 	util::{AllocatedString, STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS, with_cstr, with_cstr_ptr_array},
 	value::{DynValue, Outlet, Value, ValueType}
 };
 
+mod adapter;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 mod r#async;
 pub mod builder;
-pub mod input;
-pub mod metadata;
-pub mod output;
-pub mod run_options;
+mod input;
+mod io_binding;
+mod metadata;
+mod output;
+mod run_options;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 pub use self::r#async::InferenceFut;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 use self::r#async::{AsyncInferenceContext, InferenceFutInner};
-use self::{builder::SessionBuilder, metadata::ModelMetadata, run_options::UntypedRunOptions};
 pub use self::{
+	adapter::Adapter,
 	input::{SessionInputValue, SessionInputs},
+	io_binding::IoBinding,
+	metadata::ModelMetadata,
 	output::SessionOutputs,
-	run_options::{HasSelectedOutputs, NoSelectedOutputs, RunOptions, SelectedOutputMarker}
+	run_options::{HasSelectedOutputs, NoSelectedOutputs, OutputSelector, RunOptions, SelectedOutputMarker}
 };
+use self::{builder::SessionBuilder, run_options::UntypedRunOptions};
 
 /// Holds onto an [`ort_sys::OrtSession`] pointer and its associated allocator.
 ///
@@ -194,7 +198,7 @@ impl Session {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{run_options::RunOptions, Session}, value::{Value, ValueType, TensorRef, TensorElementType}};
+	/// # use ort::{session::{RunOptions, Session}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
 	/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
@@ -223,7 +227,7 @@ impl Session {
 	/// ```no_run
 	/// # // no_run because upsample.onnx is too simple of a model for the termination signal to be reliable enough
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef, TensorElementType}};
+	/// # use ort::{session::{Session, RunOptions}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
@@ -385,7 +389,7 @@ impl Session {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef, TensorElementType}};
+	/// # use ort::{session::{Session, RunOptions}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> { tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
 	/// let mut session = Session::builder()?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
@@ -501,7 +505,7 @@ impl Session {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{Session, run_options::RunOptions}, value::{Value, ValueType, TensorRef, TensorElementType}};
+	/// # use ort::{session::{Session, RunOptions}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> { tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
 	/// let mut session = Session::builder()?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
@@ -614,7 +618,7 @@ impl Session {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{run_options::RunOptions, Session, WorkloadType}, value::{Value, ValueType, TensorRef, TensorElementType}};
+	/// # use ort::{session::{RunOptions, Session, WorkloadType}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
 	/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// session.set_workload_type(WorkloadType::Efficient)?;

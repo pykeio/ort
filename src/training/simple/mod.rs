@@ -1,7 +1,7 @@
 use alloc::collections::VecDeque;
 use std::fs;
 
-use crate::{error::Result, session::input::SessionInputs, training::Trainer};
+use crate::{error::Result, session::SessionInputs, training::Trainer};
 
 mod dataloader;
 pub use self::dataloader::{DataLoader, IterableDataLoader, iterable_data_loader};

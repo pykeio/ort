@@ -1,67 +1,3 @@
-//! An input adapter, allowing for loading many static inputs from disk at once.
-//!
-//! [`Adapter`] essentially acts as a collection of predefined inputs allocated on a specific device that can easily be
-//! swapped out between session runs via [`RunOptions::add_adapter`]. With slight modifications to the session
-//! graph, [`Adapter`]s can be used as low-rank adapters (LoRAs) or as containers of style embeddings.
-//!
-//! # Example
-//! An adapter can be created in Python with the `AdapterFormat` class:
-//! ```python
-//! import numpy as np
-//! import onnxruntime as ort
-//!
-//! param_a = ort.OrtValue.ortvalue_from_numpy(np.array([[3], [4], [5], [6]], dtype=np.float32))
-//! param_b = ort.OrtValue.ortvalue_from_numpy(np.array([[7, 8, 9, 10]], dtype=np.float32))
-//!
-//! adapter = ort.AdapterFormat()
-//! adapter.set_parameters({
-//! 	'lora_param_a': param_a,
-//! 	'lora_param_b': param_b
-//! })
-//! adapter.export_adapter('tests/data/adapter.orl')
-//! ```
-//!
-//! Then, in Rust:
-//! ```
-//! # use ort::{adapter::Adapter, session::{run_options::RunOptions, Session}, value::Tensor};
-//! # fn main() -> ort::Result<()> {
-//! let mut model = Session::builder()?.commit_from_file("tests/data/lora_model.onnx")?;
-//! let lora = Adapter::from_file("tests/data/adapter.orl", None)?;
-//!
-//! let mut run_options = RunOptions::new()?;
-//! run_options.add_adapter(&lora)?;
-//!
-//! let outputs =
-//! 	model.run_with_options(ort::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?], &run_options)?;
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! Using [`Adapter`] is identical to, but more convenient than:
-//! ```
-//! # use ort::{adapter::Adapter, session::{run_options::RunOptions, Session}, value::Tensor};
-//! # fn main() -> ort::Result<()> {
-//! let mut model = Session::builder()?.commit_from_file("tests/data/lora_model.onnx")?;
-//!
-//! // Load our parameters from disk somehow
-//! let param_a = Tensor::<f32>::from_array(([4, 1], vec![3., 4., 5., 6.]))?;
-//! let param_b = Tensor::<f32>::from_array(([1, 4], vec![7., 8., 6., 10.]))?;
-//!
-//! let outputs = model.run(ort::inputs![
-//! 	"input" => Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?,
-//! 	// Adapter parameters are just inputs.
-//! 	"lora_param_a" => param_a.view(),
-//! 	"lora_param_b" => param_b.view()
-//! ])?;
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! [`Adapter`] also lets us copy the parameters to a GPU at load time, so that they don't need to be copied on each
-//! session run.
-//!
-//! [`RunOptions::add_adapter`]: crate::session::run_options::RunOptions::add_adapter
-
 use alloc::sync::Arc;
 use core::ptr::{self, NonNull};
 #[cfg(feature = "std")]
@@ -91,7 +27,67 @@ impl Drop for AdapterInner {
 
 /// An input adapter, allowing for loading many static inputs from disk at once.
 ///
-/// See the [module-level documentation][self] for more information.
+/// [`Adapter`] essentially acts as a collection of predefined inputs allocated on a specific device that can easily be
+/// swapped out between session runs via [`RunOptions::add_adapter`]. With slight modifications to the session
+/// graph, [`Adapter`]s can be used as low-rank adapters (LoRAs) or as containers of style embeddings.
+///
+/// # Example
+/// An adapter can be created in Python with the `AdapterFormat` class:
+/// ```python
+/// import numpy as np
+/// import onnxruntime as ort
+///
+/// param_a = ort.OrtValue.ortvalue_from_numpy(np.array([[3], [4], [5], [6]], dtype=np.float32))
+/// param_b = ort.OrtValue.ortvalue_from_numpy(np.array([[7, 8, 9, 10]], dtype=np.float32))
+///
+/// adapter = ort.AdapterFormat()
+/// adapter.set_parameters({
+/// 	'lora_param_a': param_a,
+/// 	'lora_param_b': param_b
+/// })
+/// adapter.export_adapter('tests/data/adapter.orl')
+/// ```
+///
+/// Then, in Rust:
+/// ```
+/// # use ort::{session::{Adapter, RunOptions, Session}, value::Tensor};
+/// # fn main() -> ort::Result<()> {
+/// let mut model = Session::builder()?.commit_from_file("tests/data/lora_model.onnx")?;
+/// let lora = Adapter::from_file("tests/data/adapter.orl", None)?;
+///
+/// let mut run_options = RunOptions::new()?;
+/// run_options.add_adapter(&lora)?;
+///
+/// let outputs =
+/// 	model.run_with_options(ort::inputs![Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?], &run_options)?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// Using [`Adapter`] is identical to, but more convenient than:
+/// ```
+/// # use ort::{session::{Adapter, RunOptions, Session}, value::Tensor};
+/// # fn main() -> ort::Result<()> {
+/// let mut model = Session::builder()?.commit_from_file("tests/data/lora_model.onnx")?;
+///
+/// // Load our parameters from disk somehow
+/// let param_a = Tensor::<f32>::from_array(([4, 1], vec![3., 4., 5., 6.]))?;
+/// let param_b = Tensor::<f32>::from_array(([1, 4], vec![7., 8., 6., 10.]))?;
+///
+/// let outputs = model.run(ort::inputs![
+/// 	"input" => Tensor::<f32>::from_array(([4, 4], vec![1.0; 16]))?,
+/// 	// Adapter parameters are just inputs.
+/// 	"lora_param_a" => param_a.view(),
+/// 	"lora_param_b" => param_b.view()
+/// ])?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// [`Adapter`] also lets us copy the parameters to a GPU at load time, so that they don't need to be copied on each
+/// session run.
+///
+/// [`RunOptions::add_adapter`]: crate::session::RunOptions::add_adapter
 #[derive(Debug, Clone)]
 pub struct Adapter {
 	pub(crate) inner: Arc<AdapterInner>
@@ -105,10 +101,9 @@ impl Adapter {
 	///
 	/// ```
 	/// # use ort::{
-	/// # 	adapter::Adapter,
 	/// # 	ep,
 	/// # 	memory::DeviceType,
-	/// # 	session::{run_options::RunOptions, Session},
+	/// # 	session::{Adapter, RunOptions, Session},
 	/// # 	value::Tensor
 	/// # };
 	/// # fn main() -> ort::Result<()> {
@@ -151,10 +146,9 @@ impl Adapter {
 	///
 	/// ```
 	/// # use ort::{
-	/// # 	adapter::Adapter,
 	/// # 	ep,
 	/// # 	memory::DeviceType,
-	/// # 	session::{run_options::RunOptions, Session},
+	/// # 	session::{Adapter, RunOptions, Session},
 	/// # 	value::Tensor
 	/// # };
 	/// # fn main() -> ort::Result<()> {

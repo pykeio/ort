@@ -1,5 +1,4 @@
 use ort::{
-	adapter::Adapter,
 	ep,
 	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
 	operator::{
@@ -7,7 +6,7 @@ use ort::{
 		io::{OperatorInput, OperatorOutput},
 		kernel::{Kernel, KernelAttributes, KernelContext}
 	},
-	session::{RunOptions, Session},
+	session::{Adapter, RunOptions, Session},
 	value::{Tensor, TensorElementType}
 };
 

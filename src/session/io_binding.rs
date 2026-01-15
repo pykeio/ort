@@ -1,81 +1,3 @@
-//! Enables binding of session inputs and/or outputs to pre-allocated memory.
-//!
-//! [`IoBinding`] minimizes copies between a device (like a GPU) and the host (CPU) by allowing you to bind a
-//! certain input/output to a pre-allocated value on a specific device.
-//!
-//! [`IoBinding`] is most suitable for:
-//! - An ensemble of models in which the output from one model is the input to another and does not need to pass through
-//!   the CPU to perform additional processing.
-//! - Situations where an output should stay on a device (e.g. to perform additional hardware-accelerated processing).
-//! - Models that accept an input that does not change for multiple subsequent runs (like the conditional embedding for
-//!   a diffusion model).
-//!
-//! [`IoBinding`] will not provide any meaningful benefit for:
-//! - Models where every input changes with each invocation, such as a causal language model or object recognition
-//!   model.
-//! - Pipelines that go straight from CPU -> GPU -> CPU.
-//!
-//! # Example
-//! A diffusion model which takes a text condition input.
-//!
-//! ```no_run
-//! # use ort::{
-//! # 	ep,
-//! # 	io_binding::IoBinding,
-//! # 	memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType},
-//! # 	session::Session,
-//! # 	value::Tensor
-//! # };
-//! # fn main() -> ort::Result<()> {
-//! let mut text_encoder = Session::builder()?
-//! 	.with_execution_providers([ep::CUDA::default().build()])?
-//! 	.commit_from_file("text_encoder.onnx")?;
-//! let mut unet = Session::builder()?
-//! 	.with_execution_providers([ep::CUDA::default().build()])?
-//! 	.commit_from_file("unet.onnx")?;
-//!
-//! let text_condition = text_encoder
-//! 	.run(ort::inputs![Tensor::<i64>::from_array((
-//! 		vec![27],
-//! 		vec![
-//! 			23763, 15460, 473, 68, 312, 265, 17463, 4098, 304, 1077, 283, 198, 7676, 5976, 272, 285, 3609, 435,
-//! 			21680, 321, 265, 300, 1689, 64, 285, 4763, 64
-//! 		]
-//! 	))?])?
-//! 	.remove("output0")
-//! 	.unwrap();
-//!
-//! let input_allocator = Allocator::new(
-//! 	&unet,
-//! 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
-//! )?;
-//! let mut latents = Tensor::<f32>::new(&input_allocator, [1_usize, 4, 64, 64])?;
-//!
-//! let mut io_binding = unet.create_binding()?;
-//! io_binding.bind_input("condition", &text_condition)?;
-//!
-//! let output_allocator = Allocator::new(
-//! 	&unet,
-//! 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUOutput)?
-//! )?;
-//! io_binding.bind_output("noise_pred", Tensor::<f32>::new(&output_allocator, [1_usize, 4, 64, 64])?)?;
-//!
-//! for _ in 0..20 {
-//! 	io_binding.bind_input("latents", &latents)?;
-//! 	let noise_pred = unet.run_binding(&io_binding)?.remove("noise_pred").unwrap();
-//!
-//! 	let mut latents = latents.extract_array_mut();
-//! 	latents += &noise_pred.try_extract_array::<f32>()?;
-//! }
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! [`IoBinding`] may provide a decent speedup in this example since the `condition` tensor is unchanging between runs.
-//! If we were to use normal session inference, the `condition` tensor would be needlessly copied with each invocation
-//! of `unet.run()`, and this copying can come with significant latency & overhead. With [`IoBinding`], the `condition`
-//! tensor is only copied to the device once instead of 20 times.
-
 use alloc::{string::String, sync::Arc};
 use core::{
 	fmt::Debug,
@@ -94,9 +16,80 @@ use crate::{
 
 /// Enables binding of session inputs and/or outputs to pre-allocated memory.
 ///
-/// An `IoBinding` can be created from a [`Session`] with [`Session::create_binding`].
+/// [`IoBinding`] minimizes copies between a device (like a GPU) and the host (CPU) by allowing you to bind a
+/// certain input/output to a pre-allocated value on a specific device.
 ///
-/// See the [module-level documentation][self] for more information.
+/// [`IoBinding`] is most suitable for:
+/// - An ensemble of models in which the output from one model is the input to another and does not need to pass through
+///   the CPU to perform additional processing.
+/// - Situations where an output should stay on a device (e.g. to perform additional hardware-accelerated processing).
+/// - Models that accept an input that does not change for multiple subsequent runs (like the conditional embedding for
+///   a diffusion model).
+///
+/// [`IoBinding`] will not provide any meaningful benefit for:
+/// - Models where every input changes with each invocation, such as a causal language model or object recognition
+///   model.
+/// - Pipelines that go straight from CPU -> GPU -> CPU.
+///
+/// # Example
+/// A diffusion model which takes a text condition input.
+///
+/// ```no_run
+/// # use ort::{
+/// # 	ep,
+/// # 	memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType},
+/// # 	session::{Session, IoBinding},
+/// # 	value::Tensor
+/// # };
+/// # fn main() -> ort::Result<()> {
+/// let mut text_encoder = Session::builder()?
+/// 	.with_execution_providers([ep::CUDA::default().build()])?
+/// 	.commit_from_file("text_encoder.onnx")?;
+/// let mut unet = Session::builder()?
+/// 	.with_execution_providers([ep::CUDA::default().build()])?
+/// 	.commit_from_file("unet.onnx")?;
+///
+/// let text_condition = text_encoder
+/// 	.run(ort::inputs![Tensor::<i64>::from_array((
+/// 		vec![27],
+/// 		vec![
+/// 			23763, 15460, 473, 68, 312, 265, 17463, 4098, 304, 1077, 283, 198, 7676, 5976, 272, 285, 3609, 435,
+/// 			21680, 321, 265, 300, 1689, 64, 285, 4763, 64
+/// 		]
+/// 	))?])?
+/// 	.remove("output0")
+/// 	.unwrap();
+///
+/// let input_allocator = Allocator::new(
+/// 	&unet,
+/// 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
+/// )?;
+/// let mut latents = Tensor::<f32>::new(&input_allocator, [1_usize, 4, 64, 64])?;
+///
+/// let mut io_binding = unet.create_binding()?;
+/// io_binding.bind_input("condition", &text_condition)?;
+///
+/// let output_allocator = Allocator::new(
+/// 	&unet,
+/// 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUOutput)?
+/// )?;
+/// io_binding.bind_output("noise_pred", Tensor::<f32>::new(&output_allocator, [1_usize, 4, 64, 64])?)?;
+///
+/// for _ in 0..20 {
+/// 	io_binding.bind_input("latents", &latents)?;
+/// 	let noise_pred = unet.run_binding(&io_binding)?.remove("noise_pred").unwrap();
+///
+/// 	let mut latents = latents.extract_array_mut();
+/// 	latents += &noise_pred.try_extract_array::<f32>()?;
+/// }
+/// # Ok(())
+/// # }
+/// ```
+///
+/// [`IoBinding`] may provide a decent speedup in this example since the `condition` tensor is unchanging between runs.
+/// If we were to use normal session inference, the `condition` tensor would be needlessly copied with each invocation
+/// of `unet.run()`, and this copying can come with significant latency & overhead. With [`IoBinding`], the `condition`
+/// tensor is only copied to the device once instead of 20 times.
 #[derive(Debug)]
 pub struct IoBinding {
 	ptr: NonNull<ort_sys::OrtIoBinding>,

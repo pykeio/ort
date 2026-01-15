@@ -10,11 +10,13 @@ use smallvec::SmallVec;
 
 use crate::{
 	AsPointer,
-	adapter::{Adapter, AdapterInner},
 	error::Result,
 	logging::LogLevel,
 	ortsys,
-	session::Outlet,
+	session::{
+		Outlet,
+		adapter::{Adapter, AdapterInner}
+	},
 	util::{MiniMap, STACK_SESSION_OUTPUTS, with_cstr},
 	value::{DynValue, Value, ValueTypeMarker}
 };
@@ -23,7 +25,7 @@ use crate::{
 ///
 /// ```
 /// # use std::sync::Arc;
-/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
+/// # use ort::{session::{Session, RunOptions, OutputSelector}, memory::Allocator, value::Tensor};
 /// # fn main() -> ort::Result<()> {
 /// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 /// let input = Tensor::<f32>::new(&Allocator::default(), [1_usize, 64, 64, 3])?;
@@ -102,7 +104,7 @@ impl OutputSelector {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
+	/// # use ort::{session::{Session, RunOptions, OutputSelector}, memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = Tensor::<f32>::new(&Allocator::default(), [1_usize, 64, 64, 3])?;
@@ -227,7 +229,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, memory::Allocator, value::Tensor};
+	/// # use ort::{session::{Session, RunOptions, OutputSelector}, memory::Allocator, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
 	/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = Tensor::<f32>::new(&Allocator::default(), [1_usize, 64, 64, 3])?;
@@ -282,7 +284,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// ```no_run
 	/// # // no_run because upsample.onnx is too simple of a model for the termination signal to be reliable enough
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, value::Value};
+	/// # use ort::{session::{Session, RunOptions, OutputSelector}, value::Value};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
@@ -310,7 +312,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	///
 	/// ```no_run
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{Session, run_options::{RunOptions, OutputSelector}}, value::Value};
+	/// # use ort::{session::{Session, RunOptions, OutputSelector}, value::Value};
 	/// # fn main() -> ort::Result<()> {
 	/// # 	let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
@@ -339,7 +341,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// like CUDA:
 	/// ```no_run
 	/// # use std::sync::Arc;
-	/// # use ort::session::run_options::RunOptions;
+	/// # use ort::session::RunOptions;
 	/// # fn main() -> ort::Result<()> {
 	/// let mut run_options = RunOptions::new()?;
 	/// run_options.add_config_entry("gpu_graph_id", "1")?;

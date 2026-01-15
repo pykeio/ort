@@ -239,7 +239,7 @@ impl CUDA {
 	/// - Models with control flow operators (like `If`, `Loop`, or `Scan`) are not supported.
 	/// - Input/output shapes cannot change across inference calls.
 	/// - The address of inputs/outputs cannot change across inference calls, so
-	///   [`IoBinding`](crate::io_binding::IoBinding) must be used.
+	///   [`IoBinding`](crate::session::IoBinding) must be used.
 	/// - `Session`s using CUDA graphs are technically not `Send` or `Sync`.
 	///
 	/// Consult the [ONNX Runtime documentation on CUDA graphs](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#using-cuda-graphs-preview) for more information.

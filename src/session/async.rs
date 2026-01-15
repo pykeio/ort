@@ -14,7 +14,7 @@ use smallvec::SmallVec;
 
 use crate::{
 	error::Result,
-	session::{SessionOutputs, SharedSessionInner, run_options::UntypedRunOptions},
+	session::{SessionOutputs, SharedSessionInner, UntypedRunOptions},
 	util::{STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS},
 	value::{Value, ValueInner}
 };

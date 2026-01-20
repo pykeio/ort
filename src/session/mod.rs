@@ -522,11 +522,11 @@ impl Session {
 	) -> Result<SessionOutputs<'r>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
-				self.run_inner_async(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), &run_options.inner)
+				self.run_inner_async(self.inputs.iter().map(|input| input.name()).collect(), input_values.iter().collect(), &run_options.inner)
 					.await
 			}
 			SessionInputs::ValueArray(input_values) => {
-				self.run_inner_async(self.inputs.iter().map(|input| input.name.as_str()).collect(), input_values.iter().collect(), &run_options.inner)
+				self.run_inner_async(self.inputs.iter().map(|input| input.name()).collect(), input_values.iter().collect(), &run_options.inner)
 					.await
 			}
 			SessionInputs::ValueMap(input_values) => {
@@ -539,8 +539,8 @@ impl Session {
 	#[cfg(target_arch = "wasm32")]
 	async fn run_inner_async<'i, 'r, 's: 'r, 'v: 'i + 's>(
 		&'s self,
-		input_names: SmallVec<&str, { STACK_SESSION_INPUTS }>,
-		input_values: SmallVec<&SessionInputValue<'v>, { STACK_SESSION_INPUTS }>,
+		input_names: SmallVec<[&str; STACK_SESSION_INPUTS]>,
+		input_values: SmallVec<[&SessionInputValue<'v>; STACK_SESSION_INPUTS]>,
 		run_options: &'r UntypedRunOptions
 	) -> Result<SessionOutputs<'r>> {
 		if input_values.len() > input_names.len() {
@@ -551,14 +551,14 @@ impl Session {
 		}
 
 		let (output_names, mut output_tensors) = run_options.outputs.resolve_outputs(&self.outputs);
-		let mut output_value_ptrs: SmallVec<*mut ort_sys::OrtValue, { STACK_SESSION_OUTPUTS }> = output_tensors
+		let mut output_value_ptrs: SmallVec<[*mut ort_sys::OrtValue; STACK_SESSION_OUTPUTS]> = output_tensors
 			.iter_mut()
 			.map(|c| match c {
 				Some(v) => v.ptr_mut(),
 				None => ptr::null_mut()
 			})
 			.collect();
-		let input_value_ptrs: SmallVec<*const ort_sys::OrtValue, { STACK_SESSION_INPUTS }> = input_values.iter().map(|c| c.ptr()).collect();
+		let input_value_ptrs: SmallVec<[*const ort_sys::OrtValue; STACK_SESSION_INPUTS]> = input_values.iter().map(|c| c.ptr()).collect();
 
 		let status = ortsys![
 			unsafe RunAsync(

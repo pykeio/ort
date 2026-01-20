@@ -69,3 +69,17 @@ jobs:
       - name: Run tests
         run: |
           cargo test --manifest-path backends/tract/Cargo.toml -p ort-tract --verbose -- --test-threads 1
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2.7.8
+      - name: Run tests
+        run: |
+          cargo check --manifest-path backends/web/Cargo.toml -p ort-web --target wasm32-unknown-unknown

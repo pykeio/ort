@@ -580,7 +580,7 @@ pub fn init() -> EnvironmentBuilder {
 ///   and you *must* call `.commit()` on the builder returned by this function.
 ///
 /// [`Session`]: crate::session::Session
-#[cfg(feature = "load-dynamic")]
+#[cfg(all(feature = "load-dynamic", not(target_arch = "wasm32")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "load-dynamic")))]
 #[must_use = "commit() must be called in order for the environment to take effect"]
 pub fn init_from<P: AsRef<std::path::Path>>(path: P) -> Result<EnvironmentBuilder> {

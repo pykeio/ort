@@ -53,7 +53,7 @@ pub use self::ndarray::ArrayExt;
 /// let _ = ort::util::preload_dylib(application_dir.join("DirectML.dll"));
 /// ```
 #[cfg_attr(docsrs, doc(cfg(any(feature = "preload-dylibs", feature = "load-dynamic"))))]
-#[cfg(feature = "preload-dylibs")]
+#[cfg(all(feature = "preload-dylibs", not(target_arch = "wasm32")))]
 pub fn preload_dylib<P: libloading::AsFilename>(path: P) -> Result<(), libloading::Error> {
 	let library = unsafe { libloading::Library::new(path) }?;
 	// Do not run `FreeLibrary` so the library remains in the loaded modules list.

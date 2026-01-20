@@ -276,7 +276,7 @@ impl core::error::Error for RegisterError {}
 #[allow(unused)]
 macro_rules! define_ep_register {
 	($symbol:ident($($id:ident: $type:ty),*) -> $rt:ty) => {
-		#[cfg(feature = "load-dynamic")]
+		#[cfg(all(feature = "load-dynamic", not(target_arch = "wasm32")))]
 		#[allow(non_snake_case)]
 		let $symbol = unsafe {
 			let dylib = $crate::G_ORT_LIB.get().expect("dylib not yet initialized");
@@ -291,7 +291,7 @@ macro_rules! define_ep_register {
 				}
 			}
 		};
-		#[cfg(not(feature = "load-dynamic"))]
+		#[cfg(not(all(feature = "load-dynamic", not(target_arch = "wasm32"))))]
 		unsafe extern "C" {
 			fn $symbol($($id: $type),*) -> $rt;
 		}

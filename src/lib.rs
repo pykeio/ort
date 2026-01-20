@@ -58,7 +58,7 @@ use core::{ffi::CStr, ptr::NonNull, str};
 
 pub use ort_sys as sys;
 
-#[cfg(feature = "load-dynamic")]
+#[cfg(all(feature = "load-dynamic", not(target_arch = "wasm32")))]
 pub use self::environment::init_from;
 pub(crate) use self::logging::{debug, error, info, trace, warning as warn};
 #[cfg(test)]
@@ -76,10 +76,10 @@ pub use self::{
 /// the API.
 pub const MINOR_VERSION: u32 = ort_sys::ORT_API_VERSION;
 
-#[cfg(feature = "load-dynamic")]
+#[cfg(all(feature = "load-dynamic", not(target_arch = "wasm32")))]
 pub(crate) static G_ORT_LIB: OnceLock<libloading::Library> = OnceLock::new();
 
-#[cfg(feature = "load-dynamic")]
+#[cfg(all(feature = "load-dynamic", not(target_arch = "wasm32")))]
 pub(crate) fn load_dylib_from_path(path: &std::path::Path) -> Result<bool> {
 	let mut inserter = Some(|| -> crate::Result<libloading::Library> {
 		use core::cmp::Ordering;
@@ -156,19 +156,19 @@ static G_ORT_API: OnceLock<ApiPointer> = OnceLock::new();
 /// - Loading the ONNX Runtime dynamic library fails if the `load-dynamic` feature is enabled.
 #[inline]
 pub fn api() -> &'static ort_sys::OrtApi {
-	#[cfg(feature = "alternative-backend")]
+	#[cfg(any(feature = "alternative-backend", target_arch = "wasm32"))]
 	let ptr = G_ORT_API
 		.get()
 		.expect(
 			"attempted to use `ort` APIs before initializing a backend\nwhen the `alternative-backend` feature is enabled, `ort::set_api` must be called first to configure the `OrtApi` used by the library"
 		)
 		.0;
-	#[cfg(not(feature = "alternative-backend"))]
+	#[cfg(not(any(feature = "alternative-backend", target_arch = "wasm32")))]
 	let ptr = G_ORT_API.get_or_init(setup_api).0;
 	unsafe { ptr.as_ref() }
 }
 
-#[cfg(not(feature = "alternative-backend"))]
+#[cfg(not(any(feature = "alternative-backend", target_arch = "wasm32")))]
 #[cold]
 fn setup_api() -> ApiPointer {
 	#[cfg(feature = "load-dynamic")]

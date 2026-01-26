@@ -211,7 +211,7 @@ impl InferenceSession {
 #[serde(untagged)]
 pub enum ShapeElement {
 	Named(String),
-	Value(i32)
+	Value(i64)
 }
 
 #[derive(Deserialize, Debug)]

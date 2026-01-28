@@ -17,7 +17,7 @@ pub enum BinariesSource {
 pub fn static_link_prerequisites(source: BinariesSource) {
 	let target_triple = env::var("TARGET").unwrap();
 
-	let cpp_link_stdlib = if let Some(stdlib) = vars::get(vars::CXX_STDLIB).or_else(|| vars::get(vars::CXX_STDLIB_ALT)) {
+	let cpp_link_stdlib = if let Some(stdlib) = vars::get_any(vars::CXX_STDLIB) {
 		if stdlib.is_empty() { None } else { Some(stdlib) }
 	} else if target_triple.contains("msvc") {
 		None

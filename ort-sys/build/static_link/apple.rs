@@ -42,7 +42,7 @@ pub fn ios_rtlib_search_dir() -> Option<String> {
 }
 
 fn search_and_link_frameworks_in_sub_dir(sub_dir: &str) -> bool {
-	let Some(xcfwk_dir) = vars::get(vars::IOS_ONNX_XCFWK_LOCATION) else {
+	let Some(xcfwk_dir) = vars::get_any(vars::IOS_ONNX_XCFWK_PATH) else {
 		return false;
 	};
 
@@ -64,7 +64,7 @@ fn search_and_link_frameworks_in_sub_dir(sub_dir: &str) -> bool {
 
 	log::debug!("successfully linked framework from {}", fwk_dir.display());
 
-	let Some(ext_xcfwk_dir) = vars::get(vars::IOS_ONNX_EXT_XCFWK_LOCATION) else {
+	let Some(ext_xcfwk_dir) = vars::get_any(vars::IOS_ONNX_EXT_XCFWK_PATH) else {
 		// If ext is not set, skip linking
 		return true;
 	};

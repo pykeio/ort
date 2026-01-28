@@ -64,9 +64,8 @@ pub fn fetch_file(source_url: &str) -> Result<BodyReader<'static>, Error> {
 }
 
 pub fn should_skip() -> bool {
-	vars::get("CARGO_NET_OFFLINE").as_deref() == Some("true")
-		|| match vars::get(vars::SKIP_DOWNLOAD) {
-			Some(val) => val == "1" || val.to_lowercase() == "true",
-			None => false
-		}
+	match vars::get_any(vars::SKIP_DOWNLOAD) {
+		Some(val) => val == "1" || val.to_lowercase() == "true",
+		None => false
+	}
 }

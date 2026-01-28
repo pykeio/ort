@@ -2,7 +2,7 @@ unsafe extern "C" {
 	#[link_name = "\n\nThe ort-sys crate could not link to ONNX Runtime because:
 	- `libonnxruntime` is not configured via `pkg-config`
 	- ort-sys was instructed not to download prebuilt binaries (`cargo build --offline`), or the `download-binaries` feature is not enabled
-	- Neither `ORT_LIB_LOCATION` or `ORT_IOS_XCFWK_LOCATION` (for iOS) were set to link to custom binaries
+	- Neither `ORT_LIB_PATH` or `ORT_IOS_XCFWK_PATH` (for iOS) were set to link to custom binaries
 
 To rectify this:
 	- Compile ONNX Runtime from source and manually configure linking (see https://ort.pyke.io/setup/linking for more information)

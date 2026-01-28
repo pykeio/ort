@@ -42,7 +42,7 @@ fn main() {
 		return;
 	}
 
-	if let Some(lib_dir) = vars::get(vars::SYSTEM_LIB_LOCATION) {
+	if let Some(lib_dir) = vars::get_any(vars::SYSTEM_LIB_PATH) {
 		let lib_dir = PathBuf::from(lib_dir);
 		if dynamic_link::prefer_dynamic_linking() {
 			println!("cargo:rustc-link-lib=onnxruntime");

@@ -57,3 +57,4 @@ When you need to deploy a PyTorch/TensorFlow/Keras/scikit-learn/PaddlePaddle mod
 - **[`FastEmbed-rs`](https://github.com/Anush008/fastembed-rs)** uses `ort` for generating vector embeddings, reranking locally.
 - **[Ortex](https://github.com/relaypro-open/ortex)** uses `ort` for safe ONNX Runtime bindings in Elixir.
 - **[SilentKeys](https://github.com/gptguy/silentkeys)** uses `ort` for fast, on-device real-time dictation with NVIDIA Parakeet and Silero VAD.
+- **[Murmure](https://github.com/Kieirra/murmure)** uses `ort` as its core engine, leveraging NVIDIA Parakeet to deliver fully local, free, private and cross‑platform Speech‑to‑Text enhanced with LLM post‑processing.

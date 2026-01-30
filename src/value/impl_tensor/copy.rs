@@ -7,10 +7,10 @@ use core::ops::{Deref, DerefMut};
 use super::DefiniteTensorValueTypeMarker;
 use crate::{
 	Error, OnceLock, Result, ep,
-	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
+	memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
 	session::{IoBinding, NoSelectedOutputs, RunOptions, Session, builder::GraphOptimizationLevel},
 	util::{MiniMap, Mutex, MutexGuard},
-	value::{DynTensor, Value}
+	value::Value
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,10 +92,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	pub fn to(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
 		self.copy_to_inner(device, device_id, |identity_session| {
 			let target_memory_info = MemoryInfo::new(device, device_id, AllocatorType::Device, MemoryType::Default)?;
-
-			let allocator = Allocator::new(&identity_session.session, target_memory_info)?;
-			let new_tensor = DynTensor::new(&allocator, *self.data_type(), self.shape().clone())?;
-			identity_session.binding.bind_output("output", new_tensor)?;
+			identity_session.binding.bind_output_to_device("output", &target_memory_info)?;
 
 			let output = identity_session
 				.session

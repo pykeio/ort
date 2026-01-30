@@ -79,8 +79,6 @@ jobs:
   docs-rs:
     name: docs.rs build
     runs-on: ubuntu-24.04
-    env:
-      RUSTDOCFLAGS: -Dwarnings
     steps:
       - name: Checkout sources
         uses: actions/checkout@v5

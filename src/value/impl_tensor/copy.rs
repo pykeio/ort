@@ -228,7 +228,9 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 
 		let mut identity_session = IdentitySessionHandle::new(source_memory_info, device, device_id, tensor_type)?;
 		identity_session.binding.bind_input("input", self)?;
-		runner(&mut identity_session)
+		let res = runner(&mut identity_session);
+		identity_session.binding.clear();
+		res
 	}
 }
 

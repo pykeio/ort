@@ -355,7 +355,8 @@ unsafe extern "system" fn GetTensorMutableData(value: *mut OrtValue, out: *mut *
 				CpuStorage::F64(v) => v.as_ptr() as *mut _,
 				CpuStorage::F32(v) => v.as_ptr() as *mut _,
 				CpuStorage::F16(v) => v.as_ptr() as *mut _,
-				CpuStorage::BF16(v) => v.as_ptr() as *mut _
+				CpuStorage::BF16(v) => v.as_ptr() as *mut _,
+				_ => return Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented dtype")
 			};
 			OrtStatusPtr::default()
 		}
@@ -397,8 +398,13 @@ unsafe extern "system" fn SetDimensions(info: *mut OrtTensorTypeAndShapeInfo, di
 
 unsafe extern "system" fn GetTensorElementType(info: *const OrtTensorTypeAndShapeInfo, out: *mut ONNXTensorElementDataType) -> OrtStatusPtr {
 	let info = unsafe { &*info.cast::<TypeInfo>() };
-	*out = convert_dtype_to_sys(info.dtype);
-	OrtStatusPtr::default()
+	match convert_dtype_to_sys(info.dtype) {
+		Ok(ty) => {
+			*out = ty;
+			OrtStatusPtr::default()
+		}
+		Err(e) => e.into_sys()
+	}
 }
 
 unsafe extern "system" fn GetDimensionsCount(info: *const OrtTensorTypeAndShapeInfo, out: *mut usize) -> OrtStatusPtr {

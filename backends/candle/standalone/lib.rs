@@ -12,7 +12,7 @@ unsafe extern "system" fn get_api(version: u32) -> *const ort_sys::OrtApi {
 	if version <= 23 { &API as *const _ } else { core::ptr::null() }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn OrtGetApiBase() -> *const ort_sys::OrtApiBase {
 	&API_BASE as *const _
 }

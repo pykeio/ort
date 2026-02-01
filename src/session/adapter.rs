@@ -88,6 +88,7 @@ impl Drop for AdapterInner {
 /// session run.
 ///
 /// [`RunOptions::add_adapter`]: crate::session::RunOptions::add_adapter
+#[cfg_attr(docsrs, doc(cfg(feature = "api-20")))]
 #[derive(Debug, Clone)]
 pub struct Adapter {
 	pub(crate) inner: Arc<AdapterInner>

@@ -18,15 +18,17 @@ use crate::{
 	value::DynValue
 };
 
+#[cfg(feature = "api-22")]
+#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
 mod editable;
 mod impl_commit;
 mod impl_config_keys;
 mod impl_options;
 
-pub use self::{
-	editable::EditableSession,
-	impl_options::{GraphOptimizationLevel, PrepackedWeights}
-};
+#[cfg(feature = "api-22")]
+#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
+pub use self::editable::EditableSession;
+pub use self::impl_options::{GraphOptimizationLevel, PrepackedWeights};
 
 /// Creates a session using the builder pattern.
 ///

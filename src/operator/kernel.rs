@@ -104,6 +104,8 @@ impl KernelAttributes {
 		Ok(CString::from_vec_with_nul(name)?.into_string()?)
 	}
 
+	#[cfg(feature = "api-18")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "api-18")))]
 	pub fn allocator(&self, mem_type: MemoryType) -> Result<Allocator> {
 		let mut ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
 		ortsys![unsafe KernelInfoGetAllocator(self.ptr.as_ptr(), mem_type.into(), &mut ptr)?; nonNull(ptr)];

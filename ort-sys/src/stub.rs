@@ -1655,6 +1655,7 @@ unsafe extern "system" fn SessionOptionsAppendExecutionProvider_OpenVINO_V2(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-18")]
 unsafe extern "system" fn SessionOptionsAppendExecutionProvider_VitisAI(
 	options: *mut OrtSessionOptions,
 	provider_options_keys: *const *const ::core::ffi::c_char,
@@ -1664,6 +1665,7 @@ unsafe extern "system" fn SessionOptionsAppendExecutionProvider_VitisAI(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-18")]
 unsafe extern "system" fn KernelContext_GetScratchBuffer(
 	context: *const OrtKernelContext,
 	mem_info: *const OrtMemoryInfo,
@@ -1673,10 +1675,12 @@ unsafe extern "system" fn KernelContext_GetScratchBuffer(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-18")]
 unsafe extern "system" fn KernelInfoGetAllocator(info: *const OrtKernelInfo, mem_type: OrtMemType, out: *mut *mut OrtAllocator) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-18")]
 unsafe extern "system" fn AddExternalInitializersFromMemory(
 	options: *mut OrtSessionOptions,
 	external_initializer_file_names: *const *const os_char,
@@ -1687,10 +1691,12 @@ unsafe extern "system" fn AddExternalInitializersFromMemory(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-20")]
 unsafe extern "system" fn CreateLoraAdapter(adapter_file_path: *const os_char, allocator: *mut OrtAllocator, out: *mut *mut OrtLoraAdapter) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-20")]
 unsafe extern "system" fn CreateLoraAdapterFromArray(
 	bytes: *const ::core::ffi::c_void,
 	num_bytes: usize,
@@ -1700,12 +1706,15 @@ unsafe extern "system" fn CreateLoraAdapterFromArray(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-20")]
 unsafe extern "system" fn ReleaseLoraAdapter(input: *mut OrtLoraAdapter) {}
 
+#[cfg(feature = "api-20")]
 unsafe extern "system" fn RunOptionsAddActiveLoraAdapter(options: *mut OrtRunOptions, adapter: *const OrtLoraAdapter) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-20")]
 unsafe extern "system" fn SetEpDynamicOptions(
 	sess: *mut OrtSession,
 	keys: *const *const ::core::ffi::c_char,
@@ -1715,26 +1724,34 @@ unsafe extern "system" fn SetEpDynamicOptions(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn ReleaseValueInfo(input: *mut OrtValueInfo) {}
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn ReleaseNode(input: *mut OrtNode) {}
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn ReleaseGraph(input: *mut OrtGraph) {}
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn ReleaseModel(input: *mut OrtModel) {}
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn GetValueInfoName(value_info: *const OrtValueInfo, name: *mut *const ::core::ffi::c_char) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn GetValueInfoTypeInfo(value_info: *const OrtValueInfo, type_info: *mut *const OrtTypeInfo) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn GetModelEditorApi() -> *const OrtModelEditorApi {
 	ptr::null()
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn CreateTensorWithDataAndDeleterAsOrtValue(
 	deleter: *mut OrtAllocator,
 	p_data: *mut ::core::ffi::c_void,
@@ -1747,24 +1764,30 @@ unsafe extern "system" fn CreateTensorWithDataAndDeleterAsOrtValue(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn SessionOptionsSetLoadCancellationFlag(options: *mut OrtSessionOptions, cancel: bool) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn GetCompileApi() -> *const OrtCompileApi {
 	ptr::null_mut()
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn CreateKeyValuePairs(out: *mut *mut OrtKeyValuePairs) {
 	unsafe { *out = ptr::null_mut() };
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn AddKeyValuePair(kvps: *mut OrtKeyValuePairs, key: *const ::core::ffi::c_char, value: *const ::core::ffi::c_char) {}
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn GetKeyValue(kvps: *const OrtKeyValuePairs, key: *const ::core::ffi::c_char) -> *const ::core::ffi::c_char {
 	ptr::null()
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn GetKeyValuePairs(
 	kvps: *const OrtKeyValuePairs,
 	keys: *mut *const *const ::core::ffi::c_char,
@@ -1773,10 +1796,13 @@ unsafe extern "system" fn GetKeyValuePairs(
 ) {
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn RemoveKeyValuePair(kvps: *mut OrtKeyValuePairs, key: *const ::core::ffi::c_char) {}
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn ReleaseKeyValuePairs(input: *mut OrtKeyValuePairs) {}
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn RegisterExecutionProviderLibrary(
 	env: *mut OrtEnv,
 	registration_name: *const ::core::ffi::c_char,
@@ -1785,14 +1811,17 @@ unsafe extern "system" fn RegisterExecutionProviderLibrary(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn UnregisterExecutionProviderLibrary(env: *mut OrtEnv, registration_name: *const ::core::ffi::c_char) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn GetEpDevices(env: *const OrtEnv, ep_devices: *mut *const *const OrtEpDevice, num_ep_devices: *mut usize) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn SessionOptionsAppendExecutionProvider_V2(
 	session_options: *mut OrtSessionOptions,
 	env: *mut OrtEnv,
@@ -1805,6 +1834,7 @@ unsafe extern "system" fn SessionOptionsAppendExecutionProvider_V2(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn SessionOptionsSetEpSelectionPolicy(
 	session_options: *mut OrtSessionOptions,
 	policy: OrtExecutionProviderDevicePolicy
@@ -1812,6 +1842,7 @@ unsafe extern "system" fn SessionOptionsSetEpSelectionPolicy(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn SessionOptionsSetEpSelectionPolicyDelegate(
 	session_options: *mut OrtSessionOptions,
 	delegate: EpSelectionDelegate,
@@ -1820,46 +1851,57 @@ unsafe extern "system" fn SessionOptionsSetEpSelectionPolicyDelegate(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn HardwareDevice_Type(device: *const OrtHardwareDevice) -> OrtHardwareDeviceType {
 	OrtHardwareDeviceType::OrtHardwareDeviceType_CPU
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn HardwareDevice_VendorId(device: *const OrtHardwareDevice) -> u32 {
 	0
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn HardwareDevice_Vendor(device: *const OrtHardwareDevice) -> *const ::core::ffi::c_char {
 	ptr::null()
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn HardwareDevice_DeviceId(device: *const OrtHardwareDevice) -> u32 {
 	0
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn HardwareDevice_Metadata(device: *const OrtHardwareDevice) -> *const OrtKeyValuePairs {
 	ptr::null()
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn EpDevice_EpName(ep_device: *const OrtEpDevice) -> *const ::core::ffi::c_char {
 	ptr::null()
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn EpDevice_EpVendor(ep_device: *const OrtEpDevice) -> *const ::core::ffi::c_char {
 	ptr::null()
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn EpDevice_EpMetadata(ep_device: *const OrtEpDevice) -> *const OrtKeyValuePairs {
 	ptr::null()
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn EpDevice_EpOptions(ep_device: *const OrtEpDevice) -> *const OrtKeyValuePairs {
 	ptr::null()
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn EpDevice_Device(ep_device: *const OrtEpDevice) -> *const OrtHardwareDevice {
 	ptr::null()
 }
 
+#[cfg(feature = "api-22")]
 unsafe extern "system" fn GetEpApi() -> *const OrtEpApi {
 	ptr::null()
 }
@@ -2142,47 +2184,89 @@ pub const fn api() -> OrtApi {
 		SetDeterministicCompute,
 		KernelContext_ParallelFor,
 		SessionOptionsAppendExecutionProvider_OpenVINO_V2,
+		#[cfg(feature = "api-18")]
 		SessionOptionsAppendExecutionProvider_VitisAI,
+		#[cfg(feature = "api-18")]
 		KernelContext_GetScratchBuffer,
+		#[cfg(feature = "api-18")]
 		KernelInfoGetAllocator,
+		#[cfg(feature = "api-18")]
 		AddExternalInitializersFromMemory,
+		#[cfg(feature = "api-20")]
 		CreateLoraAdapter,
+		#[cfg(feature = "api-20")]
 		CreateLoraAdapterFromArray,
+		#[cfg(feature = "api-20")]
 		ReleaseLoraAdapter,
+		#[cfg(feature = "api-20")]
 		RunOptionsAddActiveLoraAdapter,
+		#[cfg(feature = "api-20")]
 		SetEpDynamicOptions,
+		#[cfg(feature = "api-22")]
 		ReleaseValueInfo,
+		#[cfg(feature = "api-22")]
 		ReleaseNode,
+		#[cfg(feature = "api-22")]
 		ReleaseGraph,
+		#[cfg(feature = "api-22")]
 		ReleaseModel,
+		#[cfg(feature = "api-22")]
 		GetValueInfoName,
+		#[cfg(feature = "api-22")]
 		GetValueInfoTypeInfo,
+		#[cfg(feature = "api-22")]
 		GetModelEditorApi,
+		#[cfg(feature = "api-22")]
 		CreateTensorWithDataAndDeleterAsOrtValue,
+		#[cfg(feature = "api-22")]
 		SessionOptionsSetLoadCancellationFlag,
+		#[cfg(feature = "api-22")]
 		GetCompileApi,
+		#[cfg(feature = "api-22")]
 		CreateKeyValuePairs,
+		#[cfg(feature = "api-22")]
 		AddKeyValuePair,
+		#[cfg(feature = "api-22")]
 		GetKeyValue,
+		#[cfg(feature = "api-22")]
 		GetKeyValuePairs,
+		#[cfg(feature = "api-22")]
 		RemoveKeyValuePair,
+		#[cfg(feature = "api-22")]
 		ReleaseKeyValuePairs,
+		#[cfg(feature = "api-22")]
 		RegisterExecutionProviderLibrary,
+		#[cfg(feature = "api-22")]
 		UnregisterExecutionProviderLibrary,
+		#[cfg(feature = "api-22")]
 		GetEpDevices,
+		#[cfg(feature = "api-22")]
 		SessionOptionsAppendExecutionProvider_V2,
+		#[cfg(feature = "api-22")]
 		SessionOptionsSetEpSelectionPolicy,
+		#[cfg(feature = "api-22")]
 		SessionOptionsSetEpSelectionPolicyDelegate,
+		#[cfg(feature = "api-22")]
 		HardwareDevice_Type,
+		#[cfg(feature = "api-22")]
 		HardwareDevice_VendorId,
+		#[cfg(feature = "api-22")]
 		HardwareDevice_Vendor,
+		#[cfg(feature = "api-22")]
 		HardwareDevice_DeviceId,
+		#[cfg(feature = "api-22")]
 		HardwareDevice_Metadata,
+		#[cfg(feature = "api-22")]
 		EpDevice_EpName,
+		#[cfg(feature = "api-22")]
 		EpDevice_EpVendor,
+		#[cfg(feature = "api-22")]
 		EpDevice_EpMetadata,
+		#[cfg(feature = "api-22")]
 		EpDevice_EpOptions,
+		#[cfg(feature = "api-22")]
 		EpDevice_Device,
+		#[cfg(feature = "api-22")]
 		GetEpApi
 	}
 }

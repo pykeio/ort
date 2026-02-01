@@ -47,7 +47,7 @@ targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 rustdoc-args = [ "--cfg", "docsrs" ]
 
 [features]
-default = [ "std", "ndarray", "tracing", "download-binaries", "tls-native", "copy-dylibs" ]
+default = [ "std", "ndarray", "tracing", "download-binaries", "tls-native", "copy-dylibs", "api-23" ]
 
 std = [ "ort-sys/std", "ndarray/std", "tracing?/std" ]
 training = [ "ort-sys/training" ]
@@ -63,6 +63,14 @@ preload-dylibs = [ "dep:libloading" ]
 load-dynamic = [ "std", "preload-dylibs", "ort-sys/disable-linking" ]
 copy-dylibs = [ "ort-sys/copy-dylibs" ]
 pkg-config = [ "ort-sys/pkg-config" ]
+
+api-17 = [ "ort-sys/api-17" ]
+api-18 = [ "ort-sys/api-18" ]
+api-19 = [ "ort-sys/api-19" ]
+api-20 = [ "ort-sys/api-20" ]
+api-21 = [ "ort-sys/api-21" ]
+api-22 = [ "ort-sys/api-22" ]
+api-23 = [ "ort-sys/api-23" ]
 
 tls-rustls = [ "ort-sys/tls-rustls", "ureq?/rustls" ]
 tls-rustls-no-provider = [ "ort-sys/tls-rustls-no-provider", "ureq?/rustls-no-provider" ]

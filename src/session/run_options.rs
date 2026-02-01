@@ -8,15 +8,14 @@ use core::{
 
 use smallvec::SmallVec;
 
+#[cfg(feature = "api-20")]
+use crate::session::adapter::{Adapter, AdapterInner};
 use crate::{
 	AsPointer,
 	error::Result,
 	logging::LogLevel,
 	ortsys,
-	session::{
-		Outlet,
-		adapter::{Adapter, AdapterInner}
-	},
+	session::Outlet,
 	util::{MiniMap, STACK_SESSION_OUTPUTS, with_cstr},
 	value::{DynValue, Value, ValueTypeMarker}
 };
@@ -150,6 +149,7 @@ impl SelectedOutputMarker for HasSelectedOutputs {}
 pub(crate) struct UntypedRunOptions {
 	pub(crate) ptr: NonNull<ort_sys::OrtRunOptions>,
 	pub(crate) outputs: OutputSelector,
+	#[cfg(feature = "api-20")]
 	adapters: Vec<Arc<AdapterInner>>
 }
 
@@ -215,6 +215,7 @@ impl RunOptions {
 			inner: Arc::new(UntypedRunOptions {
 				ptr,
 				outputs: OutputSelector::default(),
+				#[cfg(feature = "api-20")]
 				adapters: Vec::new()
 			}),
 			_marker: PhantomData
@@ -357,6 +358,8 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 		})
 	}
 
+	#[cfg(feature = "api-20")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "api-20")))]
 	pub fn add_adapter(&mut self, adapter: &Adapter) -> Result<()> {
 		let Some(inner) = Arc::get_mut(&mut self.inner) else {
 			panic!("Expected RunOptions to have exclusive access");

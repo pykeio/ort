@@ -173,6 +173,7 @@ impl ValueType {
 
 	/// Converts this type to an [`ort_sys::OrtTypeInfo`] using the Model Editor API, so it shouldn't be used outside of
 	/// `crate::editor`
+	#[cfg(feature = "api-22")]
 	pub(crate) fn to_type_info(&self) -> Result<*mut ort_sys::OrtTypeInfo> {
 		let mut info_ptr: *mut ort_sys::OrtTypeInfo = ptr::null_mut();
 		match self {
@@ -311,6 +312,7 @@ impl Outlet {
 		&self.dtype
 	}
 
+	#[cfg(feature = "api-22")]
 	pub(crate) fn into_editor_value_info(self) -> Result<NonNull<ort_sys::OrtValueInfo>> {
 		let type_info = self.dtype.to_type_info()?;
 		let _guard = run_on_drop(|| ortsys![unsafe ReleaseTypeInfo(type_info)]);

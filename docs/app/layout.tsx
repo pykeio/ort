@@ -1,4 +1,4 @@
-import { Theme } from '@radix-ui/themes';
+import { Card, Theme } from '@radix-ui/themes';
 import type { Metadata } from 'next';
 import { Layout, Navbar, Footer as NextraFooter } from 'nextra-theme-docs';
 import { Head } from 'nextra/components';
@@ -9,6 +9,7 @@ import 'nextra-theme-docs/style.css';
 import './globals.css';
 
 import FooterEmoji from '../components/FooterEmoji';
+import { TocSponsors } from '../components/Sponsors';
 
 export const metadata: Metadata = {
 	metadataBase: new URL('https://ort.pyke.io'),
@@ -68,20 +69,26 @@ export default async function RootLayout({ children }) {
 
 		</Head>
 		<body>
-			<Theme accentColor="red" radius="large" scaling="105%">
+			<Theme accentColor='red' radius='large' scaling='105%'>
 				<Layout
 					docsRepositoryBase='https://github.com/pykeio/ort/blob/main/docs'
 					nextThemes={{
 						defaultTheme: 'system'
 					}}
 					navbar={<Navbar
-						logo={<img src="/assets/banner.png" style={{ height: '34px' }} />}
+						logo={<img src='/assets/banner.png' style={{ height: '34px' }} />}
 						chatLink='https://discord.gg/uQtsNu2xMa'
 						projectLink='https://github.com/pykeio/ort'
 					/>}
 					footer={<Footer />}
 					pageMap={pageMap}
 					copyPageButton={false}
+					toc={{
+						extraContent: <Card>
+							<p style={{ fontFamily: '"Monaspace Neon"', textTransform: 'uppercase', color: 'var(--gray-9)', fontSize: '0.6rem', marginTop: '-4px', marginBottom: '4px' }}>Sponsored by</p>
+							<TocSponsors />
+						</Card>
+					}}
 				>
 					{children}
 				</Layout>

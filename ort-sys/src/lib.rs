@@ -562,6 +562,41 @@ pub struct OrtOpenVINOProviderOptions {
 	#[doc = "< 0 = disabled, nonzero = enabled"]
 	pub enable_dynamic_shapes: core::ffi::c_uchar
 }
+#[repr(i32)]
+#[derive(Default, Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum OrtDmlPerformancePreference {
+	#[default]
+	Default = 0,
+	HighPerformance = 1,
+	MinimumPower = 2
+}
+#[repr(u32)]
+#[derive(Default, Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum OrtDmlDeviceFilter {
+	Any = 0xFFFF_FFFF,
+	#[default]
+	Gpu = 1 << 0,
+	Npu = 1 << 1
+}
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct OrtDmlDeviceOptions {
+	pub Preference: OrtDmlPerformancePreference,
+	pub Filter: OrtDmlDeviceFilter
+}
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct OrtDmlApi {
+	pub SessionOptionsAppendExecutionProvider_DML: unsafe extern "system" fn(options: *mut OrtSessionOptions, device_id: c_int) -> OrtStatusPtr,
+	pub SessionOptionsAppendExecutionProvider_DML1:
+		unsafe extern "system" fn(options: *mut OrtSessionOptions, dml_device: *mut c_void, cmd_queue: *mut c_void) -> OrtStatusPtr,
+	pub CreateGPUAllocationFromD3DResource: unsafe extern "system" fn(resource: *mut c_void, dml_resource: *mut *mut c_void) -> OrtStatusPtr,
+	pub FreeGPUAllocation: unsafe extern "system" fn(dml_resource: *mut c_void) -> OrtStatusPtr,
+	pub GetD3D12ResourceFromAllocation:
+		unsafe extern "system" fn(provider: *mut OrtAllocator, dml_resource: *mut c_void, d3d_resource: *mut *mut c_void) -> OrtStatusPtr,
+	pub SessionOptionsAppendExecutionProvider_DML2:
+		unsafe extern "system" fn(options: *mut OrtSessionOptions, device_opts: *const OrtDmlDeviceOptions) -> OrtStatusPtr
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct OrtTrainingSession {

@@ -9,7 +9,7 @@ unsafe extern "system" fn get_version_string() -> *const ort_sys::c_char {
 }
 
 unsafe extern "system" fn get_api(version: u32) -> *const ort_sys::OrtApi {
-	if version <= 23 { &API as *const _ } else { core::ptr::null() }
+	if version <= ort_sys::ORT_API_VERSION { &API as *const _ } else { core::ptr::null() }
 }
 
 #[no_mangle]

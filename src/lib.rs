@@ -25,7 +25,11 @@ pub mod __private {
 #[macro_use]
 pub(crate) mod private;
 
+#[cfg(feature = "api-22")]
+#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
 pub mod compiler;
+#[cfg(feature = "api-22")]
+#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
 pub mod editor;
 pub mod environment;
 pub mod ep;
@@ -41,9 +45,11 @@ pub mod util;
 pub mod value;
 #[doc(hidden)]
 pub mod api {
+	pub use super::api as ort;
 	#[cfg(feature = "training")]
 	pub use super::training::training_api as training;
-	pub use super::{api as ort, compiler::compile_api as compile, editor::editor_api as editor};
+	#[cfg(feature = "api-22")]
+	pub use super::{compiler::compile_api as compile, editor::editor_api as editor};
 }
 
 #[deprecated = "import execution providers from `ort::ep` instead"]

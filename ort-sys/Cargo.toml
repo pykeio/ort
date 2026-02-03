@@ -20,14 +20,21 @@ build = "build/main.rs"
 status = "actively-developed"
 
 [features]
-default = [ "std" ]
+default = [ "std", "api-17" ]
 std = []
 pkg-config = [ "dep:pkg-config" ]
 training = []
 download-binaries = [ "dep:ureq", "dep:lzma-rust2", "dep:hmac-sha256" ]
 copy-dylibs = []
-
 disable-linking = []
+
+api-17 = []
+api-18 = [ "api-17" ]
+api-19 = [ "api-18" ]
+api-20 = [ "api-19" ]
+api-21 = [ "api-20" ]
+api-22 = [ "api-21" ]
+api-23 = [ "api-22" ]
 
 cuda = []
 tensorrt = []

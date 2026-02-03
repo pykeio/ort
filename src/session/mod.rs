@@ -41,6 +41,7 @@ use crate::{
 	value::{DynValue, Outlet, Value, ValueType}
 };
 
+#[cfg(feature = "api-20")]
 mod adapter;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 mod r#async;
@@ -50,19 +51,21 @@ mod io_binding;
 mod metadata;
 mod output;
 mod run_options;
+#[cfg(feature = "api-20")]
+#[cfg_attr(docsrs, doc(cfg(feature = "api-20")))]
+pub use self::adapter::Adapter;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 pub use self::r#async::InferenceFut;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 use self::r#async::{AsyncInferenceContext, InferenceFutInner};
+use self::{builder::SessionBuilder, run_options::UntypedRunOptions};
 pub use self::{
-	adapter::Adapter,
 	input::{SessionInputValue, SessionInputs},
 	io_binding::IoBinding,
 	metadata::ModelMetadata,
 	output::SessionOutputs,
 	run_options::{HasSelectedOutputs, NoSelectedOutputs, OutputSelector, RunOptions, SelectedOutputMarker}
 };
-use self::{builder::SessionBuilder, run_options::UntypedRunOptions};
 
 /// Holds onto an [`ort_sys::OrtSession`] pointer and its associated allocator.
 ///
@@ -628,6 +631,8 @@ impl Session {
 	/// # 	Ok(())
 	/// # }
 	/// ```
+	#[cfg(feature = "api-20")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "api-20")))]
 	pub fn set_workload_type(&mut self, workload_type: WorkloadType) -> Result<()> {
 		static KEY: &[u8] = b"ep.dynamic.workload_type\0";
 		match workload_type {
@@ -636,11 +641,14 @@ impl Session {
 		}
 	}
 
+	#[cfg(feature = "api-20")]
 	pub(crate) fn set_dynamic_option(&mut self, key: *const c_char, value: *const c_char) -> Result<()> {
 		ortsys![unsafe SetEpDynamicOptions(self.inner.session_ptr.as_ptr(), &key, &value, 1)?];
 		Ok(())
 	}
 
+	#[cfg(feature = "api-22")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
 	pub fn opset_for_domain(&self, domain: impl AsRef<str>) -> Result<u32> {
 		with_cstr(domain.as_ref().as_bytes(), &|domain| {
 			let mut opset = 0;

@@ -15,7 +15,9 @@ use std::path::PathBuf;
 
 use smallvec::SmallVec;
 
-use super::{EditableSession, SessionBuilder};
+#[cfg(feature = "api-22")]
+use super::EditableSession;
+use super::SessionBuilder;
 #[cfg(any(target_arch = "wasm32", feature = "std"))]
 use crate::error::{Error, ErrorCode};
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
@@ -284,8 +286,8 @@ impl SessionBuilder {
 		})
 	}
 
-	#[cfg(feature = "std")]
-	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+	#[cfg(all(feature = "std", feature = "api-22"))]
+	#[cfg_attr(docsrs, doc(cfg(all(feature = "std", feature = "api-22"))))]
 	pub fn edit_from_file<P>(self, model_filepath: P) -> Result<EditableSession>
 	where
 		P: AsRef<Path>
@@ -306,6 +308,8 @@ impl SessionBuilder {
 		EditableSession::new(session_ptr, self)
 	}
 
+	#[cfg(feature = "api-22")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
 	pub fn edit_from_memory(self, model_bytes: &[u8]) -> Result<EditableSession> {
 		let mut session_ptr: *mut ort_sys::OrtSession = ptr::null_mut();
 

@@ -49,3 +49,19 @@ jobs:
         run: |
           cargo check -p ort
           cargo check -p ort --features load-dynamic
+  multiversion:
+    name: Multiversion
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@1.88
+      - uses: Swatinem/rust-cache@v2.7.8
+      - name: Run checks
+        run: |
+          cargo check -p ort --no-default-features --features api-17
+          cargo check -p ort --no-default-features --features api-18
+          cargo check -p ort --no-default-features --features api-19
+          cargo check -p ort --no-default-features --features api-20
+          cargo check -p ort --no-default-features --features api-21
+          cargo check -p ort --no-default-features --features api-22

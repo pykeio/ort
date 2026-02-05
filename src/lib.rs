@@ -164,20 +164,33 @@ pub fn api() -> &'static ort_sys::OrtApi {
 				crate::info!("Loaded ONNX Runtime dylib with version '{version_string}'");
 
 				let lib_minor_version = version_string.split('.').nth(1).map_or(0, |x| x.parse::<u32>().unwrap_or(0));
-				match lib_minor_version.cmp(&MINOR_VERSION) {
-					Ordering::Less => panic!(
-						"ort {} is not compatible with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
+
+				// Accept ONNX Runtime 1.20.x and 1.22.x explicitly, or any minor version
+				// greater-or-equal to the crate's MINOR_VERSION (compatibility mode).
+				let is_20 = version_string.starts_with("1.20.");
+				let is_22 = version_string.starts_with("1.22.");
+
+				if is_20 || is_22 || lib_minor_version >= MINOR_VERSION {
+					crate::info!("Loaded ONNX Runtime dylib with version '{version_string}' (compatibility mode)");
+				} else {
+					panic!(
+						"ort {} is not compatible with the ONNX Runtime binary found at `{}`; expected 1.20.x, 1.22.x or 1.{MINOR_VERSION}.x, but got '{version_string}'",
 						env!("CARGO_PKG_VERSION"),
 						dylib_path()
-					),
-					Ordering::Greater => crate::warn!(
-						"ort {} may have compatibility issues with the ONNX Runtime binary found at `{}`; expected GetVersionString to return '1.{MINOR_VERSION}.x', but got '{version_string}'",
-						env!("CARGO_PKG_VERSION"),
-						dylib_path()
-					),
-					Ordering::Equal => {}
+					);
+				}
+
+				// Request the appropriate API version based on runtime version.
+				// For 1.20.x, request API v20; for 1.22.x and newer, request v22 if available, else v20.
+				let api_version = if is_20 {
+					20
+				} else if is_22 {
+					22
+				} else {
+					ort_sys::ORT_API_VERSION
 				};
-				let api: *const ort_sys::OrtApi = ((*base).GetApi)(ort_sys::ORT_API_VERSION);
+
+				let api: *const ort_sys::OrtApi = ((*base).GetApi)(api_version);
 				ApiPointer(NonNull::new(api.cast_mut()).expect("Failed to initialize ORT API"))
 			}
 			#[cfg(not(feature = "load-dynamic"))]

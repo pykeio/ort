@@ -391,6 +391,12 @@ impl OrtMemType {
 	pub const OrtMemTypeCPU: OrtMemType = OrtMemType::OrtMemTypeCPUOutput;
 }
 #[repr(i32)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum OrtDeviceMemoryType {
+	OrtDeviceMemoryType_DEFAULT = 0,
+	OrtDeviceMemoryType_HOST_ACCESSIBLE = 5
+}
+#[repr(i32)]
 #[doc = " \\brief Memory types for allocated memory, execution provider specific types should be extended in each provider."]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum OrtMemType {
@@ -1666,7 +1672,24 @@ pub struct OrtApi {
 	#[cfg(feature = "api-22")]
 	pub EpDevice_Device: unsafe extern "system" fn(ep_device: *const OrtEpDevice) -> *const OrtHardwareDevice,
 	#[cfg(feature = "api-22")]
-	pub GetEpApi: unsafe extern "system" fn() -> *const OrtEpApi
+	pub GetEpApi: unsafe extern "system" fn() -> *const OrtEpApi,
+	#[cfg(feature = "api-23")]
+	pub GetTensorSizeInBytes: unsafe extern "system" fn(ort_value: *const OrtValue, size: *mut usize) -> OrtStatusPtr,
+	#[cfg(feature = "api-23")]
+	pub AllocatorGetStats: unsafe extern "system" fn(ort_allocator: *const OrtAllocator, out: *mut *mut OrtKeyValuePairs) -> OrtStatusPtr,
+	#[cfg(feature = "api-23")]
+	pub CreateMemoryInfo_V2: unsafe extern "system" fn(
+		name: *const c_char,
+		device_type: OrtMemoryInfoDeviceType,
+		vendor_id: u32,
+		device_id: i32,
+		mem_type: OrtDeviceMemoryType,
+		alignment: usize,
+		allocator_type: OrtAllocatorType,
+		out: *mut *mut OrtMemoryInfo
+	) -> OrtStatusPtr,
+	#[cfg(feature = "api-23")]
+	pub MemoryInfoGetDeviceMemType: unsafe extern "system" fn(ptr: *const OrtMemoryInfo) -> OrtDeviceMemoryType
 }
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]

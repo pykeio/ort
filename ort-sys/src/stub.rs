@@ -1906,6 +1906,38 @@ unsafe extern "system" fn GetEpApi() -> *const OrtEpApi {
 	ptr::null()
 }
 
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn GetTensorSizeInBytes(ort_value: *const OrtValue, size: *mut usize) -> OrtStatusPtr {
+	unsafe { *size = 0 };
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn AllocatorGetStats(ort_allocator: *const OrtAllocator, out: *mut *mut OrtKeyValuePairs) -> OrtStatusPtr {
+	unsafe { *out = ptr::null_mut() };
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn CreateMemoryInfo_V2(
+	name: *const c_char,
+	device_type: OrtMemoryInfoDeviceType,
+	vendor_id: u32,
+	device_id: i32,
+	mem_type: OrtDeviceMemoryType,
+	alignment: usize,
+	allocator_type: OrtAllocatorType,
+	out: *mut *mut OrtMemoryInfo
+) -> OrtStatusPtr {
+	unsafe { *out = ptr::null_mut() };
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn MemoryInfoGetDeviceMemType(ptr: *const OrtMemoryInfo) -> OrtDeviceMemoryType {
+	OrtDeviceMemoryType::OrtDeviceMemoryType_HOST_ACCESSIBLE
+}
+
 pub const fn api() -> OrtApi {
 	OrtApi {
 		CreateStatus,
@@ -2267,6 +2299,14 @@ pub const fn api() -> OrtApi {
 		#[cfg(feature = "api-22")]
 		EpDevice_Device,
 		#[cfg(feature = "api-22")]
-		GetEpApi
+		GetEpApi,
+		#[cfg(feature = "api-23")]
+		GetTensorSizeInBytes,
+		#[cfg(feature = "api-23")]
+		AllocatorGetStats,
+		#[cfg(feature = "api-23")]
+		CreateMemoryInfo_V2,
+		#[cfg(feature = "api-23")]
+		MemoryInfoGetDeviceMemType
 	}
 }

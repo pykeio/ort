@@ -504,7 +504,14 @@ impl MemoryInfo {
 	/// Returns `true` if this memory is accessible by the CPU; meaning that, if a value were allocated on this device,
 	/// it could be extracted to an `ndarray` or slice.
 	pub fn is_cpu_accessible(&self) -> bool {
-		self.device_type() == DeviceType::CPU
+		// CUDA_PINNED used to be `DeviceType::CPU` pre-1.23, but now is `DeviceType::GPU`, so we have to use
+		// `MemoryInfoGetDeviceMemType` instead. But that returns `DEFAULT` (implying non-host accessible) for the CPU
+		// device, so we still need the old check too. I hate this library.
+		#[cfg(feature = "api-23")]
+		return self.device_type() == DeviceType::CPU
+			|| ortsys![unsafe MemoryInfoGetDeviceMemType(self.ptr.as_ptr())] == ort_sys::OrtDeviceMemoryType::OrtDeviceMemoryType_HOST_ACCESSIBLE;
+		#[cfg(not(feature = "api-23"))]
+		return self.device_type() == DeviceType::CPU;
 	}
 }
 
@@ -556,6 +563,18 @@ mod tests {
 		assert_eq!(a, b);
 		let c = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?;
 		assert_ne!(a, c);
+		Ok(())
+	}
+
+	#[test]
+	#[cfg(feature = "cuda")]
+	fn test_cpu_accessible() -> crate::Result<()> {
+		let mem = MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::Default)?;
+		assert!(mem.is_cpu_accessible());
+		let mem = MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?;
+		assert!(!mem.is_cpu_accessible());
+		let mem = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?;
+		assert!(mem.is_cpu_accessible());
 		Ok(())
 	}
 }

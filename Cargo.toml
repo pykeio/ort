@@ -117,6 +117,6 @@ libloading = { version = "0.9", optional = true }
 [dev-dependencies]
 anyhow = "1.0"
 ureq = { version = "3", default-features = false, features = [ "native-tls" ] }
-image = "0.25"
+image = { version = "0.25", default-features = false, features = [ "png", "jpeg" ] }
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
 tokio = { version = "1.36", features = [ "test-util" ] }

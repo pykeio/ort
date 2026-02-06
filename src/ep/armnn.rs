@@ -1,9 +1,12 @@
+#![allow(deprecated)]
+
 use super::{ExecutionProvider, RegisterError};
 use crate::{error::Result, session::builder::SessionBuilder};
 
 /// [Arm NN execution provider](https://onnxruntime.ai/docs/execution-providers/community-maintained/ArmNN-ExecutionProvider.html)
 /// for ARM platforms.
 #[derive(Debug, Default, Clone)]
+#[deprecated = "recently removed from ONNX Runtime; use CPU (now optimized for ARM w/ Kleidi) or ACL, XNNPACK"]
 pub struct ArmNN {
 	use_arena: bool
 }

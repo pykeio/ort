@@ -124,13 +124,6 @@ export const EXECUTION_PROVIDER_ARRAY: ExecutionProvider[] = [
 		platforms: [ { arch: 'arm64' } ]
 	},
 	{
-		icon: ARM_LOGO,
-		vendor: null,
-		name: 'ArmNN',
-		feature: 'armnn',
-		platforms: [ { os: 'linux', arch: 'arm64' }, { os: 'android', arch: 'arm64' } ]
-	},
-	{
 		icon: <BsAmd style={{ color: '#dd0823' }} />,
 		vendor: 'AMD',
 		name: 'Vitis AI',

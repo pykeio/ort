@@ -7,7 +7,7 @@ edition = "2024"
 [dependencies]
 ort = { path = "../../" }
 anyhow = "1.0"
-image = "0.25"
+image = { version = "0.25", default-features = false, features = [ "jpeg" ] }
 ndarray = "0.17"
 tokio = { version = "1", features = ["full"] }
 tokenizers = { version = "0.21", default-features = false, features = [ "onig" ] }

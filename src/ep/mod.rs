@@ -58,6 +58,7 @@ pub use self::qnn::QNN;
 pub mod xnnpack;
 pub use self::xnnpack::XNNPACK;
 pub mod armnn;
+#[allow(deprecated)]
 pub use self::armnn::ArmNN;
 pub mod migraphx;
 pub use self::migraphx::MIGraphX;
@@ -393,6 +394,7 @@ fn is_ep_available(name: &str) -> Result<bool> {
 pub use self::acl::ACL as ACLExecutionProvider;
 #[deprecated = "import `ort::ep::ArmNN` instead"]
 #[doc(hidden)]
+#[allow(deprecated)]
 pub use self::armnn::ArmNN as ArmNNExecutionProvider;
 #[deprecated = "import `ort::ep::Azure` instead"]
 #[doc(hidden)]

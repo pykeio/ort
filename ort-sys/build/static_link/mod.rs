@@ -92,26 +92,27 @@ pub fn static_link(base_lib_dir: &Path) -> bool {
 			false
 		}
 	};
-	let vcpkg_target = match env::var("TARGET").as_deref() {
-		Ok("i686-pc-windows-msvc") => Some("x86-windows"),
-		Ok("x86_64-pc-windows-msvc") => Some("x64-windows"),
-		Ok("x86_64-uwp-windows-msvc") => Some("x64-uwp"),
-		Ok("aarch64-pc-windows-msvc") => Some("arm64-windows"),
-		Ok("aarch64-uwp-windows-msvc") => Some("arm64-uwp"),
-		Ok("aarch64-apple-darwin") => Some("arm64-osx"),
-		Ok("x86_64-apple-darwin") => Some("x64-osx"),
-		Ok("x86_64-unknown-linux-gnu") => Some("x64-linux"),
-		Ok("armv7-linux-androideabi") => Some("arm-neon-android"),
-		Ok("x86_64-linux-android") => Some("x64-android"),
-		Ok("aarch64-linux-android") => Some("arm64-android"),
+	let vcpkg_target = vars::get(vars::VCPKG_TARGET).or_else(|| match env::var("TARGET").as_deref() {
+		Ok("i686-pc-windows-msvc") => Some("x86-windows".to_string()),
+		Ok("x86_64-pc-windows-msvc") => Some("x64-windows".to_string()),
+		Ok("x86_64-uwp-windows-msvc") => Some("x64-uwp".to_string()),
+		Ok("aarch64-pc-windows-msvc") => Some("arm64-windows".to_string()),
+		Ok("aarch64-uwp-windows-msvc") => Some("arm64-uwp".to_string()),
+		Ok("aarch64-apple-darwin") => Some("arm64-osx".to_string()),
+		Ok("x86_64-apple-darwin") => Some("x64-osx".to_string()),
+		Ok("x86_64-unknown-linux-gnu") => Some("x64-linux".to_string()),
+		Ok("armv7-linux-androideabi") => Some("arm-neon-android".to_string()),
+		Ok("x86_64-linux-android") => Some("x64-android".to_string()),
+		Ok("aarch64-linux-android") => Some("arm64-android".to_string()),
 		_ => None
-	};
+	});
 
 	let mut profile = vars::get(vars::SYSTEM_LIB_PROFILE).unwrap_or_default();
 	if profile.is_empty() {
 		for i in ["Release", "RelWithDebInfo", "MinSizeRel", "Debug"] {
 			if base_lib_dir.join(i).exists() && base_lib_dir.join(i).join(platform_format_lib("onnxruntime_common")).exists() {
 				profile = String::from(i);
+				log::debug!("detected profile {profile}");
 				break;
 			}
 		}
@@ -134,7 +135,7 @@ pub fn static_link(base_lib_dir: &Path) -> bool {
 		(base_lib_dir.join("onnxruntime"), base_lib_dir.join("onnxruntime").join("lib"), base_lib_dir.join("_deps"), Box::new(|p: PathBuf, _| p)),
 	];
 	'main: for (lib_dir, extension_lib_dir, external_lib_dir, transform_dep) in static_configs {
-		if lib_dir.join(platform_format_lib("onnxruntime_common")).exists() && external_lib_dir.exists() {
+		if lib_dir.join(platform_format_lib("onnxruntime_common")).exists() {
 			log::debug!("attempting to link from {}", lib_dir.display());
 
 			add_search_dir(&lib_dir);
@@ -160,7 +161,7 @@ pub fn static_link(base_lib_dir: &Path) -> bool {
 
 			let (vcpkg_lib_dir, has_vcpkg_link) = {
 				let vcpkg_base_dir = base_lib_dir.join("vcpkg_installed");
-				if let Some(vcpkg_target) = vcpkg_target {
+				if let Some(vcpkg_target) = &vcpkg_target {
 					if vcpkg_base_dir.join(vcpkg_target).exists() {
 						let vcpkg_lib_dir = vcpkg_base_dir.join(vcpkg_target).join("lib");
 						log::debug!("using vcpkg libraries from {}", vcpkg_lib_dir.display());
@@ -221,9 +222,7 @@ pub fn static_link(base_lib_dir: &Path) -> bool {
 			}
 			println!("cargo:rustc-link-lib=static=re2");
 
-			if has_vcpkg_link && target_os.contains("windows") {
-				println!("cargo:rustc-link-lib=static=abseil_dll");
-			} else {
+			{
 				add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("debugging"), &profile));
 				println!("cargo:rustc-link-lib=static=absl_examine_stack");
 				println!("cargo:rustc-link-lib=static=absl_debugging_internal");
@@ -238,10 +237,16 @@ pub fn static_link(base_lib_dir: &Path) -> bool {
 				println!("cargo:rustc-link-lib=static=absl_strerror");
 				println!("cargo:rustc-link-lib=static=absl_raw_logging_internal");
 				println!("cargo:rustc-link-lib=static=absl_throw_delegate");
-				add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("hash"), &profile));
+				let absl_hash_dir = if !has_vcpkg_link {
+					let dir = transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("hash"), &profile);
+					add_search_dir(&dir);
+					dir
+				} else {
+					vcpkg_lib_dir.clone().unwrap()
+				};
 				println!("cargo:rustc-link-lib=static=absl_hash");
 				println!("cargo:rustc-link-lib=static=absl_city");
-				println!("cargo:rustc-link-lib=static=absl_low_level_hash");
+				optional_link_lib(&absl_hash_dir, "absl_low_level_hash");
 				add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("container"), &profile));
 				println!("cargo:rustc-link-lib=static=absl_hashtablez_sampler");
 				println!("cargo:rustc-link-lib=static=absl_raw_hash_set");
@@ -274,6 +279,8 @@ pub fn static_link(base_lib_dir: &Path) -> bool {
 				println!("cargo:rustc-link-lib=static=absl_log_internal_proto");
 				println!("cargo:rustc-link-lib=static=absl_log_internal_globals");
 				optional_link_lib(&abseil_lib_log_dir, "absl_log_internal_check_op");
+				optional_link_lib(&abseil_lib_log_dir, "absl_log_internal_structured_proto");
+				optional_link_lib(&abseil_lib_log_dir, "absl_log_internal_nullguard");
 				println!("cargo:rustc-link-lib=static=absl_log_internal_log_sink_set");
 				println!("cargo:rustc-link-lib=static=absl_log_sink");
 				println!("cargo:rustc-link-lib=static=absl_log_internal_message");

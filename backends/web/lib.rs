@@ -177,7 +177,7 @@ pub const FEATURE_WEBNN: u8 = FEATURE_WEBGPU;
 /// use ort_web::Dist;
 ///
 /// async fn init_model() -> anyhow::Result<Session> {
-/// 	let dist = Dist::new("https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/")
+/// 	let dist = Dist::new("https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.1/dist/")
 /// 		// load the WebGPU build
 /// 		.with_script_name("ort.webgpu.min.js");
 /// 	ort::set_api(ort_web::api(dist).await?);

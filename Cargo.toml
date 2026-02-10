@@ -22,7 +22,7 @@ exclude = [
 
 [package]
 name = "ort"
-description = "A safe Rust wrapper for ONNX Runtime 1.23 - Optimize and accelerate machine learning inference & training"
+description = "A safe Rust wrapper for ONNX Runtime 1.24 - Optimize and accelerate machine learning inference & training"
 version = "2.0.0-rc.11"
 edition = "2024"
 rust-version = "1.88"
@@ -47,7 +47,7 @@ targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 rustdoc-args = [ "--cfg", "docsrs" ]
 
 [features]
-default = [ "std", "ndarray", "tracing", "download-binaries", "tls-native", "copy-dylibs", "api-23" ]
+default = [ "std", "ndarray", "tracing", "download-binaries", "tls-native", "copy-dylibs", "api-24" ]
 
 std = [ "ort-sys/std", "ndarray/std", "tracing?/std" ]
 training = [ "ort-sys/training" ]
@@ -71,6 +71,7 @@ api-20 = [ "ort-sys/api-20", "api-19" ]
 api-21 = [ "ort-sys/api-21", "api-20" ]
 api-22 = [ "ort-sys/api-22", "api-21" ]
 api-23 = [ "ort-sys/api-23", "api-22" ]
+api-24 = [ "ort-sys/api-24", "api-23" ]
 
 tls-rustls = [ "ort-sys/tls-rustls", "ureq?/rustls" ]
 tls-rustls-no-provider = [ "ort-sys/tls-rustls-no-provider", "ureq?/rustls-no-provider" ]

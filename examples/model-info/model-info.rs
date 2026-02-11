@@ -30,12 +30,12 @@ fn main() -> ort::Result<()> {
 	}
 
 	println!("Inputs:");
-	for (i, input) in session.inputs.iter().enumerate() {
-		println!("    {i} {}: {}", input.name, input.input_type);
+	for (i, input) in session.inputs().iter().enumerate() {
+		println!("    {i} {}: {}", input.name(), input.dtype());
 	}
 	println!("Outputs:");
-	for (i, output) in session.outputs.iter().enumerate() {
-		println!("    {i} {}: {}", output.name, output.output_type);
+	for (i, output) in session.outputs().iter().enumerate() {
+		println!("    {i} {}: {}", output.name(), output.dtype());
 	}
 
 	Ok(())

@@ -338,9 +338,9 @@ pub(crate) fn apply_execution_providers(session_builder: &mut SessionBuilder, ep
 
 			if matches!(e, RegisterError::MissingFeature) {
 				if ep.inner.supported_by_platform() {
-					crate::warn!(%source, "{e}");
+					crate::warn!(%source, "Couldn't register `{}`: {e}", ep.inner.name());
 				} else {
-					crate::debug!(%source, "{e} (note: additionally, `{}` may not be supported on this platform)", ep.inner.name());
+					crate::debug!(%source, "Couldn't register `{}`: {e} (note: it may not be supported on this platform)", ep.inner.name());
 				}
 			} else {
 				crate::error!(%source, "An error occurred when attempting to register `{}`: {e}", ep.inner.name());

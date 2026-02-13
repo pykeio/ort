@@ -29,11 +29,22 @@ fn main() -> ort::Result<()> {
 		println!("Produced by {x}");
 	}
 
-	println!("Inputs:");
+	if let Ok(custom_keys) = meta.custom_keys()
+		&& !custom_keys.is_empty()
+	{
+		println!("=== Custom keys ===");
+		for key in custom_keys {
+			if let Some(value) = meta.custom(&key) {
+				println!("    {key}: {value}");
+			}
+		}
+	};
+
+	println!("=== Inputs ===");
 	for (i, input) in session.inputs().iter().enumerate() {
 		println!("    {i} {}: {}", input.name(), input.dtype());
 	}
-	println!("Outputs:");
+	println!("=== Outputs ===");
 	for (i, output) in session.outputs().iter().enumerate() {
 		println!("    {i} {}: {}", output.name(), output.dtype());
 	}

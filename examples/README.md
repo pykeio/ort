@@ -10,7 +10,6 @@
 - [**`train-clm`**](#train-clm): Trains a causal language model from scratch using `ort`
     - [**`train-clm-simple`**](#train-clm-simple): `train-clm`, but simpler! Uses a 🤗-esque training API.
 - [**`custom-ops`**](#custom-ops): Example implementation of custom operator kernels
-- [**`wasm-emscripten`**](#wasm-emscripten): `ort` running in the browser
 
 To run an example:
 <ol>
@@ -182,12 +181,3 @@ trainer.train(
 > 💡 This example supports all EPs with the default (ONNX Runtime) backend.
 
 You can also implement your own custom ONNX operators with `ort`! This example showcases two simple operator kernel implementations and their usage in sessions with `OperatorDomain`.
-
-## `wasm-emscripten`
-**[🧑‍💻 View source](https://github.com/pykeio/ort/blob/main/examples/wasm-emscripten/src/main.rs) | `examples/wasm-emscripten/src/main.rs` | 💖 Contributed by [Raphael Menges](https://github.com/raphaelmenges)**
-
-<img src="./wasm-emscripten/demo.png">
-
-> ⚠️ This example is tricky to get working. See [the `wasm-emscripten` README](https://github.com/pykeio/ort/blob/main/examples/wasm-emscripten/README.md). When deploying `ort` to the web, we recommend using the `tract` backend instead of the default ONNX Runtime backend when possible - it's *way* easier!
-
-This example runs a simplified version of the [YOLOv8 example](#yolov8) in the browser using the `wasm32-unknown-emscripten` target.

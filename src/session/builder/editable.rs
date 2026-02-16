@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, sync::Arc};
+use alloc::sync::Arc;
 use core::{
 	ops::Deref,
 	ptr::{self, NonNull}
@@ -49,7 +49,7 @@ impl EditableSession {
 			};
 
 			// add to extras so it outlives the session
-			inner._extras.push(Box::new(prepacked_weights));
+			inner._extras.push(prepacked_weights.inner);
 		}
 
 		Ok(self.session)

@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, sync::Arc, vec::Vec};
+use alloc::{sync::Arc, vec::Vec};
 #[cfg(feature = "fetch-models")]
 use core::fmt::Write;
 use core::{
@@ -260,15 +260,15 @@ impl SessionBuilder {
 			.map(|i| io::extract_output(ptr, &allocator, i))
 			.collect::<Result<Vec<Outlet>>>()?;
 
-		let mut extras: SmallVec<[Box<dyn Any>; 4]> = self.operator_domains.drain(..).map(|d| Box::new(d) as Box<dyn Any>).collect();
+		let mut extras: SmallVec<[Arc<dyn Any>; 4]> = self.operator_domains.drain(..).map(|d| d as Arc<dyn Any>).collect();
 		if let Some(prepacked_weights) = self.prepacked_weights.take() {
-			extras.push(Box::new(prepacked_weights) as Box<dyn Any>);
+			extras.push(prepacked_weights.inner as Arc<dyn Any>);
 		}
 		if let Some(thread_manager) = self.thread_manager.take() {
-			extras.push(Box::new(thread_manager) as Box<dyn Any>);
+			extras.push(thread_manager as Arc<dyn Any>);
 		}
 		if let Some(logger) = self.logger.take() {
-			extras.push(Box::new(logger) as Box<dyn Any>); // Box<Arc<Box<dyn ...>>>!
+			extras.push(logger as Arc<dyn Any>);
 		}
 
 		crate::logging::create!(Session, ptr);

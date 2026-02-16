@@ -78,7 +78,7 @@ pub struct SharedSessionInner {
 	_initializers: SmallVec<[Arc<DynValue>; 4]>,
 	/// Additional things we may need to hold onto for the duration of this session, like `OperatorDomain`s and
 	/// DLL handles for operator libraries.
-	_extras: SmallVec<[Box<dyn Any>; 4]>,
+	_extras: SmallVec<[Arc<dyn Any>; 4]>,
 	_environment: Arc<Environment>
 }
 

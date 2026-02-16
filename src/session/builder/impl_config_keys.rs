@@ -97,4 +97,11 @@ impl SessionBuilder {
 		self.add_config_entry("session.intra_op.allow_spinning", if enable { "1" } else { "0" })?;
 		Ok(self)
 	}
+
+	/// Disables falling back to the CPU for operations not supported by any other EP.
+	/// Models with graphs that cannot be placed entirely on the EP(s) will fail to commit.
+	pub fn with_disable_cpu_fallback(mut self) -> Result<Self> {
+		self.add_config_entry("session.disable_cpu_ep_fallback", "1")?;
+		Ok(self)
+	}
 }

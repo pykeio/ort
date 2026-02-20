@@ -1938,6 +1938,560 @@ unsafe extern "system" fn MemoryInfoGetDeviceMemType(ptr: *const OrtMemoryInfo) 
 	OrtDeviceMemoryType::OrtDeviceMemoryType_HOST_ACCESSIBLE
 }
 
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn MemoryInfoGetVendorId(ptr: *const OrtMemoryInfo) -> u32 {
+	0
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn ValueInfo_GetValueProducer(
+	value_info: *const OrtValueInfo,
+	producer_node: *mut *const OrtNode,
+	producer_output_index: *mut usize
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn ValueInfo_GetValueNumConsumers(value_info: *const OrtValueInfo, num_consumers: *mut usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn ValueInfo_GetValueConsumers(
+	value_info: *const OrtValueInfo,
+	nodes: *mut *const OrtNode,
+	input_indices: *mut i64,
+	num_consumers: usize
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn ValueInfo_GetInitializerValue(value_info: *const OrtValueInfo, initializer_value: *mut *const OrtValue) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn ValueInfo_GetExternalInitializerInfo(value_info: *const OrtValueInfo, info: *mut *mut OrtExternalInitializerInfo) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn ValueInfo_IsRequiredGraphInput(value_info: *const OrtValueInfo, is_required_graph_input: *mut bool) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn ValueInfo_IsOptionalGraphInput(value_info: *const OrtValueInfo, is_optional_graph_input: *mut bool) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn ValueInfo_IsGraphOutput(value_info: *const OrtValueInfo, is_graph_output: *mut bool) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn ValueInfo_IsConstantInitializer(value_info: *const OrtValueInfo, is_constant_initializer: *mut bool) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn ValueInfo_IsFromOuterScope(value_info: *const OrtValueInfo, is_from_outer_scope: *mut bool) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Graph_GetName(graph: *const OrtGraph, graph_name: *mut *const c_char) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Graph_GetModelPath(graph: *const OrtGraph, model_path: *mut *const os_char) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Graph_GetOnnxIRVersion(graph: *const OrtGraph, onnx_ir_version: *mut i64) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Graph_GetNumOperatorSets(graph: *const OrtGraph, num_operator_sets: *mut usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Graph_GetOperatorSets(
+	graph: *const OrtGraph,
+	domains: *mut *const c_char,
+	opset_versions: *mut i64,
+	num_operator_sets: usize
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Graph_GetNumInputs(graph: *const OrtGraph, num_inputs: *mut usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Graph_GetInputs(graph: *const OrtGraph, inputs: *mut *const OrtValueInfo, num_inputs: usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Graph_GetNumOutputs(graph: *const OrtGraph, num_outputs: *mut usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Graph_GetOutputs(graph: *const OrtGraph, outputs: *mut *const OrtValueInfo, num_outputs: usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Graph_GetNumInitializers(graph: *const OrtGraph, num_initializers: *mut usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Graph_GetInitializers(graph: *const OrtGraph, initializers: *mut *const OrtValueInfo, num_initializers: usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Graph_GetNumNodes(graph: *const OrtGraph, num_nodes: *mut usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Graph_GetNodes(graph: *const OrtGraph, nodes: *mut *const OrtNode, num_nodes: usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Graph_GetParentNode(graph: *const OrtGraph, node: *mut *const OrtNode) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Graph_GetGraphView(
+	src_graph: *const OrtGraph,
+	nodes: *mut *const OrtNode,
+	num_nodes: usize,
+	dst_graph: *mut *mut OrtGraph
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetId(node: *const OrtNode, node_id: *mut usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetName(node: *const OrtNode, node_name: *mut *const c_char) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetOperatorType(node: *const OrtNode, operator_type: *mut *const c_char) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetDomain(node: *const OrtNode, domain_name: *mut *const c_char) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetSinceVersion(node: *const OrtNode, since_version: *mut i32) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetNumInputs(node: *const OrtNode, num_inputs: *mut usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetInputs(node: *const OrtNode, inputs: *mut *const OrtValueInfo, num_inputs: usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetNumOutputs(node: *const OrtNode, num_outputs: *mut usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetOutputs(node: *const OrtNode, outputs: *mut *const OrtValueInfo, num_outputs: usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetNumImplicitInputs(node: *const OrtNode, num_implicit_inputs: *mut usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetImplicitInputs(node: *const OrtNode, implicit_inputs: *mut *const OrtValueInfo, num_implicit_inputs: usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetNumAttributes(node: *const OrtNode, num_attributes: *mut usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetAttributes(node: *const OrtNode, attributes: *mut *const OrtOpAttr, num_attributes: usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetAttributeByName(node: *const OrtNode, attribute_name: *const c_char, attribute: *mut *const OrtOpAttr) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn OpAttr_GetTensorAttributeAsOrtValue(attribute: *const OrtOpAttr, attr_tensor: *mut *mut OrtValue) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn OpAttr_GetType(attribute: *const OrtOpAttr, r#type: *mut OrtOpAttrType) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn OpAttr_GetName(attribute: *const OrtOpAttr, name: *mut *const c_char) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetNumSubgraphs(node: *const OrtNode, num_subgraphs: *mut usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetSubgraphs(
+	node: *const OrtNode,
+	subgraphs: *mut *const OrtGraph,
+	num_subgraphs: *mut usize,
+	attribute_names: *mut *const c_char
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetGraph(node: *const OrtNode, graph: *mut *const OrtGraph) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Node_GetEpName(node: *const OrtNode, out: *mut *const c_char) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn ReleaseExternalInitializerInfo(value: *mut OrtExternalInitializerInfo) {}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn ExternalInitializerInfo_GetFilePath(info: *const OrtExternalInitializerInfo) -> *const os_char {
+	ptr::null()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn ExternalInitializerInfo_GetFileOffset(info: *const OrtExternalInitializerInfo) -> i64 {
+	0
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn ExternalInitializerInfo_GetByteSize(info: *const OrtExternalInitializerInfo) -> usize {
+	0
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn GetRunConfigEntry(options: *const OrtRunOptions, config_key: *const c_char) -> *const c_char {
+	ptr::null()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn EpDevice_MemoryInfo(ep_device: *const OrtEpDevice, memory_type: OrtDeviceMemoryType) -> *const OrtMemoryInfo {
+	ptr::null()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn CreateSharedAllocator(
+	env: *mut OrtEnv,
+	ep_device: *const OrtEpDevice,
+	mem_type: OrtDeviceMemoryType,
+	allocator_type: OrtAllocatorType,
+	allocator_options: *const OrtKeyValuePairs,
+	allocator: *mut *mut OrtAllocator
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn GetSharedAllocator(env: *mut OrtEnv, mem_info: *const OrtMemoryInfo, allocator: *mut *mut OrtAllocator) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn ReleaseSharedAllocator(env: *mut OrtEnv, ep_device: *const OrtEpDevice, mem_type: OrtDeviceMemoryType) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn GetTensorData(value: *const OrtValue, out: *mut *const c_void) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn GetSessionOptionsConfigEntries(options: *const OrtSessionOptions, out: *mut *mut OrtKeyValuePairs) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn SessionGetMemoryInfoForInputs(
+	session: *const OrtSession,
+	inputs_memory_info: *mut *const OrtMemoryInfo,
+	num_inputs: usize
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn SessionGetMemoryInfoForOutputs(
+	session: *const OrtSession,
+	outputs_memory_info: *mut *const OrtMemoryInfo,
+	num_outputs: usize
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn SessionGetEpDeviceForInputs(
+	session: *const OrtSession,
+	inputs_ep_devices: *mut *const OrtEpDevice,
+	num_inputs: usize
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn CreateSyncStreamForEpDevice(
+	ep_device: *const OrtEpDevice,
+	stream_options: *const OrtKeyValuePairs,
+	stream: *mut *mut OrtSyncStream
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn SyncStream_GetHandle(stream: *mut OrtSyncStream) -> *mut c_void {
+	ptr::null_mut()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn ReleaseSyncStream(value: *mut OrtSyncStream) {}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn CopyTensors(
+	env: *mut OrtEnv,
+	src_tensors: *const *const OrtValue,
+	dst_tensors: *mut *const OrtValue,
+	stream: *mut OrtSyncStream,
+	num_tensors: usize
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn Graph_GetModelMetadata(graph: *mut OrtGraph, out: *mut *mut OrtModelMetadata) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn GetModelCompatibilityForEpDevices(
+	ep_devices: *const *const OrtEpDevice,
+	num_ep_devices: usize,
+	compatibility_info: *const c_char,
+	out_status: *mut OrtCompiledModelCompatibility
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-23")]
+unsafe extern "system" fn CreateExternalInitializerInfo(
+	filepath: *const os_char,
+	file_offset: i64,
+	byte_size: usize,
+	out: *mut *mut OrtExternalInitializerInfo
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn TensorTypeAndShape_HasShape(info: *const OrtTensorTypeAndShapeInfo) -> bool {
+	false
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn KernelInfo_GetConfigEntries(info: *const OrtKernelInfo, out: *mut *mut OrtKeyValuePairs) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn KernelInfo_GetOperatorDomain(info: *const OrtKernelInfo, out: *mut c_char, size: *mut usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn KernelInfo_GetOperatorType(info: *const OrtKernelInfo, out: *mut c_char, size: *mut usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn GetInteropApi() -> *const OrtInteropApi {
+	ptr::null()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn SessionGetEpDeviceForOutputs(
+	session: *const OrtSession,
+	outputs_ep_devices: *mut *const OrtEpDevice,
+	num_outputs: usize
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn GetNumHardwareDevices(env: *const OrtEnv, num_devices: *mut usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn GetHardwareDevices(env: *const OrtEnv, devices: *mut *const OrtHardwareDevice, num_devices: *mut usize) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn GetHardwareDeviceEpIncompatibilityDetails(
+	env: *const OrtEnv,
+	ep_name: *const c_char,
+	hw: *const OrtHardwareDevice,
+	details: *mut *mut OrtDeviceEpIncompatibilityDetails
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn DeviceEpIncompatibilityDetails_GetReasonsBitmask(
+	details: *const OrtDeviceEpIncompatibilityDetails,
+	reasons_bitmask: *mut u32
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn DeviceEpIncompatibilityDetails_GetNotes(
+	details: *const OrtDeviceEpIncompatibilityDetails,
+	notes: *mut *const c_char
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn DeviceEpIncompatibilityDetails_GetErrorCode(details: *const OrtDeviceEpIncompatibilityDetails, error_code: *mut i32) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn ReleaseDeviceEpIncompatibilityDetails(value: *mut OrtDeviceEpIncompatibilityDetails) {}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn GetCompatibilityInfoFromModel(
+	model_path: *const os_char,
+	ep_type: *const c_char,
+	allocator: *mut OrtAllocator,
+	compatibility_info: *mut *mut c_char
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn GetCompatibilityInfoFromModelBytes(
+	model_data: *const c_void,
+	model_data_length: usize,
+	ep_type: *const c_char,
+	allocator: *mut OrtAllocator,
+	compatibility_info: *mut *mut c_char
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn CreateEnvWithOptions(options: *const OrtEnvCreationOptions, out: *mut *mut OrtEnv) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn Session_GetEpGraphAssignmentInfo(
+	session: *const OrtSession,
+	ep_subgraphs: *mut *const *const OrtEpAssignedSubgraph,
+	num_ep_subgraphs: *mut usize
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn EpAssignedSubgraph_GetEpName(ep_subgraph: *const OrtEpAssignedSubgraph, out: *mut *const c_char) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn EpAssignedSubgraph_GetNodes(
+	ep_subgraph: *const OrtEpAssignedSubgraph,
+	ep_nodes: *mut *const *const OrtEpAssignedNode,
+	num_ep_nodes: *mut usize
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn EpAssignedNode_GetName(ep_node: *const OrtEpAssignedNode, out: *mut *const c_char) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn EpAssignedNode_GetDomain(ep_node: *const OrtEpAssignedNode, out: *mut *const c_char) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn EpAssignedNode_GetOperatorType(ep_node: *const OrtEpAssignedNode, out: *mut *const c_char) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn RunOptionsSetSyncStream(options: *mut OrtRunOptions, sync_stream: *mut OrtSyncStream) {}
+
+#[cfg(feature = "api-24")]
+unsafe extern "system" fn GetTensorElementTypeAndShapeDataReference(
+	value: *const OrtValue,
+	elem_type: *mut ONNXTensorElementDataType,
+	shape_data: *mut *const i64,
+	shape_data_count: *mut usize
+) -> OrtStatusPtr {
+	OrtStatusPtr::default()
+}
+
 pub const fn api() -> OrtApi {
 	OrtApi {
 		CreateStatus,
@@ -2307,6 +2861,190 @@ pub const fn api() -> OrtApi {
 		#[cfg(feature = "api-23")]
 		CreateMemoryInfo_V2,
 		#[cfg(feature = "api-23")]
-		MemoryInfoGetDeviceMemType
+		MemoryInfoGetDeviceMemType,
+		#[cfg(feature = "api-23")]
+		MemoryInfoGetVendorId,
+		#[cfg(feature = "api-23")]
+		ValueInfo_GetValueProducer,
+		#[cfg(feature = "api-23")]
+		ValueInfo_GetValueNumConsumers,
+		#[cfg(feature = "api-23")]
+		ValueInfo_GetValueConsumers,
+		#[cfg(feature = "api-23")]
+		ValueInfo_GetInitializerValue,
+		#[cfg(feature = "api-23")]
+		ValueInfo_GetExternalInitializerInfo,
+		#[cfg(feature = "api-23")]
+		ValueInfo_IsRequiredGraphInput,
+		#[cfg(feature = "api-23")]
+		ValueInfo_IsOptionalGraphInput,
+		#[cfg(feature = "api-23")]
+		ValueInfo_IsGraphOutput,
+		#[cfg(feature = "api-23")]
+		ValueInfo_IsConstantInitializer,
+		#[cfg(feature = "api-23")]
+		ValueInfo_IsFromOuterScope,
+		#[cfg(feature = "api-23")]
+		Graph_GetName,
+		#[cfg(feature = "api-23")]
+		Graph_GetModelPath,
+		#[cfg(feature = "api-23")]
+		Graph_GetOnnxIRVersion,
+		#[cfg(feature = "api-23")]
+		Graph_GetNumOperatorSets,
+		#[cfg(feature = "api-23")]
+		Graph_GetOperatorSets,
+		#[cfg(feature = "api-23")]
+		Graph_GetNumInputs,
+		#[cfg(feature = "api-23")]
+		Graph_GetInputs,
+		#[cfg(feature = "api-23")]
+		Graph_GetNumOutputs,
+		#[cfg(feature = "api-23")]
+		Graph_GetOutputs,
+		#[cfg(feature = "api-23")]
+		Graph_GetNumInitializers,
+		#[cfg(feature = "api-23")]
+		Graph_GetInitializers,
+		#[cfg(feature = "api-23")]
+		Graph_GetNumNodes,
+		#[cfg(feature = "api-23")]
+		Graph_GetNodes,
+		#[cfg(feature = "api-23")]
+		Graph_GetParentNode,
+		#[cfg(feature = "api-23")]
+		Graph_GetGraphView,
+		#[cfg(feature = "api-23")]
+		Node_GetId,
+		#[cfg(feature = "api-23")]
+		Node_GetName,
+		#[cfg(feature = "api-23")]
+		Node_GetOperatorType,
+		#[cfg(feature = "api-23")]
+		Node_GetDomain,
+		#[cfg(feature = "api-23")]
+		Node_GetSinceVersion,
+		#[cfg(feature = "api-23")]
+		Node_GetNumInputs,
+		#[cfg(feature = "api-23")]
+		Node_GetInputs,
+		#[cfg(feature = "api-23")]
+		Node_GetNumOutputs,
+		#[cfg(feature = "api-23")]
+		Node_GetOutputs,
+		#[cfg(feature = "api-23")]
+		Node_GetNumImplicitInputs,
+		#[cfg(feature = "api-23")]
+		Node_GetImplicitInputs,
+		#[cfg(feature = "api-23")]
+		Node_GetNumAttributes,
+		#[cfg(feature = "api-23")]
+		Node_GetAttributes,
+		#[cfg(feature = "api-23")]
+		Node_GetAttributeByName,
+		#[cfg(feature = "api-23")]
+		OpAttr_GetTensorAttributeAsOrtValue,
+		#[cfg(feature = "api-23")]
+		OpAttr_GetType,
+		#[cfg(feature = "api-23")]
+		OpAttr_GetName,
+		#[cfg(feature = "api-23")]
+		Node_GetNumSubgraphs,
+		#[cfg(feature = "api-23")]
+		Node_GetSubgraphs,
+		#[cfg(feature = "api-23")]
+		Node_GetGraph,
+		#[cfg(feature = "api-23")]
+		Node_GetEpName,
+		#[cfg(feature = "api-23")]
+		ReleaseExternalInitializerInfo,
+		#[cfg(feature = "api-23")]
+		ExternalInitializerInfo_GetFilePath,
+		#[cfg(feature = "api-23")]
+		ExternalInitializerInfo_GetFileOffset,
+		#[cfg(feature = "api-23")]
+		ExternalInitializerInfo_GetByteSize,
+		#[cfg(feature = "api-23")]
+		GetRunConfigEntry,
+		#[cfg(feature = "api-23")]
+		EpDevice_MemoryInfo,
+		#[cfg(feature = "api-23")]
+		CreateSharedAllocator,
+		#[cfg(feature = "api-23")]
+		GetSharedAllocator,
+		#[cfg(feature = "api-23")]
+		ReleaseSharedAllocator,
+		#[cfg(feature = "api-23")]
+		GetTensorData,
+		#[cfg(feature = "api-23")]
+		GetSessionOptionsConfigEntries,
+		#[cfg(feature = "api-23")]
+		SessionGetMemoryInfoForInputs,
+		#[cfg(feature = "api-23")]
+		SessionGetMemoryInfoForOutputs,
+		#[cfg(feature = "api-23")]
+		SessionGetEpDeviceForInputs,
+		#[cfg(feature = "api-23")]
+		CreateSyncStreamForEpDevice,
+		#[cfg(feature = "api-23")]
+		SyncStream_GetHandle,
+		#[cfg(feature = "api-23")]
+		ReleaseSyncStream,
+		#[cfg(feature = "api-23")]
+		CopyTensors,
+		#[cfg(feature = "api-23")]
+		Graph_GetModelMetadata,
+		#[cfg(feature = "api-23")]
+		GetModelCompatibilityForEpDevices,
+		#[cfg(feature = "api-23")]
+		CreateExternalInitializerInfo,
+		#[cfg(feature = "api-24")]
+		TensorTypeAndShape_HasShape,
+		#[cfg(feature = "api-24")]
+		KernelInfo_GetConfigEntries,
+		#[cfg(feature = "api-24")]
+		KernelInfo_GetOperatorDomain,
+		#[cfg(feature = "api-24")]
+		KernelInfo_GetOperatorType,
+		#[cfg(feature = "api-24")]
+		GetInteropApi,
+		#[cfg(feature = "api-24")]
+		SessionGetEpDeviceForOutputs,
+		#[cfg(feature = "api-24")]
+		GetNumHardwareDevices,
+		#[cfg(feature = "api-24")]
+		GetHardwareDevices,
+		#[cfg(feature = "api-24")]
+		GetHardwareDeviceEpIncompatibilityDetails,
+		#[cfg(feature = "api-24")]
+		DeviceEpIncompatibilityDetails_GetReasonsBitmask,
+		#[cfg(feature = "api-24")]
+		DeviceEpIncompatibilityDetails_GetNotes,
+		#[cfg(feature = "api-24")]
+		DeviceEpIncompatibilityDetails_GetErrorCode,
+		#[cfg(feature = "api-24")]
+		ReleaseDeviceEpIncompatibilityDetails,
+		#[cfg(feature = "api-24")]
+		GetCompatibilityInfoFromModel,
+		#[cfg(feature = "api-24")]
+		GetCompatibilityInfoFromModelBytes,
+		#[cfg(feature = "api-24")]
+		CreateEnvWithOptions,
+		#[cfg(feature = "api-24")]
+		Session_GetEpGraphAssignmentInfo,
+		#[cfg(feature = "api-24")]
+		EpAssignedSubgraph_GetEpName,
+		#[cfg(feature = "api-24")]
+		EpAssignedSubgraph_GetNodes,
+		#[cfg(feature = "api-24")]
+		EpAssignedNode_GetName,
+		#[cfg(feature = "api-24")]
+		EpAssignedNode_GetDomain,
+		#[cfg(feature = "api-24")]
+		EpAssignedNode_GetOperatorType,
+		#[cfg(feature = "api-24")]
+		RunOptionsSetSyncStream,
+		#[cfg(feature = "api-24")]
+		GetTensorElementTypeAndShapeDataReference
 	}
 }

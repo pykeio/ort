@@ -188,7 +188,9 @@ impl AsPointer for SessionBuilder {
 #[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
 pub struct LoadCanceler(Weak<SessionOptionsPointer>);
 
+#[cfg(feature = "api-22")]
 unsafe impl Send for LoadCanceler {}
+#[cfg(feature = "api-22")]
 unsafe impl Sync for LoadCanceler {}
 
 #[cfg(feature = "api-22")]

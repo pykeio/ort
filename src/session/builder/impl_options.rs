@@ -291,6 +291,28 @@ impl SessionBuilder {
 		ortsys![unsafe SetSessionLogVerbosityLevel(self.ptr_mut(), verbosity)?];
 		Ok(self)
 	}
+
+	/// Automatically select & register an execution provider according to the given [`policy`](AutoEpPolicy) based on
+	/// available devices.
+	///
+	/// ```
+	/// # use ort::session::{Session, builder::AutoEpPolicy};
+	/// # fn main() -> ort::Result<()> {
+	/// use std::sync::Arc;
+	///
+	/// let mut session = Session::builder()?
+	/// 	// moar power!!1!
+	/// 	.with_auto_ep(AutoEpPolicy::MaxPerformance)?
+	/// 	.commit_from_file("tests/data/upsample.onnx")?;
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	#[cfg(feature = "api-22")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
+	pub fn with_auto_ep(mut self, policy: AutoEpPolicy) -> Result<Self> {
+		ortsys![unsafe SessionOptionsSetEpSelectionPolicy(self.ptr_mut(), policy.into())?];
+		Ok(self)
+	}
 }
 
 /// ONNX Runtime provides various graph optimizations to improve performance. Graph optimizations are essentially
@@ -426,5 +448,44 @@ impl AsPointer for PrepackedWeights {
 
 	fn ptr_mut(&mut self) -> *mut Self::Sys {
 		self.inner.0
+	}
+}
+
+/// The policy used for [automatic EP selection](SessionBuilder::with_auto_ep).
+#[cfg(feature = "api-22")]
+#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AutoEpPolicy {
+	/// Same as [`Self::PreferCPU`]; ensures broadest compatibility.
+	#[default]
+	Default,
+	/// Prefer the most performant CPU-based accelerator.
+	PreferCPU,
+	/// Prefer an NPU accelerator, if available; fall back to CPU otherwise.
+	PreferNPU,
+	/// Prefer a GPU accelerator, if available; fall back to CPU otherwise.
+	PreferGPU,
+	/// Choose an EP that offers maximum performance.
+	/// Currently the same as [`Self::PreferGPU`].
+	MaxPerformance,
+	/// Choose an EP that offers maximum efficiency (performance per watt).
+	/// Currently the same as [`Self::PreferNPU`].
+	MaxEfficiency,
+	/// Choose an EP that offers the lowest overall power usage.
+	/// Currently the same as [`Self::PreferNPU`].
+	MinPower
+}
+
+impl From<AutoEpPolicy> for ort_sys::OrtExecutionProviderDevicePolicy {
+	fn from(val: AutoEpPolicy) -> Self {
+		match val {
+			AutoEpPolicy::Default => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_DEFAULT,
+			AutoEpPolicy::PreferCPU => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_PREFER_CPU,
+			AutoEpPolicy::PreferNPU => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_PREFER_NPU,
+			AutoEpPolicy::PreferGPU => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_PREFER_GPU,
+			AutoEpPolicy::MaxPerformance => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_MAX_PERFORMANCE,
+			AutoEpPolicy::MaxEfficiency => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_MAX_EFFICIENCY,
+			AutoEpPolicy::MinPower => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_MIN_OVERALL_POWER
+		}
 	}
 }

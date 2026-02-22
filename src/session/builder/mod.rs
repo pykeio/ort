@@ -30,8 +30,8 @@ mod impl_options;
 
 #[cfg(feature = "api-22")]
 #[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
-pub use self::editable::EditableSession;
-pub use self::impl_options::{GraphOptimizationLevel, PrepackedWeights};
+pub use self::editable::*;
+pub use self::impl_options::*;
 
 /// Creates a session using the builder pattern.
 ///

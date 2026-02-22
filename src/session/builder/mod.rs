@@ -108,6 +108,11 @@ impl SessionBuilder {
 		let mut session_options_ptr: *mut ort_sys::OrtSessionOptions = ptr::null_mut();
 		ortsys![unsafe CreateSessionOptions(&mut session_options_ptr)?; nonNull(session_options_ptr)];
 
+		// target on-device usage; prefer efficiency by default
+		// .with_execution_providers/.with_auto_ep will override this
+		#[cfg(feature = "api-22")]
+		let _ = ortsys![@ort: unsafe SessionOptionsSetEpSelectionPolicy(session_options_ptr.as_ptr(), AutoEpPolicy::MaxEfficiency.into()) as Result];
+
 		Ok(Self {
 			session_options_ptr: Arc::new(SessionOptionsPointer::new(session_options_ptr)),
 			memory_info: None,

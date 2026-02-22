@@ -476,6 +476,7 @@ pub enum AutoEpPolicy {
 	MinPower
 }
 
+#[cfg(feature = "api-22")]
 impl From<AutoEpPolicy> for ort_sys::OrtExecutionProviderDevicePolicy {
 	fn from(val: AutoEpPolicy) -> Self {
 		match val {

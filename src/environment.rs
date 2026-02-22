@@ -50,9 +50,13 @@ use core::{
 	mem::forget,
 	ptr::{self, NonNull}
 };
+#[cfg(all(feature = "api-22", feature = "std"))]
+use std::path::Path;
 
 use smallvec::SmallVec;
 
+#[cfg(feature = "api-22")]
+use crate::ep::ExecutionProviderLibrary;
 use crate::{
 	AsPointer,
 	ep::ExecutionProviderDispatch,
@@ -106,6 +110,35 @@ impl Environment {
 	/// Returns the execution providers configured by [`EnvironmentBuilder::with_execution_providers`].
 	pub fn execution_providers(&self) -> &[ExecutionProviderDispatch] {
 		&self.execution_providers
+	}
+
+	/// Registers an execution provider library from the given `path`. Can be used to customize the path of a provider
+	/// library, or load new ones ONNX Runtime was not initially compiled with.
+	///
+	/// `name` is semi-arbitrary - it should be unique per EP library. Adding the suffix `.virtual` to `name` allows the
+	/// EP library to create virtual [devices](crate::device).
+	///
+	/// Returns a handle that can be used to [unregister](ExecutionProviderLibrary::unregister) the library, should it
+	/// no longer be needed.
+	///
+	/// ```
+	/// # fn main() -> ort::Result<()> {
+	/// let env = ort::environment::get_environment()?;
+	///
+	/// let _ = env.register_ep_library("CUDA", "/path/to/onnxruntime_providers_cuda.dll");
+	/// # Ok(())
+	/// # }
+	/// ```
+	#[cfg(all(feature = "api-22", feature = "std"))]
+	#[cfg_attr(docsrs, doc(cfg(all(feature = "api-22", feature = "std"))))]
+	pub fn register_ep_library<P: AsRef<Path>>(self: &Arc<Self>, name: impl Into<String>, path: P) -> Result<ExecutionProviderLibrary> {
+		let name = name.into();
+		let path = crate::util::path_to_os_char(path);
+		with_cstr(name.as_bytes(), &|name| {
+			ortsys![unsafe RegisterExecutionProviderLibrary(self.ptr().cast_mut(), name.as_ptr(), path.as_ptr())?];
+			Ok(())
+		})?;
+		Ok(ExecutionProviderLibrary::new(name, self))
 	}
 
 	#[inline]

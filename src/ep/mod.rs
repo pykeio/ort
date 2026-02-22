@@ -14,6 +14,8 @@
 //! }
 //! ```
 
+#[cfg(feature = "api-22")]
+use alloc::sync::Weak;
 use alloc::{ffi::CString, string::ToString, sync::Arc, vec::Vec};
 use core::{
 	any::Any,
@@ -22,6 +24,8 @@ use core::{
 	ptr
 };
 
+#[cfg(feature = "api-22")]
+use crate::environment::Environment;
 use crate::{
 	error::Result,
 	ortsys,
@@ -387,6 +391,37 @@ fn is_ep_available(name: &str) -> Result<bool> {
 	}
 
 	Ok(false)
+}
+
+/// Handle to a loaded execution provider library, obtained from [`Environment::register_ep_library`].
+#[cfg(feature = "api-22")]
+#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
+pub struct ExecutionProviderLibrary {
+	name: String,
+	env: Weak<Environment>
+}
+
+#[cfg(feature = "api-22")]
+impl ExecutionProviderLibrary {
+	pub(crate) fn new(name: impl Into<String>, env: &Arc<Environment>) -> Self {
+		Self {
+			name: name.into(),
+			env: Arc::downgrade(env)
+		}
+	}
+
+	/// Unregister the EP library from the environment.
+	#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
+	pub fn unregister(self) -> Result<()> {
+		if let Some(env) = self.env.upgrade() {
+			use crate::AsPointer;
+			crate::util::with_cstr(self.name.as_bytes(), &|name| {
+				ortsys![unsafe UnregisterExecutionProviderLibrary(env.ptr().cast_mut(), name.as_ptr())?];
+				Ok(())
+			})?;
+		}
+		Ok(())
+	}
 }
 
 #[deprecated = "import `ort::ep::ACL` instead"]

@@ -295,7 +295,7 @@ impl SessionBuilder {
 	/// Automatically select & register an execution provider according to the given [`policy`](AutoEpPolicy) based on
 	/// available devices.
 	///
-	/// ```
+	/// ```no_run
 	/// # use ort::session::{Session, builder::AutoEpPolicy};
 	/// # fn main() -> ort::Result<()> {
 	/// use std::sync::Arc;

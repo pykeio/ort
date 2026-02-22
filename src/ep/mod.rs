@@ -14,9 +14,9 @@
 //! }
 //! ```
 
-#[cfg(feature = "api-22")]
-use alloc::sync::Weak;
 use alloc::{ffi::CString, string::ToString, sync::Arc, vec::Vec};
+#[cfg(feature = "api-22")]
+use alloc::{string::String, sync::Weak};
 use core::{
 	any::Any,
 	ffi::c_char,

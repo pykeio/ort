@@ -4,7 +4,7 @@ import { walk } from 'jsr:@std/fs@1.0.2';
 const PROJECT_ROOT = dirname(import.meta.dirname!);
 const DECODER = new TextDecoder('utf-8');
 const SYMBOL_DEF_REGEX = /pub\s+([A-Za-z_][A-Za-z0-9_]+):/;
-const SYMBOL_USAGE_REGEX = /ortsys!\[\s*(?:unsafe\s+)?([A-Za-z_][A-Za-z0-9_]+)/gm;
+const SYMBOL_USAGE_REGEX = /ortsys!\[\s*(?:@ort:)?\s*(?:unsafe\s+)?([A-Za-z_][A-Za-z0-9_]+)/gm;
 
 const IGNORED_SYMBOLS = new Set<string>([
 	'KernelContext_GetScratchBuffer', // implemented in src/operator/kernel.rs but impl appears to be broken so ignoring
@@ -12,6 +12,7 @@ const IGNORED_SYMBOLS = new Set<string>([
 	'RegisterCustomOpsUsingFunction',
 	'SessionOptionsAppendExecutionProvider_CUDA', // we use V2
 	'SessionOptionsAppendExecutionProvider_TensorRT', // we use V2
+	'SessionOptionsAppendExecutionProvider_OpenVINO', // we use V2
 	'GetValueType', // we get value types via GetTypeInfo -> GetOnnxTypeFromTypeInfo, which is equivalent
 	'SetLanguageProjection', // someday we shall have `ORT_PROJECTION_RUST`, but alas, today is not that day...
 
@@ -38,12 +39,18 @@ const IGNORED_SYMBOLS = new Set<string>([
 
 	// non-use
 	'HasValue',
-	'GetExecutionProviderApi', // available via ort_sys for those who need it
 	'CreateCpuMemoryInfo',
 	'ReleaseMapTypeInfo', // neither map or sequence type infos ever get directly allocated, so im not sure why these exist
 	'ReleaseSequenceTypeInfo',
 	'UpdateTensorRTProviderOptionsWithValue',
-	'UpdateCUDAProviderOptionsWithValue'
+	'UpdateCUDAProviderOptionsWithValue',
+	'GetBoundOutputNames',
+	'GetTensorShapeElementCount', // calculatd by us
+	// string tensors have special extraction & aren't mutable
+	'GetStringTensorElementLength',
+	'GetStringTensorElement',
+	'FillStringTensorElement',
+	'GetResizedStringTensorElementBuffer',
 ]);
 
 const sysSymbols = new Set<string>();

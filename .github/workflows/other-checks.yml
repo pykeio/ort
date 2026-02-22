@@ -37,6 +37,7 @@ jobs:
       - name: Run checks
         run: |
           cargo check -p ort --no-default-features
+          cargo check -p ort --no-default-features --features api-24
   msrv:
     name: MSRV (1.88)
     runs-on: ubuntu-latest
@@ -59,9 +60,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2.7.8
       - name: Run checks
         run: |
-          cargo check -p ort --no-default-features --features api-17
-          cargo check -p ort --no-default-features --features api-18
-          cargo check -p ort --no-default-features --features api-19
-          cargo check -p ort --no-default-features --features api-20
-          cargo check -p ort --no-default-features --features api-21
-          cargo check -p ort --no-default-features --features api-22
+          cargo check -p ort --no-default-features --features api-17,std,ndarray,tracing
+          cargo check -p ort --no-default-features --features api-18,std,ndarray,tracing
+          cargo check -p ort --no-default-features --features api-19,std,ndarray,tracing
+          cargo check -p ort --no-default-features --features api-20,std,ndarray,tracing
+          cargo check -p ort --no-default-features --features api-21,std,ndarray,tracing
+          cargo check -p ort --no-default-features --features api-22,std,ndarray,tracing
+          cargo check -p ort --no-default-features --features api-23,std,ndarray,tracing
+          cargo check -p ort --no-default-features --features api-24,std,ndarray,tracing

@@ -3,7 +3,7 @@ use alloc::string::String;
 use wasm_bindgen::{JsCast, JsValue};
 
 pub fn value_to_string(value: &JsValue) -> String {
-	js_sys::Object::unchecked_from_js_ref(value).to_string().into()
+	js_sys::Object::<JsValue>::unchecked_from_js_ref(value).to_js_string().into()
 }
 
 pub fn num_elements(dims: &[i32]) -> usize {

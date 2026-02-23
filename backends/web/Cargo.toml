@@ -22,16 +22,16 @@ name = "ort_web"
 path = "lib.rs"
 
 [dependencies]
-js-sys = "0.3"
+js-sys = "0.3.87"
 ort = { path = "../../", version = "=2.0.0-rc.11", default-features = false, features = [ "alternative-backend", "api-17" ] }
 ort-sys = { path = "../../ort-sys", version = "=2.0.0-rc.11", default-features = false, features = [ "disable-linking", "api-17" ] }
 serde = { version = "1.0", features = [ "derive" ] }
 serde-wasm-bindgen = "0.6"
-wasm-bindgen = "0.2"
+wasm-bindgen = "0.2.110"
 wasm-bindgen-futures = "0.4"
 
 [dependencies.web-sys]
-version = "0.3"
+version = "0.3.87"
 features = [
 	"console",
 	"ImageData",

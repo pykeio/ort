@@ -14,3 +14,4 @@ none	aarch64-linux-android	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.24.2/aarch64-l
 none	aarch64-apple-ios	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.24.2/aarch64-apple-ios.tar.lzma2	ace020d895f8280333206ea8af8bd6daba8a6bdb83c298986a0fdc1e0e3f57f0
 none	aarch64-apple-darwin	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.24.2/aarch64-apple-darwin.tar.lzma2	612739f75438dc0a075461e1fb454226b4a1eb175e60a7271ba966bbbb972cd4
 none	aarch64-apple-ios-sim	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.24.2/aarch64-apple-ios-sim.tar.lzma2	73ef2f89087d72aaccf4228bcfe0225f63ccc137048fe584f4e024f41b725b79
+wgpu	aarch64-apple-darwin	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.24.2/aarch64-apple-darwin+wgpu.tar.lzma2	e7271056b10dc2fec4b1bcc5bb9ac28a5f288de0a1f9c24c389c95566a487549

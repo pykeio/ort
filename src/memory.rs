@@ -342,7 +342,7 @@ impl From<ort_sys::OrtMemType> for MemoryType {
 pub enum DeviceType {
 	CPU,
 	GPU,
-	FPGA
+	NPU
 }
 
 impl From<DeviceType> for ort_sys::OrtMemoryInfoDeviceType {
@@ -350,7 +350,7 @@ impl From<DeviceType> for ort_sys::OrtMemoryInfoDeviceType {
 		match value {
 			DeviceType::CPU => ort_sys::OrtMemoryInfoDeviceType::OrtMemoryInfoDeviceType_CPU,
 			DeviceType::GPU => ort_sys::OrtMemoryInfoDeviceType::OrtMemoryInfoDeviceType_GPU,
-			DeviceType::FPGA => ort_sys::OrtMemoryInfoDeviceType::OrtMemoryInfoDeviceType_FPGA
+			DeviceType::NPU => ort_sys::OrtMemoryInfoDeviceType::OrtMemoryInfoDeviceType_FPGA
 		}
 	}
 }
@@ -360,7 +360,7 @@ impl From<ort_sys::OrtMemoryInfoDeviceType> for DeviceType {
 		match value {
 			ort_sys::OrtMemoryInfoDeviceType::OrtMemoryInfoDeviceType_CPU => DeviceType::CPU,
 			ort_sys::OrtMemoryInfoDeviceType::OrtMemoryInfoDeviceType_GPU => DeviceType::GPU,
-			ort_sys::OrtMemoryInfoDeviceType::OrtMemoryInfoDeviceType_FPGA => DeviceType::FPGA
+			ort_sys::OrtMemoryInfoDeviceType::OrtMemoryInfoDeviceType_FPGA => DeviceType::NPU
 		}
 	}
 }

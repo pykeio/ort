@@ -1,6 +1,7 @@
 use alloc::{
 	borrow::Cow,
-	sync::{Arc, Weak}
+	sync::{Arc, Weak},
+	vec::Vec
 };
 use core::{
 	any::Any,
@@ -10,8 +11,8 @@ use core::{
 use smallvec::SmallVec;
 
 use crate::{
-	AsPointer,
-	environment::{Environment, get_environment},
+	AsPointer, Error,
+	environment::{self, Environment},
 	error::Result,
 	logging::LoggerFunction,
 	memory::MemoryInfo,
@@ -128,10 +129,11 @@ impl SessionBuilder {
 		})
 	}
 
-	pub(crate) fn add_config_entry(&mut self, key: &str, value: &str) -> Result<()> {
+	#[inline]
+	pub(crate) fn add_config_entry(&mut self, key: impl AsRef<str>, value: impl AsRef<str>) -> Result<()> {
 		let ptr = self.ptr_mut();
-		with_cstr(key.as_bytes(), &|key| {
-			with_cstr(value.as_bytes(), &|value| {
+		with_cstr(key.as_ref().as_bytes(), &|key| {
+			with_cstr(value.as_ref().as_bytes(), &|value| {
 				ortsys![unsafe AddSessionConfigEntry(ptr, key.as_ptr(), value.as_ptr())?];
 				Ok(())
 			})

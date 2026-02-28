@@ -111,7 +111,7 @@ impl SessionBuilder {
 		// target on-device usage; prefer efficiency by default
 		// .with_execution_providers/.with_auto_ep will override this
 		#[cfg(feature = "api-22")]
-		let _ = ortsys![@ort: unsafe SessionOptionsSetEpSelectionPolicy(session_options_ptr.as_ptr(), AutoEpPolicy::MaxEfficiency.into()) as Result];
+		let _ = ortsys![@ort: unsafe SessionOptionsSetEpSelectionPolicy(session_options_ptr.as_ptr(), AutoDevicePolicy::MaxEfficiency.into()) as Result];
 
 		Ok(Self {
 			session_options_ptr: Arc::new(SessionOptionsPointer::new(session_options_ptr)),

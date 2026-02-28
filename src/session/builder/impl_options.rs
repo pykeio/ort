@@ -292,24 +292,24 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
-	/// Automatically select & register an execution provider according to the given [`policy`](AutoEpPolicy) based on
-	/// available devices.
+	/// Automatically select & register an execution provider according to the given [`policy`](AutoDevicePolicy) based
+	/// on available devices.
 	///
 	/// ```no_run
-	/// # use ort::session::{Session, builder::AutoEpPolicy};
+	/// # use ort::session::{Session, builder::AutoDevicePolicy};
 	/// # fn main() -> ort::Result<()> {
 	/// use std::sync::Arc;
 	///
 	/// let mut session = Session::builder()?
 	/// 	// moar power!!1!
-	/// 	.with_auto_ep(AutoEpPolicy::MaxPerformance)?
+	/// 	.with_auto_device(AutoDevicePolicy::MaxPerformance)?
 	/// 	.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	Ok(())
 	/// # }
 	/// ```
 	#[cfg(feature = "api-22")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
-	pub fn with_auto_ep(mut self, policy: AutoEpPolicy) -> Result<Self> {
+	pub fn with_auto_device(mut self, policy: AutoDevicePolicy) -> Result<Self> {
 		ortsys![unsafe SessionOptionsSetEpSelectionPolicy(self.ptr_mut(), policy.into())?];
 		Ok(self)
 	}
@@ -451,11 +451,11 @@ impl AsPointer for PrepackedWeights {
 	}
 }
 
-/// The policy used for [automatic EP selection](SessionBuilder::with_auto_ep).
+/// The policy used for [automatic device selection](SessionBuilder::with_auto_device).
 #[cfg(feature = "api-22")]
 #[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum AutoEpPolicy {
+pub enum AutoDevicePolicy {
 	/// Same as [`Self::PreferCPU`]; ensures broadest compatibility.
 	#[default]
 	Default,
@@ -465,28 +465,28 @@ pub enum AutoEpPolicy {
 	PreferNPU,
 	/// Prefer a GPU accelerator, if available; fall back to CPU otherwise.
 	PreferGPU,
-	/// Choose an EP that offers maximum performance.
+	/// Choose a device that offers maximum performance.
 	/// Currently the same as [`Self::PreferGPU`].
 	MaxPerformance,
-	/// Choose an EP that offers maximum efficiency (performance per watt).
+	/// Choose a device that offers maximum efficiency (performance per watt).
 	/// Currently the same as [`Self::PreferNPU`].
 	MaxEfficiency,
-	/// Choose an EP that offers the lowest overall power usage.
+	/// Choose a device that offers the lowest overall power usage.
 	/// Currently the same as [`Self::PreferNPU`].
 	MinPower
 }
 
 #[cfg(feature = "api-22")]
-impl From<AutoEpPolicy> for ort_sys::OrtExecutionProviderDevicePolicy {
-	fn from(val: AutoEpPolicy) -> Self {
+impl From<AutoDevicePolicy> for ort_sys::OrtExecutionProviderDevicePolicy {
+	fn from(val: AutoDevicePolicy) -> Self {
 		match val {
-			AutoEpPolicy::Default => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_DEFAULT,
-			AutoEpPolicy::PreferCPU => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_PREFER_CPU,
-			AutoEpPolicy::PreferNPU => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_PREFER_NPU,
-			AutoEpPolicy::PreferGPU => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_PREFER_GPU,
-			AutoEpPolicy::MaxPerformance => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_MAX_PERFORMANCE,
-			AutoEpPolicy::MaxEfficiency => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_MAX_EFFICIENCY,
-			AutoEpPolicy::MinPower => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_MIN_OVERALL_POWER
+			AutoDevicePolicy::Default => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_DEFAULT,
+			AutoDevicePolicy::PreferCPU => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_PREFER_CPU,
+			AutoDevicePolicy::PreferNPU => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_PREFER_NPU,
+			AutoDevicePolicy::PreferGPU => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_PREFER_GPU,
+			AutoDevicePolicy::MaxPerformance => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_MAX_PERFORMANCE,
+			AutoDevicePolicy::MaxEfficiency => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_MAX_EFFICIENCY,
+			AutoDevicePolicy::MinPower => ort_sys::OrtExecutionProviderDevicePolicy::OrtExecutionProviderDevicePolicy_MIN_OVERALL_POWER
 		}
 	}
 }

@@ -1,1 +1,5 @@
 msrv = "1.88"
+# BuilderResult is large because it's Result<SessionBuilder, Error<SessionBuilder>>. But rustc optimizes the struct layout
+# of BuilderResult such that the error SessionBuilder and ok SessionBuilder take up the same space in memory, so the
+# error variant is actually only 8 extra bytes. We increase the threshold here to effectively ignore clippy::result_large_err.
+large-error-threshold = 160

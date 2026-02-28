@@ -20,15 +20,20 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
-	/// Enable flush-to-zero and denormal-as-zero.
+	/// Disables subnormal floats by enabling the denormals-are-zero and flush-to-zero flags for all threads in the
+	/// session's internal thread pool.
+	///
+	/// [Subnormal floats](https://en.wikipedia.org/wiki/Subnormal_number) are extremely small numbers very close to zero.
+	/// Operations involving subnormal numbers can be very slow; enabling this flag will instead treat them as `0.0`,
+	/// giving faster & more consistent performance, but lower accuracy (in cases where subnormals are involved).
 	///
 	/// This option is **disabled** by default, as it may hurt model accuracy.
-	pub fn with_denormal_as_zero(mut self) -> Result<Self> {
+	pub fn with_flush_to_zero(mut self) -> Result<Self> {
 		self.add_config_entry("session.set_denormal_as_zero", "1")?;
 		Ok(self)
 	}
 
-	/// Enable/disable fusion for quantized models in QDQ (QuantizeLinear/DequantizeLinear) format.
+	/// Enable/disable fusion for quantized models in QDQ (`QuantizeLinear`/`DequantizeLinear`) format.
 	///
 	/// This option is **enabled** by default for all EPs except DirectML.
 	pub fn with_quant_qdq(mut self, enable: bool) -> Result<Self> {
@@ -52,11 +57,19 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
-	/// Enable fast GELU approximation.
+	/// Enable fast tanh-based GELU approximation (like PyTorch's `nn.GELU(approximate='tanh')`).
 	///
-	/// This option is **disabled** by default, as it may hurt accuracy.
+	/// This option is **disabled** by default, as it may impact results.
 	pub fn with_approximate_gelu(mut self) -> Result<Self> {
 		self.add_config_entry("optimization.enable_gelu_approximation", "1")?;
+		Ok(self)
+	}
+
+	/// Enable the `Cast` chain elimination optimization.
+	///
+	/// This option is **disabled** by default, as it may impact results.
+	pub fn with_cast_chain_elimination(mut self) -> Result<Self> {
+		self.add_config_entry("optimization.enable_cast_chain_elimination", "1")?;
 		Ok(self)
 	}
 
@@ -69,15 +82,16 @@ impl SessionBuilder {
 	}
 
 	/// Accepts a comma-separated list of optimizers to disable.
-	pub fn with_disabled_optimizers(mut self, optimizers: &str) -> Result<Self> {
+	pub fn with_disabled_optimizers(mut self, optimizers: impl AsRef<str>) -> Result<Self> {
 		self.add_config_entry("optimization.disable_specified_optimizers", optimizers)?;
 		Ok(self)
 	}
 
-	/// Enable using device allocator for allocating initialized tensor memory.
+	/// Enable using the device allocator for allocating initialized tensor memory, potentially bypassing arena
+	/// allocators.
 	///
 	/// This option is **disabled** by default.
-	pub fn with_device_allocator_for_initializers(mut self) -> Result<Self> {
+	pub fn with_device_allocated_initializers(mut self) -> Result<Self> {
 		self.add_config_entry("session.use_device_allocator_for_initializers", "1")?;
 		Ok(self)
 	}

@@ -103,7 +103,7 @@ impl SessionBuilder {
 	/// # }
 	/// ```
 	pub fn new() -> Result<Self> {
-		let _environment = get_environment()?;
+		let _environment = environment::current()?;
 
 		let mut session_options_ptr: *mut ort_sys::OrtSessionOptions = ptr::null_mut();
 		ortsys![unsafe CreateSessionOptions(&mut session_options_ptr)?; nonNull(session_options_ptr)];

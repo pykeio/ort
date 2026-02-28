@@ -90,6 +90,14 @@ unsafe impl Send for Environment {}
 unsafe impl Sync for Environment {}
 
 impl Environment {
+	/// Returns a handle to the currently active `Environment`. If one has not yet been [committed][commit] (or an old
+	/// environment has fallen out of usage), a new environment will be created & committed.
+	///
+	/// [commit]: EnvironmentBuilder::commit
+	pub fn current() -> Result<Arc<Environment>> {
+		self::current()
+	}
+
 	/// Sets the global log level.
 	///
 	/// ```
@@ -168,9 +176,9 @@ impl Drop for Environment {
 	}
 }
 
-/// Returns a reference to the currently active `Environment`. If one has not yet been committed (or an old environment
+/// Returns a handle to the currently active `Environment`. If one has not yet been committed (or an old environment
 /// has fallen out of usage), a new environment will be created & committed.
-pub fn get_environment() -> Result<Arc<Environment>> {
+pub fn current() -> Result<Arc<Environment>> {
 	let mut env_lock = G_ENV.lock();
 	if let Some(env) = env_lock.as_ref()
 		&& let Some(upgraded) = Weak::upgrade(env)

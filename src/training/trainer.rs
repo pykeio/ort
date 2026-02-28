@@ -11,7 +11,7 @@ use super::{Checkpoint, Optimizer, training_api};
 use crate::{
 	AsPointer,
 	environment::Environment,
-	error::{Result, status_to_result},
+	error::{Error, Result},
 	memory::Allocator,
 	ortsys,
 	session::{RunOptions, SessionInputValue, SessionInputs, SessionOutputs, builder::SessionBuilder},
@@ -329,11 +329,11 @@ fn extract_io_names(
 	) -> ort_sys::OrtStatusPtr
 ) -> Result<Vec<String>> {
 	let mut count = 0;
-	unsafe { status_to_result(get_count(ptr.as_ptr(), &mut count)) }?;
+	unsafe { Error::result_from_status(get_count(ptr.as_ptr(), &mut count)) }?;
 	(0..count)
 		.map(|i| {
 			let mut name_bytes: *const c_char = ptr::null();
-			unsafe { status_to_result(get_name(ptr.as_ptr(), i, allocator.ptr().cast_mut(), &mut name_bytes)) }?;
+			unsafe { Error::result_from_status(get_name(ptr.as_ptr(), i, allocator.ptr().cast_mut(), &mut name_bytes)) }?;
 			let name = match char_p_to_string(name_bytes) {
 				Ok(name) => name,
 				Err(e) => {

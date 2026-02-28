@@ -35,88 +35,8 @@ impl SessionBuilder {
 	#[cfg(all(feature = "fetch-models", feature = "std", not(target_arch = "wasm32")))]
 	#[cfg_attr(docsrs, doc(cfg(all(feature = "fetch-models", feature = "std"))))]
 	pub fn commit_from_url(&mut self, model_url: impl AsRef<str>) -> Result<Session> {
-		let downloaded_path = SessionBuilder::download(model_url.as_ref())?;
+		let downloaded_path = download_model(model_url.as_ref())?;
 		self.commit_from_file(downloaded_path)
-	}
-
-	#[cfg(all(feature = "fetch-models", feature = "std", not(target_arch = "wasm32")))]
-	fn download(url: &str) -> Result<PathBuf> {
-		use ureq::{
-			config::Config,
-			tls::{RootCerts, TlsConfig, TlsProvider}
-		};
-
-		let mut download_dir = ort_sys::internal::dirs::cache_dir()
-			.expect("could not determine cache directory")
-			.join("models");
-		if std::fs::create_dir_all(&download_dir).is_err() {
-			download_dir = std::env::current_dir().expect("Failed to obtain current working directory");
-		}
-
-		let model_filename = <sha2::Sha256 as sha2::Digest>::digest(url).into_iter().fold(String::new(), |mut s, b| {
-			let _ = write!(&mut s, "{:02x}", b);
-			s
-		});
-		let model_filepath = download_dir.join(&model_filename);
-		if model_filepath.exists() {
-			crate::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), "Model already exists, skipping download");
-			Ok(model_filepath)
-		} else {
-			crate::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), url = format!("{url:?}").as_str(), "Downloading model");
-
-			let agent = Config::builder()
-				.tls_config(
-					TlsConfig::builder()
-						.root_certs(RootCerts::WebPki)
-						.provider(if cfg!(any(feature = "tls-rustls", feature = "tls-rustls-no-provider")) {
-							TlsProvider::Rustls
-						} else if cfg!(any(feature = "tls-native", feature = "tls-native-vendored")) {
-							TlsProvider::NativeTls
-						} else {
-							return Err(Error::new(
-								"No TLS provider configured. When using `fetch-models` with HTTPS URLs, a `tls-*` feature must be enabled."
-							));
-						})
-						.build()
-				)
-				.build()
-				.new_agent();
-
-			let resp = agent.get(url).call().map_err(|e| Error::new(format!("Error downloading to file: {e}")))?;
-
-			let len = resp
-				.headers()
-				.get("Content-Length")
-				.and_then(|h| h.to_str().ok())
-				.and_then(|s| s.parse::<usize>().ok())
-				.expect("Missing Content-Length header");
-			crate::info!(len, "Downloading {} bytes", len);
-
-			let mut reader = resp.into_body().into_with_config().limit(u64::MAX).reader();
-			let temp_filepath = download_dir.join(format!("tmp_{}.{model_filename}", ort_sys::internal::random_identifier()));
-
-			let f = std::fs::File::create(&temp_filepath).expect("Failed to create model file");
-			let mut writer = std::io::BufWriter::new(f);
-
-			let bytes_io_count = std::io::copy(&mut reader, &mut writer).map_err(Error::wrap)?;
-			if bytes_io_count != len as u64 {
-				return Err(Error::new(format!("Failed to download entire model; file only has {bytes_io_count} bytes, expected {len}")));
-			}
-
-			drop(writer);
-
-			match std::fs::rename(&temp_filepath, &model_filepath) {
-				Ok(()) => Ok(model_filepath),
-				Err(e) => {
-					if model_filepath.exists() {
-						let _ = std::fs::remove_file(temp_filepath);
-						Ok(model_filepath)
-					} else {
-						Err(Error::new(format!("Failed to download model: {e}")))
-					}
-				}
-			}
-		}
 	}
 
 	/// Loads an ONNX model from a file and builds the session.
@@ -329,5 +249,83 @@ impl SessionBuilder {
 		];
 
 		EditableSession::new(session_ptr, self)
+	}
+}
+
+#[cfg(all(feature = "fetch-models", feature = "std", not(target_arch = "wasm32")))]
+fn download_model(url: &str) -> Result<PathBuf> {
+	use ureq::{
+		config::Config,
+		tls::{RootCerts, TlsConfig, TlsProvider}
+	};
+
+	let mut download_dir = ort_sys::internal::dirs::cache_dir()
+		.expect("could not determine cache directory")
+		.join("models");
+	if std::fs::create_dir_all(&download_dir).is_err() {
+		download_dir = std::env::current_dir().expect("Failed to obtain current working directory");
+	}
+
+	let model_filename = <sha2::Sha256 as sha2::Digest>::digest(url).into_iter().fold(String::new(), |mut s, b| {
+		let _ = write!(&mut s, "{:02x}", b);
+		s
+	});
+	let model_filepath = download_dir.join(&model_filename);
+	if model_filepath.exists() {
+		crate::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), "Model already exists, skipping download");
+		Ok(model_filepath)
+	} else {
+		crate::info!(model_filepath = format!("{}", model_filepath.display()).as_str(), url = format!("{url:?}").as_str(), "Downloading model");
+
+		let agent = Config::builder()
+			.tls_config(
+				TlsConfig::builder()
+					.root_certs(RootCerts::WebPki)
+					.provider(if cfg!(any(feature = "tls-rustls", feature = "tls-rustls-no-provider")) {
+						TlsProvider::Rustls
+					} else if cfg!(any(feature = "tls-native", feature = "tls-native-vendored")) {
+						TlsProvider::NativeTls
+					} else {
+						return Err(Error::new("No TLS provider configured. When using `fetch-models` with HTTPS URLs, a `tls-*` feature must be enabled."));
+					})
+					.build()
+			)
+			.build()
+			.new_agent();
+
+		let resp = agent.get(url).call().map_err(|e| Error::new(format!("Error downloading to file: {e}")))?;
+
+		let len = resp
+			.headers()
+			.get("Content-Length")
+			.and_then(|h| h.to_str().ok())
+			.and_then(|s| s.parse::<usize>().ok())
+			.expect("Missing Content-Length header");
+		crate::info!(len, "Downloading {} bytes", len);
+
+		let mut reader = resp.into_body().into_with_config().limit(u64::MAX).reader();
+		let temp_filepath = download_dir.join(format!("tmp_{}.{model_filename}", ort_sys::internal::random_identifier()));
+
+		let f = std::fs::File::create(&temp_filepath).expect("Failed to create model file");
+		let mut writer = std::io::BufWriter::new(f);
+
+		let bytes_io_count = std::io::copy(&mut reader, &mut writer).map_err(Error::wrap)?;
+		if bytes_io_count != len as u64 {
+			return Err(Error::new(format!("Failed to download entire model; file only has {bytes_io_count} bytes, expected {len}")));
+		}
+
+		drop(writer);
+
+		match std::fs::rename(&temp_filepath, &model_filepath) {
+			Ok(()) => Ok(model_filepath),
+			Err(e) => {
+				if model_filepath.exists() {
+					let _ = std::fs::remove_file(temp_filepath);
+					Ok(model_filepath)
+				} else {
+					Err(Error::new(format!("Failed to download model: {e}")))
+				}
+			}
+		}
 	}
 }

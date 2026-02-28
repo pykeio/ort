@@ -34,6 +34,22 @@ mod impl_options;
 pub use self::editable::*;
 pub use self::impl_options::*;
 
+/// `Result` type returned by [`SessionBuilder`] methods.
+///
+/// This type supports [error recovery](Error::recover):
+/// ```
+/// # use ort::session::{builder::GraphOptimizationLevel, Session};
+/// # fn main() -> ort::Result<()> {
+/// let session = Session::builder()?
+/// 	.with_optimization_level(GraphOptimizationLevel::All)
+/// 	// Optimization isn't enabled in minimal builds of ONNX Runtime, so throws an error. We can just ignore it.
+/// 	.unwrap_or_else(|e| e.recover())
+/// 	.commit_from_file("tests/data/upsample.onnx")?;
+/// # Ok(())
+/// # }
+/// ```
+pub type BuilderResult = Result<SessionBuilder, Error<SessionBuilder>>;
+
 /// Creates a session using the builder pattern.
 ///
 /// Once configured, use the
@@ -146,7 +162,7 @@ impl SessionBuilder {
 	/// # use ort::session::{builder::GraphOptimizationLevel, Session};
 	/// # use std::{thread, time::Duration};
 	/// # fn main() -> ort::Result<()> {
-	/// let builder = Session::builder()?
+	/// let mut builder = Session::builder()?
 	/// 	.with_optimization_level(GraphOptimizationLevel::Level1)?
 	/// 	.with_intra_threads(1)?;
 	///
@@ -168,9 +184,11 @@ impl SessionBuilder {
 	}
 
 	/// Adds a custom configuration entry to the session.
-	pub fn with_config_entry(mut self, key: impl AsRef<str>, value: impl AsRef<str>) -> Result<Self> {
-		self.add_config_entry(key.as_ref(), value.as_ref())?;
-		Ok(self)
+	pub fn with_config_entry(mut self, key: impl AsRef<str>, value: impl AsRef<str>) -> BuilderResult {
+		match self.add_config_entry(key.as_ref(), value.as_ref()) {
+			Ok(()) => Ok(self),
+			Err(e) => Err(e.with_recover(self))
+		}
 	}
 }
 
@@ -203,7 +221,7 @@ impl LoadCanceler {
 	/// # use ort::session::{builder::GraphOptimizationLevel, Session};
 	/// # use std::{thread, time::Duration};
 	/// # fn main() -> ort::Result<()> {
-	/// let builder = Session::builder()?
+	/// let mut builder = Session::builder()?
 	/// 	.with_optimization_level(GraphOptimizationLevel::Level1)?
 	/// 	.with_intra_threads(1)?;
 	///

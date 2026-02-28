@@ -13,6 +13,7 @@ use std::sync::Mutex;
 use smallvec::SmallVec;
 
 use crate::{
+	Error,
 	error::Result,
 	session::{SessionOutputs, SharedSessionInner, UntypedRunOptions},
 	util::{STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS},
@@ -121,7 +122,7 @@ pub(crate) extern "system" fn async_callback(user_data: *mut c_void, _: *mut *mu
 
 	crate::logging::drop!(AsyncInferenceContext, user_data);
 
-	if let Err(e) = unsafe { crate::error::status_to_result(status) } {
+	if let Err(e) = unsafe { Error::result_from_status(status) } {
 		ctx.inner.emplace_value(Err(e));
 		ctx.inner.wake();
 		return;

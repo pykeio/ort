@@ -288,19 +288,19 @@ macro_rules! ortsys {
 		unsafe { ($crate::api().$method)($($n),*) }
 	};
 	(@ort: unsafe $method:ident($($n:expr),*) as Result) => {
-		unsafe { $crate::error::status_to_result(($crate::api().$method)($($n),+)) }
+		unsafe { $crate::error::Error::result_from_status(($crate::api().$method)($($n),+)) }
 	};
 	(@$api:ident: unsafe $method:ident($($n:expr),*)) => {
 		unsafe { ($crate::api::$api().unwrap().$method)($($n),+) }
 	};
 	(@$api:ident: unsafe $method:ident($($n:expr),*)?) => {
-		$crate::api::$api().and_then(|api| unsafe { $crate::error::status_to_result((api.$method)($($n),+)) })?
+		$crate::api::$api().and_then(|api| unsafe { $crate::error::Error::result_from_status((api.$method)($($n),+)) })?
 	};
 	(@$api:ident: unsafe $method:ident($($n:expr),*)?; nonNull($($check:ident),+)$(;)?) => {
-		$crate::api::$api().and_then(|api| unsafe { $crate::error::status_to_result((api.$method)($($n),+)) })?;
+		$crate::api::$api().and_then(|api| unsafe { $crate::error::Error::result_from_status((api.$method)($($n),+)) })?;
 		ortsys![@nonNull?; $($check),+];
 	};
 	(@$api:ident: unsafe $method:ident($($n:expr),*) as Result) => {
-		$crate::api::$api().and_then(|api| unsafe { $crate::error::status_to_result((api.$method)($($n),+)) })
+		$crate::api::$api().and_then(|api| unsafe { $crate::error::Error::result_from_status((api.$method)($($n),+)) })
 	};
 }

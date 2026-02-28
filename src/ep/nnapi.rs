@@ -78,7 +78,7 @@ impl ExecutionProvider for NNAPI {
 			if self.cpu_only {
 				flags |= 0x008;
 			}
-			return Ok(unsafe { crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_Nnapi(session_builder.ptr_mut(), flags)) }?);
+			return Ok(unsafe { crate::error::Error::result_from_status(OrtSessionOptionsAppendExecutionProvider_Nnapi(session_builder.ptr_mut(), flags)) }?);
 		}
 
 		Err(RegisterError::MissingFeature)

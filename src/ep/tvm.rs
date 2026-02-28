@@ -100,7 +100,7 @@ impl ExecutionProvider for TVM {
 			}
 			let options_string = alloc::ffi::CString::new(option_string.join(",")).expect("invalid option string");
 			return Ok(unsafe {
-				crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_Tvm(session_builder.ptr_mut(), options_string.as_ptr()))
+				crate::error::Error::result_from_status(OrtSessionOptionsAppendExecutionProvider_Tvm(session_builder.ptr_mut(), options_string.as_ptr()))
 			}?);
 		}
 

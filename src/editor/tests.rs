@@ -32,7 +32,7 @@ fn test_identity_graph() -> Result<()> {
 	let mut model = Model::new([Opset::new(ONNX_DOMAIN, 22)?])?;
 	model.add_graph(graph)?;
 
-	let mut session = model.into_session(SessionBuilder::new()?)?;
+	let mut session = model.into_session(&SessionBuilder::new()?)?;
 	let output = session
 		.run(inputs![Tensor::<f32>::from_array((Shape::new([5]), vec![1.0f32; 5]))?])?
 		.remove("output")
@@ -76,7 +76,7 @@ fn test_mul_graph() -> Result<()> {
 	let mut model = Model::new([Opset::new(ONNX_DOMAIN, 22)?])?;
 	model.add_graph(graph)?;
 
-	let mut session = model.into_session(SessionBuilder::new()?)?;
+	let mut session = model.into_session(&SessionBuilder::new()?)?;
 	let output = session
 		.run(inputs![Tensor::<f32>::from_array((Shape::new([5]), vec![2.0f32; 5]))?])?
 		.remove("output")

@@ -22,7 +22,7 @@
 //! # use std::path::PathBuf;
 //! # use ort::{compiler::ModelCompiler, session::Session, ep};
 //! # fn main() -> ort::Result<()> {
-//! let session_options = Session::builder()?.with_execution_providers([ep::CoreML::default()
+//! let mut session_options = Session::builder()?.with_execution_providers([ep::CoreML::default()
 //! 	.with_model_format(ep::coreml::ModelFormat::MLProgram)
 //! 	.build()])?;
 //!

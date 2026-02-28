@@ -34,7 +34,7 @@ use smallvec::SmallVec;
 use crate::{
 	AsPointer,
 	environment::Environment,
-	error::{Error, ErrorCode, Result, status_to_result},
+	error::{Error, ErrorCode, Result},
 	memory::Allocator,
 	ortsys,
 	util::{AllocatedString, STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS, with_cstr, with_cstr_ptr_array},
@@ -708,7 +708,7 @@ pub(crate) mod io {
 	) -> Result<usize> {
 		let mut num_nodes = 0;
 		let status = unsafe { f(session_ptr.as_ptr(), &mut num_nodes) };
-		unsafe { status_to_result(status) }?;
+		unsafe { Error::result_from_status(status) }?;
 		Ok(num_nodes)
 	}
 
@@ -721,7 +721,7 @@ pub(crate) mod io {
 		let mut name_ptr: *mut c_char = ptr::null_mut();
 
 		let status = unsafe { f(session_ptr.as_ptr(), i, allocator.ptr().cast_mut(), &mut name_ptr) };
-		unsafe { status_to_result(status) }?;
+		unsafe { Error::result_from_status(status) }?;
 		if name_ptr.is_null() {
 			crate::util::cold();
 			return Err(crate::Error::new("expected `name_ptr` to not be null"));
@@ -738,7 +738,7 @@ pub(crate) mod io {
 		let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = ptr::null_mut();
 
 		let status = unsafe { f(session_ptr.as_ptr(), i, &mut typeinfo_ptr) };
-		unsafe { status_to_result(status) }?;
+		unsafe { Error::result_from_status(status) }?;
 		let Some(typeinfo_ptr) = NonNull::new(typeinfo_ptr) else {
 			crate::util::cold();
 			return Err(crate::Error::new("expected `typeinfo_ptr` to not be null"));

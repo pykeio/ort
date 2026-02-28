@@ -263,7 +263,7 @@ impl Model {
 		Ok(())
 	}
 
-	pub fn into_session(self, mut options: SessionBuilder) -> Result<Session> {
+	pub fn into_session(self, options: &SessionBuilder) -> Result<Session> {
 		let mut session_ptr = ptr::null_mut();
 		ortsys![@editor:
 			unsafe CreateSessionFromModel(

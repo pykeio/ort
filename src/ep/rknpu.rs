@@ -22,7 +22,7 @@ impl ExecutionProvider for RKNPU {
 			use crate::AsPointer;
 
 			super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_RKNPU(options: *mut ort_sys::OrtSessionOptions) -> ort_sys::OrtStatusPtr);
-			return Ok(unsafe { crate::error::status_to_result(OrtSessionOptionsAppendExecutionProvider_RKNPU(session_builder.ptr_mut())) }?);
+			return Ok(unsafe { crate::error::Error::result_from_status(OrtSessionOptionsAppendExecutionProvider_RKNPU(session_builder.ptr_mut())) }?);
 		}
 
 		Err(RegisterError::MissingFeature)

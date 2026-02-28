@@ -101,9 +101,9 @@ impl Environment {
 	/// Sets the global log level.
 	///
 	/// ```
+	/// # use ort::{environment::Environment, logging::LogLevel};
 	/// # fn main() -> ort::Result<()> {
-	/// # use ort::logging::LogLevel;
-	/// let env = ort::environment::get_environment()?;
+	/// let env = Environment::current()?;
 	///
 	/// env.set_log_level(LogLevel::Warning);
 	/// # Ok(())
@@ -130,8 +130,9 @@ impl Environment {
 	/// no longer be needed.
 	///
 	/// ```
+	/// # use ort::environment::Environment;
 	/// # fn main() -> ort::Result<()> {
-	/// let env = ort::environment::get_environment()?;
+	/// let env = Environment::current()?;
 	///
 	/// let _ = env.register_ep_library("CUDA", "/path/to/onnxruntime_providers_cuda.dll");
 	/// # Ok(())

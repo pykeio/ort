@@ -102,11 +102,11 @@ impl ExecutionProvider for DirectML {
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
 		#[cfg(any(feature = "load-dynamic", feature = "directml"))]
 		{
-			use crate::AsPointer;
+			use crate::{AsPointer, Error};
 
 			let api = get_dml_api()?;
 			if let Some(device_id) = self.device_id {
-				unsafe { crate::error::status_to_result((api.SessionOptionsAppendExecutionProvider_DML)(session_builder.ptr_mut(), device_id as _)) }?;
+				unsafe { Error::result_from_status((api.SessionOptionsAppendExecutionProvider_DML)(session_builder.ptr_mut(), device_id as _)) }?;
 			} else {
 				let device_options = ort_sys::OrtDmlDeviceOptions {
 					Filter: match self.device_filter {
@@ -120,7 +120,7 @@ impl ExecutionProvider for DirectML {
 						PerformancePreference::MinimumPower => ort_sys::OrtDmlPerformancePreference::MinimumPower
 					}
 				};
-				unsafe { crate::error::status_to_result((api.SessionOptionsAppendExecutionProvider_DML2)(session_builder.ptr_mut(), &device_options)) }?;
+				unsafe { Error::result_from_status((api.SessionOptionsAppendExecutionProvider_DML2)(session_builder.ptr_mut(), &device_options)) }?;
 			}
 
 			return Ok(());

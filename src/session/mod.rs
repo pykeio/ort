@@ -356,6 +356,8 @@ impl Session {
 		binding: &'b IoBinding,
 		run_options: Option<&'r RunOptions<NoSelectedOutputs>>
 	) -> Result<SessionOutputs<'b>> {
+		use crate::util::run_on_drop;
+
 		let run_options_ptr = if let Some(run_options) = run_options { run_options.ptr() } else { ptr::null() };
 		ortsys![unsafe RunWithBinding(self.inner.ptr().cast_mut(), run_options_ptr, binding.ptr())?];
 
@@ -364,15 +366,15 @@ impl Session {
 			let mut output_values_ptr: *mut *mut ort_sys::OrtValue = ptr::null_mut();
 			ortsys![unsafe GetBoundOutputValues(binding.ptr(), self.inner.allocator.ptr().cast_mut(), &mut output_values_ptr, &mut count)?; nonNull(output_values_ptr)];
 
+			let _guard = run_on_drop(|| unsafe {
+				self.inner.allocator.free(output_values_ptr.as_ptr());
+			});
 			let output_values = unsafe { slice::from_raw_parts(output_values_ptr.as_ptr(), count) }
 				.iter()
 				.map(|ptr| unsafe {
 					DynValue::from_ptr(NonNull::new(*ptr).expect("OrtValue ptrs returned by GetBoundOutputValues should not be null"), Some(self.inner()))
 				})
 				.collect();
-			unsafe {
-				self.inner.allocator.free(output_values_ptr.as_ptr());
-			}
 
 			Ok(SessionOutputs::new(binding.output_values.iter().map(|(k, _)| k.as_str()).collect(), output_values))
 		} else {

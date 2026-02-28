@@ -7,16 +7,16 @@ use core::{
 use super::{PrepackedWeights, SessionBuilder};
 use crate::{AsPointer, Error, Result, editor::Model, ortsys, session::Session};
 
-pub struct EditableSession {
+pub struct EditableSession<'b> {
 	session: Session,
-	builder: SessionBuilder,
+	builder: &'b mut SessionBuilder,
 	prepacked_weights: Option<PrepackedWeights>
 }
 
-impl EditableSession {
-	pub(crate) fn new(session: NonNull<ort_sys::OrtSession>, mut builder: SessionBuilder) -> Result<Self> {
+impl<'b> EditableSession<'b> {
+	pub(crate) fn new(session: NonNull<ort_sys::OrtSession>, builder: &'b mut SessionBuilder) -> Result<Self> {
 		// Prepacked weights are passed to `FinalizeModelEditorSession`; steal them from the builder so we can add them later.
-		let prepacked_weights = builder.prepacked_weights.take();
+		let prepacked_weights = builder.prepacked_weights.clone();
 		Ok(Self {
 			session: builder.commit_finalize(session)?,
 			builder,
@@ -56,7 +56,7 @@ impl EditableSession {
 	}
 }
 
-impl Deref for EditableSession {
+impl Deref for EditableSession<'_> {
 	type Target = Session;
 
 	fn deref(&self) -> &Self::Target {

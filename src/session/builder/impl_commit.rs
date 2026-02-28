@@ -5,7 +5,6 @@ use core::{
 	any::Any,
 	ffi::c_void,
 	marker::PhantomData,
-	mem::replace,
 	ptr::{self, NonNull}
 };
 #[cfg(feature = "std")]
@@ -35,7 +34,7 @@ impl SessionBuilder {
 	/// Downloads a pre-trained ONNX model from the given URL and builds the session.
 	#[cfg(all(feature = "fetch-models", feature = "std", not(target_arch = "wasm32")))]
 	#[cfg_attr(docsrs, doc(cfg(all(feature = "fetch-models", feature = "std"))))]
-	pub fn commit_from_url(self, model_url: impl AsRef<str>) -> Result<Session> {
+	pub fn commit_from_url(&mut self, model_url: impl AsRef<str>) -> Result<Session> {
 		let downloaded_path = SessionBuilder::download(model_url.as_ref())?;
 		self.commit_from_file(downloaded_path)
 	}
@@ -123,7 +122,7 @@ impl SessionBuilder {
 	/// Loads an ONNX model from a file and builds the session.
 	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-	pub fn commit_from_file<P>(self, model_path: P) -> Result<Session>
+	pub fn commit_from_file<P>(&mut self, model_path: P) -> Result<Session>
 	where
 		P: AsRef<Path>
 	{
@@ -137,7 +136,7 @@ impl SessionBuilder {
 	}
 
 	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
-	fn commit_from_file_inner(mut self, model_path: &<OsCharArray as core::ops::Deref>::Target) -> Result<Session> {
+	fn commit_from_file_inner(&mut self, model_path: &<OsCharArray as core::ops::Deref>::Target) -> Result<Session> {
 		self.pre_commit()?;
 
 		let session_ptr = if let Some(prepacked_weights) = self.prepacked_weights.as_ref() {
@@ -160,10 +159,10 @@ impl SessionBuilder {
 	/// If you wish to store the model bytes and the [`InMemorySession`] in the same struct, look for crates that
 	/// facilitate creating self-referential structs, such as [`ouroboros`](https://github.com/joshua-maros/ouroboros).
 	#[cfg(not(target_arch = "wasm32"))]
-	pub fn commit_from_memory_directly(mut self, model_bytes: &[u8]) -> Result<InMemorySession<'_>> {
+	pub fn commit_from_memory_directly<'m>(&mut self, model_bytes: &'m [u8]) -> Result<InMemorySession<'m>> {
 		// Enable zero-copy deserialization for models in `.ort` format.
-		self.add_config_entry("session.use_ort_model_bytes_directly", "1")?;
-		self.add_config_entry("session.use_ort_model_bytes_for_initializers", "1")?;
+		let _ = self.add_config_entry("session.use_ort_model_bytes_directly", "1");
+		let _ = self.add_config_entry("session.use_ort_model_bytes_for_initializers", "1");
 
 		let session = self.commit_from_memory(model_bytes)?;
 		Ok(InMemorySession { session, phantom: PhantomData })
@@ -171,7 +170,7 @@ impl SessionBuilder {
 
 	/// Load an ONNX graph from memory and commit the session.
 	#[cfg(not(target_arch = "wasm32"))]
-	pub fn commit_from_memory(mut self, model_bytes: &[u8]) -> Result<Session> {
+	pub fn commit_from_memory(&mut self, model_bytes: &[u8]) -> Result<Session> {
 		self.pre_commit()?;
 
 		let model_data = model_bytes.as_ptr().cast::<c_void>();
@@ -197,7 +196,7 @@ impl SessionBuilder {
 
 	/// Downloads a pre-trained ONNX model from the given URL and builds the session.
 	#[cfg(target_arch = "wasm32")]
-	pub async fn commit_from_url(mut self, model_url: impl AsRef<str>) -> Result<Session> {
+	pub async fn commit_from_url(&mut self, model_url: impl AsRef<str>) -> Result<Session> {
 		self.pre_commit()?;
 
 		let mut session_ptr = ptr::null_mut();
@@ -213,7 +212,7 @@ impl SessionBuilder {
 
 	/// Load an ONNX graph from memory and commit the session.
 	#[cfg(target_arch = "wasm32")]
-	pub async fn commit_from_memory(mut self, model_bytes: &[u8]) -> Result<Session> {
+	pub async fn commit_from_memory(&mut self, model_bytes: &[u8]) -> Result<Session> {
 		self.pre_commit()?;
 
 		let mut session_ptr = ptr::null_mut();
@@ -240,7 +239,7 @@ impl SessionBuilder {
 		Ok(())
 	}
 
-	pub(crate) fn commit_finalize(&mut self, ptr: NonNull<ort_sys::OrtSession>) -> Result<Session> {
+	pub(crate) fn commit_finalize(&self, ptr: NonNull<ort_sys::OrtSession>) -> Result<Session> {
 		let allocator = match &self.memory_info {
 			Some(info) => {
 				let mut allocator_ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
@@ -260,14 +259,20 @@ impl SessionBuilder {
 			.map(|i| io::extract_output(ptr, &allocator, i))
 			.collect::<Result<Vec<Outlet>>>()?;
 
-		let mut extras: SmallVec<[Arc<dyn Any>; 4]> = self.operator_domains.drain(..).map(|d| d as Arc<dyn Any>).collect();
-		if let Some(prepacked_weights) = self.prepacked_weights.take() {
+		let mut extras: SmallVec<[Arc<dyn Any>; 4]> = SmallVec::new();
+		for op_domain in self.operator_domains.iter().cloned() {
+			extras.push(op_domain as Arc<dyn Any>);
+		}
+		for initializer in self.initializers.iter().cloned() {
+			extras.push(initializer as Arc<dyn Any>);
+		}
+		if let Some(prepacked_weights) = self.prepacked_weights.clone() {
 			extras.push(prepacked_weights.inner as Arc<dyn Any>);
 		}
-		if let Some(thread_manager) = self.thread_manager.take() {
+		if let Some(thread_manager) = self.thread_manager.clone() {
 			extras.push(thread_manager as Arc<dyn Any>);
 		}
-		if let Some(logger) = self.logger.take() {
+		if let Some(logger) = self.logger.clone() {
 			extras.push(logger as Arc<dyn Any>);
 		}
 
@@ -277,7 +282,6 @@ impl SessionBuilder {
 			inner: Arc::new(SharedSessionInner {
 				session_ptr: ptr,
 				allocator,
-				_initializers: replace(&mut self.initializers, SmallVec::new()),
 				_extras: extras,
 				_environment: self.environment.clone()
 			}),
@@ -288,7 +292,7 @@ impl SessionBuilder {
 
 	#[cfg(all(feature = "std", feature = "api-22"))]
 	#[cfg_attr(docsrs, doc(cfg(all(feature = "std", feature = "api-22"))))]
-	pub fn edit_from_file<P>(self, model_filepath: P) -> Result<EditableSession>
+	pub fn edit_from_file<P>(&mut self, model_filepath: P) -> Result<EditableSession<'_>>
 	where
 		P: AsRef<Path>
 	{
@@ -310,7 +314,7 @@ impl SessionBuilder {
 
 	#[cfg(feature = "api-22")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
-	pub fn edit_from_memory(self, model_bytes: &[u8]) -> Result<EditableSession> {
+	pub fn edit_from_memory(&mut self, model_bytes: &[u8]) -> Result<EditableSession<'_>> {
 		let mut session_ptr: *mut ort_sys::OrtSession = ptr::null_mut();
 
 		ortsys![@editor:

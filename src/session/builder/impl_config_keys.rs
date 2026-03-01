@@ -1,4 +1,5 @@
 use super::{BuilderResult, SessionBuilder};
+use crate::alloc::string::ToString;
 
 // https://github.com/microsoft/onnxruntime/blob/main/include/onnxruntime/core/session/onnxruntime_session_options_config_keys.h
 

@@ -1,13 +1,15 @@
 use std::{
 	collections::{HashMap, hash_map::Entry},
 	hash::{BuildHasher, DefaultHasher, Hasher},
+	path::Path,
 	sync::Arc
 };
 
 use parking_lot::Mutex;
 use tract_onnx::{
+	model::ParseResult,
 	pb::ValueInfoProto,
-	prelude::{Framework, Graph, InferenceModelExt, IntoTensor, SimplePlan, Tensor, TractResult, TypedFact, TypedOp}
+	prelude::{Framework, Graph, InferenceModelExt, IntoTensor, SimplePlan, Tensor, TractError, TractResult, TypedFact, TypedOp}
 };
 
 use crate::Environment;
@@ -54,12 +56,15 @@ pub struct Session {
 }
 
 impl Session {
-	pub fn from_buffer(env: &Environment, options: &SessionOptions, mut data: &[u8]) -> TractResult<Session> {
+	pub fn from_buffer(env: &Environment, options: &SessionOptions, mut data: &[u8], path: Option<&Path>) -> TractResult<Session> {
 		let proto_model = env.onnx.proto_model_for_read(&mut data)?;
 		let inputs = proto_model.graph.as_ref().map(|graph| graph.input.clone()).unwrap_or_default();
 		let outputs = proto_model.graph.as_ref().map(|graph| graph.output.clone()).unwrap_or_default();
 
-		let model = env.onnx.model_for_proto_model(&proto_model)?;
+		let ParseResult { model, unresolved_inputs, .. } = env.onnx.parse(&proto_model, path.and_then(|p| p.parent()).and_then(|p| p.to_str()))?;
+		if unresolved_inputs.len() > 0 {
+			return Err(TractError::msg("failed to resolve some inputs"));
+		}
 		let graph = Arc::new(if options.perform_optimizations { model.into_optimized()? } else { model.into_typed()? });
 		Ok(Session {
 			inputs,

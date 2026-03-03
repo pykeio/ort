@@ -2,7 +2,9 @@
 
 use std::{
 	ffi::{CStr, CString, OsString},
-	fs, ptr
+	fs,
+	path::Path,
+	ptr
 };
 
 use ort_sys::*;
@@ -71,12 +73,12 @@ unsafe extern "system" fn CreateSession(
 	#[cfg(not(target_os = "windows"))]
 	let path = OsString::from_encoded_bytes_unchecked(path.iter().map(|c| *c as u8).collect::<Vec<_>>());
 
-	let buf = match fs::read(path) {
+	let buf = match fs::read(&path) {
 		Ok(buf) => buf,
 		Err(e) => return Error::new_sys(OrtErrorCode::ORT_NO_SUCHFILE, format!("Failed to read model file: {e}"))
 	};
 
-	match Session::from_buffer(env, options, &buf) {
+	match Session::from_buffer(env, options, &buf, Some(Path::new(&path))) {
 		Ok(session) => {
 			*out = (Box::leak(Box::new(session)) as *mut Session).cast();
 			OrtStatusPtr::default()
@@ -97,7 +99,7 @@ unsafe extern "system" fn CreateSessionFromArray(
 
 	let buf = std::slice::from_raw_parts(model_data.cast::<u8>(), model_data_length);
 
-	match Session::from_buffer(env, options, buf) {
+	match Session::from_buffer(env, options, buf, None) {
 		Ok(session) => {
 			*out = (Box::leak(Box::new(session)) as *mut Session).cast();
 			OrtStatusPtr::default()

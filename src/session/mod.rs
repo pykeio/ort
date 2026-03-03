@@ -575,7 +575,7 @@ impl Session {
 			)
 		]
 		.await;
-		unsafe { crate::error::status_to_result(status) }?;
+		unsafe { Error::result_from_status(status) }?;
 
 		let outputs = output_tensors
 			.into_iter()

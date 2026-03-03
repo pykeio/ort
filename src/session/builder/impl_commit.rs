@@ -121,7 +121,7 @@ impl SessionBuilder {
 
 		let mut session_ptr = ptr::null_mut();
 		let status = ortsys![unsafe CreateSession(self.environment.ptr(), model_url.as_ref(), self.ptr(), &mut session_ptr)].await;
-		unsafe { crate::error::status_to_result(status) }?;
+		unsafe { Error::result_from_status(status) }?;
 
 		let Some(session_ptr) = NonNull::new(session_ptr) else {
 			return Err(Error::new(alloc::format!("Session creation failed with unknown error")));
@@ -137,7 +137,7 @@ impl SessionBuilder {
 
 		let mut session_ptr = ptr::null_mut();
 		let status = ortsys![unsafe CreateSessionFromArray(self.environment.ptr(), model_bytes.as_ref(), self.ptr(), &mut session_ptr)].await;
-		unsafe { crate::error::status_to_result(status) }?;
+		unsafe { Error::result_from_status(status) }?;
 
 		let Some(session_ptr) = NonNull::new(session_ptr) else {
 			return Err(Error::new(alloc::format!("Session creation failed with unknown error")));

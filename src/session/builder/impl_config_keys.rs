@@ -1,3 +1,5 @@
+use alloc::string::ToString;
+
 use super::{BuilderResult, SessionBuilder};
 
 // https://github.com/microsoft/onnxruntime/blob/main/include/onnxruntime/core/session/onnxruntime_session_options_config_keys.h

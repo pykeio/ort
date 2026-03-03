@@ -66,11 +66,48 @@ use crate::{
 	util::{Mutex, OnceLock, STACK_EXECUTION_PROVIDERS, run_on_drop, with_cstr}
 };
 
-/// Hold onto a weak reference here so that the environment is dropped when all sessions under it are. Statics don't run
-/// destructors; holding a strong reference to the environment here thus leads to issues, so instead of holding the
-/// environment for the entire duration of the process, we keep `Arc` references of this weak `Environment` in sessions.
-/// That way, the environment is actually dropped when it is no longer needed.
-static G_ENV: Mutex<Option<Weak<Environment>>> = Mutex::new(None);
+static G_ENV: Mutex<Option<Arc<Environment>>> = Mutex::new(None);
+
+#[used]
+#[cfg(all(not(windows), not(target_vendor = "apple")))]
+#[unsafe(link_section = ".fini_array")]
+static _ON_EXIT: unsafe extern "C" fn() = {
+	#[cfg_attr(any(target_os = "linux", target_os = "android"), unsafe(link_section = ".text.exit"))]
+	unsafe extern "C" fn _on_exit() {
+		G_ENV.lock().take();
+	}
+	_on_exit
+};
+#[used]
+#[cfg(windows)]
+#[unsafe(link_section = ".CRT$XLB")]
+static _ON_EXIT: unsafe extern "system" fn(module: *mut (), reason: u32, reserved: *mut ()) = {
+	unsafe extern "system" fn on_exit(_h: *mut (), reason: u32, _pv: *mut ()) {
+		// XLB gets called on both init & exit (?). Also, XLA never gets called, and no one online ever mentions that.
+		// Only do destructor things if we're actually exiting the process (DLL_PROCESS_EXIT = 0)
+		if reason == 0 {
+			G_ENV.lock().take();
+		}
+	}
+	on_exit
+};
+#[used]
+#[cfg(target_vendor = "apple")]
+#[unsafe(link_section = "__DATA,__mod_init_func")]
+static _ON_INIT: unsafe extern "C" fn() = {
+	// This shit took years off my life.
+	unsafe extern "C" {
+		static __dso_handle: *const ();
+		fn __cxa_atexit(cb: unsafe extern "C" fn(_: *const ()), arg: *const (), dso_handle: *const ());
+	}
+	unsafe extern "C" fn on_init() {
+		unsafe extern "C" fn on_exit(_: *const ()) {
+			G_ENV.lock().take();
+		}
+		unsafe { __cxa_atexit(on_exit, core::ptr::null(), __dso_handle) };
+	}
+	on_init
+};
 
 static G_ENV_OPTIONS: OnceLock<EnvironmentBuilder> = OnceLock::new();
 
@@ -212,15 +249,13 @@ impl Drop for Environment {
 /// has fallen out of usage), a new environment will be created & committed.
 pub fn current() -> Result<Arc<Environment>> {
 	let mut env_lock = G_ENV.lock();
-	if let Some(env) = env_lock.as_ref()
-		&& let Some(upgraded) = Weak::upgrade(env)
-	{
-		return Ok(upgraded);
+	if let Some(env) = env_lock.as_ref() {
+		return Ok(env.clone());
 	}
 
 	let options = G_ENV_OPTIONS.get_or_init(EnvironmentBuilder::new);
 	let env = options.create_environment().map(Arc::new)?;
-	*env_lock = Some(Arc::downgrade(&env));
+	*env_lock = Some(Arc::clone(&env));
 	Ok(env)
 }
 

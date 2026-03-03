@@ -394,7 +394,13 @@ impl SessionBuilder {
 	/// ```
 	#[cfg(feature = "api-22")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
-	pub fn with_devices<'e>(mut self, devices: impl IntoIterator<Item = crate::device::Device<'e>>, options: Option<&[(String, String)]>) -> BuilderResult {
+	pub fn with_devices<'e>(
+		mut self,
+		devices: impl IntoIterator<Item = crate::device::Device<'e>>,
+		options: Option<&[(alloc::string::String, alloc::string::String)]>
+	) -> BuilderResult {
+		use alloc::vec::Vec;
+
 		use smallvec::SmallVec;
 
 		use crate::util::{MiniMap, with_cstr_ptr_array};

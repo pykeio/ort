@@ -102,9 +102,9 @@ static _ON_INIT: unsafe extern "C" fn() = {
 	}
 	unsafe extern "C" fn on_init() {
 		unsafe extern "C" fn on_exit(_: *const ()) {
+			panic!("on_exit");
 			G_ENV.lock().take();
 		}
-		panic!("on_init");
 		unsafe { __cxa_atexit(on_exit, core::ptr::null(), __dso_handle) };
 	}
 	on_init

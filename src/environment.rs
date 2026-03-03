@@ -69,7 +69,7 @@ use crate::{
 static G_ENV: Mutex<Option<Arc<Environment>>> = Mutex::new(None);
 
 #[used]
-#[cfg(all(not(windows), not(target_vendor = "apple")))]
+#[cfg(all(not(windows), not(target_vendor = "apple"), not(target_arch = "wasm32")))]
 #[unsafe(link_section = ".fini_array")]
 static _ON_EXIT: unsafe extern "C" fn() = {
 	#[cfg_attr(any(target_os = "linux", target_os = "android"), unsafe(link_section = ".text.exit"))]

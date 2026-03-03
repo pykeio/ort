@@ -91,24 +91,19 @@ static _ON_EXIT: unsafe extern "system" fn(module: *mut (), reason: u32, reserve
 	}
 	on_exit
 };
-#[used]
+
 #[cfg(target_vendor = "apple")]
-#[unsafe(link_section = "__DATA,__mod_init_func")]
-static _ON_INIT: unsafe extern "C" fn() = {
-	// This shit took years off my life.
+// This shit took years off my life.
+fn register_atexit() {
 	unsafe extern "C" {
 		static __dso_handle: *const ();
 		fn __cxa_atexit(cb: unsafe extern "C" fn(_: *const ()), arg: *const (), dso_handle: *const ());
 	}
-	unsafe extern "C" fn on_init() {
-		unsafe extern "C" fn on_exit(_: *const ()) {
-			panic!("on_exit");
-			G_ENV.lock().take();
-		}
-		unsafe { __cxa_atexit(on_exit, core::ptr::null(), __dso_handle) };
+	unsafe extern "C" fn on_exit(_: *const ()) {
+		G_ENV.lock().take();
 	}
-	on_init
-};
+	unsafe { __cxa_atexit(on_exit, core::ptr::null(), __dso_handle) };
+}
 
 static G_ENV_OPTIONS: OnceLock<EnvironmentBuilder> = OnceLock::new();
 
@@ -257,6 +252,10 @@ pub fn current() -> Result<Arc<Environment>> {
 	let options = G_ENV_OPTIONS.get_or_init(EnvironmentBuilder::new);
 	let env = options.create_environment().map(Arc::new)?;
 	*env_lock = Some(Arc::clone(&env));
+
+	#[cfg(target_vendor = "apple")]
+	register_atexit();
+
 	Ok(env)
 }
 

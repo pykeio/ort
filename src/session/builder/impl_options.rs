@@ -347,14 +347,14 @@ impl SessionBuilder {
 		}
 	}
 
-	/// Automatically select & register an execution provider according to the given [`policy`](AutoDevicePolicy) based
-	/// on available devices.
+	/// Automatically select & register an execution provider according to the given [`policy`](AutoDevicePolicy), based
+	/// on available hardware devices.
+	///
+	/// For finer control over device selection, and to configure EP options, see [`SessionBuilder::with_devices`].
 	///
 	/// ```no_run
 	/// # use ort::session::{Session, builder::AutoDevicePolicy};
 	/// # fn main() -> ort::Result<()> {
-	/// use std::sync::Arc;
-	///
 	/// let mut session = Session::builder()?
 	/// 	// moar power!!1!
 	/// 	.with_auto_device(AutoDevicePolicy::MaxPerformance)?
@@ -369,6 +369,92 @@ impl SessionBuilder {
 			Ok(()) => Ok(self),
 			Err(e) => Err(e.with_recover(self))
 		}
+	}
+
+	/// Use a list of hardware devices automatically discovered by the environment via
+	/// [`Environment::devices`](crate::environment::Environment::devices).
+	///
+	/// `options` can be specified to add EP options. Each EP option must be prefixed with the name of the EP
+	/// (obtained by [`Device::ep`](crate::device::Device::ep)) followed by `.`.
+	///
+	/// ```
+	/// # use ort::{environment::Environment, session::Session, memory::DeviceType};
+	/// # fn main() -> ort::Result<()> {
+	/// let env = Environment::current()?;
+	///
+	/// let options = vec![
+	/// 	("CPUExecutionProvider.use_arena".to_string(), "1".to_string()),
+	/// 	("XnnpackExecutionProvider.num_threads".to_string(), "4".to_string()),
+	/// ];
+	/// let mut session = Session::builder()?
+	/// 	.with_devices(env.devices().filter(|dev| dev.ty() == DeviceType::CPU), Some(&options))?
+	/// 	.commit_from_file("tests/data/upsample.onnx")?;
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	#[cfg(feature = "api-22")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
+	pub fn with_devices<'e>(mut self, devices: impl IntoIterator<Item = crate::device::Device<'e>>, options: Option<&[(String, String)]>) -> BuilderResult {
+		use smallvec::SmallVec;
+
+		use crate::util::{MiniMap, with_cstr_ptr_array};
+
+		#[derive(Default)]
+		struct DeviceGroup<'o> {
+			device_ptrs: SmallVec<[*const ort_sys::OrtEpDevice; 2]>,
+			option_keys: Vec<&'o str>,
+			option_values: Vec<&'o str>
+		}
+
+		let existing_devices: SmallVec<[_; 4]> = self.environment.devices().map(|x| x.ptr()).collect();
+		let mut device_groups = MiniMap::<&str, DeviceGroup<'_>>::new();
+
+		let mut group_prefix = [0u8; 128];
+		for device in devices {
+			let ptr = device.ptr();
+			if !existing_devices.contains(&ptr) {
+				return Err(Error::new("device comes from different environment").with_recover(self));
+			}
+
+			let group = device.ep().expect("invalid utf-8");
+			group_prefix[..group.len()].copy_from_slice(group.as_bytes());
+			group_prefix[group.len()] = b'.';
+			let group_prefix = unsafe { core::str::from_utf8_unchecked(core::slice::from_raw_parts(group_prefix.as_ptr(), group.len() + 1)) };
+
+			let group = device_groups.get_or_insert_with(group, DeviceGroup::default);
+			group.device_ptrs.push(ptr);
+			if let Some(options) = options {
+				for (key, value) in options.iter() {
+					if let Some(real_key) = key.strip_prefix(group_prefix) {
+						group.option_keys.push(real_key);
+						group.option_values.push(value.as_str());
+					}
+				}
+			}
+		}
+
+		for (_, group) in device_groups.iter() {
+			let ptr = self.ptr_mut();
+			let env_ptr = self.environment.ptr().cast_mut();
+			if let Err(e) = with_cstr_ptr_array(&group.option_keys, &|option_keys| {
+				with_cstr_ptr_array(&group.option_values, &|option_values| {
+					ortsys![unsafe SessionOptionsAppendExecutionProvider_V2(
+						ptr,
+						env_ptr,
+						group.device_ptrs.as_ptr(),
+						group.device_ptrs.len(),
+						option_keys.as_ptr(),
+						option_values.as_ptr(),
+						option_keys.len()
+					)?];
+					Ok(())
+				})
+			}) {
+				return Err(e.with_recover(self));
+			}
+		}
+
+		Ok(self)
 	}
 }
 

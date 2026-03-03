@@ -37,6 +37,18 @@ impl<K: Eq, V> MiniMap<K, V> {
 		self.values.iter_mut().find(|(k, _)| key.eq(k.borrow())).map(|(_, v)| v)
 	}
 
+	pub fn get_or_insert_with(&mut self, key: K, f: impl FnOnce() -> V) -> &mut V {
+		let idx = match self.values.iter_mut().position(|(k, _)| key.eq(k.borrow())) {
+			Some(v) => v,
+			None => {
+				let idx = self.values.len();
+				self.values.push((key, f()));
+				idx
+			}
+		};
+		&mut self.values[idx].1
+	}
+
 	pub fn insert(&mut self, key: K, value: V) -> Option<V> {
 		match self.get_mut(&key) {
 			Some(v) => Some(mem::replace(v, value)),

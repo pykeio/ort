@@ -150,6 +150,37 @@ impl Environment {
 		Ok(ExecutionProviderLibrary::new(name, self))
 	}
 
+	/// Returns an iterator over all automatically discovered [hardware device](crate::device::Device)s.
+	///
+	/// ```
+	/// # use ort::environment::Environment;
+	/// # fn main() -> ort::Result<()> {
+	/// let env = Environment::current()?;
+	/// for device in env.devices() {
+	/// 	println!(
+	/// 		"{id} ({vendor} {ty:?} - {ep})",
+	/// 		id = device.id(),
+	/// 		vendor = device.vendor()?,
+	/// 		ty = device.ty(),
+	/// 		ep = device.ep()?
+	/// 	);
+	/// }
+	/// # Ok(())
+	/// # }
+	/// ```
+	#[cfg(feature = "api-22")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
+	pub fn devices(&self) -> impl DoubleEndedIterator<Item = crate::device::Device<'_>> + '_ {
+		let mut ptrs = ptr::dangling();
+		let mut len = 0;
+		// returns an error in minimal build because its unsupported. ignore & return empty iterator in that case
+		let _ = ortsys![@ort: unsafe GetEpDevices(self.ptr().cast_mut(), &mut ptrs, &mut len) as Result];
+		unsafe { core::slice::from_raw_parts(ptrs, len) }
+			.iter()
+			.filter_map(|c| NonNull::new(c.cast_mut()))
+			.map(crate::device::Device::new)
+	}
+
 	#[inline]
 	pub(crate) fn has_global_threadpool(&self) -> bool {
 		self.has_global_threadpool

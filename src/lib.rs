@@ -30,6 +30,9 @@ pub(crate) mod private;
 pub mod compiler;
 #[cfg(feature = "api-22")]
 #[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
+pub mod device;
+#[cfg(feature = "api-22")]
+#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
 pub mod editor;
 pub mod environment;
 pub mod ep;

@@ -23,7 +23,7 @@ exclude = [
 [package]
 name = "ort"
 description = "A safe Rust wrapper for ONNX Runtime 1.24 - Optimize and accelerate machine learning inference & training"
-version = "2.0.0-rc.11"
+version = "2.0.0-rc.12"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
@@ -36,7 +36,7 @@ authors = [
 	"pyke.io <contact@pyke.io>",
 	"Nicolas Bigaouette <nbigaouette@gmail.com>"
 ]
-include = [ "/src/", "/LICENSE-APACHE", "/LICENSE-MIT", "/README.md" ]
+include = [ "/src/", "/LICENSE-APACHE", "/LICENSE-MIT" ]
 
 [badges.maintenance]
 status = "actively-developed"
@@ -102,7 +102,7 @@ azure = [ "ort-sys/azure" ]
 nvrtx = [ "ort-sys/nvrtx" ]
 
 [dependencies]
-ort-sys = { version = "=2.0.0-rc.11", path = "ort-sys", default-features = false }
+ort-sys = { version = "=2.0.0-rc.12", path = "ort-sys", default-features = false }
 smallvec = { version = "1.15", default-features = false, features = [ "const_generics" ] }
 
 ndarray = { version = "0.17", default-features = false, optional = true }

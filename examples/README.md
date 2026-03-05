@@ -22,7 +22,7 @@ $ git clone https://github.com/pykeio/ort
 
 To run an example for a specific version, add `--branch`:
 ```shell
-$ git clone https://github.com/pykeio/ort --branch v2.0.0-rc.11
+$ git clone https://github.com/pykeio/ort --branch v2.0.0-rc.12
 ```
 </li>
 <li>

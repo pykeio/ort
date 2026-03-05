@@ -1,7 +1,7 @@
 [package]
 name = "ort-tract"
 description = "ort + tract = 🦀 - An alternative backend for ort, powered by tract."
-version = "0.2.0+0.22"
+version = "0.3.0+0.22"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
@@ -31,7 +31,7 @@ path = "lib.rs"
 [features]
 
 [workspace.dependencies]
-ort-sys = { version = "=2.0.0-rc.11", path = "../../ort-sys", default-features = false, features = [ "api-17" ] }
+ort-sys = { version = "=2.0.0-rc.12", path = "../../ort-sys", default-features = false, features = [ "api-17" ] }
 
 [dependencies]
 ort-sys = { workspace = true }
@@ -39,7 +39,7 @@ tract-onnx = "0.22"
 parking_lot = "0.12"
 
 [dev-dependencies]
-ort = { version = "=2.0.0-rc.11", path = "../../", default-features = false, features = [ "alternative-backend", "fetch-models", "tls-rustls", "ndarray", "api-17" ] }
+ort = { version = "=2.0.0-rc.12", path = "../../", default-features = false, features = [ "alternative-backend", "fetch-models", "tls-rustls", "ndarray", "api-17" ] }
 image = "0.25"
 ndarray = "0.17"
 

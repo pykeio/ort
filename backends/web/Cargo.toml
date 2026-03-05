@@ -4,7 +4,7 @@ resolver = "2"
 [package]
 name = "ort-web"
 description = "ONNX Runtime on the web 🌐 - An alternative backend for ort"
-version = "0.1.0+1.24"
+version = "0.2.0+1.24"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
@@ -23,8 +23,8 @@ path = "lib.rs"
 
 [dependencies]
 js-sys = "0.3.87"
-ort = { path = "../../", version = "=2.0.0-rc.11", default-features = false, features = [ "alternative-backend", "api-17" ] }
-ort-sys = { path = "../../ort-sys", version = "=2.0.0-rc.11", default-features = false, features = [ "disable-linking", "api-17" ] }
+ort = { path = "../../", version = "=2.0.0-rc.12", default-features = false, features = [ "alternative-backend", "api-17" ] }
+ort-sys = { path = "../../ort-sys", version = "=2.0.0-rc.12", default-features = false, features = [ "disable-linking", "api-17" ] }
 serde = { version = "1.0", features = [ "derive" ] }
 serde-wasm-bindgen = "0.6"
 wasm-bindgen = "0.2.110"

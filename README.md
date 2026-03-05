@@ -22,7 +22,7 @@ When you need to deploy a PyTorch/TensorFlow/Keras/scikit-learn/PaddlePaddle mod
 
 ## 📖 Documentation
 - [Guide](https://ort.pyke.io/)
-- [API reference](https://docs.rs/ort/2.0.0-rc.11/ort/)
+- [API reference](https://docs.rs/ort/2.0.0-rc.12/ort/)
 - [Examples](https://github.com/pykeio/ort/tree/main/examples)
 - [Migrating from v1.x to v2.0](https://ort.pyke.io/migrating/v2)
 

@@ -1,0 +1,36 @@
+import Ort from '../../components/Ort';
+
+# Multiversioning
+<Ort/> can support any version of ONNX Runtime between 1.17 to 1.24. It does this by lowering the **API version** it requests based on what features are enabled.
+
+By default, the latest APIs (gated under feature `api-24`) are enabled by default, so you have access to all ONNX Runtime 1.24 features out of the box. If you want to target an earlier version of ONNX Runtime, you must disable `default-features` and set your minimum API version accordingly:
+```toml filename="Cargo.toml"
+[dependencies.ort]
+version = "=2.0.0-rc.12"
+default-features = false
+features = [
+    "std",
+    "ndarray",
+    "download-binaries",
+    
+    # We use the `Adapter` API, which is only available since ONNX Runtime 1.20,
+    # so set our minimum API version to 20.
+    "api-20"
+]
+```
+
+In the above example, only features available since ONNX Runtime 1.20 will be accessible in code. Because `download-binaries` is enabled, <Ort/> will still download the latest ONNX Runtime (v1.24), but it will happily use an older version if you [set up manual linking](/setup/linking).
+
+The [API docs](https://docs.rs/ort) shows the minimum API version required for each method/struct; if no notice is shown, then it's always available.
+
+![A screenshot of the docs.rs page for SessionBuilder::with_auto_device. Below the method definition, an infobox says "Available on crate feature api-22 only".](/assets/_api-version-feature.webp)
+
+The following API version features are available. Each feature also enables all APIs before it.
+- **`api-17`**: ONNX Runtime v1.17 (baseline)
+- **`api-18`**: ONNX Runtime v1.18
+- **`api-19`**: ONNX Runtime v1.19
+- **`api-20`**: ONNX Runtime v1.20
+- **`api-21`**: ONNX Runtime v1.21
+- **`api-22`**: ONNX Runtime v1.22
+- **`api-23`**: ONNX Runtime v1.23
+- **`api-24`**: ONNX Runtime v1.24 (latest)

@@ -1,3 +1,4 @@
+import { Link } from 'nextra-theme-docs';
 import { BiChip } from 'react-icons/bi';
 import { BsAmd } from 'react-icons/bs';
 import { PiGlobeBold } from 'react-icons/pi';
@@ -10,6 +11,7 @@ export interface ExecutionProvider {
 	vendor: string | null;
 	name: string;
 	feature: string;
+	note?: React.ReactNode;
 	platforms: TripleFilter[];
 	binaries?: TripleFilter[];
 }
@@ -23,6 +25,7 @@ export const EXECUTION_PROVIDER_ARRAY: ExecutionProvider[] = [
 		vendor: 'NVIDIA',
 		name: 'CUDA',
 		feature: 'cuda',
+		note: <>Supports both CUDA 12 & CUDA 13. See <Link href='/perf/execution-providers#cuda'>here</Link> for more info.</>,
 		platforms: [ { os: 'windows', arch: 'x64' }, { os: 'linux', arch: 'x64' }, { os: 'linux', arch: 'arm64' } ],
 		binaries: [ { os: 'windows', arch: 'x64' }, { os: 'linux', arch: 'x64' } ]
 	},
@@ -149,8 +152,8 @@ export const EXECUTION_PROVIDER_ARRAY: ExecutionProvider[] = [
 		vendor: null,
 		name: 'WebGPU',
 		feature: 'webgpu',
-		platforms: [ { os: 'web' }, { os: 'windows' }, { os: 'linux' } ],
-		binaries: [ { os: 'web' }, { os: 'windows', arch: 'x64' }, { os: 'linux', arch: 'x64' } ]
+		platforms: [ { os: 'web' }, { os: 'windows' }, { os: 'linux' }, { os: 'macos' } ],
+		binaries: [ { os: 'web' }, { os: 'windows', arch: 'x64' }, { os: 'linux', arch: 'x64' }, { os: 'macos', arch: 'arm64' } ]
 	},
 	{
 		icon: <PiGlobeBold style={{ color: '#0066b0' }} />,

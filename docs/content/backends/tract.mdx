@@ -1,7 +1,9 @@
 import { Steps } from 'nextra/components';
 
+import Ort from '../../components/Ort';
+
 # `ort-tract`
-`ort-tract` is an [alternative backend](/backends) for `ort` based on [`tract`](https://github.com/sonos/tract).
+`ort-tract` is an [alternative backend](/backends) for <Ort/> based on [`tract`](https://github.com/sonos/tract).
 
 ## Supported APIs
 - ✅ `ort::init`
@@ -35,26 +37,28 @@ import { Steps } from 'nextra/components';
 ### Install `ort-tract`
 ```toml filename="Cargo.toml"
 [dependencies]
-ort-tract = "0.2.0+0.21"
+ort-tract = "0.3.0+0.22"
 ...
 ```
 
 ### Enable the `alternative-backend` feature
-This instructs `ort` to not try to download/link to ONNX Runtime.
+This instructs <Ort/> to not try to download/link to ONNX Runtime.
 
 ```toml filename="Cargo.toml"
 [dependencies.ort]
-version = "=2.0.0-rc.11"
+version = "=2.0.0-rc.12"
 default-features = false # Disables the `download-binaries` feature since we don't need it
 features = [
+    "std",
+    "ndarray",
     "alternative-backend"
 ]
 ```
 
 ### Initialize the backend
-Use `ort::set_api` to use the crate's API implementation.
+Use [`ort::set_api`](https://docs.rs/ort/latest/ort/fn.set_api.html) to use the crate's API implementation.
 
-```rs
+```rs filename="main.rs"
 fn main() {
     // This should run as early in your application as possible - before you ever use `ort`!
     ort::set_api(ort_tract::api());

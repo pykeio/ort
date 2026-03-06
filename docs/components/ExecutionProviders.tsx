@@ -1,15 +1,15 @@
 'use client';
 
 import { Card, Flex, Heading, Skeleton, Switch, Text } from '@radix-ui/themes';
+import { Code } from 'nextra/components';
 import { useState } from 'react';
+import { PiCheckBold, PiInfoFill, PiWarningFill } from 'react-icons/pi';
 import { useStore } from 'zustand';
 
 import { EXECUTION_PROVIDER_ARRAY } from '../core/ep';
 import { PLATFORM_STORE } from '../core/platform';
 import { useIsClient } from '../core/utils';
 import PlatformSelector from './PlatformSelector';
-import { Code } from 'nextra/components';
-import { PiCheckBold, PiInfoFill, PiWarningBold, PiWarningFill } from 'react-icons/pi';
 
 export default function ExecutionProviders() {
 	const isClient = useIsClient();
@@ -80,6 +80,7 @@ export default function ExecutionProviders() {
 								? <Flex direction='row' gap='1' align='center' style={{ fontSize: '12px', color: 'var(--green-11)' }}><PiCheckBold /> Ready to use</Flex>
 								: <Flex direction='row' gap='1' align='center' style={{ fontSize: '12px', color: 'var(--gray-11)' }}><PiInfoFill /> Requires compiling ONNX Runtime from source</Flex>
 							: null}
+						{ep.note && <Flex direction='row' gap='1' align='center' style={{ fontSize: '12px', color: 'var(--gray-11)' }}><PiInfoFill /> <span>{ep.note}</span></Flex>}
 						<Code style={{ fontSize: '12px' }}>features = [ "{ep.feature}" ]</Code>
 					</Card>
 				})}

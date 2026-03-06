@@ -2,10 +2,12 @@
 title: 'Troubleshooting: Performance'
 ---
 
+import Ort from '../../components/Ort';
+
 # Troubleshooting: Performance
 
-## Execution providers don't seem to register
-`ort` is designed to fail gracefully when an execution provider is not available or fails to register. To debug errors raised by EPs, [set up logging for `ort`](/troubleshooting/logging).
+## Execution providers don't seem to work
+<Ort/> is designed to fail gracefully when an execution provider is not available or fails to register. To debug errors raised by EPs, [set up logging for <Ort/>](/troubleshooting/logging).
 
 You can also detect EP regsitration failures programmatically. See [Execution providers: Fallback behavior](/perf/execution-providers#fallback-behavior) for more info.
 

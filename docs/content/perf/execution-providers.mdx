@@ -20,7 +20,7 @@ Not all platforms support all execution providers, of course. This handy widget 
 <Callout type='info'>
     To enable the use of an execution provider inside <Ort/>, you'll need to enable its respective Cargo feature, e.g. the `cuda` feature to use CUDA, or the `coreml` feature to use CoreML.
 
-    ```toml Cargo.toml
+    ```toml filename="Cargo.toml"
     [dependencies]
     ort = { version = "2.0", features = [ "cuda" ] }
     ```
@@ -28,9 +28,9 @@ Not all platforms support all execution providers, of course. This handy widget 
     See the widget above for the full list of EPs and their corresponding Cargo features.
 </Callout>
 
-In order to configure sessions to use certain execution providers, you must **register** them when creating an environment or session. You can do this via the `SessionBuilder::with_execution_providers` method. For example, to register the CUDA execution provider for a session:
+In order to configure sessions to use certain execution providers, you must **register** them when creating an environment or session. You can do this via the [`SessionBuilder::with_execution_providers`](https://docs.rs/ort/latest/ort/session/builder/struct.SessionBuilder.html#method.with_execution_providers) method. For example, to register the CUDA execution provider for a session:
 
-```rust
+```rust filename="main.rs"
 use ort::{ep::CUDA, session::Session};
 
 fn main() -> anyhow::Result<()> {
@@ -42,9 +42,9 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-You can, of course, specify multiple execution providers. `ort` will register all EPs specified, in order. If an EP does not support a certain operator in a graph, it will fall back to the next successfully registered EP, or to the CPU if all else fails.
+You can, of course, specify multiple execution providers. <Ort/> will register all EPs specified, in order. If an EP does not support a certain operator in a graph, it will fall back to the next successfully registered EP, or to the CPU if all else fails.
 
-```rust
+```rust filename="main.rs"
 use ort::{ep, session::Session};
 
 fn main() -> anyhow::Result<()> {
@@ -65,9 +65,9 @@ fn main() -> anyhow::Result<()> {
 ```
 
 ## Configuring EPs
-EPs have configuration options to control behavior or increase performance. Each execution provider struct returns a builder with configuration methods. See the [API reference](https://docs.rs/ort/2.0.0-rc.11/ort/ep/index.html#reexports) for the EP structs for more information on which options are supported and what they do.
+EPs have configuration options to control behavior or increase performance. Each execution provider struct returns a builder with configuration methods. See the [API reference](https://docs.rs/ort/latest/ort/ep/index.html#reexports) for the EP structs for more information on which options are supported and what they do.
 
-```rust
+```rust filename="main.rs"
 use ort::{ep, session::Session};
 
 fn main() -> anyhow::Result<()> {
@@ -86,10 +86,10 @@ fn main() -> anyhow::Result<()> {
 ```
 
 ## Fallback behavior
-`ort` will silently fail and fall back to executing on the CPU if all execution providers fail to register. In many cases, though, you'll want to show the user an error message when an EP fails to register, or outright abort the process.
+<Ort/> will silently fail and fall back to executing on the CPU if all execution providers fail to register. In many cases, though, you'll want to show the user an error message when an EP fails to register, or outright abort the process.
 
-You can configure an EP to return an error on failure by adding `.error_on_failure()` after you `.build()` it. In this example, if CUDA doesn't register successfully, the program will exit with an error at `with_execution_providers`:
-```rust
+You can configure an EP to return an error on failure by adding [`.error_on_failure()`](https://docs.rs/ort/latest/ort/ep/struct.ExecutionProviderDispatch.html#method.error_on_failure) after you `.build()` it. In this example, if CUDA doesn't register successfully, the program will exit with an error at `with_execution_providers`:
+```rust filename="main.rs"
 use ort::{ep, session::Session};
 
 fn main() -> anyhow::Result<()> {
@@ -103,9 +103,9 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-If you require more complex error handling, you can also manually register execution providers via the `ExecutionProvider::register` method:
+If you require more complex error handling, you can also manually register execution providers via the [`ExecutionProvider::register`](https://docs.rs/ort/latest/ort/ep/trait.ExecutionProvider.html#tymethod.register) method:
 
-```rust
+```rust filename="main.rs"
 use ort::{
     ep::{self, ExecutionProvider},
     session::Session
@@ -126,9 +126,9 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-You can also check whether ONNX Runtime is even compiled with support for the execution provider with the `is_available` method.
+You can also check whether ONNX Runtime is even compiled with support for the execution provider with the [`is_available`](https://docs.rs/ort/latest/ort/ep/trait.ExecutionProvider.html#method.is_available) method.
 
-```rust
+```rust filename="main.rs"
 use ort::{
     ep::{self, ExecutionProvider},
     session::Session
@@ -152,10 +152,10 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-## Global defaults
-You can configure `ort` to attempt to register a list of execution providers for all sessions created in an environment.
+## Global EPs
+You can configure EPs to be registered for all sessions created throughout the program by configuring the environment:
 
-```rust
+```rust filename="main.rs"
 use ort::{ep, session::Session};
 
 fn main() -> anyhow::Result<()> {
@@ -165,17 +165,17 @@ fn main() -> anyhow::Result<()> {
 
     let session = Session::builder()?.commit_from_file("model.onnx")?;
     // The session will attempt to register the CUDA EP
-    // since we configured the environment default.
+    // since we configured environment EPs.
 
     Ok(())
 }
 ```
 
 <Callout type='warning'>
-    `ort::init` must come before you create any sessions, otherwise the configuration will not take effect!
+    Environment configs must be committed before you create any sessions, otherwise the configuration will not take effect!
 </Callout>
 
-Sessions configured with their own execution providers will *extend* the execution provider defaults, rather than overriding them.
+EPs configured on a per-session basis (with [`SessionBuilder::with_execution_providers`](https://docs.rs/ort/latest/ort/session/builder/struct.SessionBuilder.html#method.with_execution_providers)) will *take precedence* over environment EPs, but it won't replace them.
 
 ## Troubleshooting
 If it seems like the execution provider is not registering properly, or you are not getting acceptable performance, see the [Troubleshooting: Performance](/troubleshooting/performance) page for more information on how to debug any EP issues.
@@ -185,14 +185,28 @@ If it seems like the execution provider is not registering properly, or you are 
 ### Dynamically-linked EP requirements
 Certain EPs like CUDA and TensorRT use a separate interface that require them to be compiled as dynamic libraries which are loaded at runtime when the EP is registered. The DirectML and WebGPU EP do not use this interface, but do require helper dylibs.
 
-Due to the quirks of dynamic library loading, you may encounter issues with builds including these EPs due to ONNX Runtime failing to find the dylibs at runtime. `ort`'s `copy-dylibs` Cargo feature (which is enabled by default) tries to alleviate this issue by symlinking these dylibs into your `target` folder so they can be found by your application when in development. On Windows platforms that don't have [Developer Mode](https://learn.microsoft.com/en-us/windows/uwp/get-started/enable-your-device-for-development) enabled, a copy is instead performed (excluding examples and tests). On other platforms, additional setup is required to get the application to load dylibs from its parent folder.
+Due to the quirks of dynamic library loading, you may encounter issues with builds including these EPs due to ONNX Runtime failing to find the dylibs at runtime. <Ort/>'s `copy-dylibs` [Cargo feature](/setup/cargo-features) (which is enabled by default) tries to alleviate this issue by symlinking these dylibs into your `target` folder so they can be found by your application when in development. On Windows platforms that don't have [Developer Mode](https://learn.microsoft.com/en-us/windows/uwp/get-started/enable-your-device-for-development) enabled, a copy is instead performed. On other platforms, additional setup is required to get the application to load dylibs from its parent folder.
 
 See [Runtime dylib loading](/setup/linking#runtime-dylib-loading) for more information.
 
+### Prebuilt binary combos
+<Ort/> provides prebuilt binaries for the following combinations of EP features:
+
+- `directml`/`xnnpack`/`coreml` are available in any build if the platform supports it.
+- `cuda`/`tensorrt`
+- `webgpu`
+- `nvrtx`
+
+This means that we have builds for `features = ["cuda", "tensorrt", "directml"]`, but *not* `features = ["cuda", "webgpu"]`. Specifying both `cuda` and `webgpu` for example **will fall back to downloading a CPU-only build**.
+
+If you want a single build of ONNX Runtime that has both `cuda` *and* `webgpu`, you'll have to compile it from source.
+
 ### CUDA
-`ort` provides binaries for CUDA 12 with cuDNN 9.x only. Make sure the correct version of CUDA & cuDNN are installed and available on the `PATH`.
+<Ort/> provides binaries for CUDA ≥ 12.8 or ≥ 13.2, and targets cuDNN ≥ 9.19. Make sure CUDA and cuDNN are installed and available on the `PATH`.
+
+<Ort/> will try to automatically detect which CUDA version you're using, but sometimes it gets it wrong and reverts to CUDA 12 (especially if you have both 12 and 13 installed). You can override the CUDA version by setting the `ORT_CUDA_VERSION` environment variable to `12` or `13`.
 
 ### WebGPU
 The WebGPU EP is **experimental** and may produce incorrect results/crashes; these issues should be reported upstream as there's unfortunately nothing we can do about them.
 
-WebGPU binaries are provided for Windows & Linux. On Windows, the build supports running on DirectX 12 or DirectX 11. On Linux, it supports Vulkan & OpenGL/GLES.
+WebGPU binaries are provided for Windows, macOS, and Linux. On Windows, DirectX 12 and 11 are supported. On Linux, Vulkan and OpenGL/GLES are supported.

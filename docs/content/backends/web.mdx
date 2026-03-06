@@ -1,0 +1,168 @@
+import { Steps } from 'nextra/components';
+
+import Ort from '../../components/Ort';
+
+# `ort-web`
+`ort-web` is an [alternative backend](/backends) for <Ort/> that allows you to use ONNX Runtime on the Web.
+
+ONNX Runtime is written in C++. Compiling it to WASM requires the use of [Emscripten](https://emscripten.org/). Meanwhile, Rust in WASM typically uses [`wasm-bindgen`](https://wasm-bindgen.github.io/wasm-bindgen/). Emscripten and `wasm-bindgen` have very different ABIs, conventions, and build processes that make them impractical to link together normally.
+
+Rather than trying to link ONNX Runtime into your Rust application, `ort-web` instead acts as a *bridge* between ONNX Runtime in Emscripten and your Rust code. They live in separate WebAssembly contexts, and `ort-web` allows data to flow between them. `ort-web` tries to feel as close to normal <Ort/> as possible, but because two WASM contexts cannot directly share memory, there are some limitations, like having to [manually synchronize data](#synchronization) between contexts.
+
+## Supported APIs
+- ✅ `ort::init`
+- 🔷 `ort::environment::EnvironmentBuilder`
+    - `EnvironmentBuilder::with_telemetry` <sup>[*](#telemetry)</sup>
+    - `EnvironmentBuilder::commit`
+- 🔷 `ort::memory::Allocator`
+    - `Allocator::default`
+    - `Allocator::memory_info`
+- ✅ `ort::memory::MemoryInfo`
+- 🔷 `ort::session::Session`
+    - `Session::builder`
+    - `Session::allocator`
+    - `Session::run_async`
+    - ⚠️ Synchronous run methods like `Session::run` and `Session::run_with_options` are not supported.
+- 🔷 `ort::session::builder::SessionBuilder`
+    - `SessionBuilder::new`
+    - `SessionBuilder::commit_from_memory`
+    - `SessionBuilder::commit_from_url` (does not require `fetch-models` feature)
+    - `SessionBuilder::with_optimization_level`
+- ✅ `ort::value::DynValue`, `ort::value::DynValueRef`, `ort::value::DynValueRefMut`
+- ✅ `ort::value::Tensor`, `TensorRef`, `TensorRefMut`, etc.
+- ✅ `ort::value::ValueType`
+
+## Installation
+
+<Steps>
+
+### Install `ort-web`
+```toml filename="Cargo.toml"
+[dependencies]
+ort-web = "0.2.1+1.24"
+...
+```
+
+### Enable the `alternative-backend` feature
+This instructs <Ort/> to not try its usual linking steps.
+
+```toml filename="Cargo.toml"
+[dependencies.ort]
+version = "=2.0.0-rc.12"
+default-features = false # Disables the `download-binaries` feature since we don't need it
+features = [
+    "std",
+    "ndarray",
+    "api-24",
+    "alternative-backend"
+]
+```
+
+### Initialize the backend
+Use [`ort::set_api`](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/fn.set_api.html) to use the crate's API implementation.
+
+```rs filename="lib.rs"
+use ort_web::FEATURE_WEBGPU;
+use wasm_bindgen::JsError;
+
+async fn init() -> Result<(), JsError> {
+    // This should always be run before you use any other `ort` API.
+    ort::set_api(ort_web::api(FEATURE_WEBGPU).await?);
+
+    ...
+}
+```
+
+### Done!
+
+</Steps>
+
+## Toggling features
+You can choose which build of ONNX Runtime to fetch by choosing any combination of `FEATURE_WEBGL`, `FEATURE_WEBGPU`, and `FEATURE_WEBNN`. These enable the usage of the WebGL, [WebGPU](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/ep/webgpu/struct.WebGPU.html), and [WebNN](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/ep/webnn/struct.WebNN.html) EPs respectively. You can `|` features together to enable multiple at once:
+
+```rs
+use ort_web::{FEATURE_WEBGL, FEATURE_WEBGPU};
+ort::set_api(ort_web::api(FEATURE_WEBGL | FEATURE_WEBGPU).await?);
+```
+
+You'll still need to configure the EPs on a per-session basis later like you would normally, but this allows you to e.g. only fetch the CPU build (`FEATURE_NONE`) if the user doesn't have hardware acceleration.
+
+## Session creation
+Sessions can only be [created from a URL](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/session/builder/struct.SessionBuilder.html#method.commit_from_url), or [indirectly from memory](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/session/builder/struct.SessionBuilder.html#method.commit_from_memory)--that means no `SessionBuilder::commit_from_memory_directly` for `.ort` format models, and no `SessionBuilder::commit_from_file`.
+
+Unlike vanilla <Ort/>, `commit_from_url` and `commit_from_memory` are marked `async` on the Web and thus need to be `await`ed. Also, `commit_from_url` is always available, regardless of whether the `fetch-models` feature is enabled.
+
+```rs filename="lib.rs"
+use ort::{ep, session::Session};
+use ort_web::FEATURE_WEBGPU;
+use wasm_bindgen::JsError;
+
+async fn init() -> Result<(), JsError> {
+    ort::set_api(ort_web::api(FEATURE_WEBGPU).await?);
+
+    let mut session = Session::builder()?
+        .with_execution_providers([
+            // only available with FEATURE_WEBGPU
+            ep::WebGPU::default().build()
+        ])?
+        .commit_from_url("./model.onnx")
+        .await?; // <- note we must .await on the web
+}
+```
+
+## Synchronization
+With `ort-web`, ONNX Runtime is loaded as a separate WASM module, and `ort-web` acts as an intermediary between it and <Ort/>. There is no mechanism in WASM for two modules to share memory, so tensors often need to be *'synchronized'* when one side needs to see data from the other.
+
+This means that [`Tensor::new`](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/value/type.Tensor.html#method.new) should never be used for creating inputs, as they start out allocated on the ONNX Runtime side, thus requiring a sync (of *empty data*) to Rust before it can be written to. Prefer instead [`Tensor::from_array`](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/value/type.Tensor.html#method.from_array)/[`TensorRef::from_array_view`](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/value/type.TensorRef.html#method.from_array_view), as tensors created this way never require synchronization.
+
+Outputs of a session are **not** synchronized automatically. If you wish to use their data in Rust, you must either sync all outputs at once with [`ort_web::sync_outputs`](https://docs.rs/ort-web/latest/ort_web/fn.sync_outputs.html), or sync each tensor at a time (if you only use a few outputs):
+```rs filename="lib.rs"
+use ort_web::{TensorExt, SyncDirection};
+
+let mut outputs = session.run_async(ort::inputs![...]).await?;
+
+let mut bounding_boxes = outputs.remove("bounding_boxes").unwrap();
+bounding_boxes.sync(SyncDirection::Rust).await?;
+
+// now we can use the data
+let data = bounding_boxes.try_extract_tensor::<f32>()?;
+```
+
+Once a session output is `sync`ed, that tensor becomes backed by a Rust buffer. Updates to the tensor's data from the Rust side will not reflect in ONNX Runtime until the tensor is `sync`ed with [`SyncDirection::Runtime`](https://docs.rs/ort-web/latest/ort_web/enum.SyncDirection.html#variant.Runtime). Likewise, updates to the tensor's data from ONNX Runtime won't reflect in Rust until Rust syncs that tensor with [`SyncDirection::Rust`](https://docs.rs/ort-web/latest/ort_web/enum.SyncDirection.html#variant.Rust). You don't have to worry about this behavior if you only ever *read* from session outputs, though.
+
+## Serving assets
+`ort-web` dynamically fetches the required scripts & WASM binary at runtime. By default, it will fetch the build from the `cdn.pyke.io` domain, so make sure it's accessible through your [content security policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP) if you have that configured.
+
+You can also use a self-hosted build with [`Dist`](https://docs.rs/ort-web/latest/ort_web/struct.Dist.html):
+```rs filename="lib.rs"
+use ort::session::Session;
+use ort_web::Dist;
+
+async fn init_model() -> anyhow::Result<Session> {
+	let dist = Dist::new("https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.2/dist/")
+		// we want to load the WebGPU build
+		.with_script_name("ort.webgpu.min.js");
+	ort::set_api(ort_web::api(dist).await?);
+}
+```
+
+The scripts & binary can be acquired from the `dist` folder of the [`onnxruntime-web` npm package](https://npmjs.com/package/onnxruntime-web).
+
+## Telemetry
+Unlike vanilla <Ort/>, `ort-web` **includes & enables telemetry by default**; this telemetry data is sent to pyke, not Microsoft.
+
+When telemetry is enabled, committing a session for the first time on a page will send the domain name to `signal.pyke.io`. This is **the only data we collect**; we use it to better understand where & how `ort-web` is being used. You can see the exact details in the [`_telemetry.js` file](https://docs.rs/crate/ort-web/latest/source/_telemetry.js).
+
+You can always disable this telemetry via [`EnvironmentBuilder::with_telemetry`](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/environment/struct.EnvironmentBuilder.html#method.with_telemetry):
+```rs filename="lib.rs"
+use wasm_bindgen::JsError;
+async fn init() -> Result<(), JsError> {
+    ort::set_api(ort_web::api().await?);
+
+    ort::init()
+        .with_telemetry(false)
+        .commit();
+
+    // ...
+}
+```

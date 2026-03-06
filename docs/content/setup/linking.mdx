@@ -1,23 +1,24 @@
 ---
 title: Linking
-description: Here's how `ort` links to ONNX Runtime, and how to configure its behavior.
+description: How `ort` links to ONNX Runtime, and how to configure its behavior for custom builds.
 ---
 
 # Linking
 
 import { Callout, Tabs, Steps } from 'nextra/components';
+import Ort from '../../components/Ort';
 
-`ort` provides its own builds of ONNX Runtime to make your experience as painless as possible, but in some cases, you'll want to use a custom build of ONNX Runtime with `ort`. Luckily, we make this very easy by handling all of the linking configuration automagically. Just point `ort` to the output of ONNX Runtime's build pipeline and it'll Just Work™.
+<Ort/> provides its own builds of ONNX Runtime to make your experience as painless as possible, but in some cases, you'll want to use a custom build of ONNX Runtime with <Ort/>. Luckily, we make this very easy by handling all of the linking configuration automagically. Just point <Ort/> to the output of ONNX Runtime's build pipeline and it'll Just Work™.
 
 ## Static linking
-Most ONNX Runtime compile configurations will support static linking - just run `build.sh` without the `--build_shared_lib` argument. You should prefer static linking if your execution providers support it, as it avoids many issues and follows de facto Rust practices. If you compile both static libraries and dynamic libraries, `ort` will prefer linking to the static libraries.
+Most ONNX Runtime compile configurations will support static linking--just run `build.sh` without the `--build_shared_lib` argument. You should prefer static linking if your execution providers support it, as it avoids many issues and follows de facto Rust practices. If you compile both static libraries and dynamic libraries, <Ort/> will prefer linking to the static libraries.
 
-To direct `ort` to your statically built binaries, use the `ORT_LIB_PATH` environment variable when running `cargo build`. Point it to the location where the static libraries (`.a`/`.lib` files) are compiled to. This will typically be `onnxruntime/build/<os>/<profile>`. For example:
+To direct <Ort/> to your statically built binaries, use the `ORT_LIB_PATH` environment variable when running `cargo build`. Point it to the location where the static libraries (`.a`/`.lib` files) are compiled to. This will typically be `onnxruntime/build/<os>/<profile>`. For example:
 ```shell
 $ ORT_LIB_PATH=~/onnxruntime/build/Linux/Release cargo build
 ```
 
-For iOS (or for other platforms if you are compiling multiple profiles at once), you'll need to manually specify the profile with the `ORT_LIB_PROFILE` environment variable. If not specified, `ort` will prefer `Release` over `RelWithDebInfo` over `MinSizeRel` over `Debug`.
+For iOS (or for other platforms if you are compiling multiple profiles at once), you'll need to manually specify the profile with the `ORT_LIB_PROFILE` environment variable. If not specified, <Ort/> will prefer `Release` over `RelWithDebInfo` over `MinSizeRel` over `Debug`.
 
 ## Dynamic linking
 When it comes to dynamic linking, there are two options: `load-dynamic`, or standard compile-time dynamic linking. We recommend `load-dynamic` as it gives more control and is often far less troublesome to work with.
@@ -37,20 +38,28 @@ ort = { version = "2", features = [ "load-dynamic" ] }
 ### Point ort to the dylib
 <Tabs items={['Programmatically', 'Via shell']}>
     <Tabs.Tab title="Programmatically">
-        ```rust main.rs
-        fn main() -> anyhow::Result<()> {
-            // Find our custom ONNX Runtime dylib path somehow
-            // (i.e. resolving it from the root of our program's install folder)
-            let dylib_path = crate::internal::find_onnxruntime_dylib()?;
+        ```rust filename="main.rs"
+        fn find_onnxruntime_dylib() -> anyhow::Result<PathBuf> {
+            // Find our custom ONNX Runtime dylib path somehow (i.e. resolving it from the root of our program's install folder)
             // The path should point to the `libonnxruntime` binary, which looks like:
-            // - on Unix: /etc/.../libonnxruntime.so
             // - on Windows: C:\Program Files\...\onnxruntime.dll
+            // - on Linux: /etc/.../libonnxruntime.so
+            // - on macOS: /.../libonnxruntime.dylib
+            unimplemented!()
+        }
 
-            // Initialize ort with the path to the dylib. This **must** be called before any usage of `ort`!
+        fn main() -> anyhow::Result<()> {
+            let dylib_path = find_onnxruntime_dylib()?;
+
+            // Initialize ort with the path to the dylib. This **must** be called before any other usage of `ort`!
             // `init_from` returns a `Result<EnvironmentBuilder>` which you can use to further configure the environment
             // before `.commit()`ing; see the Environment docs for more information on what you can configure.
             // `init_from` will return an `Err` if it fails to load the dylib.
             ort::init_from(dylib_path)?.commit();
+
+            // Now we can use `ort`!
+            let mut session = Session::builder()?
+                .commit_from_file("model.onnx")?;
 
             Ok(())
         }
@@ -62,15 +71,15 @@ ort = { version = "2", features = [ "load-dynamic" ] }
         ```shell
         $ ORT_DYLIB_PATH=../onnxruntime-build/linux-x64/libonnxruntime.so ./mirai
         ```
+
+        <Callout type='info'>`ORT_DYLIB_PATH` is relative to the *executable*. Cargo examples and tests are compiled to a different directory than binary crates: `target/<profile>/examples` and `target/<profile>/deps` respectively. Keep this in mind if you're going to use relative paths.</Callout>
     </Tabs.Tab>
 </Tabs>
 
 </Steps>
 
-<Callout type='info'>`ORT_DYLIB_PATH` is relative to the executable. Cargo examples and tests are compiled to a different directory than binary crates: `target/<profile>/examples` and `target/<profile>/deps` respectively. Keep this in mind if you're going to use relative paths.</Callout>
-
 ### Compile-time dynamic linking
-For compile-time dynamic linking, you'll need to configure your environment in the exact same way as if you were [statically linking](#static-linking).
+For compile-time dynamic linking, you'll configure your environment in the exact same way as if you were [statically linking](#static-linking), with one extra step: **set the `ORT_PREFER_DYNAMIC_LINK` environment variable to `1`**.
 
 #### Runtime dylib loading
 Dylibs linked at compile-time need to be placed in a specific location for them to be found by the executable. For Windows, this is either somewhere on the `PATH`, or in the same folder as the executable. On macOS and Linux, they have to be placed somewhere in the `LD_LIBRARY_PATH`, or you can use rpath to configure the executable to search for dylibs in its parent folder. We've had the least issues with rpath, but YMMV.
@@ -78,7 +87,7 @@ Dylibs linked at compile-time need to be placed in a specific location for them 
 To configure rpath, you'll need to:
 <Steps>
 #### Enable rpath in Cargo.toml
-```toml filename="Cargo.toml" copy
+```toml filename="Cargo.toml"
 [profile.dev]
 rpath = true
 
@@ -91,7 +100,7 @@ rpath = true
 #### Add the executable origin to rpath
 <Tabs items={['Linux', 'macOS']}>
     <Tabs.Tab title="Linux">
-        ```toml filename="~/.cargo/config.toml" copy
+        ```toml filename="~/.cargo/config.toml"
         [target.x86_64-unknown-linux-gnu]
         rustflags = [ "-Clink-args=-Wl,-rpath,\\$ORIGIN" ]
 
@@ -99,7 +108,7 @@ rpath = true
         ```
     </Tabs.Tab>
     <Tabs.Tab title="macOS">
-        ```toml filename="~/.cargo/config.toml" copy
+        ```toml filename="~/.cargo/config.toml"
         [target.x86_64-apple-darwin]
         rustflags = [ "-Clink-args=-Wl,-rpath,@loader_path" ]
 

@@ -22,7 +22,7 @@ import { CRATE_VERSION } from '../constants';
 
 <img width="100%" src="/assets/sample-onnx-graph.png" alt="An example visual representation of an ONNX graph, showing how an input tensor flows through layers of convolution nodes." />
 
-Converting a neural network to a graph representation like ONNX opens the door to more optimizations and broader acceleration hardware support. ONNX Runtime can significantly improve the inference speed/latency of most models and enable acceleration with NVIDIA CUDA & TensorRT, Intel OpenVINO, Qualcomm QNN, Huawei CANN, and [much more](/perf/execution-providers).
+Converting a neural network to a graph representation like ONNX opens the door to more optimizations and broader accelerator support. ONNX Runtime can significantly improve the inference speed/latency of most models and enable hardware acceleration with NVIDIA CUDA & TensorRT, Intel OpenVINO, Qualcomm QNN, Huawei CANN, and [much more](/perf/execution-providers).
 
 <Ort/> is the Rust gateway to ONNX Runtime, allowing you to infer your ONNX models via an easy-to-use and ergonomic API. Many commercial, open-source, & research projects use <Ort/> in some pretty serious production scenarios to boost inference performance:
 - [**Bloop**](https://bloop.ai/)'s semantic code search feature is powered by <Ort/>.
@@ -39,7 +39,7 @@ Converting a neural network to a graph representation like ONNX opens the door t
 If you have a [supported platform](/setup/platforms) (and you probably do), installing <Ort/> couldn't be any simpler! Just add it to your Cargo dependencies:
 ```toml
 [dependencies]
-ort = "=2.0.0-rc.11"
+ort = "=2.0.0-rc.12"
 ```
 
 ### Convert your model
@@ -63,10 +63,10 @@ let mut model = Session::builder()?
 ```
 
 ### Perform inference
-Preprocess your inputs, then `run()` the session to perform inference.
+Prepare your inputs, then `run()` the session to perform inference.
 
 ```rust
-let outputs = model.run(ort::inputs!["image" => image]?)?;
+let outputs = model.run(ort::inputs!["image" => image])?;
 let predictions = outputs["output0"].try_extract_array::<f32>()?;
 ...
 ```

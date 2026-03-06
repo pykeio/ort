@@ -5,30 +5,33 @@ title: 'Troubleshooting: Logging'
 # Troubleshooting: Logging
 
 import { Tabs, Steps } from 'nextra/components';
+import Ort from '../../components/Ort';
 
-`ort` hooks into ONNX Runtime to route its logging messages through the [`tracing`](https://crates.io/crates/tracing) crate. These logging messages can often provide more helpful information about specific failure modes than `ort`'s error messages alone.
+With the `tracing` [feature flag](../setup/cargo-features) (which is enabled by default), <Ort/> hooks into ONNX Runtime to route its logging messages through the [`tracing`](https://crates.io/crates/tracing) crate. These logging messages can often provide more helpful information about specific failure modes than <Ort/>'s error messages alone.
 
-To enable logging for `ort`, you need to set up a `tracing` **subscriber** in your application, such as [`tracing-subscriber`](https://crates.io/crates/tracing-subscriber). `tracing-subscriber`'s `fmt` subscriber logs readable (and quite pretty!) messages to the console. To set it up:
+To see logs from <Ort/>'s `tracing` integration, you'll need to set up a **subscriber** in your application, such as [`tracing-subscriber`](https://crates.io/crates/tracing-subscriber). `tracing-subscriber`'s `fmt` subscriber logs readable (and quite pretty!) messages to the console. To set it up:
 
 <Steps>
 
 ### Add `tracing-subscriber` to your dependencies
-```toml Cargo.toml
+```toml filename="Cargo.toml"
 [dependencies]
 tracing-subscriber = { version = "0.3", features = [ "env-filter", "fmt" ] }
 ```
 
 ### Initialize the subscriber in the main function
-```rust main.rs
+```rust filename="main.rs"
 fn main() {
     tracing_subscriber::fmt::init();
+
+    // ... rest of code
 }
 ```
 
 ### Show debug messages from ort
-The environment variable `RUST_LOG` configures filters for crates that use `tracing`; see [`tracing_subcriber::EnvFilter`](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html) for more information.
+The environment variable `RUST_LOG` configures filters for crates that use `tracing`; see [`tracing_subcriber::EnvFilter`](https://docs.rs/tracing-subscriber/0.3.22/tracing_subscriber/filter/struct.EnvFilter.html) for more information.
 
-Set `RUST_LOG` to `ort=debug` to see all debug messages from `ort`. (You can also set it to `trace` for more verbosity, or `info`, `warn`, or `error` for less.)
+Set `RUST_LOG` to `ort=debug` to see all debug messages from <Ort/>. (You can also set it to `trace` for more verbosity, or `info`, `warn`, or `error` for less.)
 <Tabs items={['Windows (PowerShell)', 'Windows (Command Prompt)', 'Linux', 'macOS']}>
     <Tabs.Tab title="Windows (PowerShell)">
         ```powershell
@@ -55,3 +58,8 @@ Set `RUST_LOG` to `ort=debug` to see all debug messages from `ort`. (You can als
 </Tabs>
 
 </Steps>
+
+## Logging without `tracing`
+When the `tracing` feature is disabled, <Ort/> will instead forward log messages to `stderr`, so you'll still see important messages even when `default-features = false`.
+
+You can configure the verbosity level by setting the `ORT_LOG` environment variable to one of `fatal`, `error`, `warning`, `info`, or `verbose`. The default log level is `warning`.

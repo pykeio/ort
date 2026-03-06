@@ -42,11 +42,11 @@ export function trackSessionInit() {
 
 	hasInitializedSession = true;
 
-	const hostname = location.hostname;
+	const encodedHostname = encoder.encode(location.hostname);
 	return track(concat(
 		new Uint8Array([ 0x01 ]),
 		new Uint8Array([ 0x90, 0x63, 0x8A, 0xE7 ]),
-		asUint32(hostname.length),
-		encoder.encode(hostname)
+		asUint32(encodedHostname.byteLength),
+		encodedHostname
 	));
 }

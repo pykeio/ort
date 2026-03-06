@@ -66,7 +66,9 @@ pub mod armnn;
 pub use self::armnn::ArmNN;
 pub mod migraphx;
 pub use self::migraphx::MIGraphX;
+#[cfg(feature = "api-18")]
 pub mod vitis;
+#[cfg(feature = "api-18")]
 pub use self::vitis::Vitis;
 pub mod rknpu;
 pub use self::rknpu::RKNPU;
@@ -479,6 +481,7 @@ pub use self::tensorrt::TensorRT as TensorRTExecutionProvider;
 #[deprecated = "import `ort::ep::TVM` instead"]
 #[doc(hidden)]
 pub use self::tvm::TVM as TVMExecutionProvider;
+#[cfg(feature = "api-18")]
 #[deprecated = "import `ort::ep::Vitis` instead"]
 #[doc(hidden)]
 pub use self::vitis::Vitis as VitisAIExecutionProvider;

@@ -9,7 +9,23 @@ fn get_dml_api() -> Result<&'static ort_sys::OrtDmlApi> {
 	DML_API.get_or_try_init(|| {
 		let mut ptr: *const ort_sys::c_void = ptr::null();
 		ortsys![unsafe GetExecutionProviderApi(c"DML".as_ptr(), 0, &mut ptr)?];
-		assert!(!ptr.is_null());
+		if ptr.is_null() {
+			return Err(crate::Error::new("DirectML is not available"));
+		}
+		// ORT 1.24+ returns a non-null pointer to a zeroed OrtDmlApi when
+		// onnxruntime_providers_dml.dll is absent rather than returning null.
+		// Verify the first function pointer is populated before caching the table,
+		// since calling a null fn pointer is undefined behaviour and causes a crash.
+		// SAFETY: `ptr` is non-null; `OrtDmlApi` is #[repr(C)] so its first field
+		// (`SessionOptionsAppendExecutionProvider_DML`) is at offset 0 and has the
+		// same size and alignment as a pointer on all supported platforms.
+		let first_fn = unsafe { *ptr.cast::<*const ort_sys::c_void>() };
+		if first_fn.is_null() {
+			return Err(crate::Error::new(
+				"DirectML is not available: GetExecutionProviderApi returned an empty OrtDmlApi \
+				 function table; ensure onnxruntime_providers_dml.dll is present alongside onnxruntime.dll"
+			));
+		}
 		Ok(unsafe { (*ptr.cast::<ort_sys::OrtDmlApi>()).clone() })
 	})
 }

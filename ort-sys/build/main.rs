@@ -94,7 +94,7 @@ cargo::error= | Alternatively, try a different backend like `ort-tract`; see htt
 			}
 		};
 
-		let bin_extract_dir = internal::dirs::cache_dir()
+		let mut bin_extract_dir = internal::dirs::cache_dir()
 			.expect("could not determine cache directory")
 			.join("dfbin")
 			.join(target)
@@ -115,6 +115,7 @@ cargo::error= | Alternatively, try a different backend like `ort-tract`; see htt
 			let mut should_rename = true;
 			if fs::create_dir_all(&temp_extract_dir).is_err() {
 				temp_extract_dir = env::var("OUT_DIR").unwrap().into();
+				bin_extract_dir = temp_extract_dir.clone();
 				should_rename = false;
 			}
 			if let Err(e) = self::download::extract_tgz(&mut verified_reader, &temp_extract_dir) {

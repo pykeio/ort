@@ -55,7 +55,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 			.and_then(|(ptr, shape)| Ok(unsafe { ndarray::ArrayView::from_shape_ptr(shape.to_ixdyn(), data_ptr(ptr)?) }))
 	}
 
-	/// Attempt to extract the scalar from a tensor of type `T`.
+	/// Attempt to extract the singular value from a scalar tensor of type `T`.
 	///
 	/// ```
 	/// # use std::sync::Arc;
@@ -71,7 +71,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// # Errors
 	/// May return an error if:
-	/// - The tensor is not 0-dimensional.
+	/// - The tensor has more or less than 1 element.
 	/// - The provided type `T` does not match the tensor's element type.
 	/// - This is a [`DynValue`], and the value is not actually a tensor.
 	/// - The tensor's data is not allocated in CPU memory.
@@ -79,10 +79,10 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_scalar<T: PrimitiveTensorElementType + Copy>(&self) -> Result<T> {
 		extract_tensor(self, T::into_tensor_element_type()).and_then(|(ptr, shape)| {
-			if !shape.is_empty() {
+			if shape.num_elements() != 1 {
 				return Err(Error::new_with_code(
 					ErrorCode::InvalidArgument,
-					format!("Cannot extract scalar {} from a tensor of dimensionality {}", T::into_tensor_element_type(), shape.len())
+					format!("Cannot extract scalar {} from a tensor with {} elements", T::into_tensor_element_type(), shape.num_elements())
 				));
 			}
 

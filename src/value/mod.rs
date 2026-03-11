@@ -337,7 +337,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 		&self.inner.dtype
 	}
 
-	/// Construct a [`Value`] from a C++ [`ort_sys::OrtValue`] pointer.
+	/// Construct a [`Value`] from a C++ [`ort_sys::OrtValue`] pointer. Takes ownership of `ptr`.
 	///
 	/// If the value belongs to a session (i.e. if it is the result of an inference run), you must provide the
 	/// [`SharedSessionInner`] (acquired from [`Session::inner`](crate::session::Session::inner)). This ensures the

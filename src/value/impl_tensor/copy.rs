@@ -4,13 +4,12 @@
 use alloc::{format, string::ToString};
 use core::ops::{Deref, DerefMut};
 
-use super::DefiniteTensorValueTypeMarker;
 use crate::{
 	Error, OnceLock, Result, ep,
 	memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
 	session::{IoBinding, NoSelectedOutputs, RunOptions, Session, builder::GraphOptimizationLevel},
 	util::{MiniMap, Mutex, MutexGuard},
-	value::Value
+	value::{TensorValueTypeMarker, Value}
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,7 +65,7 @@ fn ep_for_device(device: AllocationDevice, device_id: i32) -> Result<ep::Executi
 	})
 }
 
-impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
+impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// Copies the contents of this tensor to another device, returning the newly created tensor value.
 	///
 	/// ```
@@ -235,7 +234,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 }
 
 #[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
-impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Clone for Value<Type> {
+impl<Type: TensorValueTypeMarker + ?Sized> Clone for Value<Type> {
 	/// Creates a copy of this tensor and its data on the same device it resides on.
 	///
 	/// ```

@@ -328,12 +328,13 @@ macro_rules! impl_to_shape {
 				.iter()
 				.enumerate()
 				.map(|(i, c)| {
-					if *c >= 1 {
+					#[allow(unused_comparisons)]
+					if *c >= 0 {
 						Ok(*c as i64)
 					} else {
 						Err(Error::new_with_code(
 							ErrorCode::InvalidArgument,
-							format!("Invalid dimension #{}; all dimensions must be >= 1 when creating a tensor from raw data", i + 1)
+							format!("Invalid dimension #{}; all dimensions must be >= 0 when creating a tensor from raw data", i + 1)
 						))
 					}
 				})

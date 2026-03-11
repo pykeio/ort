@@ -15,6 +15,8 @@ use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use crate::util::value_to_string;
+#[macro_use]
+pub(crate) mod private;
 
 mod api;
 mod binding;
@@ -23,8 +25,6 @@ mod memory;
 mod session;
 mod tensor;
 mod util;
-#[macro_use]
-pub(crate) mod private;
 
 pub use self::{
 	session::sync_outputs,

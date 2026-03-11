@@ -226,7 +226,7 @@ pub enum SyncDirection {
 }
 
 pub trait ValueExt {
-	crate::private_trait!();
+	private_trait!();
 
 	/// Synchronize data between Rust & the runtime.
 	///
@@ -236,7 +236,7 @@ pub trait ValueExt {
 }
 
 impl<T: ValueTypeMarker> ValueExt for ort::value::Value<T> {
-	crate::private_impl!();
+	private_impl!();
 
 	async fn sync(&mut self, direction: SyncDirection) -> crate::Result<()> {
 		let ptr = self.ptr_mut();

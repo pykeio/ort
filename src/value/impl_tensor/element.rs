@@ -63,7 +63,7 @@ impl TensorElementType {
 			TensorElementType::Int64 | TensorElementType::Uint64 => container_capacity * 8,
 			TensorElementType::String => 0, // unsure what to do about this...
 			TensorElementType::Float8E4M3FN | TensorElementType::Float8E4M3FNUZ | TensorElementType::Float8E5M2 | TensorElementType::Float8E5M2FNUZ => {
-				container_capacity * 4
+				container_capacity
 			}
 			TensorElementType::Float16 | TensorElementType::Bfloat16 => container_capacity * 2,
 			TensorElementType::Float32 => container_capacity * 4,

@@ -344,7 +344,7 @@ macro_rules! impl_to_shape {
 					Err(Error::new_with_code(
 						ErrorCode::InvalidArgument,
 						format!(
-							"Cannot create a tensor from raw data; shape {:?} ({} elements) is larger than the length of the data provided ({} elements)",
+							"Cannot create a tensor from raw data; shape {:?} ({} elements) is different from the length of the data provided ({} elements)",
 							v,
 							v.num_elements(),
 							expected_size

@@ -233,3 +233,20 @@ impl Drop for CompiledModel {
 		crate::logging::drop!(CompiledModel, self.ptr);
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use crate::{compiler::ModelCompiler, session::builder::SessionBuilder};
+
+	#[test]
+	fn test_compile_in_memory() -> crate::Result<()> {
+		let compiled_model = ModelCompiler::new(SessionBuilder::new()?)?
+			.with_embed_ep_context()?
+			.with_model_from_file("tests/data/upsample.onnx")?
+			.compile_to_buffer()?;
+
+		let _model = SessionBuilder::new()?.commit_from_memory(&compiled_model)?;
+
+		Ok(())
+	}
+}

@@ -87,15 +87,12 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 	pub fn try_extract_key_values<K: IntoTensorElementType + Clone + Hash + Eq, V: PrimitiveTensorElementType + Clone>(&self) -> Result<Vec<(K, V)>> {
 		match self.dtype() {
 			ValueType::Map { key, value } => {
-				let k_type = K::into_tensor_element_type();
-				if k_type != *key {
-					return Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot extract Map<{:?}, _> (value has K type {:?})", k_type, key)));
-				}
-				let v_type = V::into_tensor_element_type();
-				if v_type != *value {
+				let want_key = K::into_tensor_element_type();
+				let want_value = V::into_tensor_element_type();
+				if want_key != *key || want_value != *value {
 					return Err(Error::new_with_code(
 						ErrorCode::InvalidArgument,
-						format!("Cannot extract Map<{}, {}> from Map<{}, {}>", K::into_tensor_element_type(), V::into_tensor_element_type(), k_type, v_type)
+						format!("Cannot extract Map<{want_key}, {want_value}> from Map<{key}, {value}>")
 					));
 				}
 
@@ -129,13 +126,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 							} else {
 								return Err(Error::new_with_code(
 									ErrorCode::InvalidArgument,
-									format!(
-										"Cannot extract Map<{}, {}> from Map<{}, {}>",
-										K::into_tensor_element_type(),
-										V::into_tensor_element_type(),
-										k_type,
-										v_type
-									)
+									format!("Cannot extract Map<{want_key}, {want_value}> from Map<{ty}, {value}>",)
 								));
 							}
 						}
@@ -291,6 +282,10 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: PrimitiveTensorEle
 	pub fn extract_map(&self) -> HashMap<K, V> {
 		self.try_extract_map().expect("Failed to extract map")
 	}
+
+	pub fn iter(&self) -> impl ExactSizeIterator<Item = (K, V)> {
+		self.extract_key_values().into_iter()
+	}
 }
 
 impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementType + Debug + Clone> Value<MapValueType<K, V>> {
@@ -316,5 +311,14 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: IntoTensorElementT
 			inner: Arc::clone(&self.inner),
 			_markers: PhantomData
 		})
+	}
+}
+
+impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: PrimitiveTensorElementType + Debug + Clone> IntoIterator for Value<MapValueType<K, V>> {
+	type Item = (K, V);
+	type IntoIter = alloc::vec::IntoIter<(K, V)>;
+
+	fn into_iter(self) -> Self::IntoIter {
+		self.extract_key_values().into_iter()
 	}
 }

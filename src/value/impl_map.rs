@@ -322,3 +322,40 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq, V: PrimitiveTensorEle
 		self.extract_key_values().into_iter()
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use std::collections::HashMap;
+
+	use crate::value::Map;
+
+	#[test]
+	fn test_map_bad_extract() -> crate::Result<()> {
+		let keys = [String::from("1"), String::from("a"), String::from("3"), String::from("x"), String::from("abc")];
+		let values = [1.0f32, -3.0, 102.0, 0.009, 52.38124];
+
+		let map = Map::<String, f32>::new(keys.iter().cloned().zip(values.iter().cloned()))?;
+		assert!(map.try_extract_map::<u64, f32>().is_err());
+		assert!(map.try_extract_map::<String, u32>().is_err());
+		assert!(map.try_extract_map::<String, f32>().is_ok());
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_map_iter() -> crate::Result<()> {
+		let keys = [String::from("1"), String::from("a"), String::from("3"), String::from("x"), String::from("abc")];
+		let values = [1.0f32, -3.0, 102.0, 0.009, 52.38124];
+
+		let hash_map: HashMap<String, f32> = HashMap::from_iter(keys.iter().cloned().zip(values.iter().cloned()));
+		let map = Map::<String, f32>::new(keys.iter().cloned().zip(values.iter().cloned()))?;
+		for (key, value) in map.iter() {
+			assert_eq!(hash_map.get(&key), Some(&value));
+		}
+		for (key, value) in map {
+			assert_eq!(hash_map.get(&key), Some(&value));
+		}
+
+		Ok(())
+	}
+}

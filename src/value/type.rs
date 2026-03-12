@@ -461,14 +461,65 @@ mod tests {
 
 	#[test]
 	#[cfg(feature = "api-22")]
+	fn test_tensor_to_from_type_info() -> crate::Result<()> {
+		let ty = ValueType::Tensor {
+			ty: TensorElementType::Float16,
+			shape: Shape::new([1, 3, 224, 224]),
+			dimension_symbols: SymbolicDimensions::new([String::from("test1"), String::default(), String::default(), String::default()])
+		};
+		let ty_ptr = NonNull::new(ty.to_type_info()?).expect("");
+		let ty2 = unsafe { ValueType::from_type_info(ty_ptr) };
+		assert_eq!(ty, ty2);
+		assert!(ty2.is_tensor());
+		assert_eq!(format!("{ty2}"), "Tensor<f16>(1, 3, 224, 224)".to_string());
+
+		Ok(())
+	}
+
+	#[test]
+	#[cfg(feature = "api-22")]
 	fn test_map_to_from_type_info() -> crate::Result<()> {
 		let ty = ValueType::Map {
 			key: TensorElementType::Float32,
 			value: TensorElementType::String
 		};
 		let ty_ptr = NonNull::new(ty.to_type_info()?).expect("");
-		let ty_d = unsafe { ValueType::from_type_info(ty_ptr) };
-		assert_eq!(ty, ty_d);
+		let ty2 = unsafe { ValueType::from_type_info(ty_ptr) };
+		assert_eq!(ty, ty2);
+		assert!(ty2.is_map());
+		assert_eq!(format!("{ty2}"), "Map<f32, String>".to_string());
+
+		Ok(())
+	}
+
+	#[test]
+	#[cfg(feature = "api-22")]
+	fn test_sequence_to_from_type_info() -> crate::Result<()> {
+		let ty = ValueType::Sequence(Box::new(ValueType::Tensor {
+			ty: TensorElementType::Float16,
+			shape: Shape::new([1, 3, 224, 224]),
+			dimension_symbols: SymbolicDimensions::new([String::from("test1"), String::default(), String::default(), String::default()])
+		}));
+		let ty_ptr = NonNull::new(ty.to_type_info()?).expect("");
+		let ty2 = unsafe { ValueType::from_type_info(ty_ptr) };
+		assert_eq!(ty, ty2);
+		assert!(ty2.is_sequence());
+		assert_eq!(format!("{ty2}"), "Sequence<Tensor<f16>(1, 3, 224, 224)>".to_string());
+
+		Ok(())
+	}
+
+	#[test]
+	#[cfg(feature = "api-22")]
+	fn test_all_type_info() -> crate::Result<()> {
+		let ty = ValueType::Optional(Box::new(ValueType::Sequence(Box::new(ValueType::Tensor {
+			ty: TensorElementType::Float16,
+			shape: Shape::new([1, 3, 224, 224]),
+			dimension_symbols: SymbolicDimensions::empty(4)
+		}))));
+		let ty_ptr = NonNull::new(ty.to_type_info()?).expect("");
+		let ty2 = unsafe { ValueType::from_type_info(ty_ptr) };
+		assert_eq!(ty, ty2);
 
 		Ok(())
 	}

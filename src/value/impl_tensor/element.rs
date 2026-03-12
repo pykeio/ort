@@ -256,3 +256,87 @@ impl Utf8Data for Arc<str> {
 		self.as_bytes()
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use core::ptr::NonNull;
+
+	use super::TensorElementType;
+	use crate::value::{Shape, SymbolicDimensions, TensorRef, TensorValueType, ValueType, r#type::extract_data_type_from_tensor_info};
+
+	#[test]
+	fn test_value_types() -> crate::Result<()> {
+		use TensorElementType::*;
+		for ty in [
+			Bool,
+			Float8E4M3FN,
+			Float8E4M3FNUZ,
+			Float8E5M2,
+			Float8E5M2FNUZ,
+			Bfloat16,
+			Float16,
+			Float32,
+			Float64,
+			Int8,
+			Int16,
+			Int32,
+			Int64,
+			Uint8,
+			Uint16,
+			Uint32,
+			Uint64,
+			Complex64,
+			Complex128,
+			Undefined,
+			String
+		] {
+			let value_type = ValueType::Tensor {
+				ty,
+				shape: Shape::default(),
+				dimension_symbols: SymbolicDimensions::empty(0)
+			};
+			assert_eq!(unsafe { extract_data_type_from_tensor_info(NonNull::new(value_type.to_tensor_type_info().expect("")).expect("")) }, value_type);
+		}
+		Ok(())
+	}
+
+	#[test]
+	fn test_create_extract_types() -> crate::Result<()> {
+		use TensorElementType::*;
+
+		macro_rules! do_test {
+			($name:ident, $ty:ty, $value:expr) => {{
+				let data: [$ty; 5] = [$value; 5];
+				let value = TensorRef::<$ty>::from_array_view((vec![5i64], data.as_slice()))?;
+				assert_eq!(value.dtype().tensor_type(), Some($name));
+				let value = value.into_dyn().downcast::<TensorValueType<$ty>>()?;
+				assert_eq!(value.dtype().tensor_type(), Some($name));
+				assert_eq!(value.extract_tensor().1, &data);
+			}};
+		}
+
+		do_test!(Float32, f32, 2.7f32);
+		do_test!(Float64, f64, -2.10378189023f64);
+		do_test!(Uint8, u8, 91);
+		do_test!(Int8, i8, 67);
+		do_test!(Uint16, u16, 1738);
+		do_test!(Int16, i16, -22777);
+		do_test!(Uint32, u32, 9218);
+		do_test!(Int32, i32, -3790123);
+		do_test!(Uint64, u64, 231187912839);
+		do_test!(Int64, i64, i32::MAX as i64 + 1);
+		do_test!(Bool, bool, true);
+		#[cfg(feature = "half")]
+		{
+			do_test!(Float16, half::f16, half::f16::from_f32(1.037813));
+			do_test!(Bfloat16, half::bf16, half::bf16::from_f32(39.18381));
+		}
+		#[cfg(feature = "num-complex")]
+		{
+			do_test!(Complex64, num_complex::Complex32, num_complex::Complex32::new(120.192, -31.748));
+			do_test!(Complex128, num_complex::Complex64, num_complex::Complex64::new(391.2039, 8493.0));
+		}
+
+		Ok(())
+	}
+}

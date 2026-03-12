@@ -154,15 +154,11 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized> Value<SequenceValu
 	}
 
 	#[inline]
+	#[allow(clippy::len_without_is_empty)] // Sequences cannot be empty.
 	pub fn len(&self) -> usize {
 		let mut len = 0;
 		ortsys![unsafe GetValueCount(self.ptr(), &mut len).expect("infallible")];
 		len
-	}
-
-	#[inline]
-	pub fn is_empty(&self) -> bool {
-		self.len() == 0
 	}
 
 	pub fn get(&self, index: usize) -> Option<Value<T>> {
@@ -233,5 +229,31 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized> IntoIterator for V
 
 	fn into_iter(self) -> Self::IntoIter {
 		IntoIter { value: self, i: 0 }
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::value::{Sequence, Shape, Tensor};
+
+	#[test]
+	fn test_sequence_basic() -> crate::Result<()> {
+		let tensor1 = Tensor::from_array((Shape::new([5]), vec![1i32, 2, 3, 4, 5]))?;
+		let tensor2 = Tensor::from_array((Shape::new([5]), vec![5i32, 4, 3, 2, 1]))?;
+		let tensor3 = Tensor::from_array((Shape::new([5]), vec![10i32, 2, 30, 4, 50]))?;
+		let tensors = [tensor1, tensor2, tensor3];
+
+		let seq = Sequence::new(tensors.clone())?;
+		assert_eq!(seq.len(), 3);
+		assert_eq!(seq.iter().len(), 3);
+
+		for (i, tensor) in seq.iter().enumerate() {
+			assert_eq!(tensors[i].extract_tensor(), tensor.extract_tensor());
+		}
+		for (i, tensor) in seq.into_iter().enumerate() {
+			assert_eq!(tensors[i].extract_tensor(), tensor.extract_tensor());
+		}
+
+		Ok(())
 	}
 }

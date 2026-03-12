@@ -352,12 +352,11 @@ mod tests {
 
 	use super::{Shape, SymbolicDimensions, Tensor, TensorElementType};
 	use crate::{
-		memory::Allocator,
-		value::{TensorRef, ValueType}
+		memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
+		value::{TensorRef, TensorRefMut, ValueType}
 	};
 
 	#[test]
-	#[cfg(feature = "ndarray")]
 	fn test_tensor_value() -> crate::Result<()> {
 		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
 		let value = Tensor::from_array(Array1::from_vec(v.clone()))?;
@@ -374,6 +373,50 @@ mod tests {
 		let (shape, data) = value.extract_tensor();
 		assert_eq!(&**shape, [v.len() as i64]);
 		assert_eq!(data, &v);
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_tensor_from_bad_shapes() -> crate::Result<()> {
+		let v: Vec<f32> = vec![1., 2., 3., 4., 5.];
+
+		assert!(Tensor::from_array((Vec::<i64>::new(), vec![0.0])).is_ok());
+
+		assert!(TensorRef::from_array_view((vec![4i64], &*v)).is_err());
+		assert!(TensorRef::from_array_view((vec![67i64], &*v)).is_err());
+		assert!(TensorRef::from_array_view((vec![1i64, 5, -1], &*v)).is_err());
+		assert!(TensorRef::from_array_view(((), [0.0f32, 1.0].as_slice())).is_err());
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_tensor_from_raw() -> crate::Result<()> {
+		let mut v: Vec<f32> = vec![1., 2., 3., 4., 5.];
+
+		let value = unsafe {
+			TensorRefMut::<f32>::from_raw(
+				MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?,
+				v.as_mut_ptr().cast(),
+				Shape::new(vec![5i64])
+			)?
+		};
+		assert_eq!(value.dtype().tensor_type(), Some(TensorElementType::Float32));
+		assert_eq!(
+			value.dtype(),
+			&ValueType::Tensor {
+				ty: TensorElementType::Float32,
+				shape: Shape::new([v.len() as i64]),
+				dimension_symbols: SymbolicDimensions::empty(1)
+			}
+		);
+
+		let (shape, data) = value.extract_tensor();
+		assert_eq!(&**shape, [v.len() as i64]);
+		assert_eq!(data, &v);
+
+		assert!(value.try_upgrade().is_err());
 
 		Ok(())
 	}

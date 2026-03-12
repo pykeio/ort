@@ -421,3 +421,31 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 		self.try_extract_tensor_mut().expect("Failed to extract tensor")
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use crate::{
+		memory::Allocator,
+		value::{Shape, Tensor}
+	};
+
+	#[test]
+	fn test_extract_scalar() -> crate::Result<()> {
+		let tensor = Tensor::<f32>::new(&Allocator::default(), Shape::new([2i64]))?;
+		assert!(tensor.try_extract_scalar::<f32>().is_err());
+
+		let tensor = Tensor::<f32>::new(&Allocator::default(), Shape::new([1i64]))?;
+		assert!(tensor.try_extract_scalar::<f32>().is_ok());
+		let tensor = Tensor::<f32>::new(&Allocator::default(), Shape::default())?;
+		assert!(tensor.try_extract_scalar::<f32>().is_ok());
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_bad_extract() -> crate::Result<()> {
+		let tensor = Tensor::<f32>::new(&Allocator::default(), Shape::new([5i64]))?;
+		assert!(tensor.try_extract_scalar::<f64>().is_err());
+		Ok(())
+	}
+}

@@ -343,7 +343,10 @@ impl DerefMut for IdentitySessionHandle {
 
 #[cfg(test)]
 mod tests {
-	use crate::value::Tensor;
+	use crate::{
+		memory::{AllocationDevice, Allocator},
+		value::Tensor
+	};
 
 	#[test]
 	fn test_clone_tensor() -> crate::Result<()> {
@@ -354,10 +357,32 @@ mod tests {
 	}
 
 	#[test]
+	fn test_tensor_to_cpu() -> crate::Result<()> {
+		let tensor = Tensor::<f32>::from_array(([1, 5], vec![2.167892, 333., 1.0, -0.0, f32::EPSILON]))?;
+
+		let tensor2 = tensor.to_async(AllocationDevice::CPU, 0)?;
+		let tensor3 = tensor2.to(AllocationDevice::CPU, 0)?;
+		assert_eq!(tensor.extract_tensor(), tensor3.extract_tensor());
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_bad_copy_into() -> crate::Result<()> {
+		let tensor = Tensor::<f32>::from_array(([1, 5], vec![2.167892, 333., 1.0, -0.0, f32::EPSILON]))?;
+
+		let mut target_bad_shape = Tensor::<f32>::new(&Allocator::default(), [3i64])?;
+		assert!(tensor.copy_into(&mut target_bad_shape).is_err());
+
+		let mut target_f64 = Tensor::<f64>::new(&Allocator::default(), [1i64, 5])?.into_dyn();
+		assert!(tensor.into_dyn().copy_into(&mut target_f64).is_err());
+
+		Ok(())
+	}
+
+	#[test]
 	#[cfg(feature = "cuda")]
 	fn test_copy_cuda() -> crate::Result<()> {
-		use crate::memory::AllocationDevice;
-
 		let tensor = Tensor::<f32>::from_array(([1, 5], vec![2.167892, 333., 1.0, -0.0, f32::EPSILON]))?;
 
 		let cuda_tensor = tensor.to(AllocationDevice::CUDA, 0)?;
@@ -376,8 +401,6 @@ mod tests {
 	#[test]
 	#[cfg(feature = "cuda")]
 	fn test_copy_cuda_async() -> crate::Result<()> {
-		use crate::memory::AllocationDevice;
-
 		let tensor = Tensor::<f32>::from_array(([1, 5], vec![2.167892, 333., 1.0, -0.0, f32::EPSILON]))?;
 
 		let cuda_tensor = tensor.to_async(AllocationDevice::CUDA, 0)?;
@@ -392,7 +415,7 @@ mod tests {
 	fn test_copy_into_cuda() -> crate::Result<()> {
 		use crate::{
 			ep,
-			memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
+			memory::{AllocatorType, MemoryInfo, MemoryType},
 			session::Session
 		};
 
@@ -416,7 +439,7 @@ mod tests {
 	fn test_copy_into_async_cuda() -> crate::Result<()> {
 		use crate::{
 			ep,
-			memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
+			memory::{AllocatorType, MemoryInfo, MemoryType},
 			session::Session
 		};
 

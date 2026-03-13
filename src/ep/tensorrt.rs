@@ -51,6 +51,12 @@ impl TensorRT {
 	}
 
 	#[must_use]
+	pub fn with_bf16(mut self, enable: bool) -> Self {
+		self.options.set("trt_bf16_enable", if enable { "1" } else { "0" });
+		self
+	}
+
+	#[must_use]
 	pub fn with_int8(mut self, enable: bool) -> Self {
 		self.options.set("trt_int8_enable", if enable { "1" } else { "0" });
 		self

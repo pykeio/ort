@@ -209,7 +209,7 @@ impl Session {
 	/// # }
 	/// ```
 	#[cfg(not(target_arch = "wasm32"))]
-	pub fn run<'s, 'i, 'v: 'i, const N: usize>(&'s mut self, input_values: impl Into<SessionInputs<'i, 'v, N>>) -> Result<SessionOutputs<'s>> {
+	pub fn run<'s, 'i, 'v: 'i, const N: usize>(&'s self, input_values: impl Into<SessionInputs<'i, 'v, N>>) -> Result<SessionOutputs<'s>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
 				self.run_inner(self.inputs.iter().map(|input| input.name()).collect(), input_values.iter().collect(), None)
@@ -251,7 +251,7 @@ impl Session {
 	/// ```
 	#[cfg(not(target_arch = "wasm32"))]
 	pub fn run_with_options<'r, 's: 'r, 'i, 'v: 'i, O: SelectedOutputMarker, const N: usize>(
-		&'s mut self,
+		&'s self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>>,
 		run_options: &'r RunOptions<O>
 	) -> Result<SessionOutputs<'r>> {
@@ -337,13 +337,13 @@ impl Session {
 	}
 
 	#[cfg(not(target_arch = "wasm32"))]
-	pub fn run_binding<'b, 's: 'b>(&'s mut self, binding: &'b IoBinding) -> Result<SessionOutputs<'b>> {
+	pub fn run_binding<'b, 's: 'b>(&'s self, binding: &'b IoBinding) -> Result<SessionOutputs<'b>> {
 		self.run_binding_inner(binding, None)
 	}
 
 	#[cfg(not(target_arch = "wasm32"))]
 	pub fn run_binding_with_options<'r, 'b, 's: 'b>(
-		&'s mut self,
+		&'s self,
 		binding: &'b IoBinding,
 		run_options: &'r RunOptions<NoSelectedOutputs>
 	) -> Result<SessionOutputs<'b>> {
@@ -405,7 +405,7 @@ impl Session {
 	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn run_async<'r, 's: 'r, 'i, 'v: 'i + 's, O: SelectedOutputMarker, const N: usize>(
-		&'s mut self,
+		&'s self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>>,
 		run_options: &'r RunOptions<O>
 	) -> Result<InferenceFut<'r, 'v>> {

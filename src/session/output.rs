@@ -406,3 +406,6 @@ impl<'r> Iterator for IntoIter<'r> {
 		(self.effective_len, Some(self.effective_len))
 	}
 }
+
+impl ExactSizeIterator for IntoIter<'_> {}
+impl FusedIterator for IntoIter<'_> {}

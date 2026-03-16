@@ -1,5 +1,7 @@
 ignore:
   - "src/ep"
+  - "src/session/builder/impl_config_keys.rs"
+  - "src/session/builder/impl_options.rs"
   - "ort-sys"
   - "backends"
 comment: false

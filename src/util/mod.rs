@@ -8,15 +8,25 @@ use core::{
 
 use crate::{Result, memory::Allocator};
 
-#[cfg(feature = "std")]
-#[path = "mutex_std.rs"]
-mod mutex;
+#[cfg(any(test, not(feature = "std")))]
+mod mutex_spin;
+#[cfg(any(test, feature = "std"))]
+mod mutex_std;
+#[cfg(any(test, not(feature = "std")))]
+mod once_lock_spin;
+#[cfg(any(test, feature = "std"))]
+mod once_lock_std;
+
 #[cfg(not(feature = "std"))]
-#[path = "mutex_spin.rs"]
-mod mutex;
+use mutex_spin as mutex;
+#[cfg(feature = "std")]
+use mutex_std as mutex;
+#[cfg(not(feature = "std"))]
+use once_lock_spin as once_lock;
+#[cfg(feature = "std")]
+use once_lock_std as once_lock;
 
 mod map;
-mod once_lock;
 mod stack;
 pub(crate) use self::{
 	map::MiniMap,
@@ -180,40 +190,10 @@ impl<'a, 'p> Drop for AllocatedString<'a, 'p> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-	use alloc::{ffi::CString, sync::Arc};
+	use alloc::ffi::CString;
 	use core::ffi::CStr;
-	use std::thread;
 
-	use super::{MiniMap, Mutex, char_p_to_string, run_on_drop, with_cstr, with_cstr_ptr_array};
-
-	#[test]
-	fn test_mutex_sanity() {
-		let mutex = Mutex::new(());
-		for _ in 0..4 {
-			drop(mutex.lock());
-		}
-	}
-
-	#[test]
-	fn test_mutex_threaded() {
-		let mutex = Arc::new(Mutex::new(0usize));
-		let threads = (0..4)
-			.map(|_| {
-				let mutex = Arc::clone(&mutex);
-				thread::spawn(move || {
-					for _ in 0..1000 {
-						*mutex.lock() += 1;
-					}
-				})
-			})
-			.collect::<Vec<_>>();
-
-		for t in threads {
-			t.join().unwrap();
-		}
-
-		assert_eq!(*mutex.lock(), 4000);
-	}
+	use super::{MiniMap, char_p_to_string, run_on_drop, with_cstr, with_cstr_ptr_array};
 
 	#[test]
 	fn test_run_on_drop() {

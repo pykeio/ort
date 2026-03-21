@@ -269,3 +269,27 @@ impl Drop for SessionOptionsPointer {
 		crate::logging::drop!(SessionBuilder, self.0.as_ptr());
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use alloc::sync::Arc;
+	use core::sync::atomic::{AtomicBool, Ordering};
+
+	use super::SessionBuilder;
+
+	#[test]
+	fn test_session_builder_clone() -> crate::Result<()> {
+		let was_called = Arc::new(AtomicBool::new(false));
+		let builder = SessionBuilder::new()?.with_logger(Arc::new({
+			let was_called = Arc::clone(&was_called);
+			move |_level: crate::logging::LogLevel, _category: &str, _id: &str, _code_location: &str, _message: &str| {
+				was_called.store(true, Ordering::Release);
+			}
+		}))?;
+		let mut builder2 = builder.clone();
+		drop(builder);
+		let _session = builder2.commit_from_file("tests/data/upsample.onnx")?;
+		assert!(was_called.load(Ordering::Acquire));
+		Ok(())
+	}
+}

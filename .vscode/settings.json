@@ -9,6 +9,7 @@
 	"rust-analyzer.cachePriming.enable": true,
 	"rust-analyzer.diagnostics.experimental.enable": true,
 	"rust-analyzer.showUnlinkedFileNotification": false,
+	"rust-analyzer.imports.preferNoStd": true,
 	"deno.enablePaths": [
 		"tools/api-coverage.ts",
 		"tools/training-api-coverage.ts"

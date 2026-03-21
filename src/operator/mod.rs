@@ -94,7 +94,9 @@ impl ShapeInferenceContext {
 		})?;
 
 		let mut len = 0;
-		ortsys![unsafe ReadOpAttr(attr, T::attr_type(), ptr::null_mut(), 0, &mut len)?];
+		// this will always error since the length we pass (0) is too small to hold anything; we don't care about value yet, we
+		// just want the real length which will end up in the `len` variable
+		let _ = ortsys![@ort: unsafe ReadOpAttr(attr, T::attr_type(), ptr::null_mut(), 0, &mut len) as Result];
 
 		unsafe { T::from_op_attr(attr, len) }
 	}

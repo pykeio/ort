@@ -8,7 +8,7 @@
 
 | 💖 Sponsored by | |
 |:------------:|---|
-| <a href="https://rime.ai/" target="_blank"><img src="https://cdn.pyke.io/0/pyke:ort-rs/docs@0.0.0/sponsor-identity/rime.svg?_0" alt="Rime.ai"/></a> | Authentic AI voice models for enterprise. |
+| <a href="https://rime.ai/?utm_source=pykeio&utm_campaign=ort&utm_medium=readme" target="_blank"><img src="https://cdn.pyke.io/0/pyke:ort-rs/docs@0.0.0/sponsor-identity/rime.svg?_0" alt="Rime.ai"/></a> | Authentic AI voice models for enterprise. |
 
 </div>
 

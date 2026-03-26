@@ -677,7 +677,7 @@ pub fn init() -> EnvironmentBuilder {
 ///
 /// ```no_run
 /// # use ort::ep;
-/// # fn main() -> ort::Result<()> {
+/// # fn main() -> Result<(), ort::LoadDynamicError> {
 /// let lib_path = std::env::current_exe().unwrap().parent().unwrap().join("lib");
 /// ort::init_from(lib_path.join("onnxruntime.dll"))?
 /// 	.with_execution_providers([ep::CUDA::default().build()])
@@ -694,7 +694,7 @@ pub fn init() -> EnvironmentBuilder {
 #[cfg(all(feature = "load-dynamic", not(target_arch = "wasm32")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "load-dynamic")))]
 #[must_use = "commit() must be called in order for the environment to take effect"]
-pub fn init_from<P: AsRef<std::path::Path>>(path: P) -> Result<EnvironmentBuilder> {
-	crate::load_dylib_from_path(path.as_ref())?;
+pub fn init_from<P: AsRef<std::path::Path>>(path: P) -> Result<EnvironmentBuilder, crate::LoadDynamicError> {
+	crate::load_dynamic::init(path.as_ref())?;
 	Ok(EnvironmentBuilder::new())
 }

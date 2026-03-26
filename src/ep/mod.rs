@@ -286,7 +286,7 @@ macro_rules! define_ep_register {
 		#[cfg(all(feature = "load-dynamic", not(target_arch = "wasm32")))]
 		#[allow(non_snake_case)]
 		let $symbol = unsafe {
-			let dylib = $crate::G_ORT_LIB.get().expect("dylib not yet initialized");
+			let dylib = $crate::load_dynamic::G_ORT_LIB.get().expect("dylib not yet initialized");
 			let symbol: ::core::result::Result<
 				::libloading::Symbol<unsafe extern "C" fn($($id: $type),*) -> $rt>,
 				::libloading::Error

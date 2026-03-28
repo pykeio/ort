@@ -467,18 +467,18 @@ impl Session {
 		unsafe {
 			use core::ptr::write;
 
-			let ctx = ctx.assume_init_mut();
-			write(&mut ctx.inner, Arc::clone(&async_inner));
+			let ctx = ctx.as_mut_ptr();
+			write(&raw mut (*ctx).inner, Arc::clone(&async_inner));
 			// everything allocated within `run_inner_async` needs to be kept alive until we are certain inference has completed and
 			// ONNX Runtime no longer needs the data - i.e. when `async_callback` is called. `async_callback` will free all of
 			// this data just like we do in `run_inner`
-			write(&mut ctx.input_ort_values, input_ort_values);
-			write(&mut ctx._input_inner_holders, input_inner_holders);
-			write(&mut ctx.input_name_ptrs, input_name_ptrs);
-			write(&mut ctx.output_name_ptrs, output_name_ptrs);
-			write(&mut ctx.output_names, output_names);
-			write(&mut ctx.output_value_ptrs, output_tensor_ptrs);
-			write(&mut ctx.session_inner, &self.inner);
+			write(&raw mut (*ctx).input_ort_values, input_ort_values);
+			write(&raw mut (*ctx)._input_inner_holders, input_inner_holders);
+			write(&raw mut (*ctx).input_name_ptrs, input_name_ptrs);
+			write(&raw mut (*ctx).output_name_ptrs, output_name_ptrs);
+			write(&raw mut (*ctx).output_names, output_names);
+			write(&raw mut (*ctx).output_value_ptrs, output_tensor_ptrs);
+			write(&raw mut (*ctx).session_inner, &self.inner);
 		};
 		let ctx = Box::leak(unsafe { ctx.assume_init() });
 		crate::logging::create!(AsyncInferenceContext, ctx);

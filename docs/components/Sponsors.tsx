@@ -12,11 +12,5 @@ export function TocSponsors() {
 	}, [ actualResolvedTheme ]);
 
 	return <>
-		<div>
-			<a href='https://rime.ai/?utm_source=pykeio&utm_campaign=ort&utm_medium=docs' target="_blank">
-				<img src={`https://cdn.pyke.io/0/pyke:ort-rs/docs@0.0.0/sponsor-identity/rime-${resolvedTheme}.svg`} alt='Rime.ai' suppressHydrationWarning />
-			</a>
-			<p style={{ color: 'var(--gray-11)', fontSize: '0.7rem' }}>Authentic AI voice models for enterprise.</p>
-		</div>
 	</>;
 }

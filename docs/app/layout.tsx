@@ -89,12 +89,7 @@ export default async function RootLayout({ children }) {
 					footer={<Footer />}
 					pageMap={pageMap}
 					copyPageButton={false}
-					toc={{
-						extraContent: <Card>
-							<p style={{ fontFamily: '"Monaspace Neon"', textTransform: 'uppercase', color: 'var(--gray-9)', fontSize: '0.6rem', marginTop: '-4px', marginBottom: '4px' }}>Sponsored by</p>
-							<TocSponsors />
-						</Card>
-					}}
+					toc={{ extraContent: <TocSponsors /> }}
 				>
 					{children}
 				</Layout>

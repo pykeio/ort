@@ -87,8 +87,7 @@ export const EXECUTION_PROVIDER_ARRAY: ExecutionProvider[] = [
 		vendor: 'Google',
 		name: 'XNNPACK',
 		feature: 'xnnpack',
-		platforms: [ { arch: 'x64' }, { arch: 'arm64' }, { arch: 'web' } ],
-		binaries: [ { arch: 'x64' }, { arch: 'arm64' }, { arch: 'web' } ]
+		platforms: [ { arch: 'x64' }, { arch: 'arm64' }, { arch: 'web' } ]
 	},
 	{
 		icon: <SiQualcomm style={{ color: '#2e52dd' }} />,

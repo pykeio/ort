@@ -494,6 +494,7 @@ impl SessionBuilder {
 ///   when the offline model is saved. For example, if model has layout optimized for AVX2, the offline model would
 ///   require CPUs that support AVX2.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[non_exhaustive]
 pub enum GraphOptimizationLevel {
 	/// Disables all graph optimizations.
 	Disable,
@@ -604,6 +605,7 @@ impl AsPointer for PrepackedWeights {
 #[cfg(feature = "api-22")]
 #[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum AutoDevicePolicy {
 	/// Same as [`Self::PreferCPU`]; ensures broadest compatibility.
 	#[default]

@@ -206,6 +206,7 @@ impl Drop for Checkpoint {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum LearningRateScheduler {
 	Linear {
 		warmup_step_count: i64,

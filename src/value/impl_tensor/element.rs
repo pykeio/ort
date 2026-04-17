@@ -3,6 +3,7 @@ use core::fmt;
 
 /// Enum mapping ONNX Runtime's supported tensor data types.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[non_exhaustive]
 pub enum TensorElementType {
 	/// 32-bit floating point number, equivalent to Rust's `f32`.
 	Float32,

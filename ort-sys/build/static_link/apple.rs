@@ -6,7 +6,22 @@ use crate::{
 };
 
 pub fn macos_rtlib_search_dir() -> Option<String> {
-	let output = Command::new(vars::get("CC").unwrap_or_else(|| "clang".to_string()))
+	// Re-run if the active Xcode toolchain changes (xcode-select switch or in-place Xcode upgrade).
+	// `vars::get("CC")` already emits rerun-if-env-changed=CC as a side effect.
+	let _ = vars::get("DEVELOPER_DIR");
+	let cc = vars::get("CC").unwrap_or_else(|| "clang".to_string());
+
+	// Also watch the resolved compiler binary so the cache busts when Xcode replaces it.
+	if let Ok(output) = Command::new("xcrun").args(["--find", "clang"]).output() {
+		if output.status.success() {
+			let clang_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+			if !clang_path.is_empty() {
+				println!("cargo:rerun-if-changed={clang_path}");
+			}
+		}
+	}
+
+	let output = Command::new(&cc)
 		.arg("--print-search-dirs")
 		.output()
 		.ok()?;
@@ -18,9 +33,14 @@ pub fn macos_rtlib_search_dir() -> Option<String> {
 	let stdout = String::from_utf8_lossy(&output.stdout);
 	for line in stdout.lines() {
 		if line.contains("libraries: =") {
-			let path = line.split('=').nth(1)?;
+			// Use split_once to correctly handle paths that contain '='.
+			let (_, path) = line.split_once('=')?;
 			if !path.is_empty() {
-				return Some(format!("{path}/lib/darwin"));
+				let dir = format!("{path}/lib/darwin");
+				if Path::new(&dir).is_dir() {
+					return Some(dir);
+				}
+				log::warning!("macOS rtlib dir '{dir}' does not exist; skipping clang_rt.osx (Xcode/CLT upgrade may require `cargo clean`)");
 			}
 		}
 	}
@@ -31,6 +51,9 @@ pub fn macos_rtlib_search_dir() -> Option<String> {
 }
 
 pub fn ios_rtlib_search_dir() -> Option<String> {
+	// Re-run if the active Xcode toolchain changes.
+	let _ = vars::get("DEVELOPER_DIR");
+
 	let output = Command::new("xcrun").args(["clang", "--print-resource-dir"]).output().ok()?;
 	if !output.status.success() {
 		log::warning!("couldn't determine iOS rtlib dir: failed to run `xcrun clang --print-resource-dir` (exit code {:?})", output.status.code());
@@ -38,7 +61,13 @@ pub fn ios_rtlib_search_dir() -> Option<String> {
 	}
 
 	let resource_dir = String::from_utf8_lossy(&output.stdout).trim().to_string();
-	Some(format!("{}/lib/darwin", resource_dir))
+	let dir = format!("{resource_dir}/lib/darwin");
+	if Path::new(&dir).is_dir() {
+		Some(dir)
+	} else {
+		log::warning!("iOS rtlib dir '{dir}' does not exist; skipping clang_rt linking");
+		None
+	}
 }
 
 fn search_and_link_frameworks_in_sub_dir(sub_dir: &str) -> bool {

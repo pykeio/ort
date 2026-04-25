@@ -49,7 +49,7 @@ rustdoc-args = [ "--cfg", "docsrs" ]
 [features]
 default = [ "std", "ndarray", "tracing", "download-binaries", "tls-native", "copy-dylibs", "api-24" ]
 
-std = [ "ort-sys/std", "ndarray/std", "tracing?/std" ]
+std = [ "ort-sys/std", "ndarray?/std", "tracing?/std" ]
 training = [ "ort-sys/training" ]
 
 ndarray = [ "dep:ndarray" ]

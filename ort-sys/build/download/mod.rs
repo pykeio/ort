@@ -9,6 +9,7 @@ use std::{env, time::Duration};
 use ureq::{
 	Agent, BodyReader, Proxy,
 	config::Config as UreqConfig,
+	http::StatusCode,
 	tls::{RootCerts, TlsConfig, TlsProvider}
 };
 
@@ -51,16 +52,30 @@ pub fn fetch_file(source_url: &str) -> Result<BodyReader<'static>, Error> {
 				env::var("TARGET").unwrap()
 			))
 			.timeout_global(Some(Duration::from_secs(1800)))
-			.http_status_as_error(true)
+			.http_status_as_error(false)
 			.build()
 	)
 	.get(source_url)
 	.call()?;
 
-	Ok(resp.into_body()
-		.into_with_config()
-		.limit(1_073_741_824) // 1 GiB
-		.reader())
+	match resp.status() {
+		StatusCode::OK => Ok(resp.into_body()
+			.into_with_config()
+			.limit(1_073_741_824) // 1 GiB
+			.reader()),
+		StatusCode::NOT_FOUND => Err(Error::new(
+			"CDN returned 404 for the prebuilt binaries used by this version of `ort`; this is usually a temporary brownout and means you're using a version that is no longer supported and should upgrade `ort` soon. You can continue to use `ort` if you build your own ONNX Runtime binaries; see https://ort.pyke.io/setup/linking for linking instructions."
+		)),
+		StatusCode::GONE => Err(Error::new(
+			"CDN returned 410 for the prebuilt binaries used by this version of `ort` - you're using a version of `ort` that is no longer supported and should upgrade. Though not recommended, you can continue to use `ort` if you build your own ONNX Runtime binaries; see https://ort.pyke.io/setup/linking for linking instructions."
+		)),
+		code @ (StatusCode::INTERNAL_SERVER_ERROR | StatusCode::BAD_GATEWAY | StatusCode::SERVICE_UNAVAILABLE | StatusCode::GATEWAY_TIMEOUT) => {
+			Err(Error::new(format!(
+				"The CDN that serves prebuilt ONNX Runtime binaries for the `ort` crate is currently down (code {code}). A report at https://github.com/pykeio/ort/issues would be appreciated. You can bypass this error by compiling ONNX Runtime from source and configuring custom linking for `ort`; see https://ort.pyke.io/setup/linking"
+			)))
+		}
+		code => Err(ureq::Error::StatusCode(code.as_u16()))?
+	}
 }
 
 pub fn should_skip() -> bool {

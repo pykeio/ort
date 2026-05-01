@@ -45,7 +45,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2.7.8
+      - uses: Swatinem/rust-cache@v2.9.1
       - name: Run tests
         run: |
           cargo test --manifest-path backends/candle/Cargo.toml -p ort-candle --verbose -- --test-threads 1
@@ -65,7 +65,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2.7.8
+      - uses: Swatinem/rust-cache@v2.9.1
       - name: Run tests
         run: |
           cargo test --manifest-path backends/tract/Cargo.toml -p ort-tract --verbose -- --test-threads 1
@@ -79,7 +79,7 @@ jobs:
         with:
           toolchain: stable
           targets: wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v2.7.8
+      - uses: Swatinem/rust-cache@v2.9.1
       - name: Run tests
         run: |
           cargo check --manifest-path backends/web/Cargo.toml -p ort-web --target wasm32-unknown-unknown

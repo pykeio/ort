@@ -33,7 +33,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2.7.8
+      - uses: Swatinem/rust-cache@v2.9.1
       - name: Run checks
         run: |
           cargo check -p ort --no-default-features
@@ -45,7 +45,7 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install stable Rust toolchain
         uses: dtolnay/rust-toolchain@1.88
-      - uses: Swatinem/rust-cache@v2.7.8
+      - uses: Swatinem/rust-cache@v2.9.1
       - name: Run checks
         run: |
           cargo check -p ort
@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install stable Rust toolchain
         uses: dtolnay/rust-toolchain@1.88
-      - uses: Swatinem/rust-cache@v2.7.8
+      - uses: Swatinem/rust-cache@v2.9.1
       - name: Run checks
         run: |
           cargo check -p ort --no-default-features --features api-17,std,ndarray,tracing

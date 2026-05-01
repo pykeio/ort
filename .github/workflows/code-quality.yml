@@ -56,11 +56,12 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           toolchain: nightly-2026-01-29
+      - uses: Swatinem/rust-cache@v2.9.1
       - name: Get Rust version
         id: rust-version
         run: echo "::set-output name=version::$(cargo --version | cut -d ' ' -f 2)"
         shell: bash
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         id: tarpaulin-cache
         with:
           path: ~/.cargo/bin/cargo-tarpaulin
@@ -72,7 +73,7 @@ jobs:
         run: |
           cargo tarpaulin -p ort --features fetch-models,tls-rustls --verbose --timeout 120 --out xml --engine llvm --doc --lib --tests -- --test-threads 1
       - name: Upload to codecov.io
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false

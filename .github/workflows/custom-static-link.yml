@@ -36,7 +36,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2.7.8
+      - uses: Swatinem/rust-cache@v2.9.1
       - name: Run test
         run: |
           ORT_LIB_PATH="$(pwd)/onnxruntime/build/Linux/Release" cargo example-custom-ops
@@ -55,7 +55,7 @@ jobs:
   #       uses: dtolnay/rust-toolchain@stable
   #       with:
   #         toolchain: stable
-  #     - uses: Swatinem/rust-cache@v2.7.8
+  #     - uses: Swatinem/rust-cache@v2.9.1
   #     - name: Test linking
   #       run: |
   #         ORT_LIB_PATH="$(pwd)/onnxruntime/build/Linux/Release" cargo build --manifest-path examples/custom-ops/Cargo.toml --example custom-ops --target-dir target

@@ -42,7 +42,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2.7.8
+      - uses: Swatinem/rust-cache@v2.9.1
       - name: Run tests
         run: |
           cargo test -p ort --verbose --features fetch-models,tls-rustls -- --test-threads 1

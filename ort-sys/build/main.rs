@@ -47,6 +47,8 @@ fn main() {
 		if dynamic_link::prefer_dynamic_linking() {
 			println!("cargo:rustc-link-lib=onnxruntime");
 			println!("cargo:rustc-link-search=native={}", lib_dir.display());
+			#[cfg(feature = "copy-dylibs")]
+			dynamic_link::copy_dylibs(&lib_dir, &std::path::PathBuf::from(env::var("OUT_DIR").unwrap()));
 			return;
 		}
 

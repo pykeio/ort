@@ -400,7 +400,7 @@ impl MemoryInfo {
 	pub fn new(allocation_device: AllocationDevice, device_id: c_int, allocator_type: AllocatorType, memory_type: MemoryType) -> Result<Self> {
 		let mut ptr: *mut ort_sys::OrtMemoryInfo = ptr::null_mut();
 		ortsys![
-			unsafe CreateMemoryInfo(allocation_device.as_str().as_ptr().cast(), allocator_type.into(), device_id, memory_type.into(), &mut ptr)?;
+			unsafe CreateMemoryInfo(allocation_device.0.as_ptr().cast(), allocator_type.into(), device_id, memory_type.into(), &mut ptr)?;
 			nonNull(ptr)
 		];
 		crate::logging::create!(MemoryInfo, ptr);

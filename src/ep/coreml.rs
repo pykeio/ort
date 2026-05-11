@@ -212,7 +212,7 @@ impl CoreML {
 	/// import onnx
 	/// import hashlib
 	///
-	/// # You can use any other hash algorithms to ensure the model and its hash-value is a one-one mapping.
+	/// # You can use any other hash algorithms to ensure the model and its hash-value is a one-to-one mapping.
 	/// def hash_file(file_path, algorithm='sha256', chunk_size=8192):
 	/// 	hash_func = hashlib.new(algorithm)
 	/// 	with open(file_path, 'rb') as file:

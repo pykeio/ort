@@ -49,7 +49,7 @@ fn search_and_link_frameworks_in_sub_dir(sub_dir: &str) -> bool {
 	let fwk_dir = Path::new(&xcfwk_dir).join(sub_dir);
 	if !fwk_dir.exists() {
 		log::warning!("framework directory '{}' does not exist", fwk_dir.display());
-		// Framework directory not found, dont add search path at all
+		// Framework directory not found, don't add search path at all
 		return false;
 	}
 	println!("cargo:rustc-link-search=framework={}", fwk_dir.display());
@@ -71,7 +71,7 @@ fn search_and_link_frameworks_in_sub_dir(sub_dir: &str) -> bool {
 
 	let ext_fwk_dir = Path::new(&ext_xcfwk_dir).join(sub_dir);
 	if !ext_fwk_dir.exists() {
-		// Extension framework directory not found, dont add search path at all
+		// Extension framework directory not found, don't add search path at all
 		return true;
 	}
 	println!("cargo:rustc-link-search=framework={}", ext_fwk_dir.display());

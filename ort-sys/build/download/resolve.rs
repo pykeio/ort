@@ -72,7 +72,7 @@ pub fn resolve_dist() -> Result<Distribution, Option<String>> {
 	let mut dist = find_dist(&target, &feature_set);
 	if dist.is_none() && feature_set != "none" {
 		log::warning!("no prebuilt binaries available on this platform for combination of features '{feature_set}'");
-		// i dont like this behavior at all but the only thing i like less than it is rust-analyzer breaking because it
+		// I don't like this behavior at all but the only thing I like less than it is rust-analyzer breaking because it
 		// ***insists*** on enabling --all-features
 		dist = find_dist(&target, "none");
 	}

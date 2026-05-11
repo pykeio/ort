@@ -29,7 +29,7 @@
 //! ```
 //!
 //! If you don't configure an environment, one will be created with default settings at the first creation of a session.
-//! The environment can't be re-configured after one is committed, so it's important `ort::init` come before any other
+//! The environment can't be re-configured after one is committed, so it's important `ort::init` comes before any other
 //! `ort` API for the config to take effect. Authors of libraries using `ort` should **never** have the library
 //! configure the environment itself; allow the application developer to do that themselves if they wish.
 //!

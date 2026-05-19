@@ -32,16 +32,15 @@ pub fn static_link_prerequisites(source: BinariesSource) {
 		println!("cargo:rustc-link-lib={cpp_link_stdlib}");
 	}
 
-	if target_triple.contains("apple-darwin") {
-		println!("cargo:rustc-link-lib=framework=Foundation");
-		if let Some(dir) = apple::macos_rtlib_search_dir() {
-			println!("cargo:rustc-link-search={dir}");
-			println!("cargo:rustc-link-lib=clang_rt.osx");
-		}
-	} else if target_triple.contains("apple-ios") {
+	if target_triple.contains("apple") {
+		println!("cargo:rerun-if-env-changed=DEVELOPER_DIR");
 		println!("cargo:rustc-link-lib=framework=Foundation");
 		println!("cargo:rustc-link-lib=framework=CoreML");
-		if let Some(dir) = apple::ios_rtlib_search_dir() {
+
+		if target_triple.contains("apple-darwin") && let Some(dir) = apple::macos_rtlib_search_dir() {
+			println!("cargo:rustc-link-search={dir}");
+			println!("cargo:rustc-link-lib=clang_rt.osx");
+		} else if target_triple.contains("apple-ios") && let Some(dir) = apple::ios_rtlib_search_dir() {
 			println!("cargo:rustc-link-search={dir}");
 			if target_triple.contains("ios-sim") {
 				println!("cargo:rustc-link-lib=clang_rt.iossim");

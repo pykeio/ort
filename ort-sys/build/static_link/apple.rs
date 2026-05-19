@@ -19,7 +19,7 @@ pub fn macos_rtlib_search_dir() -> Option<String> {
 	for line in stdout.lines() {
 		if line.contains("libraries: =") {
 			let path = line.split('=').nth(1)?;
-			if !path.is_empty() {
+			if !path.is_empty() && Path::new(path).is_dir() {
 				return Some(format!("{path}/lib/darwin"));
 			}
 		}
@@ -38,7 +38,7 @@ pub fn ios_rtlib_search_dir() -> Option<String> {
 	}
 
 	let resource_dir = String::from_utf8_lossy(&output.stdout).trim().to_string();
-	Some(format!("{}/lib/darwin", resource_dir))
+	Some(format!("{}/lib/darwin", resource_dir)).take_if(|p| Path::new(p).is_dir())
 }
 
 fn search_and_link_frameworks_in_sub_dir(sub_dir: &str) -> bool {

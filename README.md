@@ -52,4 +52,4 @@ When you need to deploy a PyTorch/TensorFlow/Keras/scikit-learn/PaddlePaddle mod
 - **[Valentinus](https://github.com/kn0sys/valentinus)** uses `ort` to provide embedding model inference inside LMDB.
 - **[SilentKeys](https://github.com/gptguy/silentkeys)** uses `ort` for fast, on-device real-time dictation with NVIDIA Parakeet and Silero VAD.
 - **[Xybrid](https://github.com/xybrid-ai/xybrid)** uses `ort` to run LLMs, ASR, and TTS natively on-device across iOS, Android, Flutter, and Unity apps and games.
-- **[Ultralytics YOLO Rust Inference](https://github.com/ultralytics/inference)** A high-performance, pure Rust library and CLI providing fast and efficient interface for running YOLO models using `ort`.
+- **[Ultralytics YOLO Rust Inference](https://github.com/ultralytics/inference)** is a high-performance, pure Rust library and CLI providing fast and efficient interface for running YOLO models using `ort`.

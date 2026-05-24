@@ -210,11 +210,11 @@ impl<'a> AsPointer for Logger<'a> {
 /// Logs a message to a given [`Logger`].
 ///
 /// ```
-/// # use ort::operator::{Kernel, KernelContext};
+/// # use ort::operator::{Kernel, ComputeContext};
 /// struct MyKernel;
 ///
 /// impl Kernel for MyKernel {
-/// 	fn compute(&mut self, ctx: &KernelContext) -> ort::Result<()> {
+/// 	fn compute(&mut self, ctx: &ComputeContext) -> ort::Result<()> {
 /// 		let logger = ctx.logger()?;
 /// 		ort::log!(logger, Warning @ "something is off");
 ///

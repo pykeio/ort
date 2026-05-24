@@ -280,7 +280,7 @@ fn download_model(url: &str) -> Result<PathBuf> {
 		let agent = Config::builder()
 			.tls_config(
 				TlsConfig::builder()
-					.root_certs(if cfg!(feature = "tls-rustls-no-provider") {
+					.root_certs(if cfg!(any(feature = "tls-rustls", feature = "tls-rustls-no-provider")) {
 						RootCerts::WebPki
 					} else {
 						RootCerts::PlatformVerifier

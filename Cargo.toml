@@ -76,7 +76,7 @@ api-24 = [ "ort-sys/api-24", "api-23" ]
 api-25 = [ "ort-sys/api-25", "api-24" ]
 api-26 = [ "ort-sys/api-26", "api-25" ]
 
-tls-rustls = [ "ort-sys/tls-rustls", "ureq?/rustls" ]
+tls-rustls = [ "ort-sys/tls-rustls", "ureq?/rustls", "tls-rustls-no-provider" ]
 tls-rustls-no-provider = [ "ort-sys/tls-rustls-no-provider", "ureq?/rustls-no-provider" ]
 tls-native = [ "ort-sys/tls-native", "ureq?/native-tls" ]
 tls-native-vendored = [ "ort-sys/tls-native-vendored", "ureq?/native-tls", "ureq?/vendored" ]

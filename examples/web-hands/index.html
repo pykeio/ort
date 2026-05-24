@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta content='text/html;charset=utf-8' http-equiv='Content-Type' />
+	</head>
+	<body style='margin: 0'>
+		<canvas id='canvas' style='display: block; width: 100vw; height: 100vh; object-fit: contain; background-color: black'></canvas>
+		<script type='module'>
+			import init, { HandDetector, setup_ort } from './pkg/example_web_kitra_blazehand.js';
+			await init();
+
+			await setup_ort();
+
+			const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+			
+			const video = document.createElement('video');
+			video.srcObject = media;
+			await video.play();
+
+			const canvas = /** @type {HTMLCanvasElement} */(document.getElementById('canvas'));
+			canvas.width = video.videoWidth;
+			canvas.height = video.videoHeight;
+			document.body.appendChild(canvas);
+
+			const ctx = canvas.getContext('2d');
+
+			const detector = await HandDetector.create('https://spaces.pyke.io/testwebhands/hand_detector.onnx', 2, 0.5, 0.3);
+
+			const update = async () => {
+				ctx.globalAlpha = 1.0;
+				ctx.drawImage(video, 0, 0);
+
+				const { width, height } = canvas;
+				for (const detection of await detector.predict_from_canvas(canvas, ctx)) {
+					ctx.globalAlpha = detection.score;
+					ctx.strokeStyle = '#ff0000';
+					ctx.lineWidth = 2;
+					ctx.strokeRect(detection.min.x, detection.min.y, detection.width, detection.height);
+				}
+
+				requestAnimationFrame(update);
+			};
+			requestAnimationFrame(update);
+		</script>
+	</body>
+</html>

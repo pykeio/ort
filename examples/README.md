@@ -2,6 +2,7 @@
 - [**`gpt2`**](#gpt2): Classic [GPT-2](https://openai.com/index/better-language-models/) language model text generation
 - [**`async-gpt2-api`**](#async-gpt2-api): GPT-2 behind an HTTP API with `Session::run_async` and [`axum`](https://crates.io/crates/axum)
 - [**`yolov8`**](#yolov8): [YOLOv8](https://docs.ultralytics.com/models/yolov8/) object detection
+- [**`web-hands`**](#web-hands): Hand detection in the browser using [`ort-web`](https://ort.pyke.io/backends/web)
 - [**`semantic-similarity`**](#semantic-similarity): Semantic textual similarity using [`all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) from [SentenceTransformers](https://sbert.net/index.html) (SBERT)
 - [**`modnet`**](#modnet): [MODNet](https://github.com/ZHKKKe/MODNet) portrait matting
     - [**`cudarc`**](#cudarc): A variant of `modnet` inferring directly from CUDA buffers using the [`cudarc`](https://crates.io/crates/cudarc) crate.
@@ -99,6 +100,25 @@ The application creates an HTTP server on port 7216. Send a POST request to `/ge
 > 💡 This example supports all EPs & backends.
 
 This example implements [YOLOv8](https://docs.ultralytics.com/models/yolov8/) object detection using `ort`. It features loading images with the [`image`](https://crates.io/crates/image) crate, converting them to `ort` tensors with [`ndarray`](https://crates.io/crates/ndarray), processing the inferred bounding boxes, and displaying them with [`show-image`](https://crates.io/crates/show-image). YOLO's architecture makes it fairly simple to adapt this example to other YOLO versions, like YOLOv10/11.
+
+## `web-hands`
+🌐 [**View live demo**](https://spaces.pyke.io/testwebhands/) | **[🧑‍💻 View source](https://github.com/pykeio/ort/blob/main/examples/web-hands/src/lib.rs) | `examples/web-hands/src/lib.rs`**
+
+<a href="https://spaces.pyke.io/testwebhands/" target="_blank"><img src="https://spaces.pyke.io/testwebhands/demo.gif"></a>
+
+> 💡 This example uses the [**`ort-web`**](https://ort.pyke.io/backends/web) alternative backend.
+
+This example showcases `ort` running a hand detection model in WASM with the [`ort-web`](https://ort.pyke.io/backends/web) backend.
+
+To build this example, use [`wasm-pack`](https://wasm-bindgen.github.io/wasm-pack/installer/):
+```shell
+$ cd examples/web-hands
+$ wasm-pack build --target web
+
+# The camera is only available in secure contexts like `localhost`, so you'll need to serve the example from an HTTP server.
+# We use sirv: https://npm.im/sirv-cli
+$ npx sirv-cli
+```
 
 ## `semantic-similarity`
 **[🧑‍💻 View source](https://github.com/pykeio/ort/blob/main/examples/sentence-transformers/semantic-similarity.rs) | `examples/sentence-transformers/semantic-similarity.rs` | 💖 Contributed by [n12n](https://github.com/kn0sys)**

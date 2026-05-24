@@ -84,13 +84,13 @@ unsafe impl Send for Allocator {}
 // threads. CPU allocator doesn't seem to be affected though.
 
 impl Allocator {
-	pub(crate) unsafe fn from_raw(ptr: NonNull<ort_sys::OrtAllocator>) -> Allocator {
+	pub(crate) unsafe fn from_raw(ptr: NonNull<ort_sys::OrtAllocator>, is_default: bool) -> Allocator {
 		let mut memory_info_ptr = ptr::null();
 		ortsys![unsafe AllocatorGetInfo(ptr.as_ptr(), &mut memory_info_ptr).expect("Failed to get memory info"); nonNull(memory_info_ptr)];
 
 		Allocator {
 			ptr,
-			is_default: false,
+			is_default,
 			info: MemoryInfo::from_raw(memory_info_ptr, false),
 			// currently, this function is only ever used in session creation, where we call `CreateAllocator` manually and store the allocator resulting from
 			// this function in the `SharedSessionInner` - we don't need to hold onto the session, because the session is holding onto us.

@@ -34,7 +34,7 @@ impl Drop for Attribute {
 }
 
 #[diagnostic::on_unimplemented(message = "`{Self}` is not a supported operator attribute")]
-pub trait FromKernelAttributes<'s> {
+pub trait FromKernelContext<'s> {
 	/// Reads the value of the attribute from an [`ort_sys::OrtKernelInfo`] given its C name.
 	#[doc(hidden)]
 	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
@@ -68,7 +68,7 @@ pub trait ToAttribute {
 	private_trait!();
 }
 
-impl FromKernelAttributes<'_> for f32 {
+impl FromKernelContext<'_> for f32 {
 	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
@@ -121,7 +121,7 @@ impl ToAttribute for f32 {
 	private_impl!();
 }
 
-impl FromKernelAttributes<'_> for i64 {
+impl FromKernelContext<'_> for i64 {
 	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
@@ -174,7 +174,7 @@ impl ToAttribute for i64 {
 	private_impl!();
 }
 
-impl FromKernelAttributes<'_> for String {
+impl FromKernelContext<'_> for String {
 	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
@@ -235,7 +235,7 @@ impl ToAttribute for String {
 	private_impl!();
 }
 
-impl FromKernelAttributes<'_> for Vec<f32> {
+impl FromKernelContext<'_> for Vec<f32> {
 	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
@@ -302,7 +302,7 @@ impl ToAttribute for Vec<f32> {
 	private_impl!();
 }
 
-impl FromKernelAttributes<'_> for Vec<i64> {
+impl FromKernelContext<'_> for Vec<i64> {
 	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized
@@ -439,7 +439,7 @@ impl ToAttribute for Vec<&str> {
 	private_impl!();
 }
 
-impl<'s, T: DowncastableTarget> FromKernelAttributes<'s> for ValueRef<'s, T> {
+impl<'s, T: DowncastableTarget> FromKernelContext<'s> for ValueRef<'s, T> {
 	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
 		Self: Sized

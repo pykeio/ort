@@ -428,6 +428,17 @@ impl ExecutionProviderLibrary {
 	}
 }
 
+pub trait ExecutionProviderResource {
+	type Type;
+
+	const VERSION: u32;
+
+	fn id(&self) -> u32;
+
+	#[doc(hidden)]
+	fn convert(value: *const core::ffi::c_void) -> Self::Type;
+}
+
 #[deprecated = "import `ort::ep::ACL` instead"]
 #[doc(hidden)]
 pub use self::acl::ACL as ACLExecutionProvider;

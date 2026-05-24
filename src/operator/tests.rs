@@ -4,7 +4,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use crate::{
 	Result,
 	logging::LogLevel,
-	operator::{Kernel, KernelAttributes, KernelContext, Operator, OperatorDomain, OperatorInput, OperatorOutput},
+	operator::{BoxedKernel, ComputeContext, Kernel, KernelContext, Operator, OperatorDomain, OperatorInput, OperatorOutput},
 	session::Session,
 	value::{Tensor, TensorElementType}
 };
@@ -12,20 +12,24 @@ use crate::{
 struct CustomOpOne;
 
 impl Operator for CustomOpOne {
+	type Kernel<'attr> = BoxedKernel<'attr>;
+
+	const INPLACES: &[(u32, u32)] = &[(0, 0), (1, 0)];
+
 	fn name(&self) -> &str {
 		"CustomOpOne"
 	}
 
-	fn inputs(&self) -> Vec<OperatorInput> {
-		vec![OperatorInput::required(TensorElementType::Float32), OperatorInput::required(TensorElementType::Float32)]
+	fn inputs(&self) -> impl IntoIterator<Item = OperatorInput> {
+		[OperatorInput::required(TensorElementType::Float32), OperatorInput::required(TensorElementType::Float32)]
 	}
 
-	fn outputs(&self) -> Vec<OperatorOutput> {
-		vec![OperatorOutput::required(TensorElementType::Float32)]
+	fn outputs(&self) -> impl IntoIterator<Item = OperatorOutput> {
+		[OperatorOutput::required(TensorElementType::Float32)]
 	}
 
-	fn create_kernel(&self, _: &KernelAttributes) -> Result<Box<dyn Kernel>> {
-		Ok(Box::new(|ctx: &KernelContext| {
+	fn create_kernel<'attr>(&self, _: &KernelContext<'attr>) -> Result<Self::Kernel<'attr>> {
+		Ok(Box::new(|ctx: &ComputeContext| {
 			let logger = ctx.logger()?;
 			crate::log!(logger, Warning @ "$sentinel1$");
 
@@ -51,20 +55,24 @@ impl Operator for CustomOpOne {
 struct CustomOpTwo;
 
 impl Operator for CustomOpTwo {
+	type Kernel<'attr> = BoxedKernel<'attr>;
+
+	const INPLACES: &[(u32, u32)] = &[(0, 0)];
+
 	fn name(&self) -> &str {
 		"CustomOpTwo"
 	}
 
-	fn inputs(&self) -> Vec<OperatorInput> {
-		vec![OperatorInput::required(TensorElementType::Float32)]
+	fn inputs(&self) -> impl IntoIterator<Item = OperatorInput> {
+		[OperatorInput::required(TensorElementType::Float32)]
 	}
 
-	fn outputs(&self) -> Vec<OperatorOutput> {
-		vec![OperatorOutput::required(TensorElementType::Int32)]
+	fn outputs(&self) -> impl IntoIterator<Item = OperatorOutput> {
+		[OperatorOutput::required(TensorElementType::Int32)]
 	}
 
-	fn create_kernel(&self, _: &KernelAttributes) -> crate::Result<Box<dyn Kernel>> {
-		Ok(Box::new(|ctx: &KernelContext| {
+	fn create_kernel<'attr>(&self, _: &KernelContext<'attr>) -> crate::Result<Self::Kernel<'attr>> {
+		Ok(Box::new(|ctx: &ComputeContext| {
 			let logger = ctx.logger()?;
 			crate::log!(logger, Verbose @ "$sentinel2$");
 
@@ -123,16 +131,20 @@ fn test_custom_ops() -> crate::Result<()> {
 struct AttrTesterIntFloat;
 
 impl Operator for AttrTesterIntFloat {
+	type Kernel<'attr> = BoxedKernel<'attr>;
+
+	const INPLACES: &[(u32, u32)] = &[(0, 0)];
+
 	fn name(&self) -> &str {
 		"AttrTesterIntFloat"
 	}
 
-	fn inputs(&self) -> Vec<OperatorInput> {
-		vec![OperatorInput::required(TensorElementType::Float32)]
+	fn inputs(&self) -> impl IntoIterator<Item = OperatorInput> {
+		[OperatorInput::required(TensorElementType::Float32)]
 	}
 
-	fn outputs(&self) -> Vec<OperatorOutput> {
-		vec![OperatorOutput::required(TensorElementType::Float32)]
+	fn outputs(&self) -> impl IntoIterator<Item = OperatorOutput> {
+		[OperatorOutput::required(TensorElementType::Float32)]
 	}
 
 	fn infer_shape(&self, ctx: &mut super::ShapeInferenceContext) -> crate::Result<()> {
@@ -146,8 +158,8 @@ impl Operator for AttrTesterIntFloat {
 		Ok(())
 	}
 
-	fn create_kernel(&self, _: &KernelAttributes) -> crate::Result<Box<dyn Kernel>> {
-		Ok(Box::new(|ctx: &KernelContext| {
+	fn create_kernel<'attr>(&self, _: &KernelContext<'attr>) -> crate::Result<Self::Kernel<'attr>> {
+		Ok(Box::new(|ctx: &ComputeContext| {
 			let x = ctx.input(0)?.ok_or_else(|| crate::Error::new("missing input"))?;
 			let (x_shape, x) = x.try_extract_tensor::<f32>()?;
 			let mut z = ctx.output(0, x_shape.to_vec())?.ok_or_else(|| crate::Error::new("missing input"))?;
@@ -163,16 +175,20 @@ impl Operator for AttrTesterIntFloat {
 struct AttrTesterString;
 
 impl Operator for AttrTesterString {
+	type Kernel<'attr> = BoxedKernel<'attr>;
+
+	const INPLACES: &[(u32, u32)] = &[(0, 0)];
+
 	fn name(&self) -> &str {
 		"AttrTesterString"
 	}
 
-	fn inputs(&self) -> Vec<OperatorInput> {
-		vec![OperatorInput::required(TensorElementType::Float32)]
+	fn inputs(&self) -> impl IntoIterator<Item = OperatorInput> {
+		[OperatorInput::required(TensorElementType::Float32)]
 	}
 
-	fn outputs(&self) -> Vec<OperatorOutput> {
-		vec![OperatorOutput::required(TensorElementType::Float32)]
+	fn outputs(&self) -> impl IntoIterator<Item = OperatorOutput> {
+		[OperatorOutput::required(TensorElementType::Float32)]
 	}
 
 	fn infer_shape(&self, ctx: &mut super::ShapeInferenceContext) -> crate::Result<()> {
@@ -183,8 +199,8 @@ impl Operator for AttrTesterString {
 		Ok(())
 	}
 
-	fn create_kernel(&self, _: &KernelAttributes) -> crate::Result<Box<dyn Kernel>> {
-		Ok(Box::new(|ctx: &KernelContext| {
+	fn create_kernel<'attr>(&self, _: &KernelContext<'attr>) -> crate::Result<Self::Kernel<'attr>> {
+		Ok(Box::new(|ctx: &ComputeContext| {
 			let x = ctx.input(0)?.ok_or_else(|| crate::Error::new("missing input"))?;
 			let (x_shape, x) = x.try_extract_tensor::<f32>()?;
 			let mut z = ctx.output(0, x_shape.to_vec())?.ok_or_else(|| crate::Error::new("missing input"))?;
@@ -214,16 +230,18 @@ fn test_op_attrs() -> crate::Result<()> {
 struct CopyTensorArrayAllVariadic;
 
 impl Operator for CopyTensorArrayAllVariadic {
+	type Kernel<'attr> = CopyVariadic;
+
 	fn name(&self) -> &str {
 		"CopyTensorArrayAllVariadic"
 	}
 
-	fn inputs(&self) -> Vec<OperatorInput> {
-		vec![OperatorInput::variadic(1).homogenous(TensorElementType::Float32)]
+	fn inputs(&self) -> impl IntoIterator<Item = OperatorInput> {
+		[OperatorInput::variadic(1).homogenous(TensorElementType::Float32)]
 	}
 
-	fn outputs(&self) -> Vec<OperatorOutput> {
-		vec![OperatorOutput::variadic(1).homogenous(TensorElementType::Float32)]
+	fn outputs(&self) -> impl IntoIterator<Item = OperatorOutput> {
+		[OperatorOutput::variadic(1).homogenous(TensorElementType::Float32)]
 	}
 
 	fn infer_shape(&self, ctx: &mut super::ShapeInferenceContext) -> crate::Result<()> {
@@ -234,35 +252,43 @@ impl Operator for CopyTensorArrayAllVariadic {
 		Ok(())
 	}
 
-	fn create_kernel(&self, _: &KernelAttributes) -> crate::Result<Box<dyn Kernel>> {
-		Ok(Box::new(|ctx: &KernelContext| copy_variadic(0, ctx)))
+	fn create_kernel<'attr>(&self, _: &KernelContext<'attr>) -> crate::Result<Self::Kernel<'attr>> {
+		Ok(CopyVariadic { start: 0 })
 	}
 }
 
-fn copy_variadic(start: usize, ctx: &KernelContext) -> crate::Result<()> {
-	for i in start..ctx.num_inputs()? {
-		let input = ctx.input(i)?.ok_or_else(|| crate::Error::new("missing input"))?;
-		let mut output = ctx
-			.output(i, input.shape().clone())?
-			.ok_or_else(|| crate::Error::new(format!("failed to allocate output {i}")))?;
+struct CopyVariadic {
+	start: usize
+}
 
-		output.try_extract_tensor_mut::<f32>()?.1.copy_from_slice(input.try_extract_tensor()?.1);
+impl Kernel for CopyVariadic {
+	fn compute(&mut self, ctx: &ComputeContext) -> crate::Result<()> {
+		for i in self.start..ctx.num_inputs()? {
+			let input = ctx.input(i)?.ok_or_else(|| crate::Error::new("missing input"))?;
+			let mut output = ctx
+				.output(i, input.shape().clone())?
+				.ok_or_else(|| crate::Error::new(format!("failed to allocate output {i}")))?;
+
+			output.try_extract_tensor_mut::<f32>()?.1.copy_from_slice(input.try_extract_tensor()?.1);
+		}
+		Ok(())
 	}
-	Ok(())
 }
 
 struct CopyTensorArrayCombined;
 
 impl Operator for CopyTensorArrayCombined {
+	type Kernel<'attr> = BoxedKernel<'attr>;
+
 	fn name(&self) -> &str {
 		"CopyTensorArrayCombined"
 	}
 
-	fn inputs(&self) -> Vec<OperatorInput> {
+	fn inputs(&self) -> impl IntoIterator<Item = OperatorInput> {
 		vec![OperatorInput::optional(TensorElementType::Float32), OperatorInput::variadic(0).homogenous(TensorElementType::Float32)]
 	}
 
-	fn outputs(&self) -> Vec<OperatorOutput> {
+	fn outputs(&self) -> impl IntoIterator<Item = OperatorOutput> {
 		vec![OperatorOutput::optional(TensorElementType::Float32), OperatorOutput::variadic(0).homogenous(TensorElementType::Float32)]
 	}
 
@@ -274,8 +300,8 @@ impl Operator for CopyTensorArrayCombined {
 		Ok(())
 	}
 
-	fn create_kernel(&self, _: &KernelAttributes) -> crate::Result<Box<dyn Kernel>> {
-		Ok(Box::new(|ctx: &KernelContext| {
+	fn create_kernel<'attr>(&self, _info: &KernelContext<'attr>) -> crate::Result<Self::Kernel<'attr>> {
+		Ok(Box::new(move |ctx: &ComputeContext| {
 			if let Ok(Some(input)) = ctx.input(0) {
 				let mut output = ctx
 					.output(0, input.shape().clone())?
@@ -283,7 +309,8 @@ impl Operator for CopyTensorArrayCombined {
 
 				output.try_extract_tensor_mut::<f32>()?.1.copy_from_slice(input.try_extract_tensor()?.1);
 			}
-			copy_variadic(1, ctx)
+
+			CopyVariadic { start: 1 }.compute(ctx)
 		}))
 	}
 }

@@ -164,7 +164,7 @@ impl SessionBuilder {
 			Some(info) => {
 				let mut allocator_ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
 				ortsys![unsafe CreateAllocator(ptr.as_ptr(), info.ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
-				unsafe { Allocator::from_raw(allocator_ptr) }
+				unsafe { Allocator::from_raw(allocator_ptr, false) }
 			}
 			None => Allocator::default()
 		};

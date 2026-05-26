@@ -19,6 +19,7 @@ use crate::static_link::BinariesSource;
 
 fn main() {
 	println!("cargo:rustc-check-cfg=cfg(link_error)");
+	println!("cargo:rustc-check-cfg=cfg(pyke)");
 
 	if env::var("DOCS_RS").is_ok() || cfg!(feature = "disable-linking") {
 		// On docs.rs, A) we don't need to link, and B) we don't have network, so we couldn't download anything if we wanted to.
@@ -74,10 +75,11 @@ fn main() {
 		return;
 	}
 
-	log::debug!("Using prebuilt binaries");
-
 	#[cfg(feature = "download-binaries")]
 	{
+		log::debug!("Using prebuilt binaries");
+		println!("cargo:rustc-cfg=pyke");
+
 		use std::fs;
 
 		let target = env::var("TARGET").unwrap();

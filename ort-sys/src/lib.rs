@@ -21,6 +21,9 @@ pub use core::ffi::{c_char, c_int, c_ulong, c_ulonglong, c_ushort, c_void};
 
 pub use self::version::ORT_API_VERSION;
 
+#[doc(hidden)]
+pub const USING_PYKE_BINARIES: bool = cfg!(pyke);
+
 #[cfg(target_os = "windows")]
 pub type os_char = c_ushort;
 #[cfg(not(target_os = "windows"))]

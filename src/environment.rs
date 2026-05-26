@@ -252,6 +252,15 @@ pub fn current() -> Result<Arc<Environment>> {
 		return Ok(env.clone());
 	}
 
+	#[cfg(all(feature = "std", target_arch = "x86_64"))]
+	{
+		if ort_sys::USING_PYKE_BINARIES && !std::is_x86_feature_detected!("avx2") {
+			eprintln!(
+				"WARNING: This CPU does not support AVX2, which is required by ort's prebuilt ONNX Runtime binaries. The app will likely crash with an illegal instruction error; use a custom build of ONNX Runtime to fix."
+			);
+		}
+	}
+
 	let options = G_ENV_OPTIONS.get_or_init(EnvironmentBuilder::new);
 	let env = options.create_environment().map(Arc::new)?;
 	*env_lock = Some(Arc::clone(&env));

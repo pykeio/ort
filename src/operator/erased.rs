@@ -1,7 +1,6 @@
 use alloc::{boxed::Box, ffi::CString};
 use core::{
 	alloc::Layout,
-	marker::PhantomData,
 	ops::RangeInclusive,
 	ptr::{self, NonNull}
 };
@@ -28,6 +27,34 @@ struct DynOperator {
 }
 
 impl DynOperator {
+	pub fn create<O: Operator>(op: O) -> DynOperator {
+		fn create_kernel<'attr, O: Operator>(op: *const (), attributes: &KernelContext<'attr>) -> crate::Result<Box<dyn Kernel + 'attr>> {
+			let op = unsafe { &*op.cast::<O>() };
+			op.create_kernel(attributes).map(|k| Box::new(k) as Box<dyn Kernel>)
+		}
+		fn infer_shape<O: Operator>(op: *const (), ctx: &mut ShapeInferenceContext) -> crate::Result<()> {
+			let op = unsafe { &*op.cast::<O>() };
+			op.infer_shape(ctx)
+		}
+		fn versions<O: Operator>(op: *const ()) -> RangeInclusive<u32> {
+			let op = unsafe { &*op.cast::<O>() };
+			op.versions()
+		}
+		fn op_drop<O: Operator>(op: *mut ()) {
+			let _ = unsafe { Box::from_raw(op.cast::<O>()) };
+		}
+
+		DynOperator {
+			op: (Box::leak(Box::new(op)) as *mut O).cast(),
+			vtable: &OperatorVTable {
+				create_kernel: create_kernel::<O>,
+				infer_shape: infer_shape::<O>,
+				versions: versions::<O>,
+				drop: op_drop::<O>
+			}
+		}
+	}
+
 	#[inline(always)]
 	pub fn create_kernel<'attr>(&self, attributes: &KernelContext<'attr>) -> crate::Result<Box<dyn Kernel + 'attr>> {
 		(self.vtable.create_kernel)(self.op, attributes)
@@ -45,40 +72,6 @@ impl DynOperator {
 impl Drop for DynOperator {
 	fn drop(&mut self) {
 		(self.vtable.drop)(self.op);
-	}
-}
-
-struct DynOperatorFactory<O: Operator + 'static>(PhantomData<O>);
-impl<O: Operator + 'static> DynOperatorFactory<O> {
-	pub fn create(op: O) -> DynOperator {
-		DynOperator {
-			op: (Box::leak(Box::new(op)) as *mut O).cast(),
-			vtable: &OperatorVTable {
-				create_kernel: DynOperatorFactory::<O>::create_kernel,
-				infer_shape: DynOperatorFactory::<O>::infer_shape,
-				versions: DynOperatorFactory::<O>::versions,
-				drop: DynOperatorFactory::<O>::op_drop
-			}
-		}
-	}
-
-	fn create_kernel<'attr>(op: *const (), attributes: &KernelContext<'attr>) -> crate::Result<Box<dyn Kernel + 'attr>> {
-		let op = unsafe { &*op.cast::<O>() };
-		op.create_kernel(attributes).map(|k| Box::new(k) as Box<dyn Kernel>)
-	}
-
-	fn infer_shape(op: *const (), ctx: &mut ShapeInferenceContext) -> crate::Result<()> {
-		let op = unsafe { &*op.cast::<O>() };
-		op.infer_shape(ctx)
-	}
-
-	fn versions(op: *const ()) -> RangeInclusive<u32> {
-		let op = unsafe { &*op.cast::<O>() };
-		op.versions()
-	}
-
-	fn op_drop(op: *mut ()) {
-		let _ = unsafe { Box::from_raw(op.cast::<O>()) };
 	}
 }
 
@@ -151,17 +144,18 @@ pub(super) fn erase<O: Operator + 'static>(operator: O) -> Result<ErasedOperator
 
 	unsafe extern "system" fn get_input_memory_type(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtMemType {
 		let erased = unsafe { &*op.cast::<ErasedOperator>() };
-		erased.inputs[index].memory_type.into()
+		// SAFETY: onnxruntime will never request an index > inputs.len
+		unsafe { erased.inputs.get_unchecked(index) }.memory_type.into()
 	}
 
 	unsafe extern "system" fn get_input_characteristic(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtCustomOpInputOutputCharacteristic {
 		let erased = unsafe { &*op.cast::<ErasedOperator>() };
-		erased.inputs[index].characteristic.into()
+		unsafe { erased.inputs.get_unchecked(index) }.characteristic.into()
 	}
 
 	unsafe extern "system" fn get_output_characteristic(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::OrtCustomOpInputOutputCharacteristic {
 		let erased = unsafe { &*op.cast::<ErasedOperator>() };
-		erased.outputs[index].characteristic.into()
+		unsafe { erased.outputs.get_unchecked(index) }.characteristic.into()
 	}
 
 	unsafe extern "system" fn get_input_type_count(op: *const ort_sys::OrtCustomOp) -> usize {
@@ -176,7 +170,7 @@ pub(super) fn erase<O: Operator + 'static>(operator: O) -> Result<ErasedOperator
 
 	unsafe extern "system" fn get_input_type(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::ONNXTensorElementDataType {
 		let erased = unsafe { &*op.cast::<ErasedOperator>() };
-		erased.inputs[index]
+		unsafe { erased.inputs.get_unchecked(index) }
 			.r#type
 			.map(|c| c.into())
 			.unwrap_or(ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED)
@@ -184,7 +178,7 @@ pub(super) fn erase<O: Operator + 'static>(operator: O) -> Result<ErasedOperator
 
 	unsafe extern "system" fn get_output_type(op: *const ort_sys::OrtCustomOp, index: usize) -> ort_sys::ONNXTensorElementDataType {
 		let erased = unsafe { &*op.cast::<ErasedOperator>() };
-		erased.outputs[index]
+		unsafe { erased.outputs.get_unchecked(index) }
 			.r#type
 			.map(|c| c.into())
 			.unwrap_or(ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED)
@@ -307,6 +301,6 @@ pub(super) fn erase<O: Operator + 'static>(operator: O) -> Result<ErasedOperator
 		execution_provider_type,
 		inputs,
 		outputs,
-		operator: DynOperatorFactory::create(operator)
+		operator: DynOperator::create(operator)
 	})
 }

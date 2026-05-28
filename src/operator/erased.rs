@@ -263,6 +263,30 @@ pub(super) fn erase<O: Operator + 'static>(operator: O) -> Result<ErasedOperator
 		}
 	}
 
+	#[cfg(feature = "api-18")]
+	unsafe extern "system" fn get_may_alias<O: Operator + 'static>(input_index: *mut *mut core::ffi::c_int, output_index: *mut *mut core::ffi::c_int) -> usize {
+		let aliases = O::ALIASES;
+		unsafe {
+			*input_index = alloc::alloc::alloc(Layout::from_size_align_unchecked(size_of::<u32>() * aliases.len(), align_of::<u32>())).cast();
+			*output_index = alloc::alloc::alloc(Layout::from_size_align_unchecked(size_of::<u32>() * aliases.len(), align_of::<u32>())).cast();
+
+			let (input_index, output_index) = (*input_index, *output_index);
+			for (i, &(input, output)) in aliases.iter().enumerate() {
+				*input_index.add(i) = input as _;
+				*output_index.add(i) = output as _;
+			}
+		}
+		aliases.len()
+	}
+
+	#[cfg(feature = "api-18")]
+	unsafe extern "system" fn release_may_alias<O: Operator + 'static>(input_index: *mut core::ffi::c_int, output_index: *mut core::ffi::c_int) {
+		unsafe {
+			alloc::alloc::dealloc(input_index.cast(), Layout::from_size_align_unchecked(size_of::<u32>() * O::ALIASES.len(), align_of::<u32>()));
+			alloc::alloc::dealloc(output_index.cast(), Layout::from_size_align_unchecked(size_of::<u32>() * O::ALIASES.len(), align_of::<u32>()));
+		}
+	}
+
 	Ok(ErasedOperator {
 		implementation: ort_sys::OrtCustomOp {
 			version: ort_sys::ORT_API_VERSION,
@@ -291,11 +315,10 @@ pub(super) fn erase<O: Operator + 'static>(operator: O) -> Result<ErasedOperator
 			GetMayInplace: Some(get_may_inplace::<O>),
 			#[cfg(feature = "api-18")]
 			ReleaseMayInplace: Some(release_may_inplace::<O>),
-			// TODO: figure out wtf they mean by alias
 			#[cfg(feature = "api-18")]
-			GetAliasMap: None,
+			GetAliasMap: Some(get_may_alias::<O>),
 			#[cfg(feature = "api-18")]
-			ReleaseAliasMap: None
+			ReleaseAliasMap: Some(release_may_alias::<O>)
 		},
 		name,
 		execution_provider_type,

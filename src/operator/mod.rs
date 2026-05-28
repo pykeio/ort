@@ -39,7 +39,7 @@ pub trait Operator: Send + Sync {
 	type Kernel<'attr>: Kernel + 'attr;
 
 	/// A list of which inputs can be reused for an output if the shapes are identical; i.e. the operation for
-	/// those outputs can be performed inplace, saving memory.
+	/// those outputs can be performed inplace, allowing the graph optimizer to save memory.
 	///
 	/// The tuple is `(input_idx, output_idx)`.
 	///
@@ -48,6 +48,16 @@ pub trait Operator: Send + Sync {
 	#[cfg(feature = "api-18")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "api-18")))]
 	const INPLACES: &[(u32, u32)] = &[];
+
+	/// A list of which inputs are output without their data being changed, allowing for memory optimizations.
+	///
+	/// The tuple is `(input_idx, output_idx)`.
+	///
+	/// The `Reshape` or `Identity` operator would set this to `&[(0, 0)]` because the input's **data** doesn't change
+	/// (only the shape in the case of `Reshape`).
+	#[cfg(feature = "api-18")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "api-18")))]
+	const ALIASES: &[(u32, u32)] = &[];
 
 	/// Returns the name of the operator.
 	fn name(&self) -> &str;

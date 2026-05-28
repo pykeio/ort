@@ -1,13 +1,15 @@
 use alloc::{boxed::Box, ffi::CString, string::String, vec, vec::Vec};
 use core::{
 	ffi::{c_char, c_void},
+	marker::PhantomData,
 	ptr::{self, NonNull},
 	slice
 };
 
-use super::attribute::FromKernelAttributes;
+use super::attribute::FromKernelContext;
 use crate::{
 	AsPointer,
+	ep::ExecutionProviderResource,
 	error::{Error, Result},
 	logging::Logger,
 	memory::{Allocator, MemoryInfo, MemoryType},
@@ -17,29 +19,38 @@ use crate::{
 };
 
 pub trait Kernel {
-	fn compute(&mut self, ctx: &KernelContext) -> crate::Result<()>;
+	fn compute(&mut self, ctx: &ComputeContext) -> crate::Result<()>;
 }
 
 impl<F> Kernel for F
 where
-	F: FnMut(&KernelContext) -> crate::Result<()>
+	F: FnMut(&ComputeContext) -> crate::Result<()>
 {
-	fn compute(&mut self, ctx: &KernelContext) -> crate::Result<()> {
+	fn compute(&mut self, ctx: &ComputeContext) -> crate::Result<()> {
 		self(ctx)
 	}
 }
 
-pub struct KernelAttributes {
-	ptr: NonNull<ort_sys::OrtKernelInfo>,
-	should_release: bool
+pub type BoxedKernel<'ctx> = Box<dyn Kernel + 'ctx>;
+
+impl Kernel for BoxedKernel<'_> {
+	fn compute(&mut self, ctx: &ComputeContext) -> crate::Result<()> {
+		Kernel::compute(&mut **self, ctx)
+	}
 }
 
-impl KernelAttributes {
+pub struct KernelContext<'ctx> {
+	ptr: NonNull<ort_sys::OrtKernelInfo>,
+	should_release: bool,
+	_p: PhantomData<&'ctx ()>
+}
+
+impl<'ctx> KernelContext<'ctx> {
 	pub(crate) fn from_ptr(ptr: NonNull<ort_sys::OrtKernelInfo>, should_release: bool) -> Self {
-		Self { ptr, should_release }
+		Self { ptr, should_release, _p: PhantomData }
 	}
 
-	pub fn get<'s, T: FromKernelAttributes<'s>>(&'s self, name: impl AsRef<str>) -> Option<T> {
+	pub fn get<T: FromKernelContext<'ctx>>(&self, name: impl AsRef<str>) -> Option<T> {
 		with_cstr(name.as_ref().as_bytes(), &|name| unsafe { T::from_info(self.ptr.as_ptr(), name.as_ptr()) }).ok()
 	}
 
@@ -81,7 +92,7 @@ impl KernelAttributes {
 		Ok(outputs)
 	}
 
-	pub fn constant_input<T: DowncastableTarget>(&self, idx: usize) -> Result<ValueRef<'_, T>> {
+	pub fn constant_input<T: DowncastableTarget>(&self, idx: usize) -> Result<ValueRef<'ctx, T>> {
 		let mut value_ptr: *const ort_sys::OrtValue = ptr::null();
 		let mut is_constant = 0;
 		ortsys![unsafe KernelInfoGetConstantInput_tensor(self.ptr.as_ptr(), idx, &mut is_constant, &mut value_ptr)?];
@@ -109,26 +120,31 @@ impl KernelAttributes {
 	pub fn allocator(&self, mem_type: MemoryType) -> Result<Allocator> {
 		let mut ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
 		ortsys![unsafe KernelInfoGetAllocator(self.ptr.as_ptr(), mem_type.into(), &mut ptr)?; nonNull(ptr)];
-		Ok(unsafe { Allocator::from_raw(ptr) })
+		Ok(unsafe { Allocator::from_raw(ptr, false) })
 	}
 
-	pub fn logger(&self) -> Result<Logger<'_>> {
+	pub fn logger(&self) -> Result<Logger<'ctx>> {
 		let mut logger: *const ort_sys::OrtLogger = ptr::null_mut();
 		ortsys![unsafe KernelInfo_GetLogger(self.ptr.as_ptr(), &mut logger)?; nonNull(logger)];
 		Ok(unsafe { Logger::from_raw(logger) })
 	}
 }
 
-impl Clone for KernelAttributes {
+// TODO: The cloned context is still bound to 'ctx. Should it be 'static? When would one even use this?
+impl Clone for KernelContext<'_> {
 	fn clone(&self) -> Self {
 		let mut ptr = ptr::null_mut();
 		ortsys![unsafe CopyKernelInfo(self.ptr.as_ptr(), &mut ptr).expect("failed to clone KernelAttributes"); nonNull(ptr)];
 		crate::logging::create!(KernelAttributes, ptr);
-		Self { ptr, should_release: true }
+		Self {
+			ptr,
+			should_release: true,
+			_p: PhantomData
+		}
 	}
 }
 
-impl AsPointer for KernelAttributes {
+impl AsPointer for KernelContext<'_> {
 	type Sys = ort_sys::OrtKernelInfo;
 
 	fn ptr(&self) -> *const Self::Sys {
@@ -136,7 +152,7 @@ impl AsPointer for KernelAttributes {
 	}
 }
 
-impl Drop for KernelAttributes {
+impl Drop for KernelContext<'_> {
 	fn drop(&mut self) {
 		if self.should_release {
 			ortsys![unsafe ReleaseKernelInfo(self.ptr.as_ptr())];
@@ -178,11 +194,11 @@ impl<T> Drop for ScratchBuffer<T> {
 	}
 }
 
-pub struct KernelContext {
+pub struct ComputeContext {
 	ptr: NonNull<ort_sys::OrtKernelContext>
 }
 
-impl KernelContext {
+impl ComputeContext {
 	pub(crate) fn new(ctx: *mut ort_sys::OrtKernelContext) -> Self {
 		Self {
 			ptr: NonNull::from(unsafe { &mut *ctx })
@@ -217,13 +233,13 @@ impl KernelContext {
 	pub fn allocator(&self, memory_info: &MemoryInfo) -> Result<Allocator> {
 		let mut allocator_ptr = ptr::null_mut();
 		ortsys![unsafe KernelContext_GetAllocator(self.ptr.as_ptr(), memory_info.ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
-		Ok(unsafe { Allocator::from_raw(allocator_ptr) })
+		Ok(unsafe { Allocator::from_raw(allocator_ptr, false) })
 	}
 
-	pub fn get_resource(&self, id: ort_sys::c_int, version: ort_sys::c_int) -> Result<Option<NonNull<ort_sys::c_void>>> {
+	pub fn resource<T: ExecutionProviderResource>(&self, resource: T) -> Result<T::Type> {
 		let mut resource_ptr: *mut ort_sys::c_void = ptr::null_mut();
-		ortsys![unsafe KernelContext_GetResource(self.ptr.as_ptr(), version, id, &mut resource_ptr)?];
-		Ok(NonNull::new(resource_ptr))
+		ortsys![unsafe KernelContext_GetResource(self.ptr.as_ptr(), T::VERSION as _, resource.id() as _, &mut resource_ptr)?];
+		Ok(T::convert(resource_ptr))
 	}
 
 	pub fn par_for<F>(&self, total: usize, max_num_batches: usize, f: F) -> Result<()>
@@ -266,14 +282,14 @@ impl KernelContext {
 	/// Returns a pointer to the GPU compute stream (i.e. `cudaStream_t`) used by the execution provider, if this
 	/// kernel's operator was configured to use said execution provider (see
 	/// [`super::Operator::execution_provider_type`]).
-	pub fn compute_stream(&self) -> Result<Option<NonNull<ort_sys::c_void>>> {
+	pub fn stream(&self) -> Result<Option<NonNull<ort_sys::c_void>>> {
 		let mut stream_ptr: *mut ort_sys::c_void = ptr::null_mut();
 		ortsys![unsafe KernelContext_GetGPUComputeStream(self.ptr.as_ptr(), &mut stream_ptr)?];
 		Ok(NonNull::new(stream_ptr))
 	}
 }
 
-impl AsPointer for KernelContext {
+impl AsPointer for ComputeContext {
 	type Sys = ort_sys::OrtKernelContext;
 
 	fn ptr(&self) -> *const Self::Sys {

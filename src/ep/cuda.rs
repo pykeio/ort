@@ -465,3 +465,49 @@ pub fn preload_dylibs(cuda_root_dir: Option<&std::path::Path>, cudnn_root_dir: O
 	}
 	Ok(())
 }
+
+pub mod resource {
+	use core::{ffi::c_void, ptr::NonNull};
+
+	use crate::ep::ExecutionProviderResource;
+
+	macro_rules! define_resource {
+		($name:ident<$ty:ty>($id:literal), $conv:expr) => {
+			pub struct $name;
+			impl ExecutionProviderResource for $name {
+				const VERSION: u32 = 3;
+				type Type = $ty;
+				fn id(&self) -> u32 {
+					$id
+				}
+				fn convert(v: *const c_void) -> Self::Type {
+					($conv)(v)
+				}
+			}
+		};
+	}
+
+	define_resource!(Stream<*const ()>(10000), |v: *const c_void| v.cast());
+	define_resource!(CuDNNHandle<*const ()>(10001), |v: *const c_void| v.cast());
+	define_resource!(CuBLASHandle<*const ()>(10002), |v: *const c_void| v.cast());
+	define_resource!(
+		DeferredCPUAllocator<Option<crate::memory::Allocator>>(10003),
+		|v: *const c_void| NonNull::new(v.cast_mut().cast()).map(|alloc| unsafe { crate::memory::Allocator::from_raw(alloc, true) })
+	);
+	define_resource!(DeviceId<u32>(10004), |v: *const c_void| v as usize as u32);
+	define_resource!(ArenaExtendStrategy<super::ArenaExtendStrategy>(10005), |v: *const c_void| match v as usize {
+		1 => super::ArenaExtendStrategy::SameAsRequested,
+		_ => super::ArenaExtendStrategy::NextPowerOfTwo
+	});
+	define_resource!(ConvAlgorithmSearch<super::ConvAlgorithmSearch>(10006), |v: *const c_void| match v as usize {
+		1 => super::ConvAlgorithmSearch::Heuristic,
+		2 => super::ConvAlgorithmSearch::Default,
+		_ => super::ConvAlgorithmSearch::Exhaustive
+	});
+	define_resource!(ConvUseMaxWorkspace<bool>(10007), |v: *const c_void| !v.is_null());
+	define_resource!(Conv1dPadToNc1d<bool>(10008), |v: *const c_void| !v.is_null());
+	define_resource!(EnableSkipLayerNormStrictMode<bool>(10009), |v: *const c_void| !v.is_null());
+	define_resource!(PreferNhwc<bool>(10010), |v: *const c_void| !v.is_null());
+	define_resource!(UseTF32<bool>(10011), |v: *const c_void| !v.is_null());
+	define_resource!(FuseConvBias<bool>(10012), |v: *const c_void| !v.is_null());
+}

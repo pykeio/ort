@@ -2083,10 +2083,14 @@ pub struct OrtCustomOp {
 	pub InferOutputShapeFn: Option<unsafe extern "system" fn(op: *const OrtCustomOp, arg1: *mut OrtShapeInferContext) -> OrtStatusPtr>,
 	pub GetStartVersion: Option<unsafe extern "system" fn(op: *const OrtCustomOp) -> core::ffi::c_int>,
 	pub GetEndVersion: Option<unsafe extern "system" fn(op: *const OrtCustomOp) -> core::ffi::c_int>,
+	#[cfg(feature = "api-18")]
 	pub GetMayInplace: Option<unsafe extern "system" fn(input_index: *mut *mut core::ffi::c_int, output_index: *mut *mut core::ffi::c_int) -> usize>,
-	pub ReleaseMayInplace: Option<unsafe extern "system" fn(input_index: *mut core::ffi::c_int, output_index: *mut *mut core::ffi::c_int)>,
+	#[cfg(feature = "api-18")]
+	pub ReleaseMayInplace: Option<unsafe extern "system" fn(input_index: *mut core::ffi::c_int, output_index: *mut core::ffi::c_int)>,
+	#[cfg(feature = "api-18")]
 	pub GetAliasMap: Option<unsafe extern "system" fn(input_index: *mut *mut core::ffi::c_int, output_index: *mut *mut core::ffi::c_int) -> usize>,
-	pub ReleaseAliasMap: Option<unsafe extern "system" fn(input_index: *mut core::ffi::c_int, output_index: *mut *mut core::ffi::c_int)>
+	#[cfg(feature = "api-18")]
+	pub ReleaseAliasMap: Option<unsafe extern "system" fn(input_index: *mut core::ffi::c_int, output_index: *mut core::ffi::c_int)>
 }
 unsafe extern "system" {
 	pub fn OrtSessionOptionsAppendExecutionProvider_CUDA(options: *mut OrtSessionOptions, device_id: core::ffi::c_int) -> OrtStatusPtr;

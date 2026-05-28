@@ -1,20 +1,23 @@
 //! Contains traits for implementing custom operator domains & kernels.
 
 use alloc::{boxed::Box, ffi::CString, vec::Vec};
-use core::ptr::{self, NonNull};
+use core::{
+	ops::RangeInclusive,
+	ptr::{self, NonNull}
+};
 
 mod attribute;
-pub(crate) mod bound;
+pub(crate) mod erased;
 mod io;
 mod kernel;
 #[cfg(test)]
 mod tests;
 
-use self::bound::BoundOperator;
+use self::erased::ErasedOperator;
 pub use self::{
-	attribute::{Attribute, FromKernelAttributes, FromOpAttr, ToAttribute},
+	attribute::{Attribute, FromKernelContext, FromOpAttr, ToAttribute},
 	io::{InputOutputCharacteristic, OperatorInput, OperatorOutput},
-	kernel::{Kernel, KernelAttributes, KernelContext, ScratchBuffer}
+	kernel::{BoxedKernel, ComputeContext, Kernel, KernelContext, ScratchBuffer}
 };
 use crate::{
 	AsPointer, Error,
@@ -32,9 +35,37 @@ use crate::{
 /// input, you'll need to define 2 separate operators (which can be done via a macro); but both of these
 /// [`Operator`] structs can return the same name in [`Operator::name`] so that they are usable as simply
 /// `my.domain:Sort` in the graph.
-pub trait Operator: Send {
+pub trait Operator: Send + Sync {
+	type Kernel<'attr>: Kernel + 'attr;
+
+	/// A list of which inputs can be reused for an output if the shapes are identical; i.e. the operation for
+	/// those outputs can be performed inplace, allowing the graph optimizer to save memory.
+	///
+	/// The tuple is `(input_idx, output_idx)`.
+	///
+	/// A `Mul` operator with inputs `A` (tensor) and `B` (scalar) would set this to `&[(0, 0)]`
+	/// since the `A` tensor can be reused for the output.
+	#[cfg(feature = "api-18")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "api-18")))]
+	const INPLACES: &[(u32, u32)] = &[];
+
+	/// A list of which inputs are output without their data being changed, allowing for memory optimizations.
+	///
+	/// The tuple is `(input_idx, output_idx)`.
+	///
+	/// The `Reshape` or `Identity` operator would set this to `&[(0, 0)]` because the input's **data** doesn't change
+	/// (only the shape in the case of `Reshape`).
+	#[cfg(feature = "api-18")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "api-18")))]
+	const ALIASES: &[(u32, u32)] = &[];
+
 	/// Returns the name of the operator.
 	fn name(&self) -> &str;
+
+	/// Returns the domain version range supported by this operator.
+	fn versions(&self) -> RangeInclusive<u32> {
+		1..=u32::MAX
+	}
 
 	/// Returns the internal name of the execution provider this operator runs on, e.g. `"CUDAExecutionProvider"` (see
 	/// [`ExecutionProvider::name`](crate::ep::ExecutionProvider::name)).
@@ -50,17 +81,10 @@ pub trait Operator: Send {
 		None
 	}
 
-	fn inputs(&self) -> Vec<OperatorInput>;
-	fn outputs(&self) -> Vec<OperatorOutput>;
+	fn inputs(&self) -> impl IntoIterator<Item = OperatorInput>;
+	fn outputs(&self) -> impl IntoIterator<Item = OperatorOutput>;
 
-	fn create_kernel(&self, attributes: &KernelAttributes) -> crate::Result<Box<dyn Kernel>>;
-
-	fn min_version(&self) -> i32 {
-		1
-	}
-	fn max_version(&self) -> i32 {
-		i32::MAX
-	}
+	fn create_kernel<'attr>(&self, kctx: &KernelContext<'attr>) -> crate::Result<Self::Kernel<'attr>>;
 
 	fn infer_shape(&self, ctx: &mut ShapeInferenceContext) -> crate::Result<()> {
 		let _ = ctx;
@@ -125,7 +149,7 @@ pub struct OperatorDomain {
 	ptr: NonNull<ort_sys::OrtCustomOpDomain>,
 	_name: CString,
 	#[allow(clippy::vec_box)]
-	operators: Vec<Box<BoundOperator>>
+	operators: Vec<Box<ErasedOperator>>
 }
 
 impl OperatorDomain {
@@ -145,10 +169,10 @@ impl OperatorDomain {
 	pub fn add<O: Operator + 'static>(mut self, operator: O) -> Result<Self> {
 		// `Box`ing the operator here because we move it into `self` immediately after registering it. Without `Box`,
 		// the pointer we pass to `CustomOpDomain_Add` would become invalid.
-		let bound = Box::new(BoundOperator::new(operator)?);
-		ortsys![unsafe CustomOpDomain_Add(self.ptr.as_ptr(), (&*bound as *const BoundOperator) as *mut _)?];
+		let erased = Box::new(erased::erase(operator)?);
+		ortsys![unsafe CustomOpDomain_Add(self.ptr.as_ptr(), (&*erased as *const ErasedOperator) as *mut _)?];
 
-		self.operators.push(bound);
+		self.operators.push(erased);
 
 		Ok(self)
 	}

@@ -1,5 +1,5 @@
 use ort::{
-	operator::{Kernel, KernelAttributes, KernelContext, Operator, OperatorDomain, OperatorInput, OperatorOutput},
+	operator::{BoxedKernel, ComputeContext, Kernel, KernelContext, Operator, OperatorDomain, OperatorInput, OperatorOutput},
 	session::Session,
 	value::{Tensor, TensorElementType}
 };
@@ -7,20 +7,22 @@ use ort::{
 struct CustomOpOne;
 
 impl Operator for CustomOpOne {
+	type Kernel<'attr> = BoxedKernel<'attr>;
+
 	fn name(&self) -> &str {
 		"CustomOpOne"
 	}
 
-	fn inputs(&self) -> Vec<OperatorInput> {
-		vec![OperatorInput::required(TensorElementType::Float32), OperatorInput::required(TensorElementType::Float32)]
+	fn inputs(&self) -> impl IntoIterator<Item = OperatorInput> {
+		[OperatorInput::required(TensorElementType::Float32), OperatorInput::required(TensorElementType::Float32)]
 	}
 
-	fn outputs(&self) -> Vec<OperatorOutput> {
-		vec![OperatorOutput::required(TensorElementType::Float32)]
+	fn outputs(&self) -> impl IntoIterator<Item = OperatorOutput> {
+		[OperatorOutput::required(TensorElementType::Float32)]
 	}
 
-	fn create_kernel(&self, _: &KernelAttributes) -> ort::Result<Box<dyn Kernel>> {
-		Ok(Box::new(|ctx: &KernelContext| {
+	fn create_kernel<'attr>(&self, _: &KernelContext<'attr>) -> ort::Result<Self::Kernel<'attr>> {
+		Ok(Box::new(|ctx: &ComputeContext| {
 			let x = ctx.input(0)?.unwrap();
 			let y = ctx.input(1)?.unwrap();
 			let (x_shape, x) = x.try_extract_tensor::<f32>()?;
@@ -43,19 +45,24 @@ impl Operator for CustomOpOne {
 struct CustomOpTwo;
 
 impl Operator for CustomOpTwo {
+	type Kernel<'attr> = BoxedKernel<'attr>;
+
+	const INPLACES: &[(u32, u32)] = &[(0, 0)];
+
 	fn name(&self) -> &str {
 		"CustomOpTwo"
 	}
-	fn inputs(&self) -> Vec<OperatorInput> {
-		vec![OperatorInput::required(TensorElementType::Float32)]
+
+	fn inputs(&self) -> impl IntoIterator<Item = OperatorInput> {
+		[OperatorInput::required(TensorElementType::Float32)]
 	}
 
-	fn outputs(&self) -> Vec<OperatorOutput> {
-		vec![OperatorOutput::required(TensorElementType::Int32)]
+	fn outputs(&self) -> impl IntoIterator<Item = OperatorOutput> {
+		[OperatorOutput::required(TensorElementType::Int32)]
 	}
 
-	fn create_kernel(&self, _: &KernelAttributes) -> ort::Result<Box<dyn Kernel>> {
-		Ok(Box::new(|ctx: &KernelContext| {
+	fn create_kernel<'attr>(&self, _: &KernelContext<'attr>) -> ort::Result<Self::Kernel<'attr>> {
+		Ok(Box::new(|ctx: &ComputeContext| {
 			let x = ctx.input(0)?.unwrap();
 			let (x_shape, x) = x.try_extract_tensor::<f32>()?;
 			let mut z = ctx.output(0, x_shape.to_vec())?.unwrap();

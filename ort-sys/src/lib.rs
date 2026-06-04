@@ -654,7 +654,9 @@ pub struct OrtDmlApi {
 	pub GetD3D12ResourceFromAllocation:
 		unsafe extern "system" fn(provider: *mut OrtAllocator, dml_resource: *mut c_void, d3d_resource: *mut *mut c_void) -> OrtStatusPtr,
 	pub SessionOptionsAppendExecutionProvider_DML2:
-		unsafe extern "system" fn(options: *mut OrtSessionOptions, device_opts: *const OrtDmlDeviceOptions) -> OrtStatusPtr
+		unsafe extern "system" fn(options: *mut OrtSessionOptions, device_opts: *const OrtDmlDeviceOptions) -> OrtStatusPtr,
+	pub GetDMLDevice: unsafe extern "system" fn(options: *mut OrtSessionOptions, dmlDevice: *mut *mut c_void) -> OrtStatusPtr,
+	pub GetDMLCommandQueue: unsafe extern "system" fn(options: *mut OrtSessionOptions, dmlCommandQueue: *mut *mut c_void) -> OrtStatusPtr
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]

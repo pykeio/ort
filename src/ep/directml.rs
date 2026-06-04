@@ -190,3 +190,39 @@ impl Drop for DMLResource {
 		let _ = unsafe { Error::result_from_status((dml_api.FreeGPUAllocation)(self.0)) };
 	}
 }
+
+pub trait DMLSessionBuilderExt {
+	/// Returns the `IDMLDevice` used by the DML execution provider. Must be called after EP registration.
+	///
+	/// Returns `None` if DML is not supported by the backend; `Ok(Err)` if DML was not registered.
+	fn dml_device(&self) -> Option<Result<*mut ()>>;
+
+	/// Returns the `ID3D12CommandQueue` used by the DML execution provider. Must be called after EP registration.
+	///
+	/// Returns `None` if DML is not supported by the backend; `Ok(Err)` if DML was not registered.
+	fn d3d_command_queue(&self) -> Option<Result<*mut ()>>;
+}
+
+impl DMLSessionBuilderExt for SessionBuilder {
+	fn dml_device(&self) -> Option<Result<*mut ()>> {
+		let dml_api = api()?;
+
+		let mut ptr = ptr::null_mut();
+		if let Err(e) = unsafe { Error::result_from_status((dml_api.GetDMLDevice)(self.ptr().cast_mut(), &mut ptr)) } {
+			return Some(Err(e));
+		}
+
+		Some(Ok(ptr.cast()))
+	}
+
+	fn d3d_command_queue(&self) -> Option<Result<*mut ()>> {
+		let dml_api = api()?;
+
+		let mut ptr = ptr::null_mut();
+		if let Err(e) = unsafe { Error::result_from_status((dml_api.GetDMLCommandQueue)(self.ptr().cast_mut(), &mut ptr)) } {
+			return Some(Err(e));
+		}
+
+		Some(Ok(ptr.cast()))
+	}
+}

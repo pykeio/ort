@@ -439,6 +439,39 @@ impl ToAttribute for Vec<&str> {
 	private_impl!();
 }
 
+#[cfg(feature = "api-25")]
+#[cfg_attr(docsrs, doc(cfg(feature = "api-25")))]
+impl FromKernelContext<'_> for Vec<String> {
+	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
+	where
+		Self: Sized
+	{
+		let mut allocator = Allocator::default();
+		let mut size = 0;
+		let mut out = ptr::null_mut();
+
+		// double call is required...
+		ortsys![unsafe KernelInfoGetAttributeArray_string(info, name, allocator.ptr_mut(), &mut out, &mut size)?; nonNull(out)];
+
+		let strings = unsafe { core::slice::from_raw_parts(out.as_ptr(), size) };
+		let _guard = crate::util::run_on_drop(|| unsafe {
+			for string in strings {
+				allocator.free::<c_char>(*string);
+			}
+
+			allocator.free(out.as_ptr());
+		});
+
+		Ok(strings
+			.iter()
+			.map(|p| unsafe { core::ffi::CStr::from_ptr(*p as *mut _) })
+			.map(|r| r.to_str().map(String::from))
+			.collect::<Result<Vec<String>, core::str::Utf8Error>>()?)
+	}
+
+	private_impl!();
+}
+
 impl<'s, T: DowncastableTarget> FromKernelContext<'s> for ValueRef<'s, T> {
 	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where

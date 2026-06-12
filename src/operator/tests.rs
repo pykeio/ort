@@ -199,7 +199,10 @@ impl Operator for AttrTesterString {
 		Ok(())
 	}
 
-	fn create_kernel<'attr>(&self, _: &KernelContext<'attr>) -> crate::Result<Self::Kernel<'attr>> {
+	fn create_kernel<'attr>(&self, ctx: &KernelContext<'attr>) -> crate::Result<Self::Kernel<'attr>> {
+		#[cfg(feature = "api-25")]
+		assert_eq!(ctx.get::<Vec<String>>("strings"), Some(vec![String::from("more"), String::from("strings")]));
+
 		Ok(Box::new(|ctx: &ComputeContext| {
 			let x = ctx.input(0)?.ok_or_else(|| crate::Error::new("missing input"))?;
 			let (x_shape, x) = x.try_extract_tensor::<f32>()?;

@@ -2359,6 +2359,11 @@ unsafe extern "system" fn KernelInfo_GetOperatorType(info: *const OrtKernelInfo,
 }
 
 #[cfg(feature = "api-24")]
+unsafe extern "system" fn KernelInfo_GetOperatorSinceVersion(info: *const OrtKernelInfo, since_version: *mut i32) -> OrtStatusPtr {
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+#[cfg(feature = "api-24")]
 unsafe extern "system" fn GetInteropApi() -> *const OrtInteropApi {
 	ptr::null()
 }
@@ -2508,7 +2513,7 @@ unsafe extern "system" fn KernelInfoGetAttributeArray_string(
 	info: *const OrtKernelInfo,
 	name: *const c_char,
 	allocator: *mut OrtAllocator,
-	out: *mut *mut *mut char,
+	out: *mut *mut *mut c_char,
 	size: *mut usize
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -3033,6 +3038,8 @@ pub const fn api() -> OrtApi {
 		KernelInfo_GetOperatorDomain,
 		#[cfg(feature = "api-24")]
 		KernelInfo_GetOperatorType,
+		#[cfg(feature = "api-24")]
+		KernelInfo_GetOperatorSinceVersion,
 		#[cfg(feature = "api-24")]
 		GetInteropApi,
 		#[cfg(feature = "api-24")]

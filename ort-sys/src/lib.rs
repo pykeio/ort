@@ -1964,6 +1964,8 @@ pub struct OrtApi {
 	#[cfg(feature = "api-24")]
 	pub KernelInfo_GetOperatorType: unsafe extern "system" fn(info: *const OrtKernelInfo, out: *mut c_char, size: *mut usize) -> OrtStatusPtr,
 	#[cfg(feature = "api-24")]
+	pub KernelInfo_GetOperatorSinceVersion: unsafe extern "system" fn(info: *const OrtKernelInfo, since_version: *mut i32) -> OrtStatusPtr,
+	#[cfg(feature = "api-24")]
 	pub GetInteropApi: unsafe extern "system" fn() -> *const OrtInteropApi,
 	#[cfg(feature = "api-24")]
 	pub SessionGetEpDeviceForOutputs:
@@ -2045,7 +2047,7 @@ pub struct OrtApi {
 		info: *const OrtKernelInfo,
 		name: *const c_char,
 		allocator: *mut OrtAllocator,
-		out: *mut *mut *mut char,
+		out: *mut *mut *mut c_char,
 		size: *mut usize
 	) -> OrtStatusPtr,
 	#[cfg(feature = "api-25")]

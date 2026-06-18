@@ -5,6 +5,7 @@
 #![warn(clippy::unwrap_used)]
 #![deny(clippy::std_instead_of_alloc, clippy::std_instead_of_core)]
 #![cfg_attr(all(not(test), not(feature = "std")), no_std)]
+#![cfg_attr(feature = "nightly", feature(f16))]
 
 //! <div align=center>
 //! 	<img src="https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/docs/trend-banner.png" width="350px">

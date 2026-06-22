@@ -2524,6 +2524,21 @@ unsafe extern "system" fn SetPerSessionThreadPoolCallbacks(env: *mut OrtEnv, con
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-27")]
+unsafe extern "system" fn GetMemPatternEnabled(options: *const OrtSessionOptions, out: *mut ::core::ffi::c_int) -> OrtStatusPtr {
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+#[cfg(feature = "api-27")]
+unsafe extern "system" fn GetSessionExecutionMode(options: *const OrtSessionOptions, out: *mut ExecutionMode) -> OrtStatusPtr {
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+#[cfg(feature = "api-27")]
+unsafe extern "system" fn SessionReleaseCapturedGraph(session: *mut OrtSession, graph_annotation_id: ::core::ffi::c_int) -> OrtStatusPtr {
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
 pub const fn api() -> OrtApi {
 	OrtApi {
 		CreateStatus,
@@ -3087,6 +3102,12 @@ pub const fn api() -> OrtApi {
 		#[cfg(feature = "api-25")]
 		KernelInfoGetAttributeArray_string,
 		#[cfg(feature = "api-25")]
-		SetPerSessionThreadPoolCallbacks
+		SetPerSessionThreadPoolCallbacks,
+		#[cfg(feature = "api-27")]
+		GetMemPatternEnabled,
+		#[cfg(feature = "api-27")]
+		GetSessionExecutionMode,
+		#[cfg(feature = "api-27")]
+		SessionReleaseCapturedGraph
 	}
 }

@@ -7,7 +7,8 @@ const V23: u32 = cfg!(feature = "api-23") as u32;
 const V24: u32 = cfg!(feature = "api-24") as u32;
 const V25: u32 = cfg!(feature = "api-25") as u32;
 const V26: u32 = cfg!(feature = "api-26") as u32;
+const V27: u32 = cfg!(feature = "api-27") as u32;
 
 #[rustfmt::skip]
 pub const ORT_API_VERSION: u32 = 17 // minimum version
-	+ V18 + V19 + V20 + V21 + V22 + V23 + V24 + V25 + V26; // We can do this because each API also enables the one before it.
+	+ V18 + V19 + V20 + V21 + V22 + V23 + V24 + V25 + V26 + V27; // We can do this because each API also enables the one before it.

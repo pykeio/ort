@@ -2051,7 +2051,13 @@ pub struct OrtApi {
 		size: *mut usize
 	) -> OrtStatusPtr,
 	#[cfg(feature = "api-25")]
-	pub SetPerSessionThreadPoolCallbacks: unsafe extern "system" fn(env: *mut OrtEnv, config: *const OrtThreadPoolCallbacksConfig) -> OrtStatusPtr
+	pub SetPerSessionThreadPoolCallbacks: unsafe extern "system" fn(env: *mut OrtEnv, config: *const OrtThreadPoolCallbacksConfig) -> OrtStatusPtr,
+	#[cfg(feature = "api-27")]
+	pub GetMemPatternEnabled: unsafe extern "system" fn(options: *const OrtSessionOptions, out: *mut core::ffi::c_int) -> OrtStatusPtr,
+	#[cfg(feature = "api-27")]
+	pub GetSessionExecutionMode: unsafe extern "system" fn(options: *const OrtSessionOptions, out: *mut ExecutionMode) -> OrtStatusPtr,
+	#[cfg(feature = "api-27")]
+	pub SessionReleaseCapturedGraph: unsafe extern "system" fn(session: *mut OrtSession, graph_annotation_id: core::ffi::c_int) -> OrtStatusPtr
 }
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]

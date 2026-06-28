@@ -55,6 +55,7 @@ training = [ "ort-sys/training" ]
 
 ndarray = [ "dep:ndarray" ]
 half = [ "dep:half" ]
+nightly = []
 num-complex = [ "dep:num-complex" ]
 tracing = [ "dep:tracing" ]
 

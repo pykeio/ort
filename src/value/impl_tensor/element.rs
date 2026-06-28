@@ -212,6 +212,8 @@ impl_type_trait!(bool, Bool);
 #[cfg(feature = "half")]
 #[cfg_attr(docsrs, doc(cfg(feature = "half")))]
 impl_type_trait!(half::f16, Float16);
+#[cfg(feature = "nightly")]
+impl_type_trait!(f16, Float16);
 impl_type_trait!(f64, Float64);
 impl_type_trait!(u32, Uint32);
 impl_type_trait!(u64, Uint64);
@@ -340,6 +342,10 @@ mod tests {
 		{
 			do_test!(Float16, half::f16, half::f16::from_f32(1.037813));
 			do_test!(Bfloat16, half::bf16, half::bf16::from_f32(39.18381));
+		}
+		#[cfg(feature = "nightly")]
+		{
+			do_test!(Float16, f16, 2.7);
 		}
 		#[cfg(feature = "num-complex")]
 		{

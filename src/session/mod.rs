@@ -284,6 +284,16 @@ impl Session {
 
 	#[cfg(not(target_arch = "wasm32"))]
 	fn run_inner<'i, 'r, 's: 'r, 'v: 'i>(
+		// Yes, the internal run functions take `&self`. In a perfect world, the public functions would take `&self` too. But we don't live in a perfect world,
+		// and ONNX Runtime's own `Run` is **not thread safe** (despite Microsoft saying it should be years ago!). You may modify those functions to take
+		// `&self` and run your models from a bunch of threads without a care in the world, and everything may *seem* fine, but that's the beauty of undefined
+		// behavior - it's undefined! You have no idea what could be going wrong behind the scenes. At least EPs like CUDA have the decency to outright crash
+		// the process most of the time. The internal run functions will stay `&self` on the off chance that MS stumbles their way into asking Copilot to fix
+		// the thread safety of `Run`; if, by some miracle, it actually manages to do that, we can then make the other functions `&self` with minimal changes.
+		//
+		// If you decide to change the run functions to take `&self` before then, you forfeit your rights to complain to me when your app crashes or data gets
+		// corrupted or your machine blows up. If you submit that change in a PR, you give me the right to repeatedly hit you over the head with a cartoon
+		// caveman's club. This comment is legally binding.
 		&'s self,
 		input_names: SmallVec<[&str; STACK_SESSION_INPUTS]>,
 		input_values: SmallVec<[&'i SessionInputValue<'v>; STACK_SESSION_INPUTS]>,
@@ -366,7 +376,7 @@ impl Session {
 
 	#[cfg(not(target_arch = "wasm32"))]
 	fn run_binding_inner<'r, 'b, 's: 'b>(
-		&'s self,
+		&'s self, // `RunWithBinding` is also not thread safe.
 		binding: &'b IoBinding,
 		run_options: Option<&'r RunOptions<NoSelectedOutputs>>
 	) -> Result<SessionOutputs<'b>> {
@@ -438,7 +448,7 @@ impl Session {
 
 	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 	fn run_inner_async<'i, 'r, 's: 'r, 'v: 'i + 's>(
-		&'s self,
+		&'s self, // Yes, `RunAsync` is also not thread safe. That doesn't make a whole lot of sense.
 		input_names: SmallVec<[&str; STACK_SESSION_INPUTS]>,
 		input_values: SmallVec<[&SessionInputValue<'v>; STACK_SESSION_INPUTS]>,
 		run_options: &'r Arc<UntypedRunOptions>

@@ -101,6 +101,8 @@ impl Drop for SharedSessionInner {
 
 /// An ONNX Runtime graph to be used for inference.
 ///
+/// Use [`SessionBuilder`]/[`Session::builder`] to create a session, and [`Session::run`] to perform inference.
+///
 /// ```
 /// # use ort::{session::Session, value::TensorRef};
 /// # fn main() -> ort::Result<()> {
@@ -110,6 +112,14 @@ impl Drop for SharedSessionInner {
 /// # 	Ok(())
 /// # }
 /// ```
+///
+/// ### Why does `run` take `&mut self`?
+/// `run_*` methods take `&mut self` not because they mutate internal state, but because various ONNX Runtime
+/// internals -- like certain EP allocators or statistics trackers -- are not thread safe. Previous versions of
+/// `ort` that allowed concurrent inference often saw crashes and memory corruption, hence the change.
+///
+/// If you need concurrent inference, we recommend creating one session per thread or batching multiple requests
+/// at once until ONNX Runtime's thread safety issues are fixed.
 #[derive(Debug)]
 pub struct Session {
 	pub(crate) inner: Arc<SharedSessionInner>,

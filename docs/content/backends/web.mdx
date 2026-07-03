@@ -39,7 +39,7 @@ Rather than trying to link ONNX Runtime into your Rust application, `ort-web` in
 ### Install `ort-web`
 ```toml filename="Cargo.toml"
 [dependencies]
-ort-web = "0.2.2+1.26"
+ort-web = "0.2.2+1.27"
 ...
 ```
 
@@ -53,7 +53,7 @@ default-features = false # Disables the `download-binaries` feature since we don
 features = [
     "std",
     "ndarray",
-    "api-26",
+    "api-27",
     "alternative-backend"
 ]
 ```
@@ -139,7 +139,7 @@ use ort::session::Session;
 use ort_web::Dist;
 
 async fn init_model() -> anyhow::Result<Session> {
-	let dist = Dist::new("https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/")
+	let dist = Dist::new("https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/")
 		// we want to load the WebGPU build
 		.with_script_name("ort.webgpu.min.js");
 	ort::set_api(ort_web::api(dist).await?);

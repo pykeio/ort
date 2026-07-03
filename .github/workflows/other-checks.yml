@@ -37,7 +37,7 @@ jobs:
       - name: Run checks
         run: |
           cargo check -p ort --no-default-features
-          cargo check -p ort --no-default-features --features api-26
+          cargo check -p ort --no-default-features --features api-27
   msrv:
     name: MSRV (1.88)
     runs-on: ubuntu-latest
@@ -70,3 +70,4 @@ jobs:
           cargo check -p ort --no-default-features --features api-24,std,ndarray,tracing
           cargo check -p ort --no-default-features --features api-25,std,ndarray,tracing
           cargo check -p ort --no-default-features --features api-26,std,ndarray,tracing
+          cargo check -p ort --no-default-features --features api-27,std,ndarray,tracing

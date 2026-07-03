@@ -53,7 +53,7 @@ pub fn resolve_dist() -> Result<Distribution, Option<String>> {
 				{
 					"cu13"
 				} else {
-					"cu12"
+					"cu13" // "fallback" to the lowest version we ship (we only ship 13 for now)
 				}
 			}
 		};

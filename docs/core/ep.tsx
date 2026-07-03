@@ -25,7 +25,7 @@ export const EXECUTION_PROVIDER_ARRAY: ExecutionProvider[] = [
 		vendor: 'NVIDIA',
 		name: 'CUDA',
 		feature: 'cuda',
-		note: <>Supports both CUDA 12 & CUDA 13. See <Link href='/perf/execution-providers#cuda'>here</Link> for more info.</>,
+		note: <>Supports CUDA 13. See <Link href='/perf/execution-providers#cuda'>here</Link> for more info.</>,
 		platforms: [ { os: 'windows', arch: 'x64' }, { os: 'linux', arch: 'x64' }, { os: 'linux', arch: 'arm64' } ],
 		binaries: [ { os: 'windows', arch: 'x64' }, { os: 'linux', arch: 'x64' } ]
 	},

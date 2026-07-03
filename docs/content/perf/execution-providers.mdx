@@ -202,9 +202,7 @@ This means that we have builds for `features = ["cuda", "tensorrt", "directml"]`
 If you want a single build of ONNX Runtime that has both `cuda` *and* `webgpu`, you'll have to compile it from source.
 
 ### CUDA
-<Ort/> provides binaries for CUDA ≥ 12.8 or ≥ 13.2, and targets cuDNN ≥ 9.19. Make sure CUDA and cuDNN are installed and available on the `PATH`.
-
-<Ort/> will try to automatically detect which CUDA version you're using, but sometimes it gets it wrong and reverts to CUDA 12 (especially if you have both 12 and 13 installed). You can override the CUDA version by setting the `ORT_CUDA_VERSION` environment variable to `12` or `13`.
+<Ort/> provides binaries for CUDA ≥ 13.2 and targets cuDNN ≥ 9.23. Make sure compatible versions of CUDA and cuDNN are installed and available on the `PATH`.
 
 ### WebGPU
 The WebGPU EP is **experimental** and may produce incorrect results/crashes; these issues should be reported upstream as there's unfortunately nothing we can do about them.

@@ -25,7 +25,6 @@ export const PLATFORMS_SUPPORTED: Triple[] = [
 	{ os: 'linux', arch: 'x64' },
 	{ os: 'linux', arch: 'arm' },
 	{ os: 'linux', arch: 'arm64' },
-	{ os: 'macos', arch: 'x64' },
 	{ os: 'macos', arch: 'arm64' },
 	{ os: 'ios', arch: 'arm64' },
 	{ os: 'android', arch: 'arm64' },

@@ -37,5 +37,5 @@ extern "C" {
 #[wasm_bindgen(module = "/_telemetry.js")]
 extern "C" {
 	#[wasm_bindgen(catch, js_name = "trackSessionInit")]
-	pub fn track_session_init() -> Result<Boolean, JsValue>;
+	pub fn track_session_init(crate_version: &str) -> Result<Boolean, JsValue>;
 }

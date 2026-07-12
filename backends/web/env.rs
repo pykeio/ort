@@ -29,7 +29,7 @@ impl Environment {
 		}
 
 		let _ = match event {
-			TelemetryEvent::SessionInit => binding::track_session_init()
+			TelemetryEvent::SessionInit => binding::track_session_init(env!("CARGO_PKG_VERSION"))
 		};
 	}
 }

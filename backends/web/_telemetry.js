@@ -9,7 +9,7 @@ function track(payload) {
 	}
 	if (navigator.webdriver || 'Cypress' in window) {
 		return false;
-    }
+	}
 
 	return navigator.sendBeacon(EVENT_URL, payload.buffer);
 }
@@ -35,7 +35,8 @@ function asUint32(x) {
 const encoder = new TextEncoder();
 
 let hasInitializedSession = false;
-export function trackSessionInit() {
+/** @param {string} version */
+export function trackSessionInit(version) {
 	if (hasInitializedSession) {
 		return true;
 	}
@@ -43,10 +44,13 @@ export function trackSessionInit() {
 	hasInitializedSession = true;
 
 	const encodedHostname = encoder.encode(location.hostname);
+	const encodedVersion = encoder.encode(version);
 	return track(concat(
 		new Uint8Array([ 0x01 ]),
-		new Uint8Array([ 0x90, 0x63, 0x8A, 0xE7 ]),
+		new Uint8Array([ 0x90, 0x61, 0x8A, 0xE7 ]),
 		asUint32(encodedHostname.byteLength),
-		encodedHostname
+		encodedHostname,
+		asUint32(encodedVersion.byteLength),
+		encodedVersion
 	));
 }

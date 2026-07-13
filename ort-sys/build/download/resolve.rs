@@ -21,9 +21,9 @@ fn parse_dist_table(target: &str) -> impl Iterator<Item = Distribution> + '_ {
 		.skip(1)
 		.filter(|c| !c.is_empty() && !c.starts_with('#'))
 		.map(|c| c.split('\t').collect::<Vec<_>>())
-		.filter(move |c| c[1] == target)
+		.filter(move |c| c[0] == target)
 		.map(|c| Distribution {
-			features: if c[0] == "none" { HashSet::new() } else { c[0].split(',').collect() },
+			features: if c[1] == "none" { HashSet::new() } else { c[1].split(',').collect() },
 			url: c[2],
 			hash: c[3]
 		})

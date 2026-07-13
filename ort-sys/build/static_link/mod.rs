@@ -37,7 +37,7 @@ pub fn static_link_prerequisites(source: BinariesSource) {
 		println!("cargo:rustc-link-lib=framework=Foundation");
 		println!("cargo:rustc-link-lib=framework=CoreML");
 
-		if target_triple.contains("apple-darwin")
+		if (target_triple.contains("apple-darwin") || target_triple.contains("apple-ios-macabi"))
 			&& let Some(dir) = apple::macos_rtlib_search_dir()
 		{
 			println!("cargo:rustc-link-search={dir}");

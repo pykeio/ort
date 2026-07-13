@@ -1,7 +1,7 @@
 use alloc::string::ToString;
 
-use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
-use crate::{error::Result, session::builder::SessionBuilder};
+use super::{ExecutionProvider, ExecutionProviderOptions};
+use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 
 #[derive(Debug, Default, Clone)]
 pub struct NVRTX {
@@ -82,27 +82,15 @@ impl ExecutionProvider for NVRTX {
 		"NvTensorRTRTXExecutionProvider"
 	}
 
-	fn supported_by_platform(&self) -> bool {
-		cfg!(all(target_os = "windows", target_arch = "x86_64"))
-	}
-
-	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
-		#[cfg(any(feature = "load-dynamic", feature = "nvrtx"))]
-		{
-			use crate::{AsPointer, ortsys};
-
-			let ffi_options = self.options.to_ffi();
-			ortsys![unsafe SessionOptionsAppendExecutionProvider(
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+		let ffi_options = self.options.to_ffi();
+		ortsys![unsafe SessionOptionsAppendExecutionProvider(
 				session_builder.ptr_mut(),
 				c"NvTensorRtRtx".as_ptr().cast::<core::ffi::c_char>(),
 				ffi_options.key_ptrs(),
 				ffi_options.value_ptrs(),
 				ffi_options.len(),
 			)?];
-			return Ok(());
-		}
-
-		Err(RegisterError::MissingFeature)
+		Ok(())
 	}
 }

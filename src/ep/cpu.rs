@@ -1,4 +1,4 @@
-use super::{ExecutionProvider, RegisterError};
+use super::ExecutionProvider;
 use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 
 /// The default CPU execution provider, powered by MLAS.
@@ -36,11 +36,7 @@ impl ExecutionProvider for CPU {
 		Ok(true)
 	}
 
-	fn supported_by_platform(&self) -> bool {
-		true
-	}
-
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		if self.use_arena {
 			ortsys![unsafe EnableCpuMemArena(session_builder.ptr_mut())?];
 		} else {

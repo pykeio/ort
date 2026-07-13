@@ -1,7 +1,8 @@
 use alloc::string::ToString;
+use core::ffi;
 
-use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
-use crate::{error::Result, session::builder::SessionBuilder};
+use super::{ExecutionProvider, ExecutionProviderOptions};
+use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpecializationStrategy {
@@ -242,28 +243,16 @@ impl ExecutionProvider for CoreML {
 		"CoreMLExecutionProvider"
 	}
 
-	fn supported_by_platform(&self) -> bool {
-		cfg!(target_vendor = "apple")
-	}
-
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
-		#[cfg(any(feature = "load-dynamic", feature = "coreml"))]
-		{
-			use crate::{AsPointer, ortsys};
-
-			let ffi_options = self.options.to_ffi();
-			ortsys![unsafe SessionOptionsAppendExecutionProvider(
-				session_builder.ptr_mut(),
-				c"CoreML".as_ptr().cast::<core::ffi::c_char>(),
-				ffi_options.key_ptrs(),
-				ffi_options.value_ptrs(),
-				ffi_options.len(),
-			)?];
-
-			return Ok(());
-		}
-
-		Err(RegisterError::MissingFeature)
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+		let ffi_options = self.options.to_ffi();
+		ortsys![unsafe SessionOptionsAppendExecutionProvider(
+			session_builder.ptr_mut(),
+			c"CoreML".as_ptr().cast::<ffi::c_char>(),
+			ffi_options.key_ptrs(),
+			ffi_options.value_ptrs(),
+			ffi_options.len(),
+		)?];
+		Ok(())
 	}
 }

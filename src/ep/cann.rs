@@ -1,7 +1,8 @@
 use alloc::string::ToString;
+use core::ptr;
 
-use super::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderOptions, RegisterError};
-use crate::{error::Result, session::builder::SessionBuilder};
+use super::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderOptions};
+use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder, util};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -207,37 +208,24 @@ impl ExecutionProvider for CANN {
 		"CANNExecutionProvider"
 	}
 
-	fn supported_by_platform(&self) -> bool {
-		cfg!(all(target_os = "linux", any(target_arch = "aarch64", target_arch = "x86_64")))
-	}
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+		let mut cann_options: *mut ort_sys::OrtCANNProviderOptions = ptr::null_mut();
+		ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)?];
+		let _guard = util::run_on_drop(|| {
+			ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
+		});
 
-	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
-		#[cfg(any(feature = "load-dynamic", feature = "cann"))]
-		{
-			use core::ptr;
+		let ffi_options = self.options.to_ffi();
 
-			use crate::{AsPointer, ortsys, util};
+		ortsys![unsafe UpdateCANNProviderOptions(
+			cann_options,
+			ffi_options.key_ptrs(),
+			ffi_options.value_ptrs(),
+			ffi_options.len()
+		)?];
 
-			let mut cann_options: *mut ort_sys::OrtCANNProviderOptions = ptr::null_mut();
-			ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)?];
-			let _guard = util::run_on_drop(|| {
-				ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
-			});
+		ortsys![unsafe SessionOptionsAppendExecutionProvider_CANN(session_builder.ptr_mut(), cann_options)?];
 
-			let ffi_options = self.options.to_ffi();
-
-			ortsys![unsafe UpdateCANNProviderOptions(
-				cann_options,
-				ffi_options.key_ptrs(),
-				ffi_options.value_ptrs(),
-				ffi_options.len()
-			)?];
-
-			ortsys![unsafe SessionOptionsAppendExecutionProvider_CANN(session_builder.ptr_mut(), cann_options)?];
-			return Ok(());
-		}
-
-		Err(RegisterError::MissingFeature)
+		Ok(())
 	}
 }

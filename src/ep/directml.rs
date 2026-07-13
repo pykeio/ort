@@ -3,7 +3,7 @@ use core::{
 	ptr::{self, NonNull}
 };
 
-use super::{ExecutionProvider, RegisterError};
+use super::ExecutionProvider;
 use crate::{
 	AsPointer,
 	error::{Error, Result},
@@ -93,37 +93,27 @@ impl ExecutionProvider for DirectML {
 		"DmlExecutionProvider"
 	}
 
-	fn supported_by_platform(&self) -> bool {
-		cfg!(target_os = "windows")
-	}
-
-	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
-		#[cfg(any(feature = "load-dynamic", feature = "directml"))]
-		{
-			let api = api().ok_or_else(|| Error::new("DirectML is not supported in this build of ONNX Runtime"))?;
-			if let Some(device_id) = self.device_id {
-				unsafe { Error::result_from_status((api.SessionOptionsAppendExecutionProvider_DML)(session_builder.ptr_mut(), device_id as _)) }?;
-			} else {
-				let device_options = ort_sys::OrtDmlDeviceOptions {
-					Filter: match self.device_filter {
-						DeviceFilter::Any => ort_sys::OrtDmlDeviceFilter::Any,
-						DeviceFilter::Gpu => ort_sys::OrtDmlDeviceFilter::Gpu,
-						DeviceFilter::Npu => ort_sys::OrtDmlDeviceFilter::Npu
-					},
-					Preference: match self.performance_preference {
-						PerformancePreference::Default => ort_sys::OrtDmlPerformancePreference::Default,
-						PerformancePreference::HighPerformance => ort_sys::OrtDmlPerformancePreference::HighPerformance,
-						PerformancePreference::MinimumPower => ort_sys::OrtDmlPerformancePreference::MinimumPower
-					}
-				};
-				unsafe { Error::result_from_status((api.SessionOptionsAppendExecutionProvider_DML2)(session_builder.ptr_mut(), &device_options)) }?;
-			}
-
-			return Ok(());
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+		let api = api().ok_or_else(|| Error::new("DirectML is not supported in this build of ONNX Runtime"))?;
+		if let Some(device_id) = self.device_id {
+			unsafe { Error::result_from_status((api.SessionOptionsAppendExecutionProvider_DML)(session_builder.ptr_mut(), device_id as _)) }?;
+		} else {
+			let device_options = ort_sys::OrtDmlDeviceOptions {
+				Filter: match self.device_filter {
+					DeviceFilter::Any => ort_sys::OrtDmlDeviceFilter::Any,
+					DeviceFilter::Gpu => ort_sys::OrtDmlDeviceFilter::Gpu,
+					DeviceFilter::Npu => ort_sys::OrtDmlDeviceFilter::Npu
+				},
+				Preference: match self.performance_preference {
+					PerformancePreference::Default => ort_sys::OrtDmlPerformancePreference::Default,
+					PerformancePreference::HighPerformance => ort_sys::OrtDmlPerformancePreference::HighPerformance,
+					PerformancePreference::MinimumPower => ort_sys::OrtDmlPerformancePreference::MinimumPower
+				}
+			};
+			unsafe { Error::result_from_status((api.SessionOptionsAppendExecutionProvider_DML2)(session_builder.ptr_mut(), &device_options)) }?;
 		}
 
-		Err(RegisterError::MissingFeature)
+		Ok(())
 	}
 }
 

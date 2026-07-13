@@ -43,7 +43,11 @@ include = [ "/src/", "/LICENSE-APACHE", "/LICENSE-MIT" ]
 status = "actively-developed"
 
 [package.metadata.docs.rs]
-features = [ "std", "ndarray", "half", "num-complex", "training", "fetch-models", "load-dynamic", "copy-dylibs" ]
+features = [
+	"std", "ndarray", "half", "num-complex", "training", "fetch-models", "load-dynamic", "copy-dylibs",
+	"cuda", "tensorrt", "openvino", "onednn", "directml", "nnapi", "coreml", "xnnpack", "rocm", "acl",
+	"armnn", "tvm", "migraphx", "rknpu", "vitis", "cann", "qnn", "webgpu", "azure", "nvrtx", "vsinpu"
+]
 targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 rustdoc-args = [ "--cfg", "docsrs" ]
 
@@ -61,6 +65,7 @@ tracing = [ "dep:tracing" ]
 
 fetch-models = [ "std", "dep:ureq", "dep:sha2" ]
 download-binaries = [ "ort-sys/download-binaries" ]
+lax-feature-matching = [ "ort-sys/lax-feature-matching" ]
 preload-dylibs = [ "dep:libloading" ]
 load-dynamic = [ "std", "preload-dylibs", "ort-sys/disable-linking" ]
 copy-dylibs = [ "ort-sys/copy-dylibs" ]

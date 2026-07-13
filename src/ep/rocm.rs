@@ -1,8 +1,8 @@
 use alloc::string::ToString;
-use core::ffi::c_void;
+use core::{ffi::c_void, ptr};
 
-use super::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderOptions, RegisterError};
-use crate::{error::Result, session::builder::SessionBuilder};
+use super::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderOptions};
+use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder, util};
 
 #[derive(Debug, Default, Clone)]
 pub struct ROCm {
@@ -91,36 +91,23 @@ impl ExecutionProvider for ROCm {
 		"ROCMExecutionProvider"
 	}
 
-	fn supported_by_platform(&self) -> bool {
-		cfg!(all(target_arch = "x86_64", target_os = "linux"))
-	}
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+		let mut rocm_options: *mut ort_sys::OrtROCMProviderOptions = ptr::null_mut();
+		ortsys![unsafe CreateROCMProviderOptions(&mut rocm_options)?];
+		let _guard = util::run_on_drop(|| {
+			ortsys![unsafe ReleaseROCMProviderOptions(rocm_options)];
+		});
 
-	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
-		#[cfg(any(feature = "load-dynamic", feature = "rocm"))]
-		{
-			use core::ptr;
+		let ffi_options = self.options.to_ffi();
+		ortsys![unsafe UpdateROCMProviderOptions(
+			rocm_options,
+			ffi_options.key_ptrs(),
+			ffi_options.value_ptrs(),
+			ffi_options.len()
+		)?];
 
-			use crate::{AsPointer, ortsys, util};
+		ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(session_builder.ptr_mut(), rocm_options)?];
 
-			let mut rocm_options: *mut ort_sys::OrtROCMProviderOptions = core::ptr::null_mut();
-			ortsys![unsafe CreateROCMProviderOptions(&mut rocm_options)?];
-			let _guard = util::run_on_drop(|| {
-				ortsys![unsafe ReleaseROCMProviderOptions(rocm_options)];
-			});
-
-			let ffi_options = self.options.to_ffi();
-			ortsys![unsafe UpdateROCMProviderOptions(
-				rocm_options,
-				ffi_options.key_ptrs(),
-				ffi_options.value_ptrs(),
-				ffi_options.len()
-			)?];
-
-			ortsys![unsafe SessionOptionsAppendExecutionProvider_ROCM(session_builder.ptr_mut(), rocm_options)?];
-			return Ok(());
-		}
-
-		Err(RegisterError::MissingFeature)
+		Ok(())
 	}
 }

@@ -33,80 +33,12 @@ use crate::{
 	util::{MiniMap, char_p_to_string, run_on_drop}
 };
 
-pub mod cpu;
-pub use self::cpu::CPU;
-pub mod cuda;
-pub use self::cuda::CUDA;
-pub mod tensorrt;
-pub use self::tensorrt::TensorRT;
-pub mod onednn;
-pub use self::onednn::OneDNN;
-pub mod acl;
-pub use self::acl::ACL;
-pub mod openvino;
-pub use self::openvino::OpenVINO;
-pub mod coreml;
-pub use self::coreml::CoreML;
-pub mod rocm;
-pub use self::rocm::ROCm;
-pub mod cann;
-pub use self::cann::CANN;
-pub mod directml;
-pub use self::directml::DirectML;
-pub mod tvm;
-pub use self::tvm::TVM;
-pub mod nnapi;
-pub use self::nnapi::NNAPI;
-pub mod qnn;
-pub use self::qnn::QNN;
-pub mod xnnpack;
-pub use self::xnnpack::XNNPACK;
-pub mod armnn;
-#[allow(deprecated)]
-pub use self::armnn::ArmNN;
-pub mod migraphx;
-pub use self::migraphx::MIGraphX;
-#[cfg(feature = "api-18")]
-pub mod vitis;
-#[cfg(feature = "api-18")]
-pub use self::vitis::Vitis;
-pub mod rknpu;
-pub use self::rknpu::RKNPU;
-pub mod webgpu;
-pub use self::webgpu::WebGPU;
-pub mod azure;
-pub use self::azure::Azure;
-pub mod vsinpu;
-pub use self::vsinpu::VSINPU;
-pub mod nvrtx;
-pub use self::nvrtx::NVRTX;
-#[cfg(target_arch = "wasm32")]
-pub mod wasm;
-#[cfg(target_arch = "wasm32")]
-pub mod webnn;
-#[cfg(target_arch = "wasm32")]
-pub use self::{wasm::WASM, webnn::WebNN};
-
 pub trait ExecutionProvider: Any + Send + Sync {
 	/// Returns the identifier of this execution provider used internally by ONNX Runtime.
 	///
 	/// This is the same as what's used in ONNX Runtime's Python API to register this execution provider, i.e.
 	/// [`TVM`]'s identifier is `TvmExecutionProvider`.
 	fn name(&self) -> &'static str;
-
-	/// Returns whether this execution provider is supported on this platform.
-	///
-	/// For example, the CoreML execution provider implements this as:
-	/// ```ignore
-	/// impl ExecutionProvider for CoreML {
-	/// 	fn supported_by_platform() -> bool {
-	/// 		cfg!(target_vendor = "apple")
-	/// 	}
-	/// }
-	/// ```
-	fn supported_by_platform(&self) -> bool {
-		true
-	}
 
 	/// Returns `Ok(true)` if ONNX Runtime was *compiled with support* for this execution provider, and `Ok(false)`
 	/// otherwise.
@@ -124,7 +56,7 @@ pub trait ExecutionProvider: Any + Send + Sync {
 	}
 
 	/// Attempts to register this execution provider on the given session.
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError>;
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()>;
 }
 
 /// Trait used for execution providers that can have arbitrary configuration keys applied.
@@ -196,7 +128,7 @@ impl Debug for ExecutionProviderDispatch {
 
 /// Sets the current GPU device of the active EP to the device specified by `device_id`.
 ///
-/// This only works for [`CUDAExecutionProvider`] & [`ROCmExecutionProvider`].
+/// This only works for [`CUDA`] & [`ROCm`].
 pub fn set_gpu_device(device_id: i32) -> Result<()> {
 	ortsys![unsafe SetCurrentGpuDeviceId(device_id)?];
 	Ok(())
@@ -204,7 +136,7 @@ pub fn set_gpu_device(device_id: i32) -> Result<()> {
 
 /// Returns the ID of the GPU device being used by the active EP.
 ///
-/// This only works for [`CUDAExecutionProvider`] & [`ROCmExecutionProvider`].
+/// This only works for [`CUDA`] & [`ROCm`].
 pub fn get_gpu_device() -> Result<i32> {
 	let mut out = 0;
 	ortsys![unsafe GetCurrentGpuDeviceId(&mut out)?];
@@ -248,40 +180,6 @@ impl ExecutionProviderOptionsFFI {
 	}
 }
 
-#[derive(Debug)]
-pub enum RegisterError {
-	Error(crate::Error),
-	MissingFeature
-}
-
-impl From<crate::Error> for RegisterError {
-	fn from(value: crate::Error) -> Self {
-		Self::Error(value)
-	}
-}
-
-impl From<RegisterError> for crate::Error {
-	fn from(value: RegisterError) -> Self {
-		match value {
-			RegisterError::Error(e) => e,
-			RegisterError::MissingFeature => {
-				crate::Error::new("The execution provider could not be registered because its corresponding Cargo feature is not enabled.")
-			}
-		}
-	}
-}
-
-impl fmt::Display for RegisterError {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		match self {
-			Self::Error(e) => fmt::Display::fmt(e, f),
-			Self::MissingFeature => f.write_str("The execution provider could not be registered because its corresponding Cargo feature is not enabled.")
-		}
-	}
-}
-
-impl core::error::Error for RegisterError {}
-
 #[allow(unused)]
 macro_rules! define_ep_register {
 	($symbol:ident($($id:ident: $type:ty),*) -> $rt:ty) => {
@@ -296,7 +194,7 @@ macro_rules! define_ep_register {
 			match symbol {
 				Ok(symbol) => symbol.into_raw(),
 				Err(e) => {
-					return ::core::result::Result::Err($crate::Error::new(::alloc::format!("Error attempting to load symbol `{}` from dynamic library: {}", stringify!($symbol), e)))?;
+					return ::core::result::Result::Err($crate::Error::new(::alloc::format!("Error attempting to load symbol `{}` from dynamic library: {}", stringify!($symbol), e)));
 				}
 			}
 		};
@@ -344,15 +242,7 @@ pub(crate) fn apply_execution_providers(session_builder: &mut SessionBuilder, ep
 				return Err(e)?;
 			}
 
-			if matches!(e, RegisterError::MissingFeature) {
-				if ep.inner.supported_by_platform() {
-					crate::warn!(%source, "Couldn't register `{}`: {e}", ep.inner.name());
-				} else {
-					crate::debug!(%source, "Couldn't register `{}`: {e} (note: it may not be supported on this platform)", ep.inner.name());
-				}
-			} else {
-				crate::error!(%source, "An error occurred when attempting to register `{}`: {e}", ep.inner.name());
-			}
+			crate::error!(%source, "An error occurred when attempting to register `{}`: {e}", ep.inner.name());
 			Ok(false)
 		} else {
 			crate::info!(%source, "Successfully registered `{}`", ep.inner.name());
@@ -439,76 +329,142 @@ pub trait ExecutionProviderResource {
 	fn convert(value: *const core::ffi::c_void) -> Self::Type;
 }
 
-#[deprecated = "import `ort::ep::ACL` instead"]
-#[doc(hidden)]
-pub use self::acl::ACL as ACLExecutionProvider;
-#[deprecated = "import `ort::ep::ArmNN` instead"]
-#[doc(hidden)]
+pub mod cpu;
+pub use self::cpu::CPU;
+
+// I hope you like attributes!
+#[cfg(feature = "cuda")]
+#[cfg_attr(docsrs, doc(cfg(feature = "cuda")))]
+pub mod cuda;
+#[cfg(feature = "cuda")]
+#[cfg_attr(docsrs, doc(cfg(feature = "cuda")))]
+pub use self::cuda::CUDA;
+#[cfg(feature = "tensorrt")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tensorrt")))]
+pub mod tensorrt;
+#[cfg(feature = "tensorrt")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tensorrt")))]
+pub use self::tensorrt::TensorRT;
+#[cfg(feature = "onednn")]
+#[cfg_attr(docsrs, doc(cfg(feature = "onednn")))]
+#[doc(alias = "dnnl")]
+pub mod onednn;
+#[cfg(feature = "onednn")]
+#[cfg_attr(docsrs, doc(cfg(feature = "onednn")))]
+#[doc(alias = "DNNL")]
+pub use self::onednn::OneDNN;
+#[cfg(feature = "acl")]
+#[cfg_attr(docsrs, doc(cfg(feature = "acl")))]
+pub mod acl;
+#[cfg(feature = "acl")]
+#[cfg_attr(docsrs, doc(cfg(feature = "acl")))]
+pub use self::acl::ACL;
+#[cfg(feature = "openvino")]
+#[cfg_attr(docsrs, doc(cfg(feature = "openvino")))]
+pub mod openvino;
+#[cfg(feature = "openvino")]
+#[cfg_attr(docsrs, doc(cfg(feature = "openvino")))]
+pub use self::openvino::OpenVINO;
+#[cfg(feature = "coreml")]
+#[cfg_attr(docsrs, doc(cfg(feature = "coreml")))]
+pub mod coreml;
+#[cfg(feature = "coreml")]
+#[cfg_attr(docsrs, doc(cfg(feature = "coreml")))]
+pub use self::coreml::CoreML;
+#[cfg(feature = "rocm")]
+#[cfg_attr(docsrs, doc(cfg(feature = "rocm")))]
+pub mod rocm;
+#[cfg(feature = "rocm")]
+#[cfg_attr(docsrs, doc(cfg(feature = "rocm")))]
+pub use self::rocm::ROCm;
+#[cfg(feature = "cann")]
+#[cfg_attr(docsrs, doc(cfg(feature = "cann")))]
+pub mod cann;
+#[cfg(feature = "cann")]
+#[cfg_attr(docsrs, doc(cfg(feature = "cann")))]
+pub use self::cann::CANN;
+#[cfg(feature = "directml")]
+#[cfg_attr(docsrs, doc(cfg(feature = "directml")))]
+pub mod directml;
+#[cfg(feature = "directml")]
+#[cfg_attr(docsrs, doc(cfg(feature = "directml")))]
+pub use self::directml::DirectML;
+#[cfg(feature = "tvm")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tvm")))]
+pub mod tvm;
+#[cfg(feature = "tvm")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tvm")))]
+pub use self::tvm::TVM;
+#[cfg(feature = "nnapi")]
+#[cfg_attr(docsrs, doc(cfg(feature = "nnapi")))]
+pub mod nnapi;
+#[cfg(feature = "nnapi")]
+#[cfg_attr(docsrs, doc(cfg(feature = "nnapi")))]
+pub use self::nnapi::NNAPI;
+#[cfg(feature = "qnn")]
+#[cfg_attr(docsrs, doc(cfg(feature = "qnn")))]
+pub mod qnn;
+#[cfg(feature = "qnn")]
+#[cfg_attr(docsrs, doc(cfg(feature = "qnn")))]
+pub use self::qnn::QNN;
+#[cfg(feature = "xnnpack")]
+#[cfg_attr(docsrs, doc(cfg(feature = "xnnpack")))]
+pub mod xnnpack;
+#[cfg(feature = "xnnpack")]
+#[cfg_attr(docsrs, doc(cfg(feature = "xnnpack")))]
+pub use self::xnnpack::XNNPACK;
+#[cfg(feature = "armnn")]
+#[cfg_attr(docsrs, doc(cfg(feature = "armnn")))]
+pub mod armnn;
+#[cfg(feature = "armnn")]
+#[cfg_attr(docsrs, doc(cfg(feature = "armnn")))]
 #[allow(deprecated)]
-pub use self::armnn::ArmNN as ArmNNExecutionProvider;
-#[deprecated = "import `ort::ep::Azure` instead"]
-#[doc(hidden)]
-pub use self::azure::Azure as AzureExecutionProvider;
-#[deprecated = "import `ort::ep::CANN` instead"]
-#[doc(hidden)]
-pub use self::cann::CANN as CANNExecutionProvider;
-#[deprecated = "import `ort::ep::CoreML` instead"]
-#[doc(hidden)]
-pub use self::coreml::CoreML as CoreMLExecutionProvider;
-#[deprecated = "import `ort::ep::CPU` instead"]
-#[doc(hidden)]
-pub use self::cpu::CPU as CPUExecutionProvider;
-#[deprecated = "import `ort::ep::CUDA` instead"]
-#[doc(hidden)]
-pub use self::cuda::CUDA as CUDAExecutionProvider;
-#[deprecated = "import `ort::ep::DirectML` instead"]
-#[doc(hidden)]
-pub use self::directml::DirectML as DirectMLExecutionProvider;
-#[deprecated = "import `ort::ep::MIGraphX` instead"]
-#[doc(hidden)]
-pub use self::migraphx::MIGraphX as MIGraphXExecutionProvider;
-#[deprecated = "import `ort::ep::NNAPI` instead"]
-#[doc(hidden)]
-pub use self::nnapi::NNAPI as NNAPIExecutionProvider;
-#[deprecated = "import `ort::ep::NVRTX` instead"]
-#[doc(hidden)]
-pub use self::nvrtx::NVRTX as NVRTXExecutionProvider;
-#[deprecated = "import `ort::ep::OneDNN` instead"]
-#[doc(hidden)]
-pub use self::onednn::OneDNN as OneDNNExecutionProvider;
-#[deprecated = "import `ort::ep::OpenVINO` instead"]
-#[doc(hidden)]
-pub use self::openvino::OpenVINO as OpenVINOExecutionProvider;
-#[deprecated = "import `ort::ep::QNN` instead"]
-#[doc(hidden)]
-pub use self::qnn::QNN as QNNExecutionProvider;
-#[deprecated = "import `ort::ep::RKNPU` instead"]
-#[doc(hidden)]
-pub use self::rknpu::RKNPU as RKNPUExecutionProvider;
-#[deprecated = "import `ort::ep::ROCm` instead"]
-#[doc(hidden)]
-pub use self::rocm::ROCm as ROCmExecutionProvider;
-#[deprecated = "import `ort::ep::TensorRT` instead"]
-#[doc(hidden)]
-pub use self::tensorrt::TensorRT as TensorRTExecutionProvider;
-#[deprecated = "import `ort::ep::TVM` instead"]
-#[doc(hidden)]
-pub use self::tvm::TVM as TVMExecutionProvider;
-#[cfg(feature = "api-18")]
-#[deprecated = "import `ort::ep::Vitis` instead"]
-#[doc(hidden)]
-pub use self::vitis::Vitis as VitisAIExecutionProvider;
-#[deprecated = "import `ort::ep::WASM` instead"]
-#[doc(hidden)]
+pub use self::armnn::ArmNN;
+#[cfg(feature = "migraphx")]
+#[cfg_attr(docsrs, doc(cfg(feature = "migraphx")))]
+pub mod migraphx;
+#[cfg(feature = "migraphx")]
+#[cfg_attr(docsrs, doc(cfg(feature = "migraphx")))]
+pub use self::migraphx::MIGraphX;
+#[cfg(all(feature = "api-18", feature = "vitis"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "api-18", feature = "vitis"))))]
+pub mod vitis;
+#[cfg(all(feature = "api-18", feature = "vitis"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "api-18", feature = "vitis"))))]
+pub use self::vitis::Vitis;
+#[cfg(feature = "rknpu")]
+#[cfg_attr(docsrs, doc(cfg(feature = "rknpu")))]
+pub mod rknpu;
+#[cfg(feature = "rknpu")]
+#[cfg_attr(docsrs, doc(cfg(feature = "rknpu")))]
+pub use self::rknpu::RKNPU;
+#[cfg(any(target_arch = "wasm32", feature = "webgpu"))]
+#[cfg_attr(docsrs, doc(cfg(any(target_arch = "wasm32", feature = "webgpu"))))]
+pub mod webgpu;
+#[cfg(any(target_arch = "wasm32", feature = "webgpu"))]
+#[cfg_attr(docsrs, doc(cfg(any(target_arch = "wasm32", feature = "webgpu"))))]
+pub use self::webgpu::WebGPU;
+#[cfg(feature = "azure")]
+#[cfg_attr(docsrs, doc(cfg(feature = "azure")))]
+pub mod azure;
+#[cfg(feature = "azure")]
+#[cfg_attr(docsrs, doc(cfg(feature = "azure")))]
+pub use self::azure::Azure;
+#[cfg(feature = "vsinpu")]
+#[cfg_attr(docsrs, doc(cfg(feature = "vsinpu")))]
+pub mod vsinpu;
+#[cfg(feature = "vsinpu")]
+#[cfg_attr(docsrs, doc(cfg(feature = "vsinpu")))]
+pub use self::vsinpu::VSINPU;
+#[cfg(feature = "nvrtx")]
+#[cfg_attr(docsrs, doc(cfg(feature = "nvrtx")))]
+pub mod nvrtx;
+#[cfg(feature = "nvrtx")]
+#[cfg_attr(docsrs, doc(cfg(feature = "nvrtx")))]
+pub use self::nvrtx::NVRTX;
 #[cfg(target_arch = "wasm32")]
-pub use self::wasm::WASM as WASMExecutionProvider;
-#[deprecated = "import `ort::ep::WebGPU` instead"]
-#[doc(hidden)]
-pub use self::webgpu::WebGPU as WebGPUExecutionProvider;
-#[deprecated = "import `ort::ep::WebNN` instead"]
-#[doc(hidden)]
+pub mod wasm;
 #[cfg(target_arch = "wasm32")]
-pub use self::webnn::WebNN as WebNNExecutionProvider;
-#[deprecated = "import `ort::ep::XNNPACK` instead"]
-#[doc(hidden)]
-pub use self::xnnpack::XNNPACK as XNNPACKExecutionProvider;
+pub mod webnn;
+#[cfg(target_arch = "wasm32")]
+pub use self::{wasm::WASM, webnn::WebNN};

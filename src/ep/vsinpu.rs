@@ -1,7 +1,11 @@
 #![allow(deprecated)]
 
-use super::{ExecutionProvider, RegisterError};
-use crate::{error::Result, session::builder::SessionBuilder};
+use super::ExecutionProvider;
+use crate::{
+	AsPointer,
+	error::{Error, Result},
+	session::builder::SessionBuilder
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct VSINPU;
@@ -13,20 +17,8 @@ impl ExecutionProvider for VSINPU {
 		"VSINPUExecutionProvider"
 	}
 
-	fn supported_by_platform(&self) -> bool {
-		true // no idea
-	}
-
-	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
-		#[cfg(any(feature = "load-dynamic", feature = "vsinpu"))]
-		{
-			use crate::AsPointer;
-
-			super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_VSINPU(options: *mut ort_sys::OrtSessionOptions) -> ort_sys::OrtStatusPtr);
-			return Ok(unsafe { crate::error::Error::result_from_status(OrtSessionOptionsAppendExecutionProvider_VSINPU(session_builder.ptr_mut())) }?);
-		}
-
-		Err(RegisterError::MissingFeature)
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+		super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_VSINPU(options: *mut ort_sys::OrtSessionOptions) -> ort_sys::OrtStatusPtr);
+		unsafe { Error::result_from_status(OrtSessionOptionsAppendExecutionProvider_VSINPU(session_builder.ptr_mut())) }
 	}
 }

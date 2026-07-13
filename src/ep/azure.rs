@@ -1,5 +1,5 @@
-use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
-use crate::{error::Result, session::builder::SessionBuilder};
+use super::{ExecutionProvider, ExecutionProviderOptions};
+use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 
 /// [Azure Execution Provider](https://onnxruntime.ai/docs/execution-providers/Azure-ExecutionProvider.html) enables
 /// operators that invoke Azure cloud models.
@@ -76,27 +76,15 @@ impl ExecutionProvider for Azure {
 		"AzureExecutionProvider"
 	}
 
-	fn supported_by_platform(&self) -> bool {
-		cfg!(any(target_os = "linux", target_os = "windows", target_os = "android"))
-	}
-
-	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
-		#[cfg(any(feature = "load-dynamic", feature = "azure"))]
-		{
-			use crate::{AsPointer, ortsys};
-
-			let ffi_options = self.options.to_ffi();
-			ortsys![unsafe SessionOptionsAppendExecutionProvider(
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+		let ffi_options = self.options.to_ffi();
+		ortsys![unsafe SessionOptionsAppendExecutionProvider(
 				session_builder.ptr_mut(),
 				c"AZURE".as_ptr().cast::<core::ffi::c_char>(),
 				ffi_options.key_ptrs(),
 				ffi_options.value_ptrs(),
 				ffi_options.len(),
 			)?];
-			return Ok(());
-		}
-
-		Err(RegisterError::MissingFeature)
+		Ok(())
 	}
 }

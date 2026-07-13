@@ -1,7 +1,13 @@
 #![allow(deprecated)]
 
-use super::{ExecutionProvider, RegisterError};
-use crate::{error::Result, session::builder::SessionBuilder};
+use core::ffi;
+
+use super::ExecutionProvider;
+use crate::{
+	AsPointer,
+	error::{Error, Result},
+	session::builder::SessionBuilder
+};
 
 /// [Arm NN execution provider](https://onnxruntime.ai/docs/execution-providers/community-maintained/ArmNN-ExecutionProvider.html)
 /// for ARM platforms.
@@ -35,22 +41,8 @@ impl ExecutionProvider for ArmNN {
 		"ArmNNExecutionProvider"
 	}
 
-	fn supported_by_platform(&self) -> bool {
-		cfg!(all(target_arch = "aarch64", any(target_os = "linux", target_os = "android")))
-	}
-
-	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
-		#[cfg(any(feature = "load-dynamic", feature = "armnn"))]
-		{
-			use crate::AsPointer;
-
-			super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_ArmNN(options: *mut ort_sys::OrtSessionOptions, use_arena: core::ffi::c_int) -> ort_sys::OrtStatusPtr);
-			return Ok(unsafe {
-				crate::error::Error::result_from_status(OrtSessionOptionsAppendExecutionProvider_ArmNN(session_builder.ptr_mut(), self.use_arena.into()))
-			}?);
-		}
-
-		Err(RegisterError::MissingFeature)
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+		super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_ArmNN(options: *mut ort_sys::OrtSessionOptions, use_arena: ffi::c_int) -> ort_sys::OrtStatusPtr);
+		unsafe { Error::result_from_status(OrtSessionOptionsAppendExecutionProvider_ArmNN(session_builder.ptr_mut(), self.use_arena.into())) }
 	}
 }

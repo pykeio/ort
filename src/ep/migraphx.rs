@@ -1,7 +1,8 @@
 use alloc::ffi::CString;
+use core::ptr;
 
-use super::{ExecutionProvider, RegisterError};
-use crate::{ep::ArenaExtendStrategy, error::Result, session::builder::SessionBuilder};
+use super::ExecutionProvider;
+use crate::{AsPointer, ep::ArenaExtendStrategy, error::Result, ortsys, session::builder::SessionBuilder};
 
 /// [MIGraphX execution provider](https://onnxruntime.ai/docs/execution-providers/MIGraphX-ExecutionProvider.html) for
 /// hardware acceleration with AMD GPUs.
@@ -187,40 +188,26 @@ impl ExecutionProvider for MIGraphX {
 		"MIGraphXExecutionProvider"
 	}
 
-	fn supported_by_platform(&self) -> bool {
-		cfg!(any(all(target_os = "linux", target_arch = "x86_64"), all(target_os = "windows", target_arch = "x86_64")))
-	}
-
-	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
-		#[cfg(any(feature = "load-dynamic", feature = "migraphx"))]
-		{
-			use core::ptr;
-
-			use crate::{AsPointer, ortsys};
-
-			let options = ort_sys::OrtMIGraphXProviderOptions {
-				device_id: self.device_id,
-				migraphx_fp16_enable: self.enable_fp16.into(),
-				migraphx_fp8_enable: self.enable_fp8.into(),
-				migraphx_int8_enable: self.enable_int8.into(),
-				migraphx_use_native_calibration_table: self.use_native_calibration_table.into(),
-				migraphx_int8_calibration_table_name: self.int8_calibration_table_name.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null),
-				migraphx_load_compiled_model: self.load_model_path.is_some().into(),
-				migraphx_load_model_path: self.load_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null),
-				migraphx_save_compiled_model: self.save_model_path.is_some().into(),
-				migraphx_save_model_path: self.save_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null),
-				migraphx_exhaustive_tune: self.exhaustive_tune,
-				migraphx_mem_limit: self.memory_limit as _,
-				migraphx_arena_extend_strategy: match self.arena_extend_strategy {
-					ArenaExtendStrategy::NextPowerOfTwo => 0,
-					ArenaExtendStrategy::SameAsRequested => 1
-				}
-			};
-			ortsys![unsafe SessionOptionsAppendExecutionProvider_MIGraphX(session_builder.ptr_mut(), &options)?];
-			return Ok(());
-		}
-
-		Err(RegisterError::MissingFeature)
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+		let options = ort_sys::OrtMIGraphXProviderOptions {
+			device_id: self.device_id,
+			migraphx_fp16_enable: self.enable_fp16.into(),
+			migraphx_fp8_enable: self.enable_fp8.into(),
+			migraphx_int8_enable: self.enable_int8.into(),
+			migraphx_use_native_calibration_table: self.use_native_calibration_table.into(),
+			migraphx_int8_calibration_table_name: self.int8_calibration_table_name.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null),
+			migraphx_load_compiled_model: self.load_model_path.is_some().into(),
+			migraphx_load_model_path: self.load_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null),
+			migraphx_save_compiled_model: self.save_model_path.is_some().into(),
+			migraphx_save_model_path: self.save_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null),
+			migraphx_exhaustive_tune: self.exhaustive_tune,
+			migraphx_mem_limit: self.memory_limit as _,
+			migraphx_arena_extend_strategy: match self.arena_extend_strategy {
+				ArenaExtendStrategy::NextPowerOfTwo => 0,
+				ArenaExtendStrategy::SameAsRequested => 1
+			}
+		};
+		ortsys![unsafe SessionOptionsAppendExecutionProvider_MIGraphX(session_builder.ptr_mut(), &options)?];
+		Ok(())
 	}
 }

@@ -25,6 +25,7 @@ std = []
 pkg-config = [ "dep:pkg-config" ]
 training = []
 download-binaries = [ "dep:ureq", "dep:lzma-rust2", "dep:hmac-sha256" ]
+lax-feature-matching = []
 copy-dylibs = []
 disable-linking = []
 

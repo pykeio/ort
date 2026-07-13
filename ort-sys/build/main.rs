@@ -174,7 +174,7 @@ note: the downloaded files are available to inspect at: {}",
 			}
 		}
 
-		static_link::static_link_prerequisites(BinariesSource::Pyke);
+		static_link::static_link_prerequisites(BinariesSource::Pyke { feature_set: dist.features });
 
 		#[cfg(feature = "copy-dylibs")]
 		dynamic_link::copy_dylibs(&bin_extract_dir, &std::path::PathBuf::from(env::var("OUT_DIR").unwrap()));

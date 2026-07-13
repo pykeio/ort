@@ -114,7 +114,12 @@ note: alternatively, try a different backend like `ort-tract`; see https://ort.p
 	// sort by best matches in descending order
 	candidates.sort_by_key(|c| Reverse(c.1));
 
-	let Some((best_dist, best_features)) = candidates.first() else {
+	let Some((best_dist, best_features)) = candidates
+		.iter()
+		// ideally find a build that matches our feature set exactly
+		.find(|x| x.0.features.symmetric_difference(&feature_set).count() == 0)
+		.or_else(|| candidates.first())
+	else {
 		unreachable!(); // we return on is_empty earlier
 	};
 

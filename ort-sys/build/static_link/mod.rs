@@ -1,4 +1,5 @@
 use std::{
+	collections::HashSet,
 	env,
 	path::{Path, PathBuf}
 };
@@ -10,7 +11,7 @@ pub use self::apple::link_ios_frameworks;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum BinariesSource {
-	Pyke,
+	Pyke { feature_set: HashSet<&'static str> },
 	UserProvided
 }
 
@@ -54,7 +55,7 @@ pub fn static_link_prerequisites(source: BinariesSource) {
 		}
 	}
 
-	if source == BinariesSource::Pyke {
+	if let BinariesSource::Pyke { feature_set } = source {
 		if target_triple.contains("windows") {
 			// pyke libs always ship compiled with DirectML on Windows, so we need to link to DX12 libraries.
 			println!("cargo:rustc-link-lib=dxguid");
@@ -63,7 +64,7 @@ pub fn static_link_prerequisites(source: BinariesSource) {
 			println!("cargo:rustc-link-lib=D3D12");
 			println!("cargo:rustc-link-lib=DirectML");
 		}
-		if cfg!(feature = "webgpu") && !target_triple.contains("wasm32") {
+		if feature_set.contains("webgpu") && !target_triple.contains("wasm32") {
 			// Dawn cannot be linked statically yet so it's shipped as a dylib we need to link to.
 			println!("cargo:rustc-link-lib=webgpu_dawn");
 		}

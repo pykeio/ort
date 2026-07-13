@@ -1,7 +1,7 @@
 use alloc::string::ToString;
 use core::ffi;
 
-use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
+use super::{ExecutionProvider, ExecutionProviderOptions};
 use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,6 +1,6 @@
 use core::ffi;
 
-use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
+use super::{ExecutionProvider, ExecutionProviderOptions};
 use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 
 #[derive(Debug, Default, Clone)]

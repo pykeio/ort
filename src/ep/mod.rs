@@ -7,7 +7,10 @@
 //!
 //! fn main() -> ort::Result<()> {
 //! 	let session = Session::builder()?
-//! 		.with_execution_providers([ep::CUDA::default().build()])?
+//! 		.with_execution_providers([
+//! 			#[cfg(feature = "cuda")]
+//! 			ep::CUDA::default().build()
+//! 		])?
 //! 		.commit_from_file("model.onnx")?;
 //!
 //! 	Ok(())

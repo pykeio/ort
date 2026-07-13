@@ -7,7 +7,12 @@
 //! ```
 //! # use ort::ep;
 //! # fn main() -> ort::Result<()> {
-//! ort::init().with_execution_providers([ep::CUDA::default().build()]).commit();
+//! ort::init()
+//! 	.with_execution_providers([
+//! 		#[cfg(feature = "cuda")]
+//! 		ep::CUDA::default().build()
+//! 	])
+//! 	.commit();
 //!
 //! // ... do other ort things now that our environment is set up...
 //! # Ok(())
@@ -22,7 +27,10 @@
 //! # fn main() -> ort::Result<()> {
 //! let lib_path = std::env::current_exe().unwrap().parent().unwrap().join("lib");
 //! ort::init_from(lib_path.join("onnxruntime.dll"))?
-//! 	.with_execution_providers([ep::CUDA::default().build()])
+//! 	.with_execution_providers([
+//! 		#[cfg(feature = "cuda")]
+//! 		ep::CUDA::default().build()
+//! 	])
 //! 	.commit();
 //! # Ok(())
 //! # }
@@ -661,7 +669,12 @@ impl EnvironmentBuilder {
 /// ```
 /// # use ort::ep;
 /// # fn main() -> ort::Result<()> {
-/// ort::init().with_execution_providers([ep::CUDA::default().build()]).commit();
+/// ort::init()
+/// 	.with_execution_providers([
+/// 		#[cfg(feature = "cuda")]
+/// 		ep::CUDA::default().build()
+/// 	])
+/// 	.commit();
 /// # Ok(())
 /// # }
 /// ```
@@ -689,7 +702,10 @@ pub fn init() -> EnvironmentBuilder {
 /// # fn main() -> Result<(), ort::LoadDynamicError> {
 /// let lib_path = std::env::current_exe().unwrap().parent().unwrap().join("lib");
 /// ort::init_from(lib_path.join("onnxruntime.dll"))?
-/// 	.with_execution_providers([ep::CUDA::default().build()])
+/// 	.with_execution_providers([
+/// 		#[cfg(feature = "cuda")]
+/// 		ep::CUDA::default().build()
+/// 	])
 /// 	.commit();
 /// # Ok(())
 /// # }

@@ -225,7 +225,7 @@ fn setup_api() -> ApiPointer {
 				Ok(s) if !s.is_empty() => s,
 				#[cfg(target_os = "windows")]
 				_ => "onnxruntime.dll".to_owned(),
-				#[cfg(any(target_os = "linux", target_os = "android"))]
+				#[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd"))]
 				_ => "libonnxruntime.so".to_owned(),
 				#[cfg(any(target_os = "macos", target_os = "ios"))]
 				_ => "libonnxruntime.dylib".to_owned()

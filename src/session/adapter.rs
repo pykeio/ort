@@ -109,7 +109,10 @@ impl Adapter {
 	/// # };
 	/// # fn main() -> ort::Result<()> {
 	/// let mut model = Session::builder()?
-	/// 	.with_execution_providers([ep::CUDA::default().build()])?
+	/// 	.with_execution_providers([
+	/// 		#[cfg(feature = "cuda")]
+	/// 		ep::CUDA::default().build()
+	/// 	])?
 	/// 	.commit_from_file("tests/data/lora_model.onnx")?;
 	///
 	/// let allocator = model.allocator();
@@ -154,7 +157,10 @@ impl Adapter {
 	/// # };
 	/// # fn main() -> ort::Result<()> {
 	/// let mut model = Session::builder()?
-	/// 	.with_execution_providers([ep::CUDA::default().build()])?
+	/// 	.with_execution_providers([
+	/// 		#[cfg(feature = "cuda")]
+	/// 		ep::CUDA::default().build()
+	/// 	])?
 	/// 	.commit_from_file("tests/data/lora_model.onnx")?;
 	///
 	/// let bytes = std::fs::read("tests/data/adapter.orl").unwrap();

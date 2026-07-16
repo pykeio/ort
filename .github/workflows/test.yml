@@ -5,7 +5,7 @@ on:
       - '.github/workflows/test.yml'
       - 'src/**/*.rs'
       - 'ort-sys/**/*.rs'
-      - 'ort-sys/**/dist.txt'
+      - 'ort-sys/**/dist.tsv'
       - 'Cargo.toml'
       - 'tests/**/*'
   pull_request:
@@ -14,7 +14,7 @@ on:
       - '.github/workflows/test.yml'
       - 'src/**/*.rs'
       - 'ort-sys/**/*.rs'
-      - 'ort-sys/**/dist.txt'
+      - 'ort-sys/**/dist.tsv'
       - 'Cargo.toml'
       - 'tests/**/*'
 permissions:

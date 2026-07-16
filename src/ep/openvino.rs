@@ -1,7 +1,7 @@
 use alloc::string::ToString;
 
-use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
-use crate::{error::Result, session::builder::SessionBuilder};
+use super::{ExecutionProvider, ExecutionProviderOptions};
+use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 
 /// [OpenVINO execution provider](https://onnxruntime.ai/docs/execution-providers/OpenVINO-ExecutionProvider.html) for
 /// Intel CPUs/GPUs/NPUs.
@@ -86,30 +86,14 @@ impl ExecutionProvider for OpenVINO {
 		"OpenVINOExecutionProvider"
 	}
 
-	fn supported_by_platform(&self) -> bool {
-		cfg!(all(target_arch = "x86_64", any(target_os = "windows", target_os = "linux")))
-	}
-
-	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
-		#[cfg(any(feature = "load-dynamic", feature = "openvino"))]
-		{
-			use alloc::ffi::CString;
-			use core::ffi::c_char;
-
-			use crate::{AsPointer, ortsys};
-
-			let ffi_options = self.options.to_ffi();
-			ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO_V2(
-				session_builder.ptr_mut(),
-				ffi_options.key_ptrs(),
-				ffi_options.value_ptrs(),
-				ffi_options.len()
-			)?];
-
-			return Ok(());
-		}
-
-		Err(RegisterError::MissingFeature)
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+		let ffi_options = self.options.to_ffi();
+		ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO_V2(
+			session_builder.ptr_mut(),
+			ffi_options.key_ptrs(),
+			ffi_options.value_ptrs(),
+			ffi_options.len()
+		)?];
+		Ok(())
 	}
 }

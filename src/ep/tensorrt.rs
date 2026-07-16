@@ -1,7 +1,8 @@
 use alloc::string::ToString;
+use core::ptr;
 
-use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
-use crate::{error::Result, session::builder::SessionBuilder};
+use super::{ExecutionProvider, ExecutionProviderOptions};
+use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder, util};
 
 #[derive(Debug, Default, Clone)]
 pub struct TensorRT {
@@ -266,36 +267,23 @@ impl ExecutionProvider for TensorRT {
 		"TensorrtExecutionProvider"
 	}
 
-	fn supported_by_platform(&self) -> bool {
-		cfg!(any(all(target_os = "linux", any(target_arch = "aarch64", target_arch = "x86_64")), all(target_os = "windows", target_arch = "x86_64")))
-	}
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+		let mut trt_options: *mut ort_sys::OrtTensorRTProviderOptionsV2 = ptr::null_mut();
+		ortsys![unsafe CreateTensorRTProviderOptions(&mut trt_options)?];
+		let _guard = util::run_on_drop(|| {
+			ortsys![unsafe ReleaseTensorRTProviderOptions(trt_options)];
+		});
 
-	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
-		#[cfg(any(feature = "load-dynamic", feature = "tensorrt"))]
-		{
-			use core::ptr;
+		let ffi_options = self.options.to_ffi();
+		ortsys![unsafe UpdateTensorRTProviderOptions(
+			trt_options,
+			ffi_options.key_ptrs(),
+			ffi_options.value_ptrs(),
+			ffi_options.len()
+		)?];
 
-			use crate::{AsPointer, ortsys, util};
+		ortsys![unsafe SessionOptionsAppendExecutionProvider_TensorRT_V2(session_builder.ptr_mut(), trt_options)?];
 
-			let mut trt_options: *mut ort_sys::OrtTensorRTProviderOptionsV2 = ptr::null_mut();
-			ortsys![unsafe CreateTensorRTProviderOptions(&mut trt_options)?];
-			let _guard = util::run_on_drop(|| {
-				ortsys![unsafe ReleaseTensorRTProviderOptions(trt_options)];
-			});
-
-			let ffi_options = self.options.to_ffi();
-			ortsys![unsafe UpdateTensorRTProviderOptions(
-				trt_options,
-				ffi_options.key_ptrs(),
-				ffi_options.value_ptrs(),
-				ffi_options.len()
-			)?];
-
-			ortsys![unsafe SessionOptionsAppendExecutionProvider_TensorRT_V2(session_builder.ptr_mut(), trt_options)?];
-			return Ok(());
-		}
-
-		Err(RegisterError::MissingFeature)
+		Ok(())
 	}
 }

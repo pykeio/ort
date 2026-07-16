@@ -18,7 +18,8 @@ mod internal;
 use crate::static_link::BinariesSource;
 
 fn main() {
-	println!("cargo:rustc-check-cfg=cfg(link_error)");
+	println!("cargo:rustc-check-cfg=cfg(link_error_generic)");
+	println!("cargo:rustc-check-cfg=cfg(link_error_bad_dist_features)");
 	println!("cargo:rustc-check-cfg=cfg(pyke)");
 
 	if env::var("DOCS_RS").is_ok() || cfg!(feature = "disable-linking") {
@@ -54,8 +55,9 @@ fn main() {
 		}
 
 		if !self::static_link::static_link(&lib_dir) {
-			println!(
-				"cargo::error=ort-sys could not link to the ONNX Runtime build in `{}`\ncargo::error= | rerun the build with `cargo build -vv | grep ort-sys` to see debug messages",
+			log::error!(
+				"ort-sys could not link to the ONNX Runtime build in `{}`
+note: rerun the build with `cargo build -vv | grep ort-sys` to see debug messages",
 				lib_dir.display()
 			);
 		} else {
@@ -71,7 +73,7 @@ fn main() {
 	let should_skip = self::download::should_skip();
 	if should_skip {
 		// Defer the error to the linking step so `cargo check` still works when `default-features = false`.
-		println!("cargo:rustc-cfg=link_error");
+		println!("cargo:rustc-cfg=link_error_generic");
 		return;
 	}
 
@@ -86,15 +88,32 @@ fn main() {
 
 		let dist = match download::resolve_dist() {
 			Ok(dist) => dist,
-			Err(feature_set) => {
-				println!(
-					r"cargo::error=ort does not provide prebuilt binaries for the target `{}` with feature set {}.
-cargo::error= | You may have to compile ONNX Runtime from source and link `ort` to your custom build; see https://ort.pyke.io/setup/linking
-cargo::error= | Alternatively, try a different backend like `ort-tract`; see https://ort.pyke.io/backends",
-					target,
-					feature_set.unwrap_or_else(|| String::from("(no features)"))
-				);
-				return;
+			Err((feature_set, best_dists)) => {
+				if cfg!(feature = "lax-feature-matching") {
+					let Some(dist) = best_dists.first() else {
+						// no binaries available for target
+						return;
+					};
+
+					log::debug!("falling back to dist with features '{}' due to lax-feature-matching", dist.features_str());
+					dist.clone()
+				} else {
+					if !best_dists.is_empty() {
+						println!("cargo:rustc-cfg=link_error_bad_dist_features");
+						println!("cargo:rustc-env=ORT_FEATURE_SET={feature_set}");
+						println!(
+							"cargo:rustc-env=ORT_AVAILABLE_DISTS=\t{}",
+							best_dists
+								.into_iter()
+								.enumerate()
+								.map(|(i, c)| format!("'{}'{}", c.features_str(), if i == 0 { " (*)" } else { "" }))
+								.collect::<Vec<String>>()
+								.join("; ")
+						);
+					} // `resolve_dist` emits its own error when the target has no dists, so we don't need to do anything in that case
+
+					return;
+				}
 			}
 		};
 
@@ -107,7 +126,7 @@ cargo::error= | Alternatively, try a different backend like `ort-tract`; see htt
 			let mut verified_reader = match download::fetch_file(dist.url) {
 				Ok(reader) => download::VerifyReader::new(reader),
 				Err(e) => {
-					println!(r"cargo::error=ort-sys failed to download prebuilt binaries from `{}`: {e}", dist.url);
+					log::error!("ort-sys failed to download prebuilt binaries from `{}`: {e}", dist.url);
 					return;
 				}
 			};
@@ -123,17 +142,16 @@ cargo::error= | Alternatively, try a different backend like `ort-tract`; see htt
 				should_rename = false;
 			}
 			if let Err(e) = self::download::extract_tgz(&mut verified_reader, &temp_extract_dir) {
-				println!(r"cargo::error=Extraction of prebuilt binaries downloaded from `{}` failed: {e}", dist.url);
+				log::error!("extraction of prebuilt binaries downloaded from `{}` failed: {e}", dist.url);
 				return;
 			}
 
 			let (calculated_hash, _) = verified_reader.finalize().expect("Failed to finalize read");
 			if calculated_hash[..] != download::hex_str_to_bytes(dist.hash) {
-				println!(
-					r"cargo::error=⚠️ The hash of the file downloaded from `{}` does not match the expected hash. ⚠️
-cargo::error= | Got {}, expected {}
-cargo::error= | If you're using a proxy, make sure it's not doing something weird. Otherwise, report this incident to https://github.com/pykeio/ort/issues & email contact@pyke.io.
-cargo::error= | The downloaded binaries are available to inspect at: {}",
+				log::error!(
+					r"⚠️ The hash of the file downloaded from `{}` does not match the expected hash. ⚠️ -- Got {}, expected {}
+note: if you're using a proxy, make sure it's not doing something weird. Otherwise, report this incident to https://github.com/pykeio/ort/issues & email contact@pyke.io.
+note: the downloaded files are available to inspect at: {}",
 					dist.url,
 					download::bytes_to_hex_str(&calculated_hash),
 					dist.hash,
@@ -149,14 +167,14 @@ cargo::error= | The downloaded binaries are available to inspect at: {}",
 						if bin_extract_dir.exists() {
 							let _ = fs::remove_dir_all(temp_extract_dir);
 						} else {
-							panic!("failed to extract downloaded binaries: {e}");
+							log::error!("failed to finalize extraction of downloaded binaries: {e}");
 						}
 					}
 				}
 			}
 		}
 
-		static_link::static_link_prerequisites(BinariesSource::Pyke);
+		static_link::static_link_prerequisites(BinariesSource::Pyke { feature_set: dist.features });
 
 		#[cfg(feature = "copy-dylibs")]
 		dynamic_link::copy_dylibs(&bin_extract_dir, &std::path::PathBuf::from(env::var("OUT_DIR").unwrap()));

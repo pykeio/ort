@@ -1,5 +1,11 @@
-use super::{ExecutionProvider, RegisterError};
-use crate::{error::Result, session::builder::SessionBuilder};
+use core::ffi;
+
+use super::ExecutionProvider;
+use crate::{
+	AsPointer,
+	error::{Error, Result},
+	session::builder::SessionBuilder
+};
 
 /// [Arm Compute Library execution provider](https://onnxruntime.ai/docs/execution-providers/community-maintained/ACL-ExecutionProvider.html)
 /// for ARM platforms.
@@ -33,22 +39,8 @@ impl ExecutionProvider for ACL {
 		"ACLExecutionProvider"
 	}
 
-	fn supported_by_platform(&self) -> bool {
-		cfg!(target_arch = "aarch64")
-	}
-
-	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
-		#[cfg(any(feature = "load-dynamic", feature = "acl"))]
-		{
-			use crate::AsPointer;
-
-			super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut ort_sys::OrtSessionOptions, enable_fast_math: core::ffi::c_int) -> ort_sys::OrtStatusPtr);
-			return Ok(unsafe {
-				crate::error::Error::result_from_status(OrtSessionOptionsAppendExecutionProvider_ACL(session_builder.ptr_mut(), self.fast_math.into()))
-			}?);
-		}
-
-		Err(RegisterError::MissingFeature)
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+		super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut ort_sys::OrtSessionOptions, enable_fast_math: ffi::c_int) -> ort_sys::OrtStatusPtr);
+		unsafe { Error::result_from_status(OrtSessionOptionsAppendExecutionProvider_ACL(session_builder.ptr_mut(), self.fast_math.into())) }
 	}
 }

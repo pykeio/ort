@@ -5,7 +5,7 @@ on:
       - '.github/workflows/other-checks.yml'
       - 'src/**/*.rs'
       - 'ort-sys/**/*.rs'
-      - 'ort-sys/**/dist.txt'
+      - 'ort-sys/**/dist.tsv'
       - 'Cargo.toml'
   pull_request:
     types: [ opened, synchronize, reopened ]
@@ -14,7 +14,7 @@ on:
       - 'src/**/*.rs'
       - 'examples/**/*'
       - 'ort-sys/**/*.rs'
-      - 'ort-sys/**/dist.txt'
+      - 'ort-sys/**/dist.tsv'
       - 'Cargo.toml'
 permissions:
   contents: read

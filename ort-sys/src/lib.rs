@@ -11,11 +11,9 @@ extern crate core;
 #[doc(hidden)]
 #[cfg(feature = "std")]
 pub mod internal;
+mod link_error;
 pub mod stub;
 mod version;
-
-#[cfg(link_error)]
-mod link_error;
 
 pub use core::ffi::{c_char, c_int, c_ulong, c_ulonglong, c_ushort, c_void};
 

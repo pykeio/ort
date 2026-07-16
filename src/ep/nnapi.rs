@@ -1,5 +1,9 @@
-use super::{ExecutionProvider, RegisterError};
-use crate::{error::Result, session::builder::SessionBuilder};
+use super::ExecutionProvider;
+use crate::{
+	AsPointer,
+	error::{Error, Result},
+	session::builder::SessionBuilder
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct NNAPI {
@@ -54,33 +58,22 @@ impl ExecutionProvider for NNAPI {
 		"NnapiExecutionProvider"
 	}
 
-	fn supported_by_platform(&self) -> bool {
-		cfg!(target_os = "android")
-	}
-
 	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
-		#[cfg(any(feature = "load-dynamic", feature = "nnapi"))]
-		{
-			use crate::AsPointer;
-
-			super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut ort_sys::OrtSessionOptions, flags: u32) -> ort_sys::OrtStatusPtr);
-			let mut flags = 0;
-			if self.use_fp16 {
-				flags |= 0x001;
-			}
-			if self.use_nchw {
-				flags |= 0x002;
-			}
-			if self.disable_cpu {
-				flags |= 0x004;
-			}
-			if self.cpu_only {
-				flags |= 0x008;
-			}
-			return Ok(unsafe { crate::error::Error::result_from_status(OrtSessionOptionsAppendExecutionProvider_Nnapi(session_builder.ptr_mut(), flags)) }?);
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+		super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut ort_sys::OrtSessionOptions, flags: u32) -> ort_sys::OrtStatusPtr);
+		let mut flags = 0;
+		if self.use_fp16 {
+			flags |= 0x001;
 		}
-
-		Err(RegisterError::MissingFeature)
+		if self.use_nchw {
+			flags |= 0x002;
+		}
+		if self.disable_cpu {
+			flags |= 0x004;
+		}
+		if self.cpu_only {
+			flags |= 0x008;
+		}
+		unsafe { Error::result_from_status(OrtSessionOptionsAppendExecutionProvider_Nnapi(session_builder.ptr_mut(), flags)) }
 	}
 }

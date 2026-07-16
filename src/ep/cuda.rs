@@ -1,8 +1,8 @@
 use alloc::string::ToString;
-use core::ops::BitOr;
+use core::{ops::BitOr, ptr};
 
-use super::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderOptions, RegisterError};
-use crate::{error::Result, session::builder::SessionBuilder};
+use super::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderOptions};
+use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder, util};
 
 // https://github.com/microsoft/onnxruntime/blob/ffceed9d44f2f3efb9dd69fa75fea51163c91d91/onnxruntime/contrib_ops/cpu/bert/attention_common.h#L160-L171
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -360,37 +360,24 @@ impl ExecutionProvider for CUDA {
 		"CUDAExecutionProvider"
 	}
 
-	fn supported_by_platform(&self) -> bool {
-		cfg!(any(all(target_os = "linux", any(target_arch = "aarch64", target_arch = "x86_64")), all(target_os = "windows", target_arch = "x86_64")))
-	}
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+		let mut cuda_options: *mut ort_sys::OrtCUDAProviderOptionsV2 = ptr::null_mut();
+		ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)?];
+		let _guard = util::run_on_drop(|| {
+			ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
+		});
 
-	#[allow(unused, unreachable_code)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
-		#[cfg(any(feature = "load-dynamic", feature = "cuda"))]
-		{
-			use core::ptr;
-
-			use crate::{AsPointer, ortsys, util};
-
-			let mut cuda_options: *mut ort_sys::OrtCUDAProviderOptionsV2 = ptr::null_mut();
-			ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)?];
-			let _guard = util::run_on_drop(|| {
-				ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
-			});
-
-			let ffi_options = self.options.to_ffi();
-			ortsys![unsafe UpdateCUDAProviderOptions(
+		let ffi_options = self.options.to_ffi();
+		ortsys![unsafe UpdateCUDAProviderOptions(
 				cuda_options,
 				ffi_options.key_ptrs(),
 				ffi_options.value_ptrs(),
 				ffi_options.len()
 			)?];
 
-			ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(session_builder.ptr_mut(), cuda_options)?];
-			return Ok(());
-		}
+		ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(session_builder.ptr_mut(), cuda_options)?];
 
-		Err(RegisterError::MissingFeature)
+		Ok(())
 	}
 }
 

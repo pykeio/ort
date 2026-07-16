@@ -1,6 +1,7 @@
 use alloc::string::ToString;
+use core::ffi;
 
-use super::{ExecutionProvider, ExecutionProviderOptions, RegisterError};
+use super::{ExecutionProvider, ExecutionProviderOptions};
 use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,16 +73,11 @@ impl ExecutionProvider for WebNN {
 		"WebNNExecutionProvider"
 	}
 
-	fn supported_by_platform(&self) -> bool {
-		cfg!(target_arch = "wasm32")
-	}
-
-	#[allow(unused)]
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<(), RegisterError> {
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		let ffi_options = self.options.to_ffi();
 		ortsys![unsafe SessionOptionsAppendExecutionProvider(
 			session_builder.ptr_mut(),
-			c"WebNN".as_ptr().cast::<core::ffi::c_char>(),
+			c"WebNN".as_ptr().cast::<ffi::c_char>(),
 			ffi_options.key_ptrs(),
 			ffi_options.value_ptrs(),
 			ffi_options.len(),

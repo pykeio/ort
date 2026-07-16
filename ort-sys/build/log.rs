@@ -17,3 +17,13 @@ macro_rules! warning {
 	};
 }
 pub(crate) use warning;
+
+macro_rules! error {
+	($fmt:expr) => {
+		println!("cargo::error={}", format!($fmt))
+	};
+	($fmt:expr, $($args:tt)*) => {
+		println!("cargo::error={}", format!($fmt, $($args)*))
+	};
+}
+pub(crate) use error;

@@ -140,14 +140,14 @@ impl SessionBuilder {
 	/// Configure this session to use a custom allocator, rather than the global default. This allocator is responsible
 	/// for allocating the *metadata* associated with values -- not the contents of the values themselves; that's
 	/// handled by the active execution providers. As such, only CPU-accessible allocators are allowed.
-	pub fn with_allocator(mut self, info: MemoryInfo) -> BuilderResult {
+	pub fn with_allocator(mut self, info: MemoryInfo<'_>) -> BuilderResult {
 		if !info.is_cpu_accessible() {
 			return Err(
 				Error::new_with_code(ErrorCode::InvalidArgument, "SessionBuilder::with_allocator may only use a CPU-accessible allocator").with_recover(self)
 			);
 		}
 
-		self.memory_info = Some(Arc::new(info));
+		self.memory_info = Some(Arc::new(info.to_owned()));
 		Ok(self)
 	}
 

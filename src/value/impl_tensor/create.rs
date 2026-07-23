@@ -144,7 +144,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 }
 
 fn tensor_from_array(
-	memory_info: MemoryInfo,
+	memory_info: MemoryInfo<'static>,
 	shape: Shape,
 	data: *mut c_void,
 	element_size: usize,
@@ -283,7 +283,7 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 	/// - The pointer must be valid for the device description provided by `MemoryInfo`.
 	/// - The returned tensor must outlive the data described by the data pointer.
 	pub unsafe fn from_raw(info: MemoryInfo, data: *mut ort_sys::c_void, shape: Shape) -> Result<TensorRefMut<'a, T>> {
-		tensor_from_array(info, shape, data, size_of::<T>(), T::into_tensor_element_type(), None).map(|tensor| {
+		tensor_from_array(info.to_owned(), shape, data, size_of::<T>(), T::into_tensor_element_type(), None).map(|tensor| {
 			let mut tensor: TensorRefMut<'_, T> = TensorRefMut::new(unsafe { tensor.transmute_type() });
 			tensor.upgradable = false;
 			tensor

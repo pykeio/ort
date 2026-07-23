@@ -70,7 +70,7 @@ pub type BuilderResult = Result<SessionBuilder, Error<SessionBuilder>>;
 /// [`Session`]: crate::session::Session
 pub struct SessionBuilder {
 	session_options_ptr: Arc<SessionOptionsPointer>,
-	memory_info: Option<Arc<MemoryInfo>>,
+	memory_info: Option<Arc<MemoryInfo<'static>>>,
 	operator_domains: SmallVec<[Arc<OperatorDomain>; 1]>,
 	initializers: Vec<Arc<DynValue>>,
 	external_initializer_buffers: Vec<Cow<'static, [u8]>>,

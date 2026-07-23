@@ -3,6 +3,7 @@
 use alloc::sync::Arc;
 use core::{
 	ffi::{CStr, c_char, c_int, c_void},
+	marker::PhantomData,
 	mem,
 	ptr::{self, NonNull},
 	str
@@ -74,7 +75,7 @@ pub struct Allocator {
 	/// [`Allocator::default`], should **not** be released, so this field marks whether or not we should call
 	/// `ReleaseAllocator` on drop.
 	is_default: bool,
-	info: MemoryInfo,
+	info: MemoryInfo<'static>,
 	/// Hold a reference to the session if this allocator is tied to one.
 	_session_inner: Option<Arc<SharedSessionInner>>
 }
@@ -144,20 +145,20 @@ impl Allocator {
 	}
 
 	/// Returns the [`MemoryInfo`] describing this allocator.
-	pub fn memory_info(&self) -> &MemoryInfo {
+	pub fn memory_info<'a>(&'a self) -> &'a MemoryInfo<'a> {
 		&self.info
 	}
 
 	/// Creates a new [`Allocator`] for the given session, to allocate memory on the device described in the
 	/// [`MemoryInfo`].
-	pub fn new(session: &Session, memory_info: MemoryInfo) -> Result<Self> {
+	pub fn new(session: &Session, memory_info: MemoryInfo<'_>) -> Result<Self> {
 		let mut ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
 		ortsys![unsafe CreateAllocator(session.ptr(), memory_info.ptr.as_ptr(), &mut ptr)?; nonNull(ptr)];
 		crate::logging::create!(Allocator, ptr);
 		Ok(Self {
 			ptr,
 			is_default: false,
-			info: memory_info,
+			info: memory_info.to_owned(),
 			_session_inner: Some(session.inner())
 		})
 	}
@@ -373,12 +374,13 @@ impl From<ort_sys::OrtMemoryInfoDeviceType> for DeviceType {
 ///
 /// [`Value`]: crate::value::Value
 #[derive(Debug)]
-pub struct MemoryInfo {
+pub struct MemoryInfo<'a> {
 	ptr: NonNull<ort_sys::OrtMemoryInfo>,
-	should_release: bool
+	should_release: bool,
+	_p: PhantomData<&'a ()>
 }
 
-impl MemoryInfo {
+impl MemoryInfo<'static> {
 	/// Creates a [`MemoryInfo`], describing a memory location on a device allocator.
 	///
 	/// # Examples
@@ -404,9 +406,15 @@ impl MemoryInfo {
 			nonNull(ptr)
 		];
 		crate::logging::create!(MemoryInfo, ptr);
-		Ok(Self { ptr, should_release: true })
+		Ok(Self {
+			ptr,
+			should_release: true,
+			_p: PhantomData
+		})
 	}
+}
 
+impl<'a> MemoryInfo<'a> {
 	pub(crate) unsafe fn from_value(value_ptr: NonNull<ort_sys::OrtValue>) -> Option<Self> {
 		let mut is_tensor = 0;
 		ortsys![unsafe IsTensor(value_ptr.as_ptr(), &mut is_tensor).expect("infallible")];
@@ -421,7 +429,7 @@ impl MemoryInfo {
 	}
 
 	pub(crate) fn from_raw(ptr: NonNull<ort_sys::OrtMemoryInfo>, should_release: bool) -> Self {
-		MemoryInfo { ptr, should_release }
+		MemoryInfo { ptr, should_release, _p: PhantomData }
 	}
 
 	// All getter functions are (at least currently) infallible - they simply just dereference the corresponding fields,
@@ -513,21 +521,25 @@ impl MemoryInfo {
 		#[cfg(not(feature = "api-23"))]
 		return self.device_type() == DeviceType::CPU;
 	}
+
+	pub fn to_owned(&self) -> MemoryInfo<'static> {
+		MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default).expect("failed to create default memory info")
+	}
 }
 
-impl Default for MemoryInfo {
+impl Default for MemoryInfo<'_> {
 	fn default() -> Self {
 		MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default).expect("failed to create default memory info")
 	}
 }
 
-impl Clone for MemoryInfo {
+impl Clone for MemoryInfo<'_> {
 	fn clone(&self) -> Self {
 		MemoryInfo::new(self.allocation_device(), self.device_id(), self.allocator_type(), self.memory_type()).expect("failed to clone memory info")
 	}
 }
 
-impl PartialEq<MemoryInfo> for MemoryInfo {
+impl PartialEq<MemoryInfo<'_>> for MemoryInfo<'_> {
 	fn eq(&self, other: &MemoryInfo) -> bool {
 		let mut out = 0;
 		ortsys![unsafe CompareMemoryInfo(self.ptr.as_ptr(), other.ptr.as_ptr(), &mut out).expect("infallible")]; // implementation always returns ok status
@@ -535,7 +547,7 @@ impl PartialEq<MemoryInfo> for MemoryInfo {
 	}
 }
 
-impl AsPointer for MemoryInfo {
+impl AsPointer for MemoryInfo<'_> {
 	type Sys = ort_sys::OrtMemoryInfo;
 
 	fn ptr(&self) -> *const Self::Sys {
@@ -543,7 +555,7 @@ impl AsPointer for MemoryInfo {
 	}
 }
 
-impl Drop for MemoryInfo {
+impl Drop for MemoryInfo<'_> {
 	fn drop(&mut self) {
 		if self.should_release {
 			ortsys![unsafe ReleaseMemoryInfo(self.ptr.as_ptr())];

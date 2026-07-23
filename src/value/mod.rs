@@ -55,13 +55,13 @@ use crate::{
 pub(crate) struct ValueInner {
 	pub(crate) ptr: NonNull<ort_sys::OrtValue>,
 	pub(crate) dtype: ValueType,
-	pub(crate) memory_info: Option<MemoryInfo>,
+	pub(crate) memory_info: Option<MemoryInfo<'static>>,
 	pub(crate) drop: bool,
 	_backing: Option<Box<dyn Any>>
 }
 
 impl ValueInner {
-	pub fn new(ptr: NonNull<ort_sys::OrtValue>, dtype: ValueType, memory_info: Option<MemoryInfo>, drop: bool) -> Arc<Self> {
+	pub fn new(ptr: NonNull<ort_sys::OrtValue>, dtype: ValueType, memory_info: Option<MemoryInfo<'static>>, drop: bool) -> Arc<Self> {
 		crate::logging::create!(Value, ptr);
 		Arc::new(Self {
 			ptr,
@@ -72,7 +72,13 @@ impl ValueInner {
 		})
 	}
 
-	pub fn new_backed(ptr: NonNull<ort_sys::OrtValue>, dtype: ValueType, memory_info: Option<MemoryInfo>, drop: bool, backing: Box<dyn Any>) -> Arc<Self> {
+	pub fn new_backed(
+		ptr: NonNull<ort_sys::OrtValue>,
+		dtype: ValueType,
+		memory_info: Option<MemoryInfo<'static>>,
+		drop: bool,
+		backing: Box<dyn Any>
+	) -> Arc<Self> {
 		crate::logging::create!(Value, ptr);
 		Arc::new(Self {
 			ptr,

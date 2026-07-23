@@ -110,8 +110,8 @@ impl SessionBuilder {
 		}
 	}
 
-	/// Enables profiling. Profile information will be writen to `profiling_file` after profiling completes.
-	/// See [`Session::end_profiling`].
+	/// Enables profiling. Profile information will be writen to `profiling_file` after calling
+	/// [`Session::end_profiling`].
 	///
 	/// [`Session::end_profiling`]: crate::session::Session::end_profiling
 	#[cfg(feature = "std")]

@@ -1,3 +1,5 @@
+#[cfg(feature = "api-23")]
+use alloc::string::ToString;
 use alloc::{string::String, sync::Arc, vec::Vec};
 use core::{
 	ffi::{CStr, c_char, c_int},
@@ -345,17 +347,38 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// # use ort::session::RunOptions;
 	/// # fn main() -> ort::Result<()> {
 	/// let mut run_options = RunOptions::new()?;
-	/// run_options.add_config_entry("gpu_graph_id", "1")?;
+	/// run_options.set("gpu_graph_id", "1")?;
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	pub fn add_config_entry(&mut self, key: impl AsRef<str>, value: impl AsRef<str>) -> Result<()> {
+	pub fn set(&mut self, key: impl AsRef<str>, value: impl AsRef<str>) -> Result<()> {
 		with_cstr(key.as_ref().as_bytes(), &|key| {
 			with_cstr(value.as_ref().as_bytes(), &|value| {
 				ortsys![unsafe AddRunConfigEntry(self.inner.ptr.as_ptr(), key.as_ptr(), value.as_ptr())?];
 				Ok(())
 			})
 		})
+	}
+
+	/// Retrieves a custom configuration option set by [`RunOptions::set`].
+	///
+	/// ```no_run
+	/// # use std::sync::Arc;
+	/// # use ort::session::RunOptions;
+	/// # fn main() -> ort::Result<()> {
+	/// let mut run_options = RunOptions::new()?;
+	/// run_options.set("foobar", "123")?;
+	/// assert_eq!(run_options.get("foobar").as_deref(), Some("123"));
+	/// # 	Ok(())
+	/// # }
+	/// ```
+	#[cfg(feature = "api-23")]
+	pub fn get(&mut self, key: impl AsRef<str>) -> Option<String> {
+		let cstr =
+			with_cstr(key.as_ref().as_bytes(), &|key| Ok(NonNull::new(ortsys![unsafe GetRunConfigEntry(self.inner.ptr.as_ptr(), key.as_ptr())].cast_mut())))
+				.ok()??;
+
+		Some(unsafe { CStr::from_ptr(cstr.as_ptr()) }.to_str().ok()?.to_string())
 	}
 
 	#[cfg(feature = "api-20")]
@@ -392,7 +415,22 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	}
 
 	pub fn disable_device_sync(&mut self) -> Result<()> {
-		self.add_config_entry("disable_synchronize_execution_providers", "1")
+		self.set("disable_synchronize_execution_providers", "1")
+	}
+
+	#[cfg(all(feature = "std", feature = "api-25"))]
+	#[cfg_attr(docsrs, doc(cfg(all(feature = "std", feature = "api-25"))))]
+	pub fn enable_profiling(&mut self, prefix: impl AsRef<std::path::Path>) -> Result<()> {
+		let prefix = crate::util::path_to_os_char(prefix);
+		ortsys![unsafe RunOptionsEnableProfiling(self.ptr_mut(), prefix.as_ptr())?];
+		Ok(())
+	}
+
+	#[cfg(feature = "api-25")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "api-25")))]
+	pub fn disable_profiling(&mut self) -> Result<()> {
+		ortsys![unsafe RunOptionsDisableProfiling(self.ptr_mut())?];
+		Ok(())
 	}
 }
 

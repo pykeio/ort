@@ -319,28 +319,6 @@ impl Outlet {
 		}
 	}
 
-	#[cfg(feature = "api-22")]
-	pub(crate) unsafe fn from_raw(raw: NonNull<ort_sys::OrtValueInfo>, drop: bool) -> Result<Self> {
-		let mut name = ptr::null();
-		ortsys![unsafe GetValueInfoName(raw.as_ptr(), &mut name)?];
-		let name = if !name.is_null() {
-			unsafe { CStr::from_ptr(name) }.to_str().map_or_else(|_| String::new(), str::to_string)
-		} else {
-			String::new()
-		};
-
-		let mut type_info = ptr::null();
-		ortsys![unsafe GetValueInfoTypeInfo(raw.as_ptr(), &mut type_info)?; nonNull(type_info)];
-		let dtype = unsafe { ValueType::from_type_info(type_info) };
-
-		Ok(Self {
-			name,
-			dtype,
-			value_info: Some(raw),
-			drop
-		})
-	}
-
 	#[inline]
 	pub fn name(&self) -> &str {
 		&self.name

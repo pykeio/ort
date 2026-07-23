@@ -70,7 +70,7 @@ pub use ort_sys as sys;
 
 #[cfg(all(feature = "load-dynamic", not(target_arch = "wasm32")))]
 pub use self::environment::init_from;
-pub(crate) use self::logging::{debug, error, info, trace, warning as warn};
+pub(crate) use self::logging::{error, info, trace, warning as warn};
 #[cfg(test)]
 pub(crate) mod test_util;
 use self::util::OnceLock;

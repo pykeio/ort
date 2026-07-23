@@ -1,6 +1,7 @@
 //! ONNX Runtime doesn't (currently) expose an API for inter-device copies, so we instead use a dummy model to copy the
 //! tensor & `IoBinding` to configure where the copy ends up.
 
+#[cfg(any(feature = "cuda", feature = "directml", feature = "cann", feature = "openvino", feature = "rocm"))]
 use alloc::{format, string::ToString};
 use core::ops::{Deref, DerefMut};
 
@@ -32,6 +33,7 @@ static SESSIONS: OnceLock<Mutex<MiniMap<IdentitySessionKey, IdentitySession>>> =
 /// `RunOptions` with [`RunOptions::disable_device_sync`], shared across `to_async()` calls to reduce allocations.
 static IDENTITY_RUN_OPTIONS: OnceLock<RunOptions<NoSelectedOutputs>> = OnceLock::new();
 
+#[allow(unused_variables)]
 fn ep_for_device(device: AllocationDevice, device_id: i32) -> Result<ep::ExecutionProviderDispatch> {
 	Ok(match device {
 		AllocationDevice::CPU => ep::CPU::default().with_arena_allocator(false).build(),

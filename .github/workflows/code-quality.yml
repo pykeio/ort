@@ -59,7 +59,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2.9.1
       - name: Get Rust version
         id: rust-version
-        run: echo "::set-output name=version::$(cargo --version | cut -d ' ' -f 2)"
+        run: echo "version=$(cargo --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
         shell: bash
       - uses: actions/cache@v5
         id: tarpaulin-cache

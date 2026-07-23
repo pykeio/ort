@@ -46,12 +46,6 @@ macro_rules! trace {
 		tracing::trace!($($arg)+);
 	}}
 }
-macro_rules! debug {
-	($($arg:tt)+) => {{
-		#[cfg(feature = "tracing")]
-		tracing::debug!($($arg)+);
-	}}
-}
 macro_rules! info {
 	($($arg:tt)+) => {{
 		#[cfg(feature = "tracing")]
@@ -70,7 +64,6 @@ macro_rules! error {
 		tracing::error!($($arg)+);
 	}}
 }
-pub(crate) use debug;
 pub(crate) use error;
 pub(crate) use info;
 pub(crate) use trace;

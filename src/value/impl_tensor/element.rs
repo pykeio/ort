@@ -55,14 +55,13 @@ pub enum TensorElementType {
 
 impl TensorElementType {
 	/// Returns the size in bytes that a container of this type occupies according to its total capacity.
-	pub fn byte_size(&self, container_capacity: usize) -> usize {
-		match self {
+	pub fn byte_size(&self, container_capacity: usize) -> Option<usize> {
+		Some(match self {
 			TensorElementType::Uint4 | TensorElementType::Int4 => container_capacity / 2,
 			TensorElementType::Bool | TensorElementType::Int8 | TensorElementType::Uint8 => container_capacity,
 			TensorElementType::Int16 | TensorElementType::Uint16 => container_capacity * 2,
 			TensorElementType::Int32 | TensorElementType::Uint32 => container_capacity * 4,
 			TensorElementType::Int64 | TensorElementType::Uint64 => container_capacity * 8,
-			TensorElementType::String => 0, // unsure what to do about this...
 			TensorElementType::Float8E4M3FN | TensorElementType::Float8E4M3FNUZ | TensorElementType::Float8E5M2 | TensorElementType::Float8E5M2FNUZ => {
 				container_capacity
 			}
@@ -71,8 +70,11 @@ impl TensorElementType {
 			TensorElementType::Float64 => container_capacity * 8,
 			TensorElementType::Complex64 => container_capacity * 8,
 			TensorElementType::Complex128 => container_capacity * 16,
-			TensorElementType::Undefined => 0
-		}
+			TensorElementType::String | TensorElementType::Undefined => {
+				// ONNX Runtime doesn't support `GetTensorSizeInBytes` for string tensors either
+				return None;
+			}
+		})
 	}
 }
 

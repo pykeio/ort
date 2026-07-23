@@ -132,7 +132,7 @@ impl DynTensor {
 			let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
 			ortsys![unsafe GetTensorMutableData(value_ptr.as_ptr(), &mut buffer_ptr)?];
 			if !buffer_ptr.is_null() {
-				unsafe { buffer_ptr.write_bytes(0, data_type.byte_size(shape.num_elements())) };
+				unsafe { buffer_ptr.write_bytes(0, data_type.byte_size(shape.num_elements()).expect("infallible")) };
 			}
 		}
 
@@ -226,8 +226,28 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub fn memory_info(&self) -> &MemoryInfo {
+	pub fn memory_info(&self) -> &MemoryInfo<'_> {
 		unsafe { self.inner.memory_info.as_ref().unwrap_unchecked() }
+	}
+
+	/// Returns the size of the tensor's data in bytes, or `None` in the case of string tensors.
+	///
+	/// ```
+	/// # use ort::{memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType}, session::Session, value::Tensor};
+	/// # fn main() -> ort::Result<()> {
+	/// let tensor = Tensor::<f32>::new(&Allocator::default(), [1_usize, 3, 224, 224])?;
+	/// assert_eq!(tensor.size(), Some(602_112)); // (1 * 3 * 224 * 224) * size_of::<f32>()
+	/// # Ok(())
+	/// # }
+	pub fn size(&self) -> Option<usize> {
+		#[cfg(feature = "api-23")]
+		{
+			let mut size = 0;
+			ortsys![@ort: unsafe GetTensorSizeInBytes(self.ptr(), &mut size) as Result].ok()?;
+			Some(size)
+		}
+		#[cfg(not(feature = "api-23"))]
+		self.data_type().byte_size(self.shape().num_elements())
 	}
 }
 

@@ -139,7 +139,28 @@ impl Environment {
 	///
 	/// [commit]: EnvironmentBuilder::commit
 	pub fn current() -> Result<Arc<Environment>> {
-		self::current()
+		let mut env_lock = G_ENV.lock();
+		if let Some(env) = env_lock.as_ref() {
+			return Ok(env.clone());
+		}
+
+		#[cfg(all(feature = "std", target_arch = "x86_64"))]
+		{
+			if ort_sys::USING_PYKE_BINARIES && !std::is_x86_feature_detected!("avx2") {
+				eprintln!(
+					"WARNING: This CPU does not support AVX2, which is required by ort's prebuilt ONNX Runtime binaries. The app will likely crash with an illegal instruction error; use a custom build of ONNX Runtime to fix."
+				);
+			}
+		}
+
+		let options = G_ENV_OPTIONS.get_or_init(EnvironmentBuilder::new);
+		let env = options.create_environment().map(Arc::new)?;
+		*env_lock = Some(Arc::clone(&env));
+
+		#[cfg(target_vendor = "apple")]
+		register_atexit();
+
+		Ok(env)
 	}
 
 	/// Sets the global log level.
@@ -250,33 +271,6 @@ impl Drop for Environment {
 		ortsys![unsafe ReleaseEnv(self.ptr_mut())];
 		crate::logging::drop!(Environment, self.ptr());
 	}
-}
-
-/// Returns a handle to the currently active `Environment`. If one has not yet been committed (or an old environment
-/// has fallen out of usage), a new environment will be created & committed.
-pub fn current() -> Result<Arc<Environment>> {
-	let mut env_lock = G_ENV.lock();
-	if let Some(env) = env_lock.as_ref() {
-		return Ok(env.clone());
-	}
-
-	#[cfg(all(feature = "std", target_arch = "x86_64"))]
-	{
-		if ort_sys::USING_PYKE_BINARIES && !std::is_x86_feature_detected!("avx2") {
-			eprintln!(
-				"WARNING: This CPU does not support AVX2, which is required by ort's prebuilt ONNX Runtime binaries. The app will likely crash with an illegal instruction error; use a custom build of ONNX Runtime to fix."
-			);
-		}
-	}
-
-	let options = G_ENV_OPTIONS.get_or_init(EnvironmentBuilder::new);
-	let env = options.create_environment().map(Arc::new)?;
-	*env_lock = Some(Arc::clone(&env));
-
-	#[cfg(target_vendor = "apple")]
-	register_atexit();
-
-	Ok(env)
 }
 
 #[derive(Debug)]

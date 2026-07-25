@@ -11,14 +11,7 @@ use core::{
 use smallvec::SmallVec;
 
 use crate::{
-	AsPointer, Error,
-	environment::{self, Environment},
-	error::Result,
-	logging::LoggerFunction,
-	memory::MemoryInfo,
-	operator::OperatorDomain,
-	ortsys,
-	util::with_cstr,
+	AsPointer, Error, environment::Environment, error::Result, logging::LoggerFunction, memory::MemoryInfo, operator::OperatorDomain, ortsys, util::with_cstr,
 	value::DynValue
 };
 
@@ -120,7 +113,7 @@ impl SessionBuilder {
 	/// # }
 	/// ```
 	pub fn new() -> Result<Self> {
-		let environment = environment::current()?;
+		let environment = Environment::current()?;
 
 		let mut session_options_ptr: *mut ort_sys::OrtSessionOptions = ptr::null_mut();
 		ortsys![unsafe CreateSessionOptions(&mut session_options_ptr)?; nonNull(session_options_ptr)];

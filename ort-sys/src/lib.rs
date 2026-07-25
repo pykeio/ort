@@ -2055,7 +2055,11 @@ pub struct OrtApi {
 	#[cfg(feature = "api-27")]
 	pub GetSessionExecutionMode: unsafe extern "system" fn(options: *const OrtSessionOptions, out: *mut ExecutionMode) -> OrtStatusPtr,
 	#[cfg(feature = "api-27")]
-	pub SessionReleaseCapturedGraph: unsafe extern "system" fn(session: *mut OrtSession, graph_annotation_id: core::ffi::c_int) -> OrtStatusPtr
+	pub SessionReleaseCapturedGraph: unsafe extern "system" fn(session: *mut OrtSession, graph_annotation_id: core::ffi::c_int) -> OrtStatusPtr,
+	#[cfg(feature = "api-28")]
+	pub GetExperimentalFunction: unsafe extern "system" fn(name: *const c_char) -> *const c_void,
+	#[cfg(feature = "api-28")]
+	pub KernelContext_GetSyncStream: unsafe extern "system" fn(context: *const OrtKernelContext, out: *mut *mut OrtSyncStream) -> OrtStatusPtr
 }
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]

@@ -496,9 +496,9 @@ impl EnvironmentBuilder {
 
 	/// Enable or disable sending telemetry data.
 	///
-	/// Typically, only Windows builds of ONNX Runtime provided by Microsoft will have telemetry enabled.
-	/// Pre-built binaries provided by pyke, binaries compiled from source, and most alternative backends won't have
-	/// telemetry enabled.
+	/// This is enabled by default in Microsoft-provided builds of ONNX Runtime. Pre-built binaries provided by pyke
+	/// (the default downloaded by `ort`), binaries compiled from source, and most alternative backends won't have
+	/// telemetry enabled by default.
 	///
 	/// The exact kind of telemetry data sent by ONNX Runtime can be found [here][etw].
 	/// Currently, this includes (but is not limited to): ONNX graph version, model producer name & version, whether or
@@ -511,7 +511,7 @@ impl EnvironmentBuilder {
 	/// The `ort-web` alternative backend collects telemetry data by default. This telemetry data is sent to pyke.
 	/// More details can be found in the `_telemetry.js` file in the root of the `ort-web` crate.
 	///
-	/// [etw]: https://github.com/microsoft/onnxruntime/blob/v1.27.0/onnxruntime/core/platform/windows/telemetry.cc
+	/// [etw]: https://github.com/microsoft/onnxruntime/blob/v1.28.0/onnxruntime/core/platform/windows/telemetry.cc
 	#[must_use = "commit() must be called in order for the environment to take effect"]
 	pub fn with_telemetry(mut self, enable: bool) -> Self {
 		self.telemetry = enable;

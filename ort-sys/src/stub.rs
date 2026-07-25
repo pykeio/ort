@@ -2539,6 +2539,17 @@ unsafe extern "system" fn SessionReleaseCapturedGraph(session: *mut OrtSession, 
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-28")]
+unsafe extern "system" fn GetExperimentalFunction(name: *const c_char) -> *const c_void {
+	ptr::null()
+}
+
+#[cfg(feature = "api-28")]
+unsafe extern "system" fn KernelContext_GetSyncStream(context: *const OrtKernelContext, out: *mut *mut OrtSyncStream) -> OrtStatusPtr {
+	unsafe { *out = ptr::null_mut() };
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
 pub const fn api() -> OrtApi {
 	OrtApi {
 		CreateStatus,
@@ -3108,6 +3119,10 @@ pub const fn api() -> OrtApi {
 		#[cfg(feature = "api-27")]
 		GetSessionExecutionMode,
 		#[cfg(feature = "api-27")]
-		SessionReleaseCapturedGraph
+		SessionReleaseCapturedGraph,
+		#[cfg(feature = "api-28")]
+		GetExperimentalFunction,
+		#[cfg(feature = "api-28")]
+		KernelContext_GetSyncStream
 	}
 }

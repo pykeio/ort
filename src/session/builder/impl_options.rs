@@ -387,7 +387,7 @@ impl SessionBuilder {
 	/// 	("XnnpackExecutionProvider.num_threads".to_string(), "4".to_string()),
 	/// ];
 	/// let mut session = Session::builder()?
-	/// 	.with_devices(env.devices().filter(|dev| dev.ty() == DeviceType::CPU), Some(&options))?
+	/// 	.with_devices(env.devices().filter(|dev| dev.hardware_device().ty() == DeviceType::CPU), Some(&options))?
 	/// 	.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	Ok(())
 	/// # }

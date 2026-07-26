@@ -222,13 +222,15 @@ impl Environment {
 	/// # fn main() -> ort::Result<()> {
 	/// let env = Environment::current()?;
 	/// for device in env.devices() {
+	/// 	let hardware_device = device.hardware_device();
 	/// 	println!(
-	/// 		"{id} ({vendor} {ty:?} - {ep})",
-	/// 		id = device.id(),
-	/// 		vendor = device.vendor()?,
-	/// 		ty = device.ty(),
+	/// 		"{ep}: {vendor} {ty:?} ({id})",
+	/// 		id = hardware_device.id(),
+	/// 		vendor = hardware_device.vendor()?,
+	/// 		ty = hardware_device.ty(),
 	/// 		ep = device.ep()?
 	/// 	);
+	/// 	// CPUExecutionProvider: Intel CPU (0)
 	/// }
 	/// # Ok(())
 	/// # }

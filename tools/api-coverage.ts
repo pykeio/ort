@@ -15,6 +15,8 @@ const IGNORED_SYMBOLS = new Set<string>([
 	'SessionOptionsAppendExecutionProvider_OpenVINO', // we use V2
 	'GetValueType', // we get value types via GetTypeInfo -> GetOnnxTypeFromTypeInfo, which is equivalent
 	'SetLanguageProjection', // someday we shall have `ORT_PROJECTION_RUST`, but alas, today is not that day...
+	'GetTensorElementTypeAndShapeDataReference', // redundant
+	'GetTensorData', // super redundant
 
 	// we use allocator APIs directly on the Allocator struct
 	'AllocatorAlloc',

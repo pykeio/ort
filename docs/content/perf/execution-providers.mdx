@@ -31,11 +31,14 @@ Not all platforms support all execution providers, of course. This handy widget 
 In order to configure sessions to use certain execution providers, you must **register** them when creating an environment or session. You can do this via the [`SessionBuilder::with_execution_providers`](https://docs.rs/ort/latest/ort/session/builder/struct.SessionBuilder.html#method.with_execution_providers) method. For example, to register the CUDA execution provider for a session:
 
 ```rust filename="main.rs"
-use ort::{ep::CUDA, session::Session};
+use ort::{ep, session::Session};
 
 fn main() -> anyhow::Result<()> {
     let session = Session::builder()?
-        .with_execution_providers([CUDA::default().build()])?
+        .with_execution_providers([
+            #[cfg(feature = "cuda")]
+            ep::CUDA::default().build()
+        ])?
         .commit_from_file("model.onnx")?;
 
     Ok(())
@@ -51,11 +54,15 @@ fn main() -> anyhow::Result<()> {
     let session = Session::builder()?
         .with_execution_providers([
             // Prefer TensorRT over CUDA.
+            #[cfg(feature = "tensorrt")]
             ep::TensorRT::default().build(),
+            #[cfg(feature = "cuda")]
             ep::CUDA::default().build(),
             // Use DirectML on Windows if NVIDIA EPs are not available
+            #[cfg(feature = "directml")]
             ep::DirectML::default().build(),
             // Or use ANE on Apple platforms
+            #[cfg(feature = "coreml")]
             ep::CoreML::default().build()
         ])?
         .commit_from_file("model.onnx")?;
@@ -73,6 +80,7 @@ use ort::{ep, session::Session};
 fn main() -> anyhow::Result<()> {
     let session = Session::builder()?
         .with_execution_providers([
+            #[cfg(feature = "coreml")]
             ep::CoreML::default()
                 // this model uses control flow operators, so enable CoreML on subgraphs too
                 .with_subgraphs()
@@ -95,7 +103,10 @@ use ort::{ep, session::Session};
 fn main() -> anyhow::Result<()> {
     let session = Session::builder()?
         .with_execution_providers([
-            ep::CUDA::default().build().error_on_failure()
+            #[cfg(feature = "cuda")]
+            ep::CUDA::default()
+                .build()
+                .error_on_failure()
         ])?
         .commit_from_file("model.onnx")?;
 
@@ -114,10 +125,13 @@ use ort::{
 fn main() -> anyhow::Result<()> {
     let builder = Session::builder()?;
 
-    let cuda = ep::CUDA::default();
-    if cuda.register(&builder).is_err() {
-        eprintln!("Failed to register CUDA!");
-        std::process::exit(1);
+    #[cfg(feature = "cuda")]
+    {
+        let cuda = ep::CUDA::default();
+        if cuda.register(&builder).is_err() {
+            eprintln!("Failed to register CUDA!");
+            std::process::exit(1);
+        }
     }
 
     let session = builder.commit_from_file("model.onnx")?;
@@ -126,7 +140,7 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-You can also check whether ONNX Runtime is even compiled with support for the execution provider with the [`is_available`](https://docs.rs/ort/latest/ort/ep/trait.ExecutionProvider.html#method.is_available) method.
+You can also check whether a custom-linked build of ONNX Runtime was even compiled with support for the execution provider with the [`is_available`](https://docs.rs/ort/latest/ort/ep/trait.ExecutionProvider.html#method.is_available) method.
 
 ```rust filename="main.rs"
 use ort::{
@@ -160,7 +174,10 @@ use ort::{ep, session::Session};
 
 fn main() -> anyhow::Result<()> {
     ort::init()
-        .with_execution_providers([ep::CUDA::default().build()])
+        .with_execution_providers([
+            #[cfg(feature = "cuda")]
+            ep::CUDA::default().build()
+        ])
         .commit();
 
     let session = Session::builder()?.commit_from_file("model.onnx")?;
@@ -188,18 +205,6 @@ Certain EPs like CUDA and TensorRT use a separate interface that require them to
 Due to the quirks of dynamic library loading, you may encounter issues with builds including these EPs due to ONNX Runtime failing to find the dylibs at runtime. <Ort/>'s `copy-dylibs` [Cargo feature](/setup/cargo-features) (which is enabled by default) tries to alleviate this issue by symlinking these dylibs into your `target` folder so they can be found by your application when in development. On Windows platforms that don't have [Developer Mode](https://learn.microsoft.com/en-us/windows/uwp/get-started/enable-your-device-for-development) enabled, a copy is instead performed. On other platforms, additional setup is required to get the application to load dylibs from its parent folder.
 
 See [Runtime dylib loading](/setup/linking#runtime-dylib-loading) for more information.
-
-### Prebuilt binary combos
-<Ort/> provides prebuilt binaries for the following combinations of EP features:
-
-- `directml`/`coreml` are available in any build if the platform supports it.
-- `cuda`/`tensorrt`
-- `webgpu`
-- `nvrtx`
-
-This means that we have builds for `features = ["cuda", "tensorrt", "directml"]`, but *not* `features = ["cuda", "webgpu"]`. Specifying both `cuda` and `webgpu` for example **will fall back to downloading a CPU-only build**.
-
-If you want a single build of ONNX Runtime that has both `cuda` *and* `webgpu`, you'll have to compile it from source.
 
 ### CUDA
 <Ort/> provides binaries for CUDA ≥ 13.2 and targets cuDNN ≥ 9.23. Make sure compatible versions of CUDA and cuDNN are installed and available on the `PATH`.

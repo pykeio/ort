@@ -1,6 +1,8 @@
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
+
 import type { Metadata } from 'next';
 import { generateStaticParamsFor, importPage } from 'nextra/pages';
+
 import { useMDXComponents as getMDXComponents } from '../../mdx-components';
 
 const hash = (x: string) => createHash('sha256').update(x).digest('base64url');

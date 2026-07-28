@@ -1,5 +1,5 @@
 import { FaRust } from 'react-icons/fa6';
-import { PiAtomBold, PiBugBeetleFill, PiCubeBold, PiGearFill, PiHandCoinsFill, PiLightningFill, PiMapPinFill, PiMapTrifoldBold, PiWrenchFill } from 'react-icons/pi';
+import { PiAtomBold, PiBugBeetleFill, PiCirclesThreeBold, PiCubeBold, PiGearFill, PiHandCoinsFill, PiLightningFill, PiMapPinFill, PiMapTrifoldBold, PiWrenchFill } from 'react-icons/pi';
 import { RxArrowTopRight } from 'react-icons/rx';
 
 import { CRATE_VERSION } from '../constants';
@@ -37,7 +37,7 @@ export default {
 	"troubleshooting": {
 		"title": <b><PiBugBeetleFill className='sidebar-icon-small' style={{ marginRight: '10px' }} /> Troubleshooting</b>
 	},
-	"migrating": {
-		"title": <b><PiMapTrifoldBold className='sidebar-icon-small' style={{ marginRight: '10px' }} /> Migration & versioning</b>
+	"misc": {
+		"title": <b><PiCirclesThreeBold className='sidebar-icon-small' style={{ marginRight: '10px' }} /> Miscellaneous</b>
 	}
 };

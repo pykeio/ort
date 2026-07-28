@@ -1,9 +1,11 @@
+import { Callout } from 'nextra/components';
+
 import Ort from '../../components/Ort';
 
 # Multiversioning
-<Ort/> can support any version of ONNX Runtime between 1.17 to 1.27. It does this by lowering the **API version** it requests based on what features are enabled.
+<Ort/> can support any version of ONNX Runtime between 1.17 and 1.28. <Ort/>'s minimum API version is controlled by its `api-<version>` Cargo features.
 
-By default, the latest APIs (gated under feature `api-27`) are enabled by default, so you have access to all ONNX Runtime 1.27 features out of the box. If you want to target an earlier version of ONNX Runtime, you must disable `default-features` and set your minimum API version accordingly:
+The latest API version (`api-28`) is enabled by default, so you have access to all ONNX Runtime 1.28 features out of the box. If you want to target an earlier version of ONNX Runtime, you must disable `default-features` and set your minimum API version accordingly:
 ```toml filename="Cargo.toml"
 [dependencies.ort]
 version = "=2.0.0-rc.12"
@@ -12,20 +14,22 @@ features = [
     "std",
     "ndarray",
     "download-binaries",
-    
+
     # We use the `Adapter` API, which is only available since ONNX Runtime 1.20,
     # so set our minimum API version to 20.
     "api-20"
 ]
 ```
 
-In the above example, only features available since ONNX Runtime 1.20 will be accessible in code. Because `download-binaries` is enabled, <Ort/> will still download the latest ONNX Runtime (v1.27), but it will happily use an older version if you [set up manual linking](/setup/linking).
+In the above example, only features available since ONNX Runtime 1.20 will be accessible in code. Because `download-binaries` is enabled, <Ort/> will still download the latest version of ONNX Runtime (v1.28), but it will happily use an older version if you [set up manual linking](/setup/linking).
 
-The [API docs](https://docs.rs/ort) shows the minimum API version required for each method/struct; if no notice is shown, then it's always available.
+<Callout type='info'>Authors of library crates using <Ort/> should always target the lowest possible version to allow greater flexibility downstream!</Callout>
+
+The [API docs](https://docs.rs/ort) show the minimum version required for each method/interface; if no such notice is shown, then it's always available, regardless of the ONNX Runtime version.
 
 <img width="100%" src="/assets/_api-version-feature.webp" alt='A screenshot of the docs.rs page for SessionBuilder::with_auto_device. Below the method definition, an infobox says "Available on crate feature api-22 only".' />
 
-The following API version features are available. Each feature also enables all APIs before it.
+The following version target features are available:
 - **`api-17`**: ONNX Runtime v1.17 (baseline)
 - **`api-18`**: ONNX Runtime v1.18
 - **`api-19`**: ONNX Runtime v1.19
@@ -36,4 +40,5 @@ The following API version features are available. Each feature also enables all 
 - **`api-24`**: ONNX Runtime v1.24
 - **`api-25`**: ONNX Runtime v1.25
 - **`api-26`**: ONNX Runtime v1.26
-- **`api-27`**: ONNX Runtime v1.27 (latest)
+- **`api-27`**: ONNX Runtime v1.27
+- **`api-28`**: ONNX Runtime v1.28 (latest)

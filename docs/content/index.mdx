@@ -13,7 +13,7 @@ import { CRATE_VERSION } from '../constants';
 </div>
 
 <Callout type='warning'>
-    These docs are for the latest alpha version of <Ort/>, <Code>{CRATE_VERSION}</Code>. This version is production-ready (just not API stable) and we recommend new & existing projects use it.
+    These docs are for the latest version of <Ort/>, <Code>{CRATE_VERSION}</Code>. This version is production-ready and we recommend new & existing projects use it.
 </Callout>
 
 <Ort/> makes it easy to deploy your machine learning models to production via [ONNX Runtime](https://onnxruntime.ai/), a hardware-accelerated inference engine. With <Ort/> + ONNX Runtime, you can run almost any ML model (including ResNet, YOLOv8, BERT, LLaMA) on almost any hardware, often far faster than PyTorch, and with the added bonus of Rust's efficiency.
@@ -24,25 +24,23 @@ import { CRATE_VERSION } from '../constants';
 
 Converting a neural network to a graph representation like ONNX opens the door to more optimizations and broader accelerator support. ONNX Runtime can significantly improve the inference speed/latency of most models and enable hardware acceleration with NVIDIA CUDA & TensorRT, Intel OpenVINO, Qualcomm QNN, Huawei CANN, and [much more](/perf/execution-providers).
 
-<Ort/> is the Rust gateway to ONNX Runtime, allowing you to infer your ONNX models via an easy-to-use and ergonomic API. Many commercial, open-source, & research projects use <Ort/> in some pretty serious production scenarios to boost inference performance:
-- [**Bloop**](https://bloop.ai/)'s semantic code search feature is powered by <Ort/>.
-- [**SurrealDB**](https://surrealdb.com/)'s powerful SurrealQL query language supports calling ML models, including ONNX graphs through <Ort/>.
-- [**Google's Magika**](https://github.com/google/magika) file type detection library is powered by <Ort/>.
-- [**Wasmtime**](https://github.com/bytecodealliance/wasmtime), an open-source WebAssembly runtime, supports ONNX inference for the [WASI-NN standard](https://github.com/WebAssembly/wasi-nn) via <Ort/>.
-- [**`rust-bert`**](https://github.com/guillaume-be/rust-bert) implements many ready-to-use NLP pipelines in Rust à la Hugging Face Transformers with both [`tch`](https://crates.io/crates/tch) & <Ort/> backends.
-- [**Supabase**](https://supabase.com)'s edge functions AI compatibility is powered by <Ort/>.
+<Ort/> is *the* Rust gateway to ONNX Runtime & other compatible ONNX inference engines, allowing you to run inference on your ONNX models via an easy-to-use and ergonomic API. Many commercial, open-source, & research projects use <Ort/> in some pretty serious production scenarios to boost inference performance:
+- [**Boquila Foundation**](https://boquila.org/) uses local models running via <Ort/> to aid in biodiversity conservation.
+- [**Wasmtime**](https://github.com/bytecodealliance/wasmtime), one of the most popular open-source WebAssembly runtimes, implements ONNX inference for the [WASI-NN standard](https://github.com/WebAssembly/wasi-nn) using <Ort/>.
+- [**SurrealDB**](https://surrealdb.com/)'s SurrealQL query language supports calling ONNX models through <Ort/>. [**Supabase**](https://supabase.com)'s AI edge functions are also powered by <Ort/>.
+- Google's [**Magika**](https://github.com/google/magika) file type detection library is powered by <Ort/>. 2 other members of the ["Big Five"](https://en.wikipedia.org/wiki/Big_Tech#Big_Five) use <Ort/>, too.
 
 # Getting started
 <Steps>
 
-### Add <Ort/> to your Cargo.toml
+{<h3>Add <Ort/> to your Cargo.toml</h3>}
 If you have a [supported platform](/setup/platforms) (and you probably do), installing <Ort/> couldn't be any simpler! Just add it to your Cargo dependencies:
 ```toml
 [dependencies]
 ort = "=2.0.0-rc.12"
 ```
 
-### Convert your model
+{<h3>Convert your model</h3>}
 Your model will need to be converted to an ONNX graph before you can use it.
 - The awesome folks at Hugging Face have [a guide](https://huggingface.co/docs/transformers/serialization) to export 🤗 Transformers models to ONNX with 🤗 Optimum.
 - For any PyTorch model: [`torch.onnx`](https://pytorch.org/docs/stable/onnx.html)
@@ -50,7 +48,7 @@ Your model will need to be converted to an ONNX graph before you can use it.
 - For TensorFlow, Keras, TFlite, & TensorFlow.js: [`tf2onnx`](https://github.com/onnx/tensorflow-onnx)
 - For PaddlePaddle: [`Paddle2ONNX`](https://github.com/PaddlePaddle/Paddle2ONNX)
 
-### Load your model
+{<h3>Load your model</h3>}
 Once you've got a model, load it in <Ort/> by creating a [`Session`](/fundamentals/session):
 
 ```rust
@@ -62,7 +60,7 @@ let mut model = Session::builder()?
     .commit_from_file("yolov8m.onnx")?;
 ```
 
-### Perform inference
+{<h3>Perform inference</h3>}
 Prepare your inputs, then `run()` the session to perform inference.
 
 ```rust
@@ -78,16 +76,19 @@ let predictions = outputs["output0"].try_extract_array::<f32>()?;
 # Next steps
 <Steps>
 
-### Unlock more performance with EPs
+{<h3>Unlock more performance with EPs</h3>}
 Use [execution providers](/perf/execution-providers) to enable hardware acceleration in your app and unlock the full power of your GPU or NPU.
 
-### Optimize I/O with `IoBinding`
-Control where and when inputs/outputs end up with [`IoBinding`](/perf/io-binding) to maximize I/O efficiency.
+{<h3>Optimize I/O with <Code>IoBinding</Code></h3>}
+[`IoBinding`](/perf/io-binding) lets you control where and when inputs/outputs end up, so you can maximize I/O efficiency when using EPs.
 
-### Go beyond ONNX Runtime
-Deploy your application to WASM with <Ort/>'s [`tract`](/backends/tract) or [`candle`](/backends/candle) backends.
+{<h3>Go beyond ONNX Runtime</h3>}
+Deploy your application to the Web with the [`ort-web`](/backends/web) backend, or expand platform compatibility with the pure-Rust [`tract`](/backends/tract) or [`candle`](/backends/candle) backends.
 
-### Show off your project!
-We'd love to see what you've made with <Ort/>! Show off your project in [GitHub Discussions](https://github.com/pykeio/ort/discussions/categories/show-and-tell) or on our [Discord](https://discord.gg/uQtsNu2xMa).
+{<h3>Support us</h3>}
+If you or your business finds <Ort/> useful, please consider [sponsoring us](https://opencollective.com/pyke-osai)! Sponsors enjoy priority support & issue resolution.
+
+{<h3>Show off your project!</h3>}
+We'd love to see what you've made with <Ort/>! Show off your project in [GitHub Discussions](https://github.com/pykeio/ort/discussions/categories/show-and-tell) or on our [Discord](https://discord.gg/uQtsNu2xMa) 💖
 
 </Steps>

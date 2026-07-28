@@ -1,0 +1,48 @@
+import Ort from '../../components/Ort';
+
+# Prebuilt binaries
+ONNX Runtime is a huge library that takes over an hour to compile. Being a C++ library, it also doesn't mesh well with Rust's build system, Cargo. To make <Ort/> as easy to use as possible, its default behavior is to download statically-linked ONNX Runtime binaries built by pyke.io.
+
+Depending on the platform, the way we compile these binaries may influence the requirements of your or your users' systems:
+- **All x86-64 binaries** are compiled with a baseline requirement of [x86-64-v3](https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels) - that's Intel Haswell (Cores/Xeons after 2013), Intel Gracemont (Atoms after Nov 2021), AMD Excavator or later, or any AMD Ryzen processor.
+- Linux binaries are compiled with Clang, not GCC, and depend on `libc++`.
+
+These restrictions aren't hard requirements set by ONNX Runtime, but are chosen by pyke.io to balance developer experience (both for you and us) and performance. Unfortunately, it's only practical for us to target a select few build configurations, and that ends up alienating some users -- in the case of the x86-64-v3 baseline, that's most owners of lower-cost Intel chips, like Pentiums. While you can absolutely use <Ort/>'s prebuilt binaries in production, we encourage you to research what hardware your user base is running, and compile ONNX Runtime yourself against a configuration that gives the best experience for as many of your users as possible.
+
+Because there are also an innumerable quantity of EP combinations, we typically only provide builds for one or a few EPs at a time; some EPs may also be available in all builds:
+- All Windows builds come with the DirectML EP enabled.
+- All macOS builds come with the CoreML EP enabled.
+- CUDA and TensorRT always ship together.
+
+While there may be both a WebGPU build *and* a CUDA build for a certain platform, enabling both the `cuda` and `webgpu` features will result in a compile error because no build including *both* CUDA + WebGPU exists. ONNX Runtime is in the process of making some EPs behave more like "plugins" (not requiring the base ONNX Runtime library to be recompiled with each EP config), so such combinations may be possible in the future.
+
+## Patches
+pyke's builds aren't strictly vanilla builds of ONNX Runtime; we employ [some patches](https://github.com/pykeio/ort-artifacts/tree/main/src/patches) to work around environment issues or improve <Ort/> compatibility. These patches do not add or remove features or meaningfully impact runtime behavior. They are not required when compiling & linking ONNX Runtime from source, though you may find them useful if you run into the same environment issues we did.
+
+## Provenance
+After the [XZ Utils debacle](https://en.wikipedia.org/wiki/XZ_Utils_backdoor), *you should be very afraid of downloading compiled binaries from random people on the Internet!* Since rc.12, <Ort/>'s prebuilt binaries are **attested**, attaching an unfalsifiable paper trail of the build process to each binary package. It's safest to just compile ONNX Runtime yourself, but if you choose to use our binaries, you should know how to verify them.
+
+When updating to a new version of <Ort/>, check the `build/download/dist.tsv` file in its respective `ort-sys` version. This is a TSV file describing each build's target triple, "feature set" (what EPs it includes), archive URL, and SHA-256 hash.
+
+To verify a build, download the archive from the URL and use GitHub's [`gh` CLI](https://cli.github.com/) to verify the file:
+```shell
+$ gh attestation verify --owner pykeio ./x86_64-pc-windows-msvc+cu13.tar.lzma2
+Loaded digest sha256:e96616510082108be228ad6ea026246a31650b7d446b330c6b9671fcb9ae6267 for file://./x86_64-pc-windows-msvc+cu13.tar.lzma2
+Loaded 1 attestation from GitHub API
+
+The following policy criteria will be enforced:
+- OIDC Issuer must match:................... https://token.actions.githubusercontent.com
+- Source Repository Owner URI must match:... https://github.com/pykeio
+- Predicate type must match:................ https://slsa.dev/provenance/v1
+- Subject Alternative Name must match regex: (?i)^https://github.com/pykeio/
+
+✓ Verification succeeded!
+
+sha256:e96616510082108be228ad6ea026246a31650b7d446b330c6b9671fcb9ae6267 was attested by:
+REPO                  PREDICATE_TYPE                  WORKFLOW
+pykeio/ort-artifacts  https://slsa.dev/provenance/v1  .github/workflows/build-runner.yml@refs/heads/main
+```
+
+Additionally, make sure that the SHA-256 hash in `dist.tsv` matches the hash calculated by `gh` -- `ort-sys`'s download logic will always check its calculated hash against `dist.tsv` as well.
+
+I (the maintainer, `decahedron1`) am the only person with backend access to `cdn.pyke.io`. It would also be a good idea to verify that every commit in [`pykeio/ort`](https://github.com/pykeio/ort) and [`pykeio/ort-artifacts`](https://github.com/pykeio/ort-artifacts) (where the binaries are compiled) are signed by my GPG key `5E30C893F305E6AF`.

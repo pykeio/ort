@@ -6,25 +6,65 @@ import Ort from '../../components/Ort';
 
 # Cargo features
 
-> *✅ = default, ⚒️ = not default*
+## Core functionality
 
-- ✅ **`ndarray`**: Enables tensors to be created from/extracted to [`ndarray`](https://crates.io/crates/ndarray) multi-dimensional arrays. We highly recommend this feature if you need to do a lot of complex pre/post-processing requiring multi-dimensional array access, but for something like an LLM, omitting this feature won't require too much extra work but will save a fair amount of compile time.
-- ✅ **`download-binaries`**: Downloads prebuilt binaries from pyke's CDN service for supported platforms. Disabling this means you'll need to compile ONNX Runtime from source yourself, and [link <Ort/> to it](/setup/linking).
-- ✅ **`copy-dylibs`**: In case dynamic libraries are used (like with the CUDA execution provider), creates a symlink to them in the relevant places in the `target` folder to make [compile-time dynamic linking](/setup/linking#compile-time-dynamic-linking) work.
-- ✅ **`tracing`**; Log messages through the [`tracing`](https://crates.io/crates/tracing) crate for simple & configurable logging. When disabled, ONNX Runtime will instead log directly to `stderr`; see [Logging](/troubleshooting/logging) to configure.
-- ⚒️ **`half`**: Enables support for creating & extracting float16/bfloat16 tensors via the [`half`](https://crates.io/crates/half) crate. ONNX models that are converted to 16-bit precision will typically convert to/from 32-bit floats at the input/output, so you will likely never actually need to enable this feature.
-- ⚒️ **`num-complex`**: Enables support for creating & extracting complex32/complex64 tensors via the [`num-complex`](https://crates.io/crates/num-complex) crate.
-- ⚒️ **`preload-dylibs`**: Enables [dynamic library preloading](https://docs.rs/ort/latest/ort/util/fn.preload_dylib.html); useful if you want to ship CUDA alongside your application instead of requiring the user to install it themselves.
-- ⚒️ **`load-dynamic`**: Enables [runtime dynamic linking](/setup/linking#runtime-loading-with-load-dynamic), which alleviates many of the troubles with compile-time dynamic linking and offers greater flexibility.
-- ⚒️ **`alternative-backend`**: Disables linking to ONNX Runtime, allowing you to instead configure an [alternative backend](/backends).
-- ⚒️ **`pkg-config`**: Enables linking to `libonnxruntime` via `pkg-config`.
-- ⚒️ **`fetch-models`**: Enables the [`SessionBuilder::commit_from_url`](https://docs.rs/ort/latest/ort/session/builder/struct.SessionBuilder.html#method.commit_from_url) method, allowing you to quickly download & run a model from a URL. This should only be used for quick testing.
+### **`std`** (enabled by default)
+<Ort/> can work with `#![no_std]`, though it does require `alloc`. You can disable this feature to support platforms without `std`, but you'll lose methods that need a filesystem, like `SessionBuilder::commit_from_file`.
+
+### **`ndarray`** (enabled by default)
+The `ndarray` feature enables [tensors](/fundamentals/value) to be created from & extracted to the multi-dimensional array types provided by the [`ndarray`](https://crates.io/crates/ndarray) crate.
+
+We highly recommend keeping this feature enabled if you need to do a lot of complex pre/post-processing requiring multi-dimensional array access, but for something like an LLM, omitting `ndarray` won't require too much extra work and will save a fair amount of compile time.
+
+### **`tracing`** (enabled by default)
+Log messages through the [`tracing`](https://crates.io/crates/tracing) crate for simple & configurable logging. You'll need to set up a [subscriber](https://docs.rs/tracing-subscriber) to see the log messages.
+
+When this feature is disabled, <Ort/> will instead have ONNX Runtime log directly to `stderr`; see [logging](/troubleshooting/logging) for more info & configuration.
+
+## Binaries & linking
+
+### **`download-binaries`** (enabled by default)
+Downloads [prebuilt binaries](/misc/prebuilt-binaries) from pyke's CDN service for supported platforms. Disabling this feature means you'll need to compile ONNX Runtime from source and [link <Ort/> to it](/setup/linking).
+
+`download-binaries` requires a [TLS feature](#tls-features) to be enabled as well.
+
+### **`copy-dylibs`** (enabled by default)
+In case dynamic libraries are used (like with the CUDA execution provider), this feature creates a symlink to them in the relevant places in the `target` folder so they can be properly picked up by the dynamic library loader.
+
+On Linux & macOS, this creates symlinks for binary crates, examples and tests. On Windows, the binaries are *copied*, and *only for binary crates*, unless [Developer Mode](https://learn.microsoft.com/en-us/windows/advanced-settings/developer-mode) is enabled; if Developer Mode is enabled, symlinks are created for all modes just like on Linux & macOS.
+
+### **`alternative-backend`**
+Disables directly linking to ONNX Runtime, allowing you to instead configure an [alternative backend](/backends).
+
+### **`load-dynamic`**
+Disables directly linking to ONNX Runtime, instead preferring [runtime dynamic linking](/setup/linking#runtime-loading-with-load-dynamic), which alleviates many of the troubles faced with compile-time dynamic linking.
+
+### **`pkg-config`**
+Enables <Ort/> to use [`pkg-config`](https://www.freedesktop.org/wiki/Software/pkg-config/) to link to `libonnxruntime`.
+
+## Utilities
+
+### **`lax-feature-matching`**
+When downloading prebuilt binaries, download the *best match* (with regard to included execution providers) instead of trying to find an *exact match*.
+
+For example, if you configure <Ort/> with features `cuda`, `tensorrt`, and `coreml`, it will always fail to download binaries because no prebuilt binaries that bundle CUDA + TensorRT + CoreML exist for any platform. But with the `lax-feature-matching` feature enabled, <Ort/> will download the closest match -- the CUDA + TensorRT build on Windows/Linux, and the CoreML build on macOS -- instead of failing outright.
+
+### **`half`**
+Enables support for creating & extracting float16/bfloat16 tensors via the [`half`](https://crates.io/crates/half) crate.
+
+ONNX models that are converted to 16-bit precision will typically convert from/to 32-bit floats at the input/output, so you will likely never actually need to create or extract a float16 tensor and thus won't need to enable this feature.
+
+### **`num-complex`**
+Enables support for creating & extracting complex32/complex64 tensors via the [`num-complex`](https://crates.io/crates/num-complex) crate.
+
+### **`preload-dylibs`**
+Enables dynamic library preloading via [`ort::util::preload_dylib`](https://docs.rs/ort/latest/ort/util/fn.preload_dylib.html). You can use this to override the path to EP dependency DLLs like `cudart64` if you wish to ship CUDA alongside your application instead of requiring the user to install it themselves.
 
 ## TLS features
-One of these is required to be enabled when `download-binaries` is enabled, as `download-binaries` always uses HTTPS.
-- ✅ **`tls-native`**: Uses the platform's native TLS provider for broadest compatibility & fastest compile times.
-- ⚒️ **`tls-rustls`**: Uses [`rustls`](https://crates.io/crates/rustls) with [`ring`](https://crates.io/crates/ring) as its crypto provider.
-- ⚒️ **`tls-native-vendored`**: Uses a vendored copy of OpenSSL on Linux.
+One of these features must be enabled when `download-binaries` is enabled, as `download-binaries` always uses HTTPS:
+- **`tls-native` (default)**: Uses the platform's native TLS provider for broadest compatibility & fastest compile times.
+- **`tls-rustls`**: Uses [`rustls`](https://crates.io/crates/rustls) for TLS, w/ [`ring`](https://crates.io/crates/ring) as its crypto provider.
+- **`tls-native-vendored`**: Uses a vendored copy of OpenSSL on Linux.
 
 ## Execution providers
 Each [execution provider](/perf/execution-providers) is also gated behind a Cargo feature. Each EP's Cargo feature must be enabled for it to be usable; see the linked page for details & the full list of EP features.

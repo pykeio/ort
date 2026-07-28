@@ -28,7 +28,7 @@ h1, h2, h3 {
 	font-weight: 800;
 }
 
-a[href="https://opencollective.com/pyke-osai"] {
+.nextra-sidebar a[href="https://opencollective.com/pyke-osai"] {
 	background: linear-gradient(90deg, #45a9fc 0%, #1dfdc8 50%, #54f150 100%);
 	border-radius: 12px;
 	padding: 0.5rem;
@@ -40,7 +40,7 @@ a[href="https://opencollective.com/pyke-osai"] {
 	background-color: transparent;
 }
 
-.dark a[href="https://opencollective.com/pyke-osai"] {
+.dark .nextra-sidebar a[href="https://opencollective.com/pyke-osai"] {
 	color: #000 !important;
 }
 

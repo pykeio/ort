@@ -1,1 +1,1 @@
-export const CRATE_VERSION = '2.0.0-rc.12';
+export const CRATE_VERSION = '2.0.0-rc.13';

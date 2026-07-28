@@ -1,9 +1,9 @@
 [package]
 name = "ort-tract"
 description = "ort + tract = 🦀 - An alternative backend for ort, powered by tract."
-version = "0.3.0+0.22"
+version = "0.4.0+0.23"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.91"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/pykeio/ort"
 homepage = "https://ort.pyke.io/backends/tract"
@@ -35,7 +35,7 @@ ort-sys = { version = "=2.0.0-rc.12", path = "../../ort-sys", default-features =
 
 [dependencies]
 ort-sys = { workspace = true }
-tract-onnx = "0.22"
+tract-onnx = "0.23"
 parking_lot = "0.12"
 
 [dev-dependencies]

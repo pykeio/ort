@@ -9,13 +9,14 @@ use parking_lot::Mutex;
 use tract_onnx::{
 	model::ParseResult,
 	pb::ValueInfoProto,
-	prelude::{Framework, Graph, InferenceModelExt, IntoTensor, SimplePlan, Tensor, TractError, TractResult, TypedFact, TypedOp}
+	prelude::{Framework, Graph, InferenceModelExt, IntoTensor, Tensor, TractError, TractResult, TypedFact, TypedOp},
+	tract_core::{model::IntoRunnable, plan::SimplePlan}
 };
 
 use crate::Environment;
 
 type OptimizedGraph = Graph<TypedFact, Box<dyn TypedOp>>;
-type RunnableGraph = SimplePlan<TypedFact, Box<dyn TypedOp>, OptimizedGraph>;
+type RunnableGraph = Arc<SimplePlan<TypedFact, Box<dyn TypedOp>>>;
 
 #[derive(Default, Clone)]
 pub struct SessionOptions {

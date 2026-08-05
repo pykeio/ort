@@ -55,7 +55,7 @@ pub use self::ndarray::ArrayExt;
 /// of the [CUDA execution provider](crate::ep::CUDA).
 ///
 /// ```
-/// use std::env;
+/// use std::env::current_exe;
 ///
 /// // Use the DirectML DLL we ship alongside the application.
 /// // This needs to come before we use any other `ort` API.

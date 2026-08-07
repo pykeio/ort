@@ -231,7 +231,7 @@ fn setup_api() -> ApiPointer {
 				_ => "libonnxruntime.dylib".to_owned()
 			}
 			.into();
-			load_dynamic::init(&path).expect("Failed to load ONNX Runtime dylib");
+			load_dynamic::init(&path).unwrap_or_else(|e| panic!("Failed to load ONNX Runtime dylib: {e}"));
 			G_ORT_LIB.get_unchecked()
 		};
 		let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const ort_sys::OrtApiBase> = dylib

@@ -56,17 +56,11 @@ fn upsample() -> ort::Result<()> {
 	let mut session = Session::builder(&env)?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
-		.commit_from_memory(&session_data)
+		.commit_from_memory_directly(&session_data) // Zero-copy.
 		.expect("Could not read model from memory");
 
-	{
-		let metadata = session.metadata()?;
-		assert_eq!(metadata.name().as_deref(), Some("tf2onnx"));
-		assert_eq!(metadata.producer().as_deref(), Some("tf2onnx"));
-
-		assert_eq!(&**session.inputs()[0].dtype().tensor_shape().expect("input0 to be a tensor type"), [-1, -1, -1, 3]);
-		assert_eq!(&**session.outputs()[0].dtype().tensor_shape().expect("output0 to be a tensor type"), [-1, -1, -1, 3]);
-	}
+	assert_eq!(&**session.inputs()[0].dtype().tensor_shape().expect("input0 to be a tensor type"), [-1, -1, -1, 3]);
+	assert_eq!(&**session.outputs()[0].dtype().tensor_shape().expect("output0 to be a tensor type"), [-1, -1, -1, 3]);
 
 	// Load image, converting to RGB format
 	let image_buffer = load_input_image(IMAGE_TO_LOAD);

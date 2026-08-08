@@ -37,8 +37,10 @@ const INPUT_SIZE_F32: f32 = INPUT_SIZE as f32;
 #[wasm_bindgen]
 impl HandDetector {
 	pub async fn create(url: &str, max_hands: usize, min_confidence: f32, min_suppression_threshold: f32) -> Result<HandDetector, JsError> {
+		let env = ort::init().build()?;
+		let session = Session::builder(&env)?.commit_from_url(url).await?;
 		Ok(Self {
-			session: Session::builder()?.commit_from_url(url).await?,
+			session,
 			resized_buffer: vec![0.0_f32; INPUT_SIZE * INPUT_SIZE * 3].into_boxed_slice(),
 			last_image_size: (0, 0),
 			anchors: calculate_ssd_anchors(INPUT_SIZE as _, INPUT_SIZE as _, 0.1484375, 0.75, 4, vec![8, 16, 16, 16]),

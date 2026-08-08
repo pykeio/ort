@@ -22,7 +22,7 @@ use crate::{
 /// # use std::sync::Arc;
 /// # use ort::{session::Session, value::{ValueType, Tensor, Shape, SymbolicDimensions, TensorElementType}};
 /// # fn main() -> ort::Result<()> {
-/// # 	let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+/// # 	let session = Session::builder(ort::test_util::test_env())?.commit_from_file("tests/data/upsample.onnx")?;
 /// // `ValueType`s can be obtained from session inputs/outputs:
 /// let input = &session.inputs()[0];
 /// assert_eq!(

@@ -22,7 +22,8 @@
 //! # use std::path::PathBuf;
 //! # use ort::{compiler::ModelCompiler, session::Session, ep};
 //! # fn main() -> ort::Result<()> {
-//! let mut session_options = Session::builder()?.with_execution_providers([
+//! # let env = ort::test_util::test_env().clone();
+//! let mut session_options = Session::builder(&env)?.with_execution_providers([
 //! 	# #[cfg(feature = "coreml")]
 //! 	ep::CoreML::default().with_model_format(ep::coreml::ModelFormat::MLProgram).build()
 //! ])?;
@@ -237,16 +238,16 @@ impl Drop for CompiledModel {
 
 #[cfg(test)]
 mod tests {
-	use crate::{compiler::ModelCompiler, session::builder::SessionBuilder};
+	use crate::{compiler::ModelCompiler, session::builder::SessionBuilder, test_util::test_env};
 
 	#[test]
 	fn test_compile_in_memory() -> crate::Result<()> {
-		let compiled_model = ModelCompiler::new(SessionBuilder::new()?)?
+		let compiled_model = ModelCompiler::new(SessionBuilder::new(test_env())?)?
 			.with_embed_ep_context()?
 			.with_model_from_file("tests/data/upsample.onnx")?
 			.compile_to_buffer()?;
 
-		let _model = SessionBuilder::new()?.commit_from_memory(&compiled_model)?;
+		let _model = SessionBuilder::new(test_env())?.commit_from_memory(&compiled_model)?;
 
 		Ok(())
 	}

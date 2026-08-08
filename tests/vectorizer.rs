@@ -11,7 +11,8 @@ use ort::{
 
 #[test]
 fn vectorizer() -> ort::Result<()> {
-	let mut session = Session::builder()?
+	let env = ort::init().build()?;
+	let mut session = Session::builder(&env)?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
 		.commit_from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("vectorizer.onnx"))

@@ -56,8 +56,8 @@ fn main() -> ort::Result<()> {
 		.with(tracing_subscriber::fmt::layer())
 		.init();
 
-	// Register EPs based on feature flags - this isn't crucial for usage and can be removed.
-	common::init()?;
+	// Create our environment, registering EPs based on feature flags; you can also simply do `ort::init().build()?`
+	let env = common::get_env()?;
 
 	let original_img = image::open(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("baseball.jpg")).unwrap();
 	let (img_width, img_height) = (original_img.width(), original_img.height());
@@ -72,7 +72,7 @@ fn main() -> ort::Result<()> {
 		input[[0, 2, y, x]] = (b as f32) / 255.;
 	}
 
-	let mut model = Session::builder()?.commit_from_url(YOLOV8M_URL)?;
+	let mut model = Session::builder(&env)?.commit_from_url(YOLOV8M_URL)?;
 
 	// Run YOLOv8 inference
 	let outputs: SessionOutputs = model.run(inputs!["images" => TensorRef::from_array_view(&input)?])?;

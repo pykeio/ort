@@ -162,7 +162,8 @@ impl<R: Sized> Error<R> {
 	/// ```
 	/// # use ort::session::{builder::GraphOptimizationLevel, Session};
 	/// # fn main() -> ort::Result<()> {
-	/// let session = Session::builder()?
+	/// # let env = ort::test_util::test_env().clone();
+	/// let session = Session::builder(&env)?
 	/// 	.with_optimization_level(GraphOptimizationLevel::All)
 	/// 	// Optimization isn't enabled in minimal builds of ONNX Runtime, so throws an error. We can just ignore it.
 	/// 	.unwrap_or_else(|e| e.recover())

@@ -42,13 +42,14 @@ use crate::{
 /// # 	value::Tensor
 /// # };
 /// # fn main() -> ort::Result<()> {
-/// let mut text_encoder = Session::builder()?
+/// # let env = ort::test_util::test_env().clone();
+/// let mut text_encoder = Session::builder(&env)?
 /// 	.with_execution_providers([
 /// 		#[cfg(feature = "cuda")]
 /// 		ep::CUDA::default().build()
 /// 	])?
 /// 	.commit_from_file("text_encoder.onnx")?;
-/// let mut unet = Session::builder()?
+/// let mut unet = Session::builder(&env)?
 /// 	.with_execution_providers([
 /// 		#[cfg(feature = "cuda")]
 /// 		ep::CUDA::default().build()
@@ -244,7 +245,7 @@ mod tests {
 	use ndarray::Array2;
 
 	#[cfg(feature = "ndarray")]
-	use crate::test_util::mnist;
+	use crate::test_util::{mnist, test_env};
 	use crate::{
 		Result,
 		memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
@@ -256,7 +257,7 @@ mod tests {
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_mnist_input_bound() -> Result<()> {
-		let mut session = Session::builder()?.commit_from_url(mnist::MODEL_URL)?;
+		let mut session = Session::builder(test_env())?.commit_from_url(mnist::MODEL_URL)?;
 
 		let array = mnist::get_image();
 
@@ -275,7 +276,7 @@ mod tests {
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_mnist_input_output_bound() -> Result<()> {
-		let mut session = Session::builder()?.commit_from_url(mnist::MODEL_URL)?;
+		let mut session = Session::builder(test_env())?.commit_from_url(mnist::MODEL_URL)?;
 
 		let array = mnist::get_image();
 
@@ -295,7 +296,7 @@ mod tests {
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_send_iobinding() -> Result<()> {
-		let mut session = Session::builder()?.commit_from_url(mnist::MODEL_URL)?;
+		let mut session = Session::builder(test_env())?.commit_from_url(mnist::MODEL_URL)?;
 
 		let array = mnist::get_image();
 
@@ -320,7 +321,7 @@ mod tests {
 	#[test]
 	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
 	fn test_mnist_clear_binds() -> Result<()> {
-		let mut session = Session::builder()?.commit_from_url(mnist::MODEL_URL)?;
+		let mut session = Session::builder(test_env())?.commit_from_url(mnist::MODEL_URL)?;
 
 		let array = mnist::get_image();
 

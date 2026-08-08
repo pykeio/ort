@@ -15,7 +15,8 @@ use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 /// # use core::num::NonZeroUsize;
 /// # use ort::{ep, session::Session};
 /// # fn main() -> ort::Result<()> {
-/// let session = Session::builder()?
+/// # let env = ort::test_util::test_env().clone();
+/// let session = Session::builder(&env)?
 /// 	.with_intra_op_spinning(false)?
 /// 	.with_intra_threads(1)?
 /// 	.with_execution_providers([ep::XNNPACK::default()

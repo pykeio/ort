@@ -3,7 +3,8 @@
 //! ```
 //! # use ort::{session::Session, value::TensorRef};
 //! # fn main() -> ort::Result<()> {
-//! let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+//! # let env = ort::test_util::test_env().clone();
+//! let mut session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 //! let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 //! let outputs = session.run(ort::inputs![TensorRef::from_array_view(&input)?])?;
 //! # 	Ok(())
@@ -78,7 +79,7 @@ pub struct SharedSessionInner {
 	/// Additional things we may need to hold onto for the duration of this session, like `OperatorDomain`s and
 	/// DLL handles for operator libraries.
 	_extras: SmallVec<[Arc<dyn Any>; 4]>,
-	_environment: Arc<Environment>
+	_environment: Environment
 }
 
 unsafe impl Send for SharedSessionInner {}
@@ -106,7 +107,8 @@ impl Drop for SharedSessionInner {
 /// ```
 /// # use ort::{session::Session, value::TensorRef};
 /// # fn main() -> ort::Result<()> {
-/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+/// # let env = ort::test_util::test_env().clone();
+/// let mut session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 /// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 /// let outputs = session.run(ort::inputs![TensorRef::from_array_view(&input)?])?;
 /// # 	Ok(())
@@ -158,8 +160,8 @@ impl Session {
 	}
 
 	/// Creates a new [`SessionBuilder`].
-	pub fn builder() -> Result<SessionBuilder> {
-		SessionBuilder::new()
+	pub fn builder(environment: &Environment) -> Result<SessionBuilder> {
+		SessionBuilder::new(environment)
 	}
 
 	/// Returns this session's [`Allocator`].
@@ -185,7 +187,8 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{RunOptions, Session}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
-	/// let session = Session::builder()?.commit_from_file("tests/data/overridable_initializer.onnx")?;
+	/// # let env = ort::test_util::test_env().clone();
+	/// let session = Session::builder(&env)?.commit_from_file("tests/data/overridable_initializer.onnx")?;
 	///
 	/// let mut overridable_initializers = session.overridable_initializers();
 	/// assert_eq!(overridable_initializers.len(), 1);
@@ -226,7 +229,8 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{RunOptions, Session}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
-	/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// # let env = ort::test_util::test_env().clone();
+	/// let mut session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 	/// let outputs = session.run(ort::inputs![TensorRef::from_array_view(&input)?])?;
 	/// # 	Ok(())
@@ -255,7 +259,8 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, RunOptions}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
-	/// # 	let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// # 	let env = ort::test_util::test_env().clone();
+	/// # 	let mut session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
 	/// let run_options = Arc::new(RunOptions::new()?);
 	///
@@ -429,7 +434,8 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, RunOptions}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> { tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-	/// let mut session = Session::builder()?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
+	/// # let env = ort::test_util::test_env().clone();
+	/// let mut session = Session::builder(&env)?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 	/// let options = RunOptions::new()?;
 	/// let outputs = session.run_async(ort::inputs![TensorRef::from_array_view(&input)?], &options)?.await?;
@@ -545,7 +551,8 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, RunOptions}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> { tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-	/// let mut session = Session::builder()?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
+	/// # let env = ort::test_util::test_env().clone();
+	/// let mut session = Session::builder(&env)?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 	/// let options = RunOptions::new()?;
 	/// let outputs = session.run_async(ort::inputs![TensorRef::from_array_view(&input)?], &options)?.await?;
@@ -658,7 +665,8 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{RunOptions, Session, WorkloadType}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
-	/// let mut session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// # let env = ort::test_util::test_env().clone();
+	/// let mut session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// session.set_workload_type(WorkloadType::Efficient)?;
 	///
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
@@ -690,7 +698,8 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{RunOptions, Session}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
-	/// let session = Session::builder()?.commit_from_file("tests/data/lora_model.onnx")?;
+	/// # let env = ort::test_util::test_env().clone();
+	/// let session = Session::builder(&env)?.commit_from_file("tests/data/lora_model.onnx")?;
 	/// assert_eq!(session.opset_for_domain(ort::editor::ONNX_DOMAIN), Some(21));
 	/// # 	Ok(())
 	/// # }

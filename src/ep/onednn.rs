@@ -44,11 +44,11 @@ impl ExecutionProvider for OneDNN {
 
 		let ffi_options = self.options.to_ffi();
 		ortsys![unsafe UpdateDnnlProviderOptions(
-				dnnl_options,
-				ffi_options.key_ptrs(),
-				ffi_options.value_ptrs(),
-				ffi_options.len()
-			)?];
+			dnnl_options,
+			ffi_options.key_ptrs(),
+			ffi_options.value_ptrs(),
+			ffi_options.len()
+		)?];
 
 		ortsys![unsafe SessionOptionsAppendExecutionProvider_Dnnl(session_builder.ptr_mut(), dnnl_options)?];
 

@@ -79,12 +79,12 @@ impl ExecutionProvider for Azure {
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		let ffi_options = self.options.to_ffi();
 		ortsys![unsafe SessionOptionsAppendExecutionProvider(
-				session_builder.ptr_mut(),
-				c"AZURE".as_ptr().cast::<core::ffi::c_char>(),
-				ffi_options.key_ptrs(),
-				ffi_options.value_ptrs(),
-				ffi_options.len(),
-			)?];
+			session_builder.ptr_mut(),
+			c"AZURE".as_ptr().cast::<core::ffi::c_char>(),
+			ffi_options.key_ptrs(),
+			ffi_options.value_ptrs(),
+			ffi_options.len(),
+		)?];
 		Ok(())
 	}
 }

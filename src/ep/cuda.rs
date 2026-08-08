@@ -369,11 +369,11 @@ impl ExecutionProvider for CUDA {
 
 		let ffi_options = self.options.to_ffi();
 		ortsys![unsafe UpdateCUDAProviderOptions(
-				cuda_options,
-				ffi_options.key_ptrs(),
-				ffi_options.value_ptrs(),
-				ffi_options.len()
-			)?];
+			cuda_options,
+			ffi_options.key_ptrs(),
+			ffi_options.value_ptrs(),
+			ffi_options.len()
+		)?];
 
 		ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(session_builder.ptr_mut(), cuda_options)?];
 

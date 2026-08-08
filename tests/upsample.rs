@@ -52,7 +52,7 @@ fn upsample() -> ort::Result<()> {
 	let env = ort::init().with_name("integration_test").build()?;
 
 	let session_data =
-		std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("upsample.onnx")).expect("Could not open model from file");
+		std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("upsample.ort")).expect("Could not open model from file");
 	let mut session = Session::builder(&env)?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
@@ -67,43 +67,6 @@ fn upsample() -> ort::Result<()> {
 		assert_eq!(&**session.inputs()[0].dtype().tensor_shape().expect("input0 to be a tensor type"), [-1, -1, -1, 3]);
 		assert_eq!(&**session.outputs()[0].dtype().tensor_shape().expect("output0 to be a tensor type"), [-1, -1, -1, 3]);
 	}
-
-	// Load image, converting to RGB format
-	let image_buffer = load_input_image(IMAGE_TO_LOAD);
-	let array = convert_image_to_cow_array(&image_buffer);
-
-	// Perform the inference
-	let outputs = session.run(inputs![TensorRef::from_array_view(&array)?])?;
-
-	assert_eq!(outputs.len(), 1);
-	let output: ArrayViewD<f32> = outputs[0].try_extract_array()?;
-
-	// The image should have doubled in size
-	assert_eq!(output.shape(), [1, 448, 448, 3]);
-
-	Ok(())
-}
-
-/// The upsample.ort can be produced by
-/// ```shell
-/// python -m onnxruntime.tools.convert_onnx_models_to_ort tests/data/upsample.onnx
-/// ```
-#[test]
-fn upsample_with_ort_model() -> ort::Result<()> {
-	const IMAGE_TO_LOAD: &str = "mushroom.png";
-
-	let env = ort::init().with_name("integration_test").build()?;
-
-	let session_data =
-		std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("upsample.ort")).expect("Could not open model from file");
-	let mut session = Session::builder(&env)?
-		.with_optimization_level(GraphOptimizationLevel::Level1)?
-		.with_intra_threads(1)?
-		.commit_from_memory_directly(&session_data) // Zero-copy.
-		.expect("Could not read model from memory");
-
-	assert_eq!(&**session.inputs()[0].dtype().tensor_shape().expect("input0 to be a tensor type"), [-1, -1, -1, 3]);
-	assert_eq!(&**session.outputs()[0].dtype().tensor_shape().expect("output0 to be a tensor type"), [-1, -1, -1, 3]);
 
 	// Load image, converting to RGB format
 	let image_buffer = load_input_image(IMAGE_TO_LOAD);

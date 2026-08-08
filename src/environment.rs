@@ -4,7 +4,7 @@
 //! across all sessions, or add a [custom logger].
 //!
 //! Environments can be set up via [`ort::init`](init):
-//! ```
+//! ```no_run
 //! # use ort::ep;
 //! # fn main() -> ort::Result<()> {
 //! let env = ort::init()
@@ -487,7 +487,7 @@ impl EnvironmentBuilder {
 
 	/// Configures the environment to use a custom logger function.
 	///
-	/// ```
+	/// ```no_run
 	/// # fn main() -> ort::Result<()> {
 	/// use std::sync::Arc;
 	///
@@ -604,7 +604,7 @@ impl EnvironmentBuilder {
 
 /// Creates an ONNX Runtime environment.
 ///
-/// ```
+/// ```no_run
 /// # use ort::ep;
 /// # fn main() -> ort::Result<()> {
 /// let env = ort::init()

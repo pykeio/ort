@@ -4,7 +4,7 @@ resolver = "3"
 [package]
 name = "ort-web"
 description = "ONNX Runtime on the web 🌐 - An alternative backend for ort"
-version = "0.3.0+1.27"
+version = "0.3.1+1.27"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"

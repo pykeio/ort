@@ -25,6 +25,20 @@ use crate::{
 	util::value_to_string
 };
 
+// TODO: remove on ort-sys bump
+unsafe extern "system" fn CreateStatus(code: OrtErrorCode, msg: *const ::core::ffi::c_char) -> OrtStatusPtr {
+	let msg = unsafe { CStr::from_ptr(msg.cast_mut()) };
+	Error::new_sys(code, msg.to_string_lossy())
+}
+
+unsafe extern "system" fn GetErrorCode(status: *const OrtStatus) -> OrtErrorCode {
+	unsafe { Error::cast_from_sys(status) }.code
+}
+
+unsafe extern "system" fn GetErrorMessage(status: *const OrtStatus) -> *const ::core::ffi::c_char {
+	unsafe { Error::cast_from_sys(status) }.message_ptr()
+}
+
 unsafe extern "system" fn CreateEnv(_log_severity_level: OrtLoggingLevel, _logid: *const ffi::c_char, out: *mut *mut OrtEnv) -> OrtStatusPtr {
 	unsafe { out.write(Environment::new_sys()) };
 	OrtStatusPtr::default()
@@ -599,6 +613,9 @@ unsafe extern "system" fn GetBuildInfoString() -> *const ffi::c_char {
 
 pub const fn api() -> OrtApi {
 	OrtApi {
+		CreateStatus,
+		GetErrorCode,
+		GetErrorMessage,
 		CreateEnv,
 		CreateEnvWithCustomLogger,
 		EnableTelemetryEvents,

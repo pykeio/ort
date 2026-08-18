@@ -1,7 +1,7 @@
 [package]
 name = "ort-candle"
 description = "ort + candle = 🦀 - An alternative backend for ort, powered by candle."
-version = "0.4.0+0.11.0"
+version = "0.4.1+0.11.0"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"

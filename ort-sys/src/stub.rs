@@ -1,7 +1,10 @@
 #![allow(non_snake_case, unused)]
 
 use alloc::{boxed::Box, ffi::CString, string::String};
-use core::{ffi::c_char, ptr};
+use core::{
+	ffi::{CStr, c_char},
+	ptr
+};
 
 use crate::*;
 
@@ -47,7 +50,7 @@ impl Error {
 }
 
 unsafe extern "system" fn CreateStatus(code: OrtErrorCode, msg: *const ::core::ffi::c_char) -> OrtStatusPtr {
-	let msg = unsafe { CString::from_raw(msg.cast_mut()) };
+	let msg = unsafe { CStr::from_ptr(msg.cast_mut()) };
 	Error::new_sys(code, msg.to_string_lossy())
 }
 

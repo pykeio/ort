@@ -17,19 +17,6 @@ use crate::{
 	tensor::TypeInfo
 };
 
-unsafe extern "system" fn CreateStatus(code: OrtErrorCode, msg: *const ::std::os::raw::c_char) -> OrtStatusPtr {
-	let msg = CString::from_raw(msg.cast_mut());
-	Error::new_sys(code, msg.to_string_lossy())
-}
-
-unsafe extern "system" fn GetErrorCode(status: *const OrtStatus) -> OrtErrorCode {
-	Error::cast_from_sys(status).code
-}
-
-unsafe extern "system" fn GetErrorMessage(status: *const OrtStatus) -> *const ::std::os::raw::c_char {
-	Error::cast_from_sys(status).message_ptr()
-}
-
 unsafe extern "system" fn CreateEnv(_log_severity_level: OrtLoggingLevel, _logid: *const ::std::os::raw::c_char, out: *mut *mut OrtEnv) -> OrtStatusPtr {
 	*out = Environment::new_sys();
 	OrtStatusPtr::default()
@@ -531,9 +518,6 @@ unsafe extern "system" fn GetBuildInfoString() -> *const ::std::os::raw::c_char 
 
 pub const fn api() -> OrtApi {
 	OrtApi {
-		CreateStatus,
-		GetErrorCode,
-		GetErrorMessage,
 		CreateEnv,
 		CreateEnvWithCustomLogger,
 		EnableTelemetryEvents,

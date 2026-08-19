@@ -156,6 +156,8 @@ pub fn static_link(base_lib_dir: &Path) -> bool {
 				}
 			}
 
+			optional_link_lib(&lib_dir.join("model_package"), "model_package");
+
 			if extension_lib_dir.exists() && extension_lib_dir.join(platform_format_lib("ortcustomops")).exists() {
 				add_search_dir(&extension_lib_dir);
 				println!("cargo:rustc-link-lib=static=ortcustomops");

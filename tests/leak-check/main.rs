@@ -76,9 +76,9 @@ impl Operator for CustomOpTwo {
 }
 
 fn main() -> ort::Result<()> {
-	ort::init().with_execution_providers([ep::CPU::default().build()]).commit();
+	let env = ort::init().with_execution_providers([ep::CPU::default().build()]).build()?;
 
-	let mut session = Session::builder()?
+	let mut session = Session::builder(&env)?
 		.with_operators(OperatorDomain::new("test.customop")?.add(CustomOpOne)?.add(CustomOpTwo)?)?
 		.commit_from_file("tests/data/custom_op_test.onnx")?;
 

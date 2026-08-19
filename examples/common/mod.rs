@@ -1,7 +1,8 @@
+use ort::environment::Environment;
 #[allow(unused)]
 use ort::ep::*;
 
-pub fn init() -> ort::Result<()> {
+pub fn get_env() -> ort::Result<Environment> {
 	#[cfg(feature = "backend-candle")]
 	ort::set_api(ort_candle::api());
 	#[cfg(feature = "backend-tract")]
@@ -47,7 +48,5 @@ pub fn init() -> ort::Result<()> {
 			#[cfg(feature = "webgpu")]
 			WebGPU::default().build()
 		])
-		.commit();
-
-	Ok(())
+		.build()
 }

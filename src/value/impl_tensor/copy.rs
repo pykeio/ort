@@ -5,7 +5,9 @@ use alloc::{format, string::ToString};
 use core::ops::{Deref, DerefMut};
 
 use crate::{
-	Error, OnceLock, Result, ep,
+	Error, OnceLock, Result,
+	environment::Environment,
+	ep,
 	memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
 	session::{IoBinding, NoSelectedOutputs, RunOptions, Session, builder::GraphOptimizationLevel},
 	util::{MiniMap, Mutex, MutexGuard},
@@ -76,8 +78,9 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	/// # use ort::{memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType}, session::Session, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
+	/// # let env = ort::test_util::test_env().clone();
 	/// # if false {
-	/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// # let session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let cuda_allocator = Allocator::new(
 	/// 	&session,
 	/// 	MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?
@@ -115,6 +118,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	/// # use ort::{memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType}, session::Session, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
+	/// # let env = ort::test_util::test_env().clone();
 	/// # let tensor = Tensor::<f32>::new(&Allocator::default(), [1_usize, 3, 224, 224])?;
 	/// # if false {
 	/// let cuda_tensor = tensor.to_async(AllocationDevice::CUDA, 0)?;
@@ -148,8 +152,9 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	/// # use ort::{memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType}, session::Session, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
+	/// # let env = ort::test_util::test_env().clone();
 	/// # if false {
-	/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// # let session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let cuda_allocator = Allocator::new(
 	/// 	&session,
 	/// 	MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?
@@ -187,9 +192,10 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	/// # use ort::{memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType}, session::Session, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
+	/// # let env = ort::test_util::test_env().clone();
 	/// let cpu_tensor = Tensor::<f32>::new(&Allocator::default(), [1_usize, 3, 224, 224])?;;
 	/// # if false {
-	/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// # let session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let cuda_allocator = Allocator::new(
 	/// 	&session,
 	/// 	MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?
@@ -245,6 +251,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Clone for Value<Type> {
 	/// ```
 	/// # use ort::{value::Tensor, AsPointer};
 	/// # fn main() -> ort::Result<()> {
+	/// # let _env = ort::test_util::test_env().clone();
 	/// let array = vec![1_i64, 2, 3, 4, 5];
 	/// let tensor = Tensor::from_array(([array.len()], array.into_boxed_slice()))?;
 	///
@@ -302,7 +309,9 @@ impl IdentitySessionHandle {
 					ep_for_device(target_device, target_device_id)?.error_on_failure()
 				);
 
-				let mut builder = Session::builder()?
+				let env = Environment::current().ok_or_else(|| Error::new("an environment must be active to copy tensors"))?;
+
+				let mut builder = Session::builder(&env)?
 					.with_optimization_level(GraphOptimizationLevel::Level3)?
 					// since these sessions are persistent for the lifetime of the program, keep them as lean as possible
 					// by disabling threading & memory optimizations (there's only 1 operation in the graph anyway)
@@ -350,11 +359,13 @@ impl DerefMut for IdentitySessionHandle {
 mod tests {
 	use crate::{
 		memory::{AllocationDevice, Allocator},
+		test_util::test_env,
 		value::Tensor
 	};
 
 	#[test]
 	fn test_clone_tensor() -> crate::Result<()> {
+		let _env = test_env();
 		let tensor = Tensor::<f32>::from_array(([1, 5], vec![2.167892, 333., 1.0, -0.0, f32::EPSILON]))?;
 		let clone = tensor.clone();
 		assert_eq!(tensor.extract_tensor(), clone.extract_tensor());
@@ -363,6 +374,7 @@ mod tests {
 
 	#[test]
 	fn test_tensor_to_cpu() -> crate::Result<()> {
+		let _env = test_env();
 		let tensor = Tensor::<f32>::from_array(([1, 5], vec![2.167892, 333., 1.0, -0.0, f32::EPSILON]))?;
 
 		let tensor2 = tensor.to_async(AllocationDevice::CPU, 0)?;
@@ -374,6 +386,7 @@ mod tests {
 
 	#[test]
 	fn test_bad_copy_into() -> crate::Result<()> {
+		let _env = test_env();
 		let tensor = Tensor::<f32>::from_array(([1, 5], vec![2.167892, 333., 1.0, -0.0, f32::EPSILON]))?;
 
 		let mut target_bad_shape = Tensor::<f32>::new(&Allocator::default(), [3i64])?;
@@ -388,6 +401,7 @@ mod tests {
 	#[test]
 	#[cfg(feature = "cuda")]
 	fn test_copy_cuda() -> crate::Result<()> {
+		let _env = test_env();
 		let tensor = Tensor::<f32>::from_array(([1, 5], vec![2.167892, 333., 1.0, -0.0, f32::EPSILON]))?;
 
 		let cuda_tensor = tensor.to(AllocationDevice::CUDA, 0)?;
@@ -406,6 +420,7 @@ mod tests {
 	#[test]
 	#[cfg(feature = "cuda")]
 	fn test_copy_cuda_async() -> crate::Result<()> {
+		let _env = test_env();
 		let tensor = Tensor::<f32>::from_array(([1, 5], vec![2.167892, 333., 1.0, -0.0, f32::EPSILON]))?;
 
 		let cuda_tensor = tensor.to_async(AllocationDevice::CUDA, 0)?;
@@ -424,7 +439,7 @@ mod tests {
 			session::Session
 		};
 
-		let dummy_session = Session::builder()?
+		let dummy_session = Session::builder(test_env())?
 			.with_execution_providers([ep::CUDA::default().build()])?
 			.commit_from_file("tests/data/upsample.ort")?;
 
@@ -448,7 +463,7 @@ mod tests {
 			session::Session
 		};
 
-		let dummy_session = Session::builder()?
+		let dummy_session = Session::builder(test_env())?
 			.with_execution_providers([ep::CUDA::default().build()])?
 			.commit_from_file("tests/data/upsample.ort")?;
 

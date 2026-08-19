@@ -1,4 +1,13 @@
-#[cfg(feature = "ndarray")]
+use crate::{environment::Environment, util::OnceLock};
+
+pub fn test_env() -> &'static Environment {
+	static TEST_ENV: OnceLock<Environment> = OnceLock::new();
+	TEST_ENV
+		.get_or_try_init(|| crate::init().build())
+		.expect("failed to create test environment")
+}
+
+#[cfg(all(test, feature = "ndarray"))]
 pub mod mnist {
 	use image::{ImageBuffer, Luma, Pixel};
 	use ndarray::{Array4, Axis};

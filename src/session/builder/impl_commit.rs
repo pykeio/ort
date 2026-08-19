@@ -148,7 +148,7 @@ impl SessionBuilder {
 
 	pub(crate) fn pre_commit(&mut self) -> Result<()> {
 		if !self.no_env_eps {
-			let env = Arc::clone(&self.environment); // dumb borrowck hack
+			let env = self.environment.clone();
 			apply_execution_providers(self, env.execution_providers(), "environment")?;
 		}
 

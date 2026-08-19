@@ -24,7 +24,8 @@ use crate::{
 /// ```no_run
 /// # use ort::{memory::{Allocator, MemoryInfo, MemoryType, AllocationDevice, AllocatorType}, session::Session, value::Tensor};
 /// # fn main() -> ort::Result<()> {
-/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+/// # let env = ort::test_util::test_env().clone();
+/// # let session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 /// let allocator = Allocator::new(
 /// 	&session,
 /// 	MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?
@@ -53,7 +54,8 @@ use crate::{
 /// ```no_run
 /// # use ort::{memory::{Allocator, MemoryInfo, MemoryType, AllocationDevice, AllocatorType}, session::Session, value::Tensor};
 /// # fn main() -> ort::Result<()> {
-/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+/// # let env = ort::test_util::test_env().clone();
+/// # let session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 /// let allocator = Allocator::new(
 /// 	&session,
 /// 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
@@ -389,7 +391,8 @@ impl MemoryInfo<'static> {
 	/// ```no_run
 	/// # use ort::{memory::{Allocator, MemoryInfo, MemoryType, AllocationDevice, AllocatorType}, session::Session, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
-	/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// # let env = ort::test_util::test_env().clone();
+	/// # let session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let allocator = Allocator::new(
 	/// 	&session,
 	/// 	MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?

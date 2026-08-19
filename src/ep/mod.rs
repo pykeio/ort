@@ -3,18 +3,17 @@
 //! Sessions can be configured with execution providers via [`SessionBuilder::with_execution_providers`]:
 //!
 //! ```no_run
-//! use ort::{ep, session::Session};
-//!
-//! fn main() -> ort::Result<()> {
-//! 	let session = Session::builder()?
-//! 		.with_execution_providers([
-//! 			#[cfg(feature = "cuda")]
-//! 			ep::CUDA::default().build()
-//! 		])?
-//! 		.commit_from_file("model.onnx")?;
-//!
-//! 	Ok(())
-//! }
+//! # use ort::{ep, session::Session};
+//! # fn main() -> ort::Result<()> {
+//! # let env = ort::test_util::test_env().clone();
+//! let session = Session::builder(&env)?
+//! 	.with_execution_providers([
+//! 		#[cfg(feature = "cuda")]
+//! 		ep::CUDA::default().build()
+//! 	])?
+//! 	.commit_from_file("model.onnx")?;
+//! # Ok(())
+//! # }
 //! ```
 
 use alloc::{ffi::CString, string::ToString, sync::Arc, vec::Vec};
@@ -28,7 +27,7 @@ use core::{
 };
 
 #[cfg(feature = "api-22")]
-use crate::environment::Environment;
+use crate::environment::{Environment, EnvironmentInner};
 use crate::{
 	error::Result,
 	ortsys,
@@ -295,25 +294,21 @@ fn is_ep_available(name: &str) -> Result<bool> {
 #[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
 pub struct ExecutionProviderLibrary {
 	name: String,
-	env: Weak<Environment>
+	env: Weak<EnvironmentInner>
 }
 
 #[cfg(feature = "api-22")]
 impl ExecutionProviderLibrary {
-	pub(crate) fn new(name: impl Into<String>, env: &Arc<Environment>) -> Self {
-		Self {
-			name: name.into(),
-			env: Arc::downgrade(env)
-		}
+	pub(crate) fn new(name: impl Into<String>, env: &Environment) -> Self {
+		Self { name: name.into(), env: env.weak() }
 	}
 
 	/// Unregister the EP library from the environment.
 	#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
 	pub fn unregister(self) -> Result<()> {
 		if let Some(env) = self.env.upgrade() {
-			use crate::AsPointer;
 			crate::util::with_cstr(self.name.as_bytes(), &|name| {
-				ortsys![unsafe UnregisterExecutionProviderLibrary(env.ptr().cast_mut(), name.as_ptr())?];
+				ortsys![unsafe UnregisterExecutionProviderLibrary(env.ptr.as_ptr(), name.as_ptr())?];
 				Ok(())
 			})?;
 		}

@@ -55,7 +55,7 @@ binding.bind_output_to_device("action", &allocator.memory_info())?;
 
 <Callout>
     In this example, when the I/O binding is run, the session output `action` will be placed into the same memory allocation provided in the `bind_output` call.
-    
+
     This means that subsequent runs will *override* the data in `action`. If you need to access a bound output's data *across* runs (i.e. in a multithreading setting), the data needs to be copied to another buffer to avoid undefined behavior.
 </Callout>
 
@@ -79,10 +79,10 @@ let action: Tensor<f32> = outputs.remove("action").unwrap().downcast()?;
 Here is a more complete example of the I/O binding API in a scenario where I/O performance can be improved significantly. This example features a typical text-to-image diffusion pipeline, using a text encoder like CLIP to create the condition tensor and a UNet for diffusion.
 
 ```rs
-let mut text_encoder = Session::builder()?
+let mut text_encoder = Session::builder(&env)?
 	.with_execution_providers([ep::CUDA::default().build()])?
 	.commit_from_file("text_encoder.onnx")?;
-let mut unet = Session::builder()?
+let mut unet = Session::builder(&env)?
 	.with_execution_providers([ep::CUDA::default().build()])?
 	.commit_from_file("unet.onnx")?;
 

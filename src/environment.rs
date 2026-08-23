@@ -429,7 +429,7 @@ impl EnvironmentBuilder {
 	}
 
 	/// Configure the environment with a given name for logging purposes.
-	#[must_use = "commit() must be called in order for the environment to take effect"]
+	#[must_use]
 	pub fn with_name<S>(mut self, name: S) -> Self
 	where
 		S: Into<String>
@@ -456,7 +456,7 @@ impl EnvironmentBuilder {
 	/// More details can be found in the `_telemetry.js` file in the root of the `ort-web` crate.
 	///
 	/// [etw]: https://github.com/microsoft/onnxruntime/blob/v1.28.0/onnxruntime/core/platform/windows/telemetry.cc
-	#[must_use = "commit() must be called in order for the environment to take effect"]
+	#[must_use]
 	pub fn with_telemetry(mut self, enable: bool) -> Self {
 		self.telemetry = enable;
 		self
@@ -465,21 +465,21 @@ impl EnvironmentBuilder {
 	/// Sets a list of execution providers which all sessions created in this environment will register.
 	///
 	/// If a session is created in this environment with [`SessionBuilder::with_execution_providers`], those EPs
-	/// will take precedence over the environment's EPs.
+	/// will be registered first, before the environment's EPs.
 	///
 	/// Execution providers will only work if the corresponding Cargo feature is enabled and ONNX Runtime was built
 	/// with support for the corresponding execution provider. Execution providers that do not have their corresponding
 	/// feature enabled will emit a warning.
 	///
 	/// [`SessionBuilder::with_execution_providers`]: crate::session::builder::SessionBuilder::with_execution_providers
-	#[must_use = "commit() must be called in order for the environment to take effect"]
+	#[must_use]
 	pub fn with_execution_providers(mut self, execution_providers: impl AsRef<[ExecutionProviderDispatch]>) -> Self {
 		self.execution_providers = execution_providers.as_ref().into();
 		self
 	}
 
 	/// Enables the global thread pool for this environment.
-	#[must_use = "commit() must be called in order for the environment to take effect"]
+	#[must_use]
 	pub fn with_global_thread_pool(mut self, options: GlobalThreadPoolOptions) -> Self {
 		self.global_thread_pool_options = Some(options);
 		self
@@ -501,6 +501,7 @@ impl EnvironmentBuilder {
 	/// # 	Ok(())
 	/// # }
 	/// ```
+	#[must_use]
 	pub fn with_logger(mut self, logger: LoggerFunction) -> Self {
 		self.logger = Some(logger);
 		self

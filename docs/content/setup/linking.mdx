@@ -52,13 +52,11 @@ ort = { version = "2", features = [ "load-dynamic" ] }
             let dylib_path = find_onnxruntime_dylib()?;
 
             // Initialize ort with the path to the dylib. This **must** be called before any other usage of `ort`!
-            // `init_from` returns a `Result<EnvironmentBuilder>` which you can use to further configure the environment
-            // before `.commit()`ing; see the Environment docs for more information on what you can configure.
             // `init_from` will return an `Err` if it fails to load the dylib.
-            ort::init_from(dylib_path)?.commit();
+            let env = ort::init_from(dylib_path)?.build()?;
 
             // Now we can use `ort`!
-            let mut session = Session::builder()?
+            let mut session = Session::builder(&env)?
                 .commit_from_file("model.onnx")?;
 
             Ok(())

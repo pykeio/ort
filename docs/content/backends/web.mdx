@@ -13,7 +13,7 @@ Rather than trying to link ONNX Runtime into your Rust application, `ort-web` in
 - ✅ `ort::init`
 - 🔷 `ort::environment::EnvironmentBuilder`
     - `EnvironmentBuilder::with_telemetry` <sup>[*](#telemetry)</sup>
-    - `EnvironmentBuilder::commit`
+    - `EnvironmentBuilder::build`
 - 🔷 `ort::memory::Allocator`
     - `Allocator::default`
     - `Allocator::memory_info`
@@ -159,9 +159,9 @@ use wasm_bindgen::JsError;
 async fn init() -> Result<(), JsError> {
     ort::set_api(ort_web::api().await?);
 
-    ort::init()
+    let env = ort::init()
         .with_telemetry(false)
-        .commit();
+        .build()?;
 
     // ...
 }

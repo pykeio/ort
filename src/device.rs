@@ -27,7 +27,7 @@ impl<'e> Device<'e> {
 	/// ```
 	/// # use ort::environment::Environment;
 	/// # fn main() -> ort::Result<()> {
-	/// let env = Environment::current()?;
+	/// # let env = ort::test_util::test_env().clone();
 	/// let cpu = env.devices().next().unwrap();
 	/// assert!(matches!(cpu.ep(), Ok("CPUExecutionProvider")));
 	/// # Ok(())
@@ -45,7 +45,7 @@ impl<'e> Device<'e> {
 	/// ```
 	/// # use ort::environment::Environment;
 	/// # fn main() -> ort::Result<()> {
-	/// let env = Environment::current()?;
+	/// # let env = ort::test_util::test_env().clone();
 	/// let cpu = env.devices().next().unwrap();
 	/// assert!(matches!(cpu.ep_vendor(), Ok("Microsoft")));
 	/// # Ok(())
@@ -115,7 +115,7 @@ impl<'e> HardwareDevice<'e> {
 	/// ```
 	/// # use ort::{environment::Environment, memory::DeviceType};
 	/// # fn main() -> ort::Result<()> {
-	/// let env = Environment::current()?;
+	/// # let env = ort::test_util::test_env().clone();
 	/// let cpu = env.devices().next().unwrap().hardware_device();
 	/// assert_eq!(cpu.ty(), DeviceType::CPU);
 	/// # Ok(())
@@ -141,7 +141,7 @@ impl<'e> HardwareDevice<'e> {
 	/// ```no_run
 	/// # use ort::{environment::Environment, memory::DeviceType};
 	/// # fn main() -> ort::Result<()> {
-	/// let env = Environment::current()?;
+	/// # let env = ort::test_util::test_env().clone();
 	/// let cpu = env.devices().next().unwrap().hardware_device();
 	/// assert_eq!(cpu.vendor().unwrap(), "Intel");
 	/// # Ok(())
@@ -228,13 +228,13 @@ impl DeviceCompatibility {
 
 #[cfg(test)]
 mod tests {
-	use crate::{Result, environment::Environment, memory::DeviceType, session::Session};
+	use crate::{Result, session::Session, test_util::test_env};
 
 	#[test]
 	fn test_session_devices() -> Result<()> {
-		let env = Environment::current()?;
+		let env = test_env();
 
-		let _session1 = Session::builder()?
+		let _session1 = Session::builder(env)?
 			.with_devices(env.devices().next(), None)?
 			.commit_from_file("tests/data/upsample.onnx")?;
 
@@ -242,7 +242,7 @@ mod tests {
 			("CPUExecutionProvider.use_arena".to_string(), "1".to_string()),
 			("XnnpackExecutionProvider.num_threads".to_string(), "4".to_string()),
 		];
-		let _session2 = Session::builder()?
+		let _session2 = Session::builder(env)?
 			.with_devices(env.devices().next(), Some(&options))?
 			.commit_from_file("tests/data/upsample.onnx")?;
 

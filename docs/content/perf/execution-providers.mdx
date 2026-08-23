@@ -28,13 +28,14 @@ Not all platforms support all execution providers, of course. This handy widget 
     See the widget above for the full list of EPs and their corresponding Cargo features.
 </Callout>
 
-In order to configure sessions to use certain execution providers, you must **register** them when creating an environment or session. You can do this via the [`SessionBuilder::with_execution_providers`](https://docs.rs/ort/latest/ort/session/builder/struct.SessionBuilder.html#method.with_execution_providers) method. For example, to register the CUDA execution provider for a session:
+In order to configure sessions to use execution providers, you must **register** them when creating an environment or session. You can do this via the [`SessionBuilder::with_execution_providers`](https://docs.rs/ort/latest/ort/session/builder/struct.SessionBuilder.html#method.with_execution_providers) or [`EnvironmentBuilder::with_execution_providers`](https://docs.rs/ort/latest/ort/environment/struct.EnvironmentBuilder.html#method.with_execution_providers) methods. For example, to register the CUDA execution provider for a session:
 
 ```rust filename="main.rs"
 use ort::{ep, session::Session};
 
 fn main() -> anyhow::Result<()> {
-    let session = Session::builder()?
+	let env = ort::init().build()?;
+    let session = Session::builder(&env)?
         .with_execution_providers([
             #[cfg(feature = "cuda")]
             ep::CUDA::default().build()
@@ -51,7 +52,8 @@ You can, of course, specify multiple execution providers. <Ort/> will register a
 use ort::{ep, session::Session};
 
 fn main() -> anyhow::Result<()> {
-    let session = Session::builder()?
+	let env = ort::init().build()?;
+    let session = Session::builder(&env)?
         .with_execution_providers([
             // Prefer TensorRT over CUDA.
             #[cfg(feature = "tensorrt")]
@@ -78,7 +80,8 @@ EPs have configuration options to control behavior or increase performance. Each
 use ort::{ep, session::Session};
 
 fn main() -> anyhow::Result<()> {
-    let session = Session::builder()?
+	let env = ort::init().build()?;
+    let session = Session::builder(&env)?
         .with_execution_providers([
             #[cfg(feature = "coreml")]
             ep::CoreML::default()
@@ -101,7 +104,8 @@ You can configure an EP to return an error on failure by adding [`.error_on_fail
 use ort::{ep, session::Session};
 
 fn main() -> anyhow::Result<()> {
-    let session = Session::builder()?
+	let env = ort::init().build()?;
+    let session = Session::builder(&env)?
         .with_execution_providers([
             #[cfg(feature = "cuda")]
             ep::CUDA::default()
@@ -123,7 +127,8 @@ use ort::{
 };
 
 fn main() -> anyhow::Result<()> {
-    let builder = Session::builder()?;
+	let env = ort::init().build()?;
+    let builder = Session::builder(&env)?;
 
     #[cfg(feature = "cuda")]
     {
@@ -149,7 +154,9 @@ use ort::{
 };
 
 fn main() -> anyhow::Result<()> {
-    let builder = Session::builder()?;
+	let env = ort::init().build()?;
+
+    let builder = Session::builder(&env)?;
 
     let coreml = ep::CoreML::default();
     if !coreml.is_available() {
@@ -167,30 +174,25 @@ fn main() -> anyhow::Result<()> {
 ```
 
 ## Global EPs
-You can configure EPs to be registered for all sessions created throughout the program by configuring the environment:
+You can configure EPs to be registered for all sessions created throughout the program by configuring them on the [environment](/fundamentals/environment):
 
 ```rust filename="main.rs"
 use ort::{ep, session::Session};
 
 fn main() -> anyhow::Result<()> {
-    ort::init()
+    let env = ort::init()
         .with_execution_providers([
             #[cfg(feature = "cuda")]
             ep::CUDA::default().build()
         ])
-        .commit();
+        .build()?;
 
-    let session = Session::builder()?.commit_from_file("model.onnx")?;
-    // The session will attempt to register the CUDA EP
-    // since we configured environment EPs.
+    let session = Session::builder(&env)?.commit_from_file("model.onnx")?;
+    // The session will attempt to register the CUDA EP since we configured environment EPs.
 
     Ok(())
 }
 ```
-
-<Callout type='warning'>
-    Environment configs must be committed before you create any sessions, otherwise the configuration will not take effect!
-</Callout>
 
 EPs configured on a per-session basis (with [`SessionBuilder::with_execution_providers`](https://docs.rs/ort/latest/ort/session/builder/struct.SessionBuilder.html#method.with_execution_providers)) will *take precedence* over environment EPs, but it won't replace them.
 

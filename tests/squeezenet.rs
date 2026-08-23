@@ -17,9 +17,9 @@ use ort::{
 fn squeezenet_mushroom() -> ort::Result<()> {
 	const IMAGE_TO_LOAD: &str = "mushroom.png";
 
-	ort::init().with_name("integration_test").commit();
+	let env = ort::init().with_name("integration_test").build()?;
 
-	let mut session = Session::builder()?
+	let mut session = Session::builder(&env)?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
 		.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/squeezenet.onnx")

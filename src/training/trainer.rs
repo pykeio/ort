@@ -1,4 +1,4 @@
-use alloc::{borrow::Cow, sync::Arc};
+use alloc::borrow::Cow;
 use core::{
 	fmt,
 	ptr::{self, NonNull}
@@ -28,7 +28,7 @@ pub struct Trainer {
 	eval_input_names: Vec<String>,
 	ckpt: Checkpoint,
 	_allocator: Allocator,
-	_environment: Arc<Environment>
+	_environment: Environment
 }
 
 impl Trainer {
@@ -109,7 +109,7 @@ impl Trainer {
 		Self::new_inner(ptr, &session_options.environment, allocator, ckpt)
 	}
 
-	fn new_inner(ptr: NonNull<ort_sys::OrtTrainingSession>, environment: &Arc<Environment>, allocator: Allocator, ckpt: Checkpoint) -> Result<Self> {
+	fn new_inner(ptr: NonNull<ort_sys::OrtTrainingSession>, environment: &Environment, allocator: Allocator, ckpt: Checkpoint) -> Result<Self> {
 		let api = training_api()?;
 		let train_output_names =
 			extract_io_names(ptr, &allocator, api.TrainingSessionGetTrainingModelOutputCount, api.TrainingSessionGetTrainingModelOutputName)?;
@@ -128,7 +128,7 @@ impl Trainer {
 			eval_input_names,
 			ckpt,
 			_allocator: allocator,
-			_environment: Arc::clone(environment)
+			_environment: environment.clone()
 		})
 	}
 

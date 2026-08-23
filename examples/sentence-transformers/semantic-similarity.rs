@@ -26,11 +26,11 @@ fn main() -> ort::Result<()> {
 		.with(tracing_subscriber::fmt::layer())
 		.init();
 
-	// Register EPs based on feature flags - this isn't crucial for usage and can be removed.
-	common::init()?;
+	// Create our environment, registering EPs based on feature flags; you can also simply do `ort::init().build()?`
+	let env = common::get_env()?;
 
 	// Load our model
-	let mut session = Session::builder()?
+	let mut session = Session::builder(&env)?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
 		.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/all-MiniLM-L6-v2.onnx")?;

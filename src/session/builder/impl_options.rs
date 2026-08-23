@@ -303,9 +303,10 @@ impl SessionBuilder {
 	/// ```
 	/// # use ort::{session::Session};
 	/// # fn main() -> ort::Result<()> {
+	/// # let env = ort::test_util::test_env().clone();
 	/// use std::sync::Arc;
 	///
-	/// let mut session = Session::builder()?
+	/// let mut session = Session::builder(&env)?
 	/// 	.with_logger(Arc::new(
 	/// 		|level: ort::logging::LogLevel, category: &str, id: &str, code_location: &str, message: &str| {
 	/// 			// ...
@@ -355,7 +356,8 @@ impl SessionBuilder {
 	/// ```no_run
 	/// # use ort::session::{Session, builder::AutoDevicePolicy};
 	/// # fn main() -> ort::Result<()> {
-	/// let mut session = Session::builder()?
+	/// # let env = ort::test_util::test_env().clone();
+	/// let mut session = Session::builder(&env)?
 	/// 	// moar power!!1!
 	/// 	.with_auto_device(AutoDevicePolicy::MaxPerformance)?
 	/// 	.commit_from_file("tests/data/upsample.onnx")?;
@@ -380,13 +382,12 @@ impl SessionBuilder {
 	/// ```
 	/// # use ort::{environment::Environment, session::Session, memory::DeviceType};
 	/// # fn main() -> ort::Result<()> {
-	/// let env = Environment::current()?;
-	///
+	/// # let env = ort::test_util::test_env().clone();
 	/// let options = vec![
 	/// 	("CPUExecutionProvider.use_arena".to_string(), "1".to_string()),
 	/// 	("XnnpackExecutionProvider.num_threads".to_string(), "4".to_string()),
 	/// ];
-	/// let mut session = Session::builder()?
+	/// let mut session = Session::builder(&env)?
 	/// 	.with_devices(env.devices().filter(|dev| dev.hardware_device().ty() == DeviceType::CPU), Some(&options))?
 	/// 	.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	Ok(())

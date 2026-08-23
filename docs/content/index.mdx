@@ -49,12 +49,13 @@ Your model will need to be converted to an ONNX graph before you can use it.
 - For PaddlePaddle: [`Paddle2ONNX`](https://github.com/PaddlePaddle/Paddle2ONNX)
 
 {<h3>Load your model</h3>}
-Once you've got a model, load it in <Ort/> by creating a [`Session`](/fundamentals/session):
+Once you've got a model, load it in <Ort/> by creating an [`Environment`](/fundamentals/environment) & [`Session`](/fundamentals/session):
 
 ```rust
 use ort::session::{builder::GraphOptimizationLevel, Session};
 
-let mut model = Session::builder()?
+let env = ort::init().build()?;
+let mut model = Session::builder(&env)?
     .with_optimization_level(GraphOptimizationLevel::Level3)?
     .with_intra_threads(4)?
     .commit_from_file("yolov8m.onnx")?;

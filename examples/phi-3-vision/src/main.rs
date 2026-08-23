@@ -221,14 +221,14 @@ async fn main() -> Result<()> {
 		.with(tracing_subscriber::fmt::layer())
 		.init();
 
-	// Register EPs based on feature flags - this isn't crucial for usage and can be removed.
-	common::init()?;
+	// Create our environment, registering EPs based on feature flags; you can also simply do `ort::init().build()?`
+	let env = common::get_env()?;
 
 	let data_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("data");
 	let tokenizer = Tokenizer::from_file(data_dir.join("tokenizer.json")).map_err(|e| anyhow::anyhow!("Error loading tokenizer: {:?}", e))?;
-	let mut vision_model = Session::builder()?.commit_from_file(data_dir.join(VISION_MODEL_NAME))?;
-	let mut text_embedding_model = Session::builder()?.commit_from_file(data_dir.join(TEXT_EMBEDDING_MODEL_NAME))?;
-	let mut generation_model = Session::builder()?.commit_from_file(data_dir.join(GENERATION_MODEL_NAME))?;
+	let mut vision_model = Session::builder(&env)?.commit_from_file(data_dir.join(VISION_MODEL_NAME))?;
+	let mut text_embedding_model = Session::builder(&env)?.commit_from_file(data_dir.join(TEXT_EMBEDDING_MODEL_NAME))?;
+	let mut generation_model = Session::builder(&env)?.commit_from_file(data_dir.join(GENERATION_MODEL_NAME))?;
 
 	// Generate text from text
 	let image: Option<DynamicImage> = None;

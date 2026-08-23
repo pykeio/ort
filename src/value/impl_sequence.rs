@@ -234,10 +234,15 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized> IntoIterator for V
 
 #[cfg(test)]
 mod tests {
-	use crate::value::{Sequence, Shape, Tensor};
+	use crate::{
+		test_util::test_env,
+		value::{Sequence, Shape, Tensor}
+	};
 
 	#[test]
 	fn test_sequence_basic() -> crate::Result<()> {
+		let _env = test_env();
+
 		let tensor1 = Tensor::from_array((Shape::new([5]), vec![1i32, 2, 3, 4, 5]))?;
 		let tensor2 = Tensor::from_array((Shape::new([5]), vec![5i32, 4, 3, 2, 1]))?;
 		let tensor3 = Tensor::from_array((Shape::new([5]), vec![10i32, 2, 30, 4, 50]))?;

@@ -95,7 +95,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// ```no_run
 	/// # use ort::{memory::{Allocator, MemoryInfo, MemoryType, AllocationDevice, AllocatorType}, session::Session, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
-	/// # let session = Session::builder()?.commit_from_file("tests/data/upsample.onnx")?;
+	/// # let session = Session::builder(ort::test_util::test_env())?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let allocator = Allocator::new(
 	/// 	&session,
 	/// 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?

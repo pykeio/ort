@@ -57,7 +57,7 @@ impl ThreadManager for StdThreadManager {
 fn global_thread_manager() -> ort::Result<()> {
 	let stats = Arc::new(ThreadStats { active_threads: AtomicUsize::new(0) });
 
-	ort::init()
+	let env = ort::init()
 		.with_name("integration_test")
 		.with_global_thread_pool(
 			GlobalThreadPoolOptions::default()
@@ -65,9 +65,9 @@ fn global_thread_manager() -> ort::Result<()> {
 				.with_intra_threads(2)?
 				.with_thread_manager(StdThreadManager { stats: Arc::clone(&stats) })?
 		)
-		.commit();
+		.build()?;
 
-	let _session = Session::builder()?.commit_from_file("tests/data/upsample.ort")?;
+	let _session = Session::builder(&env)?.commit_from_file("tests/data/upsample.ort")?;
 
 	assert_eq!(stats.active_threads.load(Ordering::Acquire), 4);
 

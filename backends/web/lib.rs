@@ -88,7 +88,8 @@ pub const FEATURE_WEBNN: u8 = FEATURE_WEBGPU;
 /// 	// This must be called at least once before using any `ort` API.
 /// 	ort::set_api(ort_web::api(FEATURE_WEBGL | FEATURE_WEBGPU).await?);
 ///
-/// 	let session = Session::builder()?.commit_from_url("https://...").await?;
+/// 	let env = ort::init().build()?;
+/// 	let session = Session::builder(&env)?.commit_from_url("https://...").await?;
 /// 	Ok(session)
 /// }
 /// ```

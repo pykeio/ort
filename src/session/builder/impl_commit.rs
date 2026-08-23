@@ -72,11 +72,12 @@ impl SessionBuilder {
 		self.commit_finalize(session_ptr)
 	}
 
-	/// Load an ONNX graph from memory and commit the session
-	/// For `.ort` models, we enable `session.use_ort_model_bytes_directly`.
-	/// For more information, check [Load ORT format model from an in-memory byte array](https://onnxruntime.ai/docs/performance/model-optimizations/ort-format-models.html#load-ort-format-model-from-an-in-memory-byte-array).
+	/// Load an ONNX graph directly from memory and commit the session.
 	///
-	/// If you wish to store the model bytes and the [`InMemorySession`] in the same struct, look for crates that
+	/// For models in the `.ort` format, `session.use_ort_model_bytes_directly` is enabled, so no copy is performed. For
+	/// more information, see [the ONNX Runtime docs](https://onnxruntime.ai/docs/performance/model-optimizations/ort-format-models.html#load-ort-format-model-from-an-in-memory-byte-array).
+	///
+	/// If you need to store the model bytes and the [`InMemorySession`] in the same struct, there are crates that can
 	/// facilitate creating self-referential structs, such as [`ouroboros`](https://github.com/joshua-maros/ouroboros).
 	#[cfg(not(target_arch = "wasm32"))]
 	pub fn commit_from_memory_directly<'m>(&mut self, model_bytes: &'m [u8]) -> Result<InMemorySession<'m>> {
@@ -148,7 +149,7 @@ impl SessionBuilder {
 
 	pub(crate) fn pre_commit(&mut self) -> Result<()> {
 		if !self.no_env_eps {
-			let env = Arc::clone(&self.environment); // dumb borrowck hack
+			let env = self.environment.clone();
 			apply_execution_providers(self, env.execution_providers(), "environment")?;
 		}
 

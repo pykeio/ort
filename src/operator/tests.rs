@@ -6,6 +6,7 @@ use crate::{
 	logging::LogLevel,
 	operator::{BoxedKernel, ComputeContext, Kernel, KernelContext, Operator, OperatorDomain, OperatorInput, OperatorOutput},
 	session::Session,
+	test_util::test_env,
 	value::{Tensor, TensorElementType}
 };
 
@@ -92,7 +93,7 @@ impl Operator for CustomOpTwo {
 fn test_custom_ops() -> crate::Result<()> {
 	let logged_values = Arc::new((AtomicBool::new(false), AtomicBool::new(false)));
 	let model = std::fs::read("tests/data/custom_op_test.onnx").expect("");
-	let mut session = Session::builder()?
+	let mut session = Session::builder(test_env())?
 		.with_operators(OperatorDomain::new("test.customop")?.add(CustomOpOne)?.add(CustomOpTwo)?)?
 		.with_logger(Arc::new({
 			let logged_values = logged_values.clone();
@@ -218,7 +219,7 @@ impl Operator for AttrTesterString {
 
 #[test]
 fn test_op_attrs() -> crate::Result<()> {
-	let mut session = Session::builder()?
+	let mut session = Session::builder(test_env())?
 		.with_operators(OperatorDomain::new("test.customop")?.add(AttrTesterIntFloat)?.add(AttrTesterString)?)?
 		.commit_from_file("tests/data/attr_tester.onnx")?;
 
@@ -325,8 +326,9 @@ fn test_variadic_io() -> crate::Result<()> {
 			.add(CopyTensorArrayAllVariadic)?
 			.add(CopyTensorArrayCombined)?
 	);
+	let env = test_env().clone();
 
-	let mut session = Session::builder()?
+	let mut session = Session::builder(&env)?
 		.with_operators(Arc::clone(&ops))?
 		.commit_from_file("tests/data/copy_2_inputs_2_outputs.onnx")?;
 
@@ -337,7 +339,7 @@ fn test_variadic_io() -> crate::Result<()> {
 	assert_eq!(values[0].try_extract_tensor::<f32>()?.1, input0.extract_tensor().1);
 	assert_eq!(values[1].try_extract_tensor::<f32>()?.1, input1.extract_tensor().1);
 
-	let mut session = Session::builder()?
+	let mut session = Session::builder(&env)?
 		.with_operators(Arc::clone(&ops))?
 		.commit_from_file("tests/data/copy_3_inputs_3_outputs.onnx")?;
 

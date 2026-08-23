@@ -89,7 +89,8 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 /// # use ndarray::Array1;
 /// # use ort::{value::Tensor, session::{builder::GraphOptimizationLevel, Session}};
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// # 	let mut session = Session::builder()?.commit_from_file("model.onnx")?;
+/// # 	let env = ort::test_util::test_env().clone();
+/// # 	let mut session = Session::builder(&env)?.commit_from_file("model.onnx")?;
 /// let _ = session.run(ort::inputs![Tensor::from_array(([5], vec![1, 2, 3, 4, 5]))?])?;
 /// # 	Ok(())
 /// # }
@@ -102,7 +103,8 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 /// # use ndarray::Array1;
 /// # use ort::{value::Tensor, session::{builder::GraphOptimizationLevel, Session}};
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// # 	let mut session = Session::builder()?.commit_from_file("model.onnx")?;
+/// # 	let env = ort::test_util::test_env().clone();
+/// # 	let mut session = Session::builder(&env)?.commit_from_file("model.onnx")?;
 /// let _ = session.run(ort::inputs! {
 /// 	"tokens" => Tensor::from_array(([5], vec![1, 2, 3, 4, 5]))?
 /// })?;
@@ -117,23 +119,24 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 /// # use ndarray::Array1;
 /// # use ort::{value::Tensor, session::{builder::GraphOptimizationLevel, Session}};
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// # 	let mut session = Session::builder()?.commit_from_file("model.onnx")?;
+/// # 	let env = ort::test_util::test_env().clone();
+/// # 	let mut session = Session::builder(&env)?.commit_from_file("model.onnx")?;
 /// # 	let model_layers = 12;
-/// 	let mut my_inputs = ort::inputs![
-/// 		"input_ids" => Tensor::from_array((vec![1, 1i64], vec![0]))?,
-/// 		"position_ids" => Tensor::from_array((vec![1, 1i64], vec![0]))?,
-/// 	];
-/// 	for layer in 0..model_layers {
-/// 		my_inputs.push((
-/// 	    	format!("past_key_values.{}.key", layer).into(),
-/// 		    Tensor::from_array(((), vec![1i64]))?.into(),
-/// 		));
-/// 		my_inputs.push((
-/// 	    	format!("past_key_values.{}.value", layer).into(),
-/// 	    	Tensor::from_array(((), vec![1i64]))?.into(),
-/// 		));
-/// 	}
-/// 	let _outputs = session.run(my_inputs)?;
+/// let mut my_inputs = ort::inputs![
+/// 	"input_ids" => Tensor::from_array((vec![1, 1i64], vec![0]))?,
+/// 	"position_ids" => Tensor::from_array((vec![1, 1i64], vec![0]))?,
+/// ];
+/// for layer in 0..model_layers {
+/// 	my_inputs.push((
+///     	format!("past_key_values.{}.key", layer).into(),
+/// 	    Tensor::from_array(((), vec![1i64]))?.into(),
+/// 	));
+/// 	my_inputs.push((
+///     	format!("past_key_values.{}.value", layer).into(),
+///     	Tensor::from_array(((), vec![1i64]))?.into(),
+/// 	));
+/// }
+/// let _outputs = session.run(my_inputs)?;
 /// # 	Ok(())
 /// # }
 /// ```

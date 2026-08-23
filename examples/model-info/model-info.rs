@@ -9,14 +9,14 @@ mod common;
 
 fn main() -> ort::Result<()> {
 	// Register backends based on feature flags - this isn't crucial for usage and can be removed.
-	common::init()?;
+	let env = common::get_env()?;
 
 	let Some(path) = env::args().nth(1) else {
 		eprintln!("usage: ./model-info <model>.onnx");
 		process::exit(0);
 	};
 
-	let session = Session::builder()?.commit_from_file(path)?;
+	let session = Session::builder(&env)?.commit_from_file(path)?;
 
 	let meta = session.metadata()?;
 	if let Some(x) = meta.name() {

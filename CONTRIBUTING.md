@@ -61,8 +61,8 @@ fn main() -> ort::Result<()> {
 		.with(tracing_subscriber::fmt::layer())
 		.init();
 
-	// Register EPs based on feature flags - this isn't crucial for usage and can be removed.
-	common::init()?;
+	// Create our environment, registering EPs based on feature flags; you can also simply do `ort::init().build()?`
+	let env = common::get_env()?;
 
     ... // The AGI part is left as an exercise for the reader.
 
@@ -70,7 +70,7 @@ fn main() -> ort::Result<()> {
 }
 ```
 
-Make sure to keep the comments annotating `mod common`, the tracing initialization, and `common::init` so their purpose is clear.
+Make sure to keep the comments annotating `mod common`, the tracing initialization, and `common::get_env` so their purpose is clear.
 
 The last thing we need to do in order to make the example runnable is to add a Cargo alias to the `.cargo/config.toml` in the root of the repository:
 ```toml

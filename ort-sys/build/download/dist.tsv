@@ -6,6 +6,7 @@ aarch64-apple-ios-sim	coreml	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.28.0/aarch64
 aarch64-linux-android	nnapi	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.28.0/aarch64-linux-android+nnapi.tar.lzma2	2436b47b88374638254bf2b3a11ee66ae67d665590fec744296434b6a94c2691
 aarch64-pc-windows-msvc	directml	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.28.0/aarch64-pc-windows-msvc+directml.tar.lzma2	56df72970baeea08295db33f15f985cd74f4d4cd00e0099c44aba1504c5d140e
 aarch64-unknown-linux-gnu	none	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.28.0/aarch64-unknown-linux-gnu.tar.lzma2	06a050ab9137ccb32421d0cb49e9ccf72d9e18ab0aeb8f8d038d1b5cc844b35a
+x86_64-linux-android	nnapi	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.28.0/x86_64-linux-android+nnapi.tar.lzma2	06814541d4ac7eb9eb67c229e3bbb1b63b0ed72616bf05722420616ac6400065
 x86_64-pc-windows-msvc	directml	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.28.0/x86_64-pc-windows-msvc+directml.tar.lzma2	f7c654b3729cb9e5ad2a36a0c38e5b48e63bf4eed22968931aed33a0ad0b527d
 x86_64-pc-windows-msvc	webgpu	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.28.0/x86_64-pc-windows-msvc+webgpu.tar.lzma2	7e21d6e157b80e910ef6bc336846ed7958f13b9dbdd0b0369d6225a59aebd825
 x86_64-pc-windows-msvc	nvrtx,directml	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.28.0/x86_64-pc-windows-msvc+nvrtx.tar.lzma2	2e219010a682726153fc4861b356869154e6222042baa35069cc6d37433a8f28

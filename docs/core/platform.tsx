@@ -14,6 +14,7 @@ export const PLATFORMS_WITH_BINARIES: Triple[] = [
 	{ os: 'linux', arch: 'arm64' },
 	{ os: 'ios', arch: 'arm64' },
 	{ os: 'android', arch: 'arm64' },
+	{ os: 'android', arch: 'x64' },
 	{ os: 'web', arch: 'web' }
 ];
 export const PLATFORMS_SUPPORTED: Triple[] = [
@@ -28,6 +29,7 @@ export const PLATFORMS_SUPPORTED: Triple[] = [
 	{ os: 'macos', arch: 'arm64' },
 	{ os: 'ios', arch: 'arm64' },
 	{ os: 'android', arch: 'arm64' },
+	{ os: 'android', arch: 'x64' },
 	{ os: 'web', arch: 'web' }
 ];
 
@@ -76,6 +78,7 @@ export function detectNativeArch(platform: Platform | null): Arch | null {
 	}
 
 	if (platform === 'ios' || platform === 'android') {
+		// This is wrong on the x86_64 Android emulator, but I don't see a better way of detecting it?
 		return 'arm64';
 	}
 

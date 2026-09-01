@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use std::{env, path::PathBuf};
+
 pub const SYSTEM_LIB_PATH: &[&str] = &["ORT_LIB_PATH", "ORT_LIB_LOCATION"];
 pub const SYSTEM_LIB_PROFILE: &str = "ORT_LIB_PROFILE";
 pub const VCPKG_TARGET: &str = "ORT_VCPKG_TARGET";
@@ -15,7 +17,7 @@ pub const CUDA_VERSION: &str = "ORT_CUDA_VERSION";
 
 pub fn get(var: &str) -> Option<String> {
 	println!("cargo:rerun-if-env-changed={var}");
-	std::env::var(var).ok()
+	env::var(var).ok()
 }
 
 pub fn get_any(vars: &[&str]) -> Option<String> {
@@ -25,4 +27,17 @@ pub fn get_any(vars: &[&str]) -> Option<String> {
 		}
 	}
 	None
+}
+
+pub fn target_dir() -> PathBuf {
+	let out_dir = std::path::PathBuf::from(env::var("OUT_DIR").unwrap());
+	// more recent rust versions have this set to `target/<profile>/build/ort-sys/<fingerprint>/out`
+	// earlier, this was `target/<profile>/build/ort-sys-<fingerprint>/out`
+	let mut ancestors = out_dir.ancestors().skip(2);
+	let target_dir = if ancestors.next().is_some_and(|x| x.ends_with("ort-sys")) {
+		ancestors.nth(1)
+	} else {
+		ancestors.next()
+	};
+	target_dir.expect("").to_path_buf()
 }

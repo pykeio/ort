@@ -11,12 +11,12 @@ pub fn prefer_dynamic_linking() -> bool {
 }
 
 #[cfg(feature = "copy-dylibs")]
-pub fn copy_dylibs(lib_dir: &Path, out_dir: &Path) {
+pub fn copy_dylibs(lib_dir: &Path) {
 	use std::fs;
 
-	// get the target directory - we need to place the dlls next to the executable so they can be properly loaded by windows
-	let out_dir = out_dir.ancestors().nth(3).unwrap();
-	for out_dir in [out_dir.to_path_buf(), out_dir.join("examples"), out_dir.join("deps")] {
+	// we need to place the dlls next to the executable so they can be properly loaded by windows
+	let target_dir = vars::target_dir();
+	for out_dir in [target_dir.to_path_buf(), target_dir.join("examples"), target_dir.join("deps")] {
 		#[cfg(windows)]
 		let mut copy_fallback = false;
 		#[cfg(not(windows))]
@@ -35,7 +35,9 @@ pub fn copy_dylibs(lib_dir: &Path, out_dir: &Path) {
 			if out_path.is_symlink() {
 				fs::remove_file(&out_path).unwrap();
 			}
-			if !out_path.exists() {
+
+			// recent rust versions no longer use the deps folder
+			if out_dir.exists() && !out_path.exists() {
 				#[cfg(windows)]
 				if std::os::windows::fs::symlink_file(&lib_path, &out_path).is_err() {
 					copy_fallback = true;

@@ -50,7 +50,7 @@ fn main() {
 			println!("cargo:rustc-link-lib=onnxruntime");
 			println!("cargo:rustc-link-search=native={}", lib_dir.display());
 			#[cfg(feature = "copy-dylibs")]
-			dynamic_link::copy_dylibs(&lib_dir, &std::path::PathBuf::from(env::var("OUT_DIR").unwrap()));
+			dynamic_link::copy_dylibs(&lib_dir);
 			return;
 		}
 
@@ -177,7 +177,7 @@ note: the downloaded files are available to inspect at: {}",
 		static_link::static_link_prerequisites(BinariesSource::Pyke { feature_set: dist.features });
 
 		#[cfg(feature = "copy-dylibs")]
-		dynamic_link::copy_dylibs(&bin_extract_dir, &std::path::PathBuf::from(env::var("OUT_DIR").unwrap()));
+		dynamic_link::copy_dylibs(&bin_extract_dir);
 
 		println!("cargo:rustc-link-search=native={}", bin_extract_dir.display());
 		println!("cargo:rustc-link-lib=static=onnxruntime");

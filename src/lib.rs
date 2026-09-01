@@ -97,6 +97,7 @@ pub(crate) mod load_dynamic {
 	pub enum LoadError {
 		Dlopen { error: libloading::Error, path: PathBuf },
 		MissingApi { path: PathBuf },
+		InvalidVersionString,
 		BadVersion { version_str: String, path: PathBuf }
 	}
 
@@ -105,6 +106,7 @@ pub(crate) mod load_dynamic {
 			match self {
 				Self::Dlopen { error, path } => f.write_fmt(format_args!("failed to load from `{}`: {error}", path.display())),
 				Self::MissingApi { path } => f.write_fmt(format_args!("{} does not export `OrtGetApiBase`", path.display())),
+				Self::InvalidVersionString => f.write_str("`OrtGetApiBase.GetVersionString` returned a malformed string"),
 				Self::BadVersion { version_str, path } => f.write_fmt(format_args!(
 					"ort {} is not compatible with the ONNX Runtime binary found at `{}`; expected version >= '1.{}.x', but got '{version_str}'",
 					env!("CARGO_PKG_VERSION"),
@@ -119,32 +121,44 @@ pub(crate) mod load_dynamic {
 
 	pub(crate) static G_ORT_LIB: OnceLock<libloading::Library> = OnceLock::new();
 
+	pub(crate) fn load_library(path: &std::path::Path) -> Result<(libloading::Library, PathBuf), LoadError> {
+		let absolute_path = if path.is_absolute() {
+			path.to_path_buf()
+		} else {
+			let relative = std::env::current_exe()
+				.expect("could not get current executable path")
+				.parent()
+				.expect("executable is root?")
+				.join(path);
+			if relative.exists() { relative } else { path.to_path_buf() }
+		};
+		match unsafe { libloading::Library::new(&absolute_path) } {
+			Ok(lib) => Ok((lib, absolute_path)),
+			Err(e) => Err(LoadError::Dlopen {
+				error: e,
+				path: absolute_path.clone()
+			})
+		}
+	}
+
+	pub(crate) fn version_string(lib: &libloading::Library, path: &std::path::Path) -> Result<&'static str, LoadError> {
+		let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const ort_sys::OrtApiBase> =
+			unsafe { lib.get(b"OrtGetApiBase") }.map_err(|_| LoadError::MissingApi { path: path.to_path_buf() })?;
+		let base: *const ort_sys::OrtApiBase = unsafe { base_getter() };
+		assert!(!base.is_null());
+
+		let version_string = unsafe { ((*base).GetVersionString)() };
+		unsafe { CStr::from_ptr(version_string) }
+			.to_str()
+			.map_err(|_| LoadError::InvalidVersionString)
+	}
+
 	pub(crate) fn init(path: &std::path::Path) -> Result<bool, LoadError> {
 		let mut inserter = Some(|| -> Result<libloading::Library, LoadError> {
 			use core::cmp::Ordering;
 
-			let absolute_path = if path.is_absolute() {
-				path.to_path_buf()
-			} else {
-				let relative = std::env::current_exe()
-					.expect("could not get current executable path")
-					.parent()
-					.expect("executable is root?")
-					.join(path);
-				if relative.exists() { relative } else { path.to_path_buf() }
-			};
-			let lib = unsafe { libloading::Library::new(&absolute_path) }.map_err(|e| LoadError::Dlopen {
-				error: e,
-				path: absolute_path.clone()
-			})?;
-
-			let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const ort_sys::OrtApiBase> =
-				unsafe { lib.get(b"OrtGetApiBase") }.map_err(|_| LoadError::MissingApi { path: absolute_path.clone() })?;
-			let base: *const ort_sys::OrtApiBase = unsafe { base_getter() };
-			assert!(!base.is_null());
-
-			let version_string = unsafe { ((*base).GetVersionString)() };
-			let version_string = unsafe { CStr::from_ptr(version_string) }.to_string_lossy();
+			let (lib, absolute_path) = load_library(path)?;
+			let version_string = version_string(&lib, &absolute_path)?;
 
 			let lib_minor_version = version_string.split('.').nth(1).map_or(0, |x| x.parse::<u32>().unwrap_or(0));
 			match lib_minor_version.cmp(&MINOR_VERSION) {

@@ -71,6 +71,26 @@ pub fn preload_dylib<P: libloading::AsFilename>(path: P) -> Result<(), libloadin
 	Ok(())
 }
 
+/// Probes the minor version of an ONNX Runtime dylib.
+///
+/// Returns `None` if the library failed to load or if the major version is not `1`.
+///
+/// ```no_run
+/// assert_eq!(ort::util::probe("libonnxruntime.so.1.26"), Some(26));
+/// ```
+#[cfg_attr(docsrs, doc(cfg(feature = "load-dynamic")))]
+#[cfg(all(feature = "load-dynamic", not(target_arch = "wasm32")))]
+pub fn probe<P: AsRef<std::path::Path>>(path: P) -> Option<u32> {
+	use crate::load_dynamic;
+	let (lib, absolute_path) = load_dynamic::load_library(path.as_ref()).ok()?;
+	let version_string = load_dynamic::version_string(&lib, &absolute_path).ok()?;
+	if version_string.starts_with("1.") {
+		version_string.split('.').nth(1).and_then(|x| x.parse::<u32>().ok())
+	} else {
+		None
+	}
+}
+
 #[cfg(target_family = "windows")]
 pub(crate) type OsCharArray = Vec<u16>;
 #[cfg(not(target_family = "windows"))]

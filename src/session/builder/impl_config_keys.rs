@@ -73,15 +73,7 @@ impl SessionBuilder {
 		self.with_config_entry("session.disable_aot_function_inlining", if enable { "0" } else { "1" })
 	}
 
-	/// Accepts a **semicolon**-separated list of optimizers to disable.
-	///
-	/// Note that ONNX Runtime splits this value on `;`, not `,`
-	/// ([`inference_session.cc`](https://github.com/microsoft/onnxruntime/blob/main/onnxruntime/core/session/inference_session.cc)
-	/// calls `utils::SplitString(disabled_string, ";")`). A comma-joined list is treated as a
-	/// single optimizer name, matches nothing, and silently disables **no** optimizers.
-	///
-	/// Unrecognized names are also ignored without error, so a typo behaves exactly like not
-	/// calling this at all.
+	/// Accepts a semicolon-separated list of optimizers to disable.
 	///
 	/// ```
 	/// # use ort::session::Session;

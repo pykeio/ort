@@ -83,12 +83,13 @@ impl SessionBuilder {
 	/// Unrecognized names are also ignored without error, so a typo behaves exactly like not
 	/// calling this at all.
 	///
-	/// ```no_run
+	/// ```
 	/// # use ort::session::Session;
 	/// # fn main() -> ort::Result<()> {
-	/// let session = Session::builder()?
+	/// # let env = ort::test_util::test_env().clone();
+	/// let session = Session::builder(&env)?
 	/// 	.with_disabled_optimizers("ConstantFolding;GeluFusionL2")?
-	/// 	.commit_from_file("model.onnx")?;
+	/// 	.commit_from_file("tests/data/upsample.onnx")?;
 	/// # Ok(())
 	/// # }
 	/// ```

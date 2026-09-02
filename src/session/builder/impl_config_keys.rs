@@ -73,7 +73,18 @@ impl SessionBuilder {
 		self.with_config_entry("session.disable_aot_function_inlining", if enable { "0" } else { "1" })
 	}
 
-	/// Accepts a comma-separated list of optimizers to disable.
+	/// Accepts a semicolon-separated list of optimizers to disable.
+	///
+	/// ```
+	/// # use ort::session::Session;
+	/// # fn main() -> ort::Result<()> {
+	/// # let env = ort::test_util::test_env().clone();
+	/// let session = Session::builder(&env)?
+	/// 	.with_disabled_optimizers("ConstantFolding;GeluFusionL2")?
+	/// 	.commit_from_file("tests/data/upsample.onnx")?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	pub fn with_disabled_optimizers(self, optimizers: impl AsRef<str>) -> BuilderResult {
 		self.with_config_entry("optimization.disable_specified_optimizers", optimizers)
 	}

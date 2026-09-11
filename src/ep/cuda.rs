@@ -384,9 +384,9 @@ impl ExecutionProvider for CUDA {
 // Take care in how these are ordered, since some of them depend on each other. Dependencies need to be loaded before
 // their dependents.
 #[cfg(windows)]
-pub const CUDA_DYLIBS: &[&str] = &["cudart64_12.dll", "cublasLt64_12.dll", "cublas64_12.dll", "cufft64_11.dll"];
+pub const CUDA_DYLIBS: &[&str] = &["cudart64_13.dll", "cublasLt64_13.dll", "cublas64_13.dll", "cufft64_12.dll"];
 #[cfg(not(windows))]
-pub const CUDA_DYLIBS: &[&str] = &["libcudart.so.12", "libcublasLt.so.12", "libcublas.so.12", "libnvrtc.so.12", "libcurand.so.10", "libcufft.so.11"];
+pub const CUDA_DYLIBS: &[&str] = &["libcudart.so.13", "libcublasLt.so.13", "libcublas.so.13", "libnvrtc.so.13", "libcurand.so.10", "libcufft.so.12"];
 
 #[cfg(windows)]
 pub const CUDNN_DYLIBS: &[&str] = &[

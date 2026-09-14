@@ -455,7 +455,7 @@ impl EnvironmentBuilder {
 	/// The `ort-web` alternative backend collects telemetry data by default. This telemetry data is sent to pyke.
 	/// More details can be found in the `_telemetry.js` file in the root of the `ort-web` crate.
 	///
-	/// [etw]: https://github.com/microsoft/onnxruntime/blob/v1.28.0/onnxruntime/core/platform/windows/telemetry.cc
+	/// [etw]: https://github.com/microsoft/onnxruntime/blob/v1.30.0/onnxruntime/core/platform/windows/telemetry.cc
 	#[must_use]
 	pub fn with_telemetry(mut self, enable: bool) -> Self {
 		self.telemetry = enable;

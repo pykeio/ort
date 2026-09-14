@@ -2553,6 +2553,25 @@ unsafe extern "system" fn KernelContext_GetSyncStream(context: *const OrtKernelC
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-29")]
+unsafe extern "system" fn SessionOptionsSetWeightlessSourceModelBuffer(
+	options: *mut OrtSessionOptions,
+	source_model_data: *const c_void,
+	source_model_data_length: usize
+) -> OrtStatusPtr {
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+#[cfg(feature = "api-30")]
+unsafe extern "system" fn KernelContext_GetPreallocatedOutput(
+	context: *const OrtKernelContext,
+	output_index: usize,
+	output: *mut *mut OrtValue
+) -> OrtStatusPtr {
+	unsafe { *output = ptr::null_mut() };
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
 pub const fn api() -> OrtApi {
 	OrtApi {
 		CreateStatus,
@@ -3126,6 +3145,10 @@ pub const fn api() -> OrtApi {
 		#[cfg(feature = "api-28")]
 		GetExperimentalFunction,
 		#[cfg(feature = "api-28")]
-		KernelContext_GetSyncStream
+		KernelContext_GetSyncStream,
+		#[cfg(feature = "api-29")]
+		SessionOptionsSetWeightlessSourceModelBuffer,
+		#[cfg(feature = "api-30")]
+		KernelContext_GetPreallocatedOutput
 	}
 }

@@ -1,5 +1,5 @@
 <div align=center>
-<img src="https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/docs/trend-banner.png" width="350px">
+<img src="https://ort.pyke.io/assets/trend-banner.png" width="350px">
 </div>
 <div align=center>
 <a href="https://app.codecov.io/gh/pykeio/ort" target="_blank"><img alt="Coverage Results" src="https://img.shields.io/codecov/c/gh/pykeio/ort?style=for-the-badge"></a> <img alt="MSRV" src="https://img.shields.io/crates/msrv/ort?style=for-the-badge"> <img alt="ONNX Runtime" src="https://img.shields.io/badge/onnxruntime-v1.28.0-blue?style=for-the-badge&logo=cplusplus">

@@ -8,7 +8,7 @@
 #![cfg_attr(feature = "nightly", feature(f16))]
 
 //! <div align=center>
-//! 	<img src="https://parcel.pyke.io/v2/cdn/assetdelivery/ortrsv2/docs/trend-banner.png" width="350px">
+//! 	<img src="https://ort.pyke.io/assets/trend-banner.png" width="350px">
 //! 	<hr />
 //! </div>
 //!

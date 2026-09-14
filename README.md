@@ -48,6 +48,7 @@ When you need to deploy a PyTorch/TensorFlow/Keras/scikit-learn/PaddlePaddle mod
 - **[oar-ocr](https://github.com/GreatV/oar-ocr)** A comprehensive OCR library, built in Rust with `ort` for efficient inference.
 - **[`FastEmbed-rs`](https://github.com/Anush008/fastembed-rs)** uses `ort` for generating vector embeddings, reranking locally.
 - **[Ahnlich](https://github.com/deven96/ahnlich)** uses `ort` to power their AI proxy for semantic search applications.
+- **[nicegal](https://github.com/centuryofimage/nicegal)** is a desktop image gallery app that uses `ort` for OCR & semantic image search.
 - **[Murmure](https://github.com/Kieirra/murmure)** uses `ort` as its core engine, leveraging NVIDIA Parakeet to deliver fully local, free, private and cross‑platform Speech‑to‑Text enhanced with LLM post‑processing.
 - **[Valentinus](https://github.com/kn0sys/valentinus)** uses `ort` to provide embedding model inference inside LMDB.
 - **[SilentKeys](https://github.com/gptguy/silentkeys)** uses `ort` for fast, on-device real-time dictation with NVIDIA Parakeet and Silero VAD.

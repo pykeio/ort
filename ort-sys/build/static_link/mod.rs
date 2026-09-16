@@ -200,9 +200,14 @@ pub fn static_link(base_lib_dir: &Path) -> bool {
 					println!("cargo:rustc-link-lib=static={lib}");
 				}
 			}
-			// protobuf v30+ validates UTF-8 through utf8_range
-			optional_link_lib(&protobuf_build, "utf8_validity");
-			optional_link_lib(&protobuf_build, "utf8_range");
+			// protobuf v30+ validates UTF-8 through utf8_range, which lives in a subdirectory of its own build
+			let utf8_range_build = transform_dep(protobuf_build.join("third_party").join("utf8_range"), &profile);
+			for dir in [&utf8_range_build, &protobuf_build] {
+				if optional_link_lib(dir, "utf8_validity") {
+					optional_link_lib(dir, "utf8_range");
+					break;
+				}
+			}
 
 			add_search_dir(transform_dep(external_lib_dir.join("onnx-build"), &profile));
 			println!("cargo:rustc-link-lib=static=onnx");
@@ -348,6 +353,24 @@ pub fn static_link(base_lib_dir: &Path) -> bool {
 				println!("cargo:rustc-link-lib=static=absl_log_internal_message");
 				optional_link_lib(&abseil_lib_log_dir, "absl_log_internal_conditions");
 				optional_link_lib(&abseil_lib_log_dir, "absl_log_internal_fnmatch");
+			}
+
+			// ONNX Runtime v1.30+ links the 1DS SDK for telemetry on non-Windows platforms when
+			// `onnxruntime_USE_TELEMETRY` is enabled, which pulls in curl & mbedtls
+			{
+				let telemetry_dir = transform_dep(external_lib_dir.join("cpp_client_telemetry-build").join("lib"), &profile);
+				if optional_link_lib(&telemetry_dir, "mat") {
+					optional_link_lib(&telemetry_dir, "sqlite3_bundled");
+					optional_link_lib(&telemetry_dir, "zlib_bundled");
+					optional_link_lib(&transform_dep(external_lib_dir.join("onnxruntime_curl-build").join("lib"), &profile), "curl");
+					let mbedtls_dir = transform_dep(external_lib_dir.join("onnxruntime_mbedtls-build").join("library"), &profile);
+					optional_link_lib(&mbedtls_dir, "mbedtls");
+					optional_link_lib(&mbedtls_dir, "mbedx509");
+					optional_link_lib(&mbedtls_dir, "mbedcrypto");
+					let mbedtls_3rdparty = external_lib_dir.join("onnxruntime_mbedtls-build").join("3rdparty");
+					optional_link_lib(&transform_dep(mbedtls_3rdparty.join("everest"), &profile), "everest");
+					optional_link_lib(&transform_dep(mbedtls_3rdparty.join("p256-m"), &profile), "p256m");
+				}
 			}
 
 			// link static EPs if present

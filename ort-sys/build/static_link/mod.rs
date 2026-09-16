@@ -55,6 +55,11 @@ pub fn static_link_prerequisites(source: BinariesSource) {
 		}
 	}
 
+	if target_triple.contains("windows") {
+		// ONNX Runtime's Windows telemetry uses CommandLineToArgvW to search for svchost arguments since 1.30
+		println!("cargo:rustc-link-lib=shell32");
+	}
+
 	if let BinariesSource::Pyke { feature_set } = source {
 		if target_triple.contains("windows") {
 			// pyke libs always ship compiled with DirectML on Windows, so we need to link to DX12 libraries.

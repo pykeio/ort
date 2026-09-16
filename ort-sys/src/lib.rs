@@ -2059,7 +2059,13 @@ pub struct OrtApi {
 	#[cfg(feature = "api-28")]
 	pub GetExperimentalFunction: unsafe extern "system" fn(name: *const c_char) -> *const c_void,
 	#[cfg(feature = "api-28")]
-	pub KernelContext_GetSyncStream: unsafe extern "system" fn(context: *const OrtKernelContext, out: *mut *mut OrtSyncStream) -> OrtStatusPtr
+	pub KernelContext_GetSyncStream: unsafe extern "system" fn(context: *const OrtKernelContext, out: *mut *mut OrtSyncStream) -> OrtStatusPtr,
+	#[cfg(feature = "api-29")]
+	pub SessionOptionsSetWeightlessSourceModelBuffer:
+		unsafe extern "system" fn(options: *mut OrtSessionOptions, source_model_data: *const c_void, source_model_data_length: usize) -> OrtStatusPtr,
+	#[cfg(feature = "api-30")]
+	pub KernelContext_GetPreallocatedOutput:
+		unsafe extern "system" fn(context: *const OrtKernelContext, output_index: usize, output: *mut *mut OrtValue) -> OrtStatusPtr
 }
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]

@@ -129,4 +129,24 @@ impl SessionBuilder {
 	pub fn with_dynamic_block_base(self, size: u32) -> BuilderResult {
 		self.with_config_entry("session.dynamic_block_base", size.to_string())
 	}
+
+	/// Enable weightless mode, requesting that execution providers operate without embedding or copying constant
+	/// initializers.
+	///
+	/// Committing will fail if an execution provider does not support weightless mode.
+	///
+	/// This option is **disabled** by default. Requires ONNX Runtime v1.29 or later.
+	pub fn with_weightless(self) -> BuilderResult {
+		self.with_config_entry("ep.enable_weightless", "1")
+	}
+
+	/// Sets the path to the original (source) model when creating a session from a weightless EPContext model, so the
+	/// execution provider can load initializer data from it.
+	///
+	/// If not set, the path stored in the EPContext node's `onnx_model_filename` attribute is used.
+	///
+	/// Requires ONNX Runtime v1.29 or later.
+	pub fn with_ep_context_source_model_path(self, path: impl AsRef<str>) -> BuilderResult {
+		self.with_config_entry("ep.context_source_model_path", path)
+	}
 }

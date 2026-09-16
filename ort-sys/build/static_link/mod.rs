@@ -242,105 +242,75 @@ pub fn static_link(base_lib_dir: &Path) -> bool {
 			println!("cargo:rustc-link-lib=static=re2");
 
 			{
-				add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("debugging"), &profile));
+				// vcpkg flattens all of abseil's libraries into one directory, whereas a source build keeps each
+				// component in its own subdirectory
+				let absl_dir = |component: &str| {
+					if !has_vcpkg_link {
+						let dir = transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join(component), &profile);
+						add_search_dir(&dir);
+						dir
+					} else {
+						vcpkg_lib_dir.clone().unwrap()
+					}
+				};
+
+				absl_dir("debugging");
 				println!("cargo:rustc-link-lib=static=absl_examine_stack");
 				println!("cargo:rustc-link-lib=static=absl_debugging_internal");
 				println!("cargo:rustc-link-lib=static=absl_demangle_internal");
 				println!("cargo:rustc-link-lib=static=absl_demangle_rust");
 				println!("cargo:rustc-link-lib=static=absl_decode_rust_punycode");
 				println!("cargo:rustc-link-lib=static=absl_utf8_for_code_point");
-				add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("base"), &profile));
+				absl_dir("base");
 				println!("cargo:rustc-link-lib=static=absl_base");
 				println!("cargo:rustc-link-lib=static=absl_spinlock_wait");
 				println!("cargo:rustc-link-lib=static=absl_malloc_internal");
 				println!("cargo:rustc-link-lib=static=absl_strerror");
 				println!("cargo:rustc-link-lib=static=absl_raw_logging_internal");
 				println!("cargo:rustc-link-lib=static=absl_throw_delegate");
-				let absl_hash_dir = if !has_vcpkg_link {
-					let dir = transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("hash"), &profile);
-					add_search_dir(&dir);
-					dir
-				} else {
-					vcpkg_lib_dir.clone().unwrap()
-				};
+				let absl_hash_dir = absl_dir("hash");
 				println!("cargo:rustc-link-lib=static=absl_hash");
 				println!("cargo:rustc-link-lib=static=absl_city");
 				optional_link_lib(&absl_hash_dir, "absl_low_level_hash");
-				add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("container"), &profile));
+				absl_dir("container");
 				println!("cargo:rustc-link-lib=static=absl_hashtablez_sampler");
 				println!("cargo:rustc-link-lib=static=absl_raw_hash_set");
-				add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("synchronization"), &profile));
+				absl_dir("synchronization");
 				println!("cargo:rustc-link-lib=static=absl_kernel_timeout_internal");
 				println!("cargo:rustc-link-lib=static=absl_graphcycles_internal");
 				println!("cargo:rustc-link-lib=static=absl_synchronization");
-				add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("time"), &profile));
+				absl_dir("time");
 				println!("cargo:rustc-link-lib=static=absl_time_zone");
 				println!("cargo:rustc-link-lib=static=absl_time");
-				add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("numeric"), &profile));
+				absl_dir("numeric");
 				println!("cargo:rustc-link-lib=static=absl_int128");
-				let absl_status_dir = if !has_vcpkg_link {
-					let dir = transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("status"), &profile);
-					add_search_dir(&dir);
-					dir
-				} else {
-					vcpkg_lib_dir.clone().unwrap()
-				};
+				let absl_status_dir = absl_dir("status");
 				optional_link_lib(&absl_status_dir, "absl_statusor");
 				optional_link_lib(&absl_status_dir, "absl_status");
-				let absl_strings_dir = if !has_vcpkg_link {
-					let dir = transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("strings"), &profile);
-					add_search_dir(&dir);
-					dir
-				} else {
-					vcpkg_lib_dir.clone().unwrap()
-				};
+				let absl_strings_dir = absl_dir("strings");
 				optional_link_lib(&absl_strings_dir, "absl_cord");
 				optional_link_lib(&absl_strings_dir, "absl_cord_internal");
 				optional_link_lib(&absl_strings_dir, "absl_cordz_info");
 				optional_link_lib(&absl_strings_dir, "absl_cordz_handle");
 				optional_link_lib(&absl_strings_dir, "absl_cordz_functions");
-				let absl_crc_dir = if !has_vcpkg_link {
-					let dir = transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("crc"), &profile);
-					add_search_dir(&dir);
-					dir
-				} else {
-					vcpkg_lib_dir.clone().unwrap()
-				};
+				let absl_crc_dir = absl_dir("crc");
 				optional_link_lib(&absl_crc_dir, "absl_crc_cord_state");
 				optional_link_lib(&absl_crc_dir, "absl_crc32c");
 				optional_link_lib(&absl_crc_dir, "absl_crc_internal");
 				optional_link_lib(&absl_crc_dir, "absl_crc_cpu_detect");
-				let absl_profiling_dir = if !has_vcpkg_link {
-					let dir = transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("profiling"), &profile);
-					add_search_dir(&dir);
-					dir
-				} else {
-					vcpkg_lib_dir.clone().unwrap()
-				};
+				let absl_profiling_dir = absl_dir("profiling");
 				optional_link_lib(&absl_profiling_dir, "absl_exponential_biased");
-				let absl_debugging_dir = if !has_vcpkg_link {
-					let dir = transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("debugging"), &profile);
-					add_search_dir(&dir);
-					dir
-				} else {
-					vcpkg_lib_dir.clone().unwrap()
-				};
+				let absl_debugging_dir = absl_dir("debugging");
 				optional_link_lib(&absl_debugging_dir, "absl_leak_check");
-				add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("strings"), &profile));
+				absl_dir("strings");
 				println!("cargo:rustc-link-lib=static=absl_str_format_internal");
 				println!("cargo:rustc-link-lib=static=absl_strings");
 				println!("cargo:rustc-link-lib=static=absl_string_view");
 				println!("cargo:rustc-link-lib=static=absl_strings_internal");
-				add_search_dir(transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("debugging"), &profile));
+				absl_dir("debugging");
 				println!("cargo:rustc-link-lib=static=absl_symbolize");
 				println!("cargo:rustc-link-lib=static=absl_stacktrace");
-				let abseil_lib_log_dir = if !has_vcpkg_link {
-					let dir = transform_dep(external_lib_dir.join("abseil_cpp-build").join("absl").join("log"), &profile);
-					add_search_dir(&dir);
-					dir
-				} else {
-					vcpkg_lib_dir.clone().unwrap()
-				};
+				let abseil_lib_log_dir = absl_dir("log");
 				println!("cargo:rustc-link-lib=static=absl_log_globals");
 				println!("cargo:rustc-link-lib=static=absl_log_internal_format");
 				println!("cargo:rustc-link-lib=static=absl_log_internal_proto");

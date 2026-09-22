@@ -214,7 +214,7 @@ unsafe extern "system" fn SessionOptionsAppendExecutionProvider(
 		}
 		"WebGPU" => {
 			execution_providers.push(binding::ExecutionProvider::WebGPU {
-				preferred_layout: match options.get("ep.webgpuexecutionprovider.preferredLayout") {
+				preferred_layout: match options.get("preferredLayout") {
 					Some(&"NHWC") => Some(binding::WebGPUPreferredLayout::NHWC),
 					Some(&"NCHW") => Some(binding::WebGPUPreferredLayout::NCHW),
 					_ => None

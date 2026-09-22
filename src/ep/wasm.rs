@@ -1,29 +1,15 @@
-use core::ffi;
-
-use super::{ExecutionProvider, ExecutionProviderOptions};
-use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
+use super::{ExecutionProviderOptions, SimpleExecutionProvider};
 
 #[derive(Debug, Default, Clone)]
-pub struct WASM {
-	options: ExecutionProviderOptions
-}
+pub struct WASM(ExecutionProviderOptions);
 
 super::impl_ep!(arbitrary; WASM);
 
-impl ExecutionProvider for WASM {
-	fn name(&self) -> &'static str {
-		"WASMExecutionProvider"
-	}
+impl SimpleExecutionProvider for WASM {
+	const CANONICAL_NAME: &'static str = "WASMExecutionProvider";
+	const SHORT_NAME: &'static str = "WASM";
 
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
-		let ffi_options = self.options.to_ffi();
-		ortsys![unsafe SessionOptionsAppendExecutionProvider(
-			session_builder.ptr_mut(),
-			c"WASM".as_ptr().cast::<ffi::c_char>(),
-			ffi_options.key_ptrs(),
-			ffi_options.value_ptrs(),
-			ffi_options.len(),
-		)?];
-		Ok(())
+	fn options(&self) -> &ExecutionProviderOptions {
+		&self.0
 	}
 }

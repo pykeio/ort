@@ -5,83 +5,37 @@ use super::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderOptions};
 use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder, util};
 
 #[derive(Debug, Default, Clone)]
-pub struct ROCm {
-	options: ExecutionProviderOptions
-}
+pub struct ROCm(ExecutionProviderOptions);
 
 super::impl_ep!(arbitrary; ROCm);
 
 impl ROCm {
-	#[must_use]
-	pub fn with_device_id(mut self, device_id: i32) -> Self {
-		self.options.set("device_id", device_id.to_string());
-		self
-	}
+	super::define_options! {
+		pub fn with_device_id(mut self, device_id: i32) -> Self = "device_id";
 
-	#[must_use]
-	pub fn with_exhaustive_conv_search(mut self, enable: bool) -> Self {
-		self.options.set("miopen_conv_exhaustive_search", if enable { "1" } else { "0" });
-		self
-	}
+		pub fn with_exhaustive_conv_search(mut self, enable: bool) -> Self = "miopen_conv_exhaustive_search";
 
-	#[must_use]
-	pub fn with_conv_use_max_workspace(mut self, enable: bool) -> Self {
-		self.options.set("miopen_conv_use_max_workspace", if enable { "1" } else { "0" });
-		self
-	}
+		pub fn with_conv_use_max_workspace(mut self, enable: bool) -> Self = "miopen_conv_use_max_workspace";
 
-	#[must_use]
-	pub fn with_mem_limit(mut self, limit: usize) -> Self {
-		self.options.set("gpu_mem_limit", limit.to_string());
-		self
-	}
+		pub fn with_mem_limit(mut self, limit: usize) -> Self = "gpu_mem_limit";
 
-	#[must_use]
-	pub fn with_arena_extend_strategy(mut self, strategy: ArenaExtendStrategy) -> Self {
-		self.options.set(
-			"arena_extend_strategy",
-			match strategy {
-				ArenaExtendStrategy::NextPowerOfTwo => "kNextPowerOfTwo",
-				ArenaExtendStrategy::SameAsRequested => "kSameAsRequested"
-			}
-		);
-		self
-	}
+		pub fn with_arena_extend_strategy(mut self, strategy: ArenaExtendStrategy) -> Self = "arena_extend_strategy";
 
-	#[must_use]
-	pub fn with_copy_in_default_stream(mut self, enable: bool) -> Self {
-		self.options.set("do_copy_in_default_stream", if enable { "1" } else { "0" });
-		self
+		pub fn with_copy_in_default_stream(mut self, enable: bool) -> Self = "do_copy_in_default_stream";
+
+		pub fn with_hip_graph(mut self, enable: bool) -> Self = "enable_hip_graph";
+
+		pub fn with_tunable_op(mut self, enable: bool) -> Self = "tunable_op_enable";
+
+		pub fn with_tuning(mut self, enable: bool) -> Self = "tunable_op_tuning_enable";
+
+		pub fn with_max_tuning_duration(mut self, ms: i32) -> Self = "tunable_op_max_tuning_duration_ms";
 	}
 
 	#[must_use]
 	pub fn with_compute_stream(mut self, ptr: *mut c_void) -> Self {
-		self.options.set("has_user_compute_stream", "1");
-		self.options.set("user_compute_stream", (ptr as usize).to_string());
-		self
-	}
-
-	#[must_use]
-	pub fn with_hip_graph(mut self, enable: bool) -> Self {
-		self.options.set("enable_hip_graph", if enable { "1" } else { "0" });
-		self
-	}
-
-	#[must_use]
-	pub fn with_tunable_op(mut self, enable: bool) -> Self {
-		self.options.set("tunable_op_enable", if enable { "1" } else { "0" });
-		self
-	}
-
-	#[must_use]
-	pub fn with_tuning(mut self, enable: bool) -> Self {
-		self.options.set("tunable_op_tuning_enable", if enable { "1" } else { "0" });
-		self
-	}
-
-	#[must_use]
-	pub fn with_max_tuning_duration(mut self, ms: i32) -> Self {
-		self.options.set("tunable_op_max_tuning_duration_ms", ms.to_string());
+		self.0.set("has_user_compute_stream", "1");
+		self.0.set("user_compute_stream", (ptr as usize).to_string());
 		self
 	}
 }
@@ -98,7 +52,7 @@ impl ExecutionProvider for ROCm {
 			ortsys![unsafe ReleaseROCMProviderOptions(rocm_options)];
 		});
 
-		let ffi_options = self.options.to_ffi();
+		let ffi_options = self.0.to_ffi();
 		ortsys![unsafe UpdateROCMProviderOptions(
 			rocm_options,
 			ffi_options.key_ptrs(),

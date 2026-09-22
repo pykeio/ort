@@ -1,8 +1,6 @@
-use alloc::string::ToString;
 use core::num::NonZeroUsize;
 
-use super::{ExecutionProvider, ExecutionProviderOptions};
-use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
+use super::{ExecutionProviderOptions, SimpleExecutionProvider};
 
 /// [XNNPACK execution provider](https://onnxruntime.ai/docs/execution-providers/Xnnpack-ExecutionProvider.html) for
 /// ARM, x86, and WASM platforms.
@@ -27,44 +25,31 @@ use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 /// # }
 /// ```
 #[derive(Debug, Default, Clone)]
-pub struct XNNPACK {
-	options: ExecutionProviderOptions
-}
+pub struct XNNPACK(ExecutionProviderOptions);
 
 super::impl_ep!(arbitrary; XNNPACK);
 
 impl XNNPACK {
-	/// Configures the number of threads to use for XNNPACK's internal intra-op threadpool.
-	///
-	/// ```
-	/// # use core::num::NonZeroUsize;
-	/// # use ort::{ep, session::Session};
-	/// # fn main() -> ort::Result<()> {
-	/// let ep = ep::XNNPACK::default().with_intra_op_num_threads(NonZeroUsize::new(4).unwrap()).build();
-	/// # Ok(())
-	/// # }
-	/// ```
-	#[must_use]
-	pub fn with_intra_op_num_threads(mut self, num_threads: NonZeroUsize) -> Self {
-		self.options.set("intra_op_num_threads", num_threads.to_string());
-		self
+	super::define_options! {
+		/// Configures the number of threads to use for XNNPACK's internal intra-op threadpool.
+		///
+		/// ```
+		/// # use core::num::NonZeroUsize;
+		/// # use ort::{ep, session::Session};
+		/// # fn main() -> ort::Result<()> {
+		/// let ep = ep::XNNPACK::default().with_intra_op_num_threads(NonZeroUsize::new(4).unwrap()).build();
+		/// # Ok(())
+		/// # }
+		/// ```
+		pub fn with_intra_op_num_threads(mut self, num_threads: NonZeroUsize) -> Self = "intra_op_num_threads";
 	}
 }
 
-impl ExecutionProvider for XNNPACK {
-	fn name(&self) -> &'static str {
-		"XnnpackExecutionProvider"
-	}
+impl SimpleExecutionProvider for XNNPACK {
+	const SHORT_NAME: &'static str = "XNNPACK";
+	const CANONICAL_NAME: &'static str = "XnnpackExecutionProvider";
 
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
-		let ffi_options = self.options.to_ffi();
-		ortsys![unsafe SessionOptionsAppendExecutionProvider(
-			session_builder.ptr_mut(),
-			c"XNNPACK".as_ptr().cast::<core::ffi::c_char>(),
-			ffi_options.key_ptrs(),
-			ffi_options.value_ptrs(),
-			ffi_options.len(),
-		)?];
-		Ok(())
+	fn options(&self) -> &ExecutionProviderOptions {
+		&self.0
 	}
 }

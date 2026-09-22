@@ -29,6 +29,7 @@ use core::{
 #[cfg(feature = "api-22")]
 use crate::environment::{Environment, EnvironmentInner};
 use crate::{
+	AsPointer,
 	error::Result,
 	ortsys,
 	session::builder::SessionBuilder,
@@ -66,8 +67,43 @@ pub trait ExecutionProvider: Any + Send + Sync {
 /// Most execution providers have a small set of configuration options which don't change between ONNX Runtime releases;
 /// others, like the CUDA execution provider, often have options added that go undocumented and thus unimplemented by
 /// `ort`. This allows you to configure these options regardless.
-pub trait ArbitrarilyConfigurableExecutionProvider {
-	fn with_arbitrary_config(self, key: impl ToString, value: impl ToString) -> Self;
+pub trait ArbitrarilyConfigurableExecutionProvider: Sized {
+	fn options_mut(&mut self) -> &mut ExecutionProviderOptions;
+
+	fn with_arbitrary_config(mut self, key: impl ToString, value: impl ToString) -> Self {
+		self.options_mut().set(key.to_string(), value.to_string());
+		self
+	}
+}
+
+pub(crate) trait SimpleExecutionProvider: ArbitrarilyConfigurableExecutionProvider + Send + Sync + 'static {
+	const CANONICAL_NAME: &'static str;
+	const SHORT_NAME: &'static str;
+
+	fn options(&self) -> &ExecutionProviderOptions;
+}
+
+impl<E: SimpleExecutionProvider> ExecutionProvider for E {
+	fn name(&self) -> &'static str {
+		Self::CANONICAL_NAME
+	}
+
+	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+		let ffi_options = self.options().to_ffi();
+		ortsys![unsafe SessionOptionsAppendExecutionProvider(
+			session_builder.ptr_mut(),
+			// 1.22 lets us use canonical EP names instead of the weird short names. Prefer those for clarity.
+			if cfg!(feature = "api-22") {
+				Self::CANONICAL_NAME
+			} else {
+				Self::SHORT_NAME
+			}.as_ptr().cast::<core::ffi::c_char>(),
+			ffi_options.key_ptrs(),
+			ffi_options.value_ptrs(),
+			ffi_options.len(),
+		)?];
+		Ok(())
+	}
 }
 
 /// The strategy for extending the device memory arena.
@@ -78,6 +114,15 @@ pub enum ArenaExtendStrategy {
 	NextPowerOfTwo,
 	/// Memory extends by the requested amount.
 	SameAsRequested
+}
+
+impl fmt::Display for ArenaExtendStrategy {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			Self::NextPowerOfTwo => f.write_str("kNextPowerOfTwo"),
+			Self::SameAsRequested => f.write_str("kSameAsRequested")
+		}
+	}
 }
 
 /// Dynamic execution provider container, used to provide a list of multiple types of execution providers when
@@ -129,7 +174,7 @@ impl Debug for ExecutionProviderDispatch {
 }
 
 #[derive(Default, Debug, Clone)]
-pub(crate) struct ExecutionProviderOptions(MiniMap<CString, CString>);
+pub struct ExecutionProviderOptions(MiniMap<CString, CString>);
 
 impl ExecutionProviderOptions {
 	pub fn set(&mut self, key: impl Into<Vec<u8>>, value: impl Into<Vec<u8>>) {
@@ -138,7 +183,7 @@ impl ExecutionProviderOptions {
 	}
 
 	#[allow(unused)]
-	pub fn to_ffi(&self) -> ExecutionProviderOptionsFFI {
+	pub(crate) fn to_ffi(&self) -> ExecutionProviderOptionsFFI {
 		let (key_ptrs, value_ptrs) = self.0.iter().map(|(k, v)| (k.as_ptr(), v.as_ptr())).unzip();
 		ExecutionProviderOptionsFFI { key_ptrs, value_ptrs }
 	}
@@ -197,9 +242,8 @@ macro_rules! impl_ep {
 		$crate::ep::impl_ep!($symbol);
 
 		impl $crate::ep::ArbitrarilyConfigurableExecutionProvider for $symbol {
-			fn with_arbitrary_config(mut self, key: impl ::alloc::string::ToString, value: impl ::alloc::string::ToString) -> Self {
-				self.options.set(key.to_string(), value.to_string());
-				self
+			fn options_mut(&mut self) -> &mut $crate::ep::ExecutionProviderOptions {
+				&mut self.0
 			}
 		}
 	};
@@ -219,6 +263,26 @@ macro_rules! impl_ep {
 	};
 }
 pub(crate) use impl_ep;
+
+macro_rules! define_options {
+	($(
+        $(#[$attr:meta])*
+		$vis:vis fn $fn_name:ident(mut self, $arg_name:ident: $type:ty) -> Self = $opt_name:expr;
+	)*) => {
+		$(
+			$(#[$attr])*
+			#[must_use]
+			$vis fn $fn_name(mut self, $arg_name: $type) -> Self {
+				self.0.set($opt_name, define_options!(@to_str($arg_name: $type)));
+				self
+			}
+		)*
+	};
+
+	(@to_str($v:ident: bool)) => { if $v { "1" } else { "0" } };
+	(@to_str($v:ident: $ty:ty)) => { ::alloc::string::ToString::to_string(&($v)) };
+}
+pub(crate) use define_options;
 
 pub(crate) fn apply_execution_providers(session_builder: &mut SessionBuilder, eps: &[ExecutionProviderDispatch], source: &'static str) -> Result<()> {
 	fn register_inner(session_builder: &mut SessionBuilder, ep: &ExecutionProviderDispatch, #[allow(unused)] source: &'static str) -> Result<bool> {

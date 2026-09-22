@@ -1,5 +1,4 @@
-use super::{ExecutionProvider, ExecutionProviderOptions};
-use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
+use super::{ExecutionProviderOptions, SimpleExecutionProvider};
 
 /// [Azure Execution Provider](https://onnxruntime.ai/docs/execution-providers/Azure-ExecutionProvider.html) enables
 /// operators that invoke Azure cloud models.
@@ -66,26 +65,15 @@ use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 /// # }
 /// ```
 #[derive(Debug, Default, Clone)]
-pub struct Azure {
-	options: ExecutionProviderOptions
-}
+pub struct Azure(ExecutionProviderOptions);
 
 super::impl_ep!(arbitrary; Azure);
 
-impl ExecutionProvider for Azure {
-	fn name(&self) -> &'static str {
-		"AzureExecutionProvider"
-	}
+impl SimpleExecutionProvider for Azure {
+	const CANONICAL_NAME: &'static str = "AzureExecutionProvider";
+	const SHORT_NAME: &'static str = "AZURE";
 
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
-		let ffi_options = self.options.to_ffi();
-		ortsys![unsafe SessionOptionsAppendExecutionProvider(
-			session_builder.ptr_mut(),
-			c"AZURE".as_ptr().cast::<core::ffi::c_char>(),
-			ffi_options.key_ptrs(),
-			ffi_options.value_ptrs(),
-			ffi_options.len(),
-		)?];
-		Ok(())
+	fn options(&self) -> &ExecutionProviderOptions {
+		&self.0
 	}
 }

@@ -7,26 +7,22 @@ use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder, 
 /// Intel CPUs & iGPUs.
 #[derive(Debug, Default, Clone)]
 #[doc(alias = "DNNL")]
-pub struct OneDNN {
-	options: ExecutionProviderOptions
-}
+pub struct OneDNN(ExecutionProviderOptions);
 
 super::impl_ep!(arbitrary; OneDNN);
 
 impl OneDNN {
-	/// Enable/disable the usage of the arena allocator.
-	///
-	/// ```
-	/// # use ort::{ep, session::Session};
-	/// # fn main() -> ort::Result<()> {
-	/// let ep = ep::OneDNN::default().with_arena_allocator(true).build();
-	/// # Ok(())
-	/// # }
-	/// ```
-	#[must_use]
-	pub fn with_arena_allocator(mut self, enable: bool) -> Self {
-		self.options.set("use_arena", if enable { "1" } else { "0" });
-		self
+	super::define_options! {
+		/// Enable/disable the usage of the arena allocator.
+		///
+		/// ```
+		/// # use ort::{ep, session::Session};
+		/// # fn main() -> ort::Result<()> {
+		/// let ep = ep::OneDNN::default().with_arena_allocator(true).build();
+		/// # Ok(())
+		/// # }
+		/// ```
+		pub fn with_arena_allocator(mut self, enable: bool) -> Self = "use_arena";
 	}
 }
 
@@ -42,7 +38,7 @@ impl ExecutionProvider for OneDNN {
 			ortsys![unsafe ReleaseDnnlProviderOptions(dnnl_options)];
 		});
 
-		let ffi_options = self.options.to_ffi();
+		let ffi_options = self.0.to_ffi();
 		ortsys![unsafe UpdateDnnlProviderOptions(
 			dnnl_options,
 			ffi_options.key_ptrs(),

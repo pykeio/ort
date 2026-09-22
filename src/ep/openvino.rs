@@ -1,61 +1,54 @@
 use alloc::string::ToString;
 
-use super::{ExecutionProvider, ExecutionProviderOptions};
-use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
+use super::{ExecutionProviderOptions, SimpleExecutionProvider};
 
 /// [OpenVINO execution provider](https://onnxruntime.ai/docs/execution-providers/OpenVINO-ExecutionProvider.html) for
 /// Intel CPUs/GPUs/NPUs.
 #[derive(Default, Debug, Clone)]
-pub struct OpenVINO {
-	options: ExecutionProviderOptions
-}
+pub struct OpenVINO(ExecutionProviderOptions);
 
 super::impl_ep!(arbitrary; OpenVINO);
 
 impl OpenVINO {
-	/// Overrides the accelerator hardware type and precision.
-	///
-	/// `device_type` should be in the format `CPU`, `NPU`, `GPU`, `GPU.0`, `GPU.1`, etc. Heterogenous combinations are
-	/// also supported in the format `HETERO:NPU,GPU`.
-	///
-	/// ```
-	/// # use ort::{ep, session::Session};
-	/// # fn main() -> ort::Result<()> {
-	/// let ep = ep::OpenVINO::default().with_device_type("GPU.0").build();
-	/// # Ok(())
-	/// # }
-	/// ```
-	#[must_use]
-	pub fn with_device_type(mut self, device_type: impl AsRef<str>) -> Self {
-		self.options.set("device_type", device_type.as_ref());
-		self
+	super::define_options! {
+		/// Overrides the accelerator hardware type and precision.
+		///
+		/// `device_type` should be in the format `CPU`, `NPU`, `GPU`, `GPU.0`, `GPU.1`, etc. Heterogenous combinations are
+		/// also supported in the format `HETERO:NPU,GPU`.
+		///
+		/// ```
+		/// # use ort::{ep, session::Session};
+		/// # fn main() -> ort::Result<()> {
+		/// let ep = ep::OpenVINO::default().with_device_type("GPU.0").build();
+		/// # Ok(())
+		/// # }
+		/// ```
+		pub fn with_device_type(mut self, device_type: impl ToString) -> Self = "device_type";
+
+		/// Overrides the accelerator default value of number of threads with this value at runtime. If this option is not
+		/// explicitly set, default value of 8 is used during build time.
+		pub fn with_num_threads(mut self, num_threads: usize) -> Self = "num_of_threads";
+
+		/// Explicitly specify the path to save and load the blobs, enabling model caching.
+		pub fn with_cache_dir(mut self, dir: impl ToString) -> Self = "cache_dir";
+
+		pub fn with_num_streams(mut self, num_streams: u8) -> Self = "num_streams";
+
+		pub fn with_precision(mut self, precision: impl ToString) -> Self = "precision";
 	}
 
-	/// Overrides the accelerator default value of number of threads with this value at runtime. If this option is not
-	/// explicitly set, default value of 8 is used during build time.
-	#[must_use]
-	pub fn with_num_threads(mut self, num_threads: usize) -> Self {
-		self.options.set("num_of_threads", num_threads.to_string());
-		self
-	}
-
-	/// Explicitly specify the path to save and load the blobs, enabling model caching.
-	#[must_use]
-	pub fn with_cache_dir(mut self, dir: impl AsRef<str>) -> Self {
-		self.options.set("cache_dir", dir.as_ref());
-		self
-	}
+	// OpenVINO is the only EP that doesn't accept 1/0 for boolean options, so we have to define these separately
 
 	/// This option enables OpenCL queue throttling for GPU devices (reduces CPU utilization when using GPU).
 	#[must_use]
 	pub fn with_opencl_throttling(mut self, enable: bool) -> Self {
-		self.options.set("enable_opencl_throttling", if enable { "true" } else { "false" });
+		self.0.set("enable_opencl_throttling", if enable { "true" } else { "false" });
 		self
 	}
 
 	#[must_use]
 	pub fn with_qdq_optimizer(mut self, enable: bool) -> Self {
-		self.options.set("enable_qdq_optimizer", if enable { "true" } else { "false" });
+		self.0.set("enable_qdq_optimizer", if enable { "true" } else { "false" });
 		self
 	}
 
@@ -64,36 +57,16 @@ impl OpenVINO {
 	/// shaped images/data.
 	#[must_use]
 	pub fn with_dynamic_shapes(mut self, enable: bool) -> Self {
-		self.options.set("disable_dynamic_shapes", if enable { "false" } else { "true" });
-		self
-	}
-
-	#[must_use]
-	pub fn with_num_streams(mut self, num_streams: u8) -> Self {
-		self.options.set("num_streams", num_streams.to_string());
-		self
-	}
-
-	#[must_use]
-	pub fn with_precision(mut self, precision: impl AsRef<str>) -> Self {
-		self.options.set("precision", precision.as_ref());
+		self.0.set("disable_dynamic_shapes", if enable { "false" } else { "true" });
 		self
 	}
 }
 
-impl ExecutionProvider for OpenVINO {
-	fn name(&self) -> &'static str {
-		"OpenVINOExecutionProvider"
-	}
+impl SimpleExecutionProvider for OpenVINO {
+	const CANONICAL_NAME: &'static str = "OpenVINOExecutionProvider";
+	const SHORT_NAME: &'static str = "OpenVINO";
 
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
-		let ffi_options = self.options.to_ffi();
-		ortsys![unsafe SessionOptionsAppendExecutionProvider_OpenVINO_V2(
-			session_builder.ptr_mut(),
-			ffi_options.key_ptrs(),
-			ffi_options.value_ptrs(),
-			ffi_options.len()
-		)?];
-		Ok(())
+	fn options(&self) -> &ExecutionProviderOptions {
+		&self.0
 	}
 }

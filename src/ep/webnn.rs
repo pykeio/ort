@@ -1,8 +1,6 @@
-use alloc::string::ToString;
-use core::ffi;
+use core::fmt;
 
-use super::{ExecutionProvider, ExecutionProviderOptions};
-use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
+use super::{ExecutionProviderOptions, SimpleExecutionProvider};
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PowerPreference {
@@ -12,14 +10,13 @@ pub enum PowerPreference {
 	LowPower
 }
 
-impl PowerPreference {
-	#[must_use]
-	pub fn as_str(&self) -> &'static str {
-		match self {
+impl fmt::Display for PowerPreference {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.write_str(match self {
 			PowerPreference::Default => "default",
 			PowerPreference::HighPerformance => "high-performance",
 			PowerPreference::LowPower => "low-power"
-		}
+		})
 	}
 }
 
@@ -30,58 +27,36 @@ pub enum DeviceType {
 	NPU
 }
 
-impl DeviceType {
-	#[must_use]
-	pub fn as_str(&self) -> &'static str {
-		match self {
+impl fmt::Display for DeviceType {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.write_str(match self {
 			DeviceType::CPU => "cpu",
 			DeviceType::GPU => "gpu",
 			DeviceType::NPU => "npu"
-		}
+		})
 	}
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct WebNN {
-	options: ExecutionProviderOptions
-}
-
-impl WebNN {
-	#[must_use]
-	pub fn with_device_type(mut self, device_type: DeviceType) -> Self {
-		self.options.set("deviceType", device_type.as_str());
-		self
-	}
-
-	#[must_use]
-	pub fn with_power_preference(mut self, pref: PowerPreference) -> Self {
-		self.options.set("powerPreference", pref.as_str());
-		self
-	}
-
-	#[must_use]
-	pub fn with_threads(mut self, threads: u32) -> Self {
-		self.options.set("numThreads", threads.to_string());
-		self
-	}
-}
+pub struct WebNN(ExecutionProviderOptions);
 
 super::impl_ep!(arbitrary; WebNN);
 
-impl ExecutionProvider for WebNN {
-	fn name(&self) -> &'static str {
-		"WebNNExecutionProvider"
-	}
+impl WebNN {
+	super::define_options! {
+		pub fn with_device_type(mut self, device_type: DeviceType) -> Self = "deviceType";
 
-	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
-		let ffi_options = self.options.to_ffi();
-		ortsys![unsafe SessionOptionsAppendExecutionProvider(
-			session_builder.ptr_mut(),
-			c"WebNN".as_ptr().cast::<ffi::c_char>(),
-			ffi_options.key_ptrs(),
-			ffi_options.value_ptrs(),
-			ffi_options.len(),
-		)?];
-		Ok(())
+		pub fn with_power_preference(mut self, pref: PowerPreference) -> Self = "powerPreference";
+
+		pub fn with_threads(mut self, threads: u32) -> Self = "numThreads";
+	}
+}
+
+impl SimpleExecutionProvider for WebNN {
+	const CANONICAL_NAME: &'static str = "WebNNExecutionProvider";
+	const SHORT_NAME: &'static str = "WEBNN";
+
+	fn options(&self) -> &ExecutionProviderOptions {
+		&self.0
 	}
 }

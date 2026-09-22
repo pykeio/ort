@@ -1,5 +1,5 @@
 use alloc::string::ToString;
-use core::{ops::BitOr, ptr};
+use core::{fmt, ops::BitOr, ptr};
 
 use super::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderOptions};
 use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder, util};
@@ -45,6 +45,12 @@ impl BitOr for AttentionBackend {
 	}
 }
 
+impl fmt::Display for AttentionBackend {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		self.0.fmt(f)
+	}
+}
+
 /// The type of search done for cuDNN convolution algorithms.
 #[derive(Debug, Clone, Default)]
 pub enum ConvAlgorithmSearch {
@@ -76,243 +82,217 @@ pub enum ConvAlgorithmSearch {
 	Default
 }
 
+impl fmt::Display for ConvAlgorithmSearch {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.write_str(match self {
+			ConvAlgorithmSearch::Exhaustive => "EXHAUSTIVE",
+			ConvAlgorithmSearch::Heuristic => "HEURISTIC",
+			ConvAlgorithmSearch::Default => "DEFAULT"
+		})
+	}
+}
+
 /// [CUDA execution provider](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html) for NVIDIA
 /// CUDA-enabled GPUs.
 #[derive(Debug, Default, Clone)]
-pub struct CUDA {
-	options: ExecutionProviderOptions
-}
+pub struct CUDA(ExecutionProviderOptions);
 
 super::impl_ep!(arbitrary; CUDA);
 
 impl CUDA {
-	/// Configures which device the EP should use.
-	///
-	/// ```
-	/// # use ort::{ep, session::Session};
-	/// # fn main() -> ort::Result<()> {
-	/// let ep = ep::CUDA::default().with_device_id(0).build();
-	/// # Ok(())
-	/// # }
-	/// ```
-	#[must_use]
-	pub fn with_device_id(mut self, device_id: i32) -> Self {
-		self.options.set("device_id", device_id.to_string());
-		self
-	}
+	super::define_options! {
+		/// Configures which device the EP should use.
+		///
+		/// ```
+		/// # use ort::{ep, session::Session};
+		/// # fn main() -> ort::Result<()> {
+		/// let ep = ep::CUDA::default().with_device_id(0).build();
+		/// # Ok(())
+		/// # }
+		/// ```
+		pub fn with_device_id(mut self, device_id: i32) -> Self = "device_id";
 
-	/// Configure the size limit of the device memory arena in bytes.
-	///
-	/// This only controls how much memory can be allocated to the *arena* - actual memory usage may be higher due to
-	/// internal CUDA allocations, like those required for different [`ConvAlgorithmSearch`] options.
-	///
-	/// ```
-	/// # use ort::{ep, session::Session};
-	/// # fn main() -> ort::Result<()> {
-	/// let ep = ep::CUDA::default().with_memory_limit(2 * 1024 * 1024 * 1024).build();
-	/// # Ok(())
-	/// # }
-	/// ```
-	#[must_use]
-	pub fn with_memory_limit(mut self, limit: usize) -> Self {
-		self.options.set("gpu_mem_limit", limit.to_string());
-		self
-	}
+		/// Configure the size limit of the device memory arena in bytes.
+		///
+		/// This only controls how much memory can be allocated to the *arena* - actual memory usage may be higher due to
+		/// internal CUDA allocations, like those required for different [`ConvAlgorithmSearch`] options.
+		///
+		/// ```
+		/// # use ort::{ep, session::Session};
+		/// # fn main() -> ort::Result<()> {
+		/// let ep = ep::CUDA::default().with_memory_limit(2 * 1024 * 1024 * 1024).build();
+		/// # Ok(())
+		/// # }
+		/// ```
+		pub fn with_memory_limit(mut self, limit: usize) -> Self = "gpu_mem_limit";
 
-	/// Configure the strategy for extending the device's memory arena.
-	///
-	/// ```
-	/// # use ort::{ep::{self, ArenaExtendStrategy}, session::Session};
-	/// # fn main() -> ort::Result<()> {
-	/// let ep = ep::CUDA::default()
-	/// 	.with_arena_extend_strategy(ArenaExtendStrategy::SameAsRequested)
-	/// 	.build();
-	/// # Ok(())
-	/// # }
-	/// ```
-	#[must_use]
-	pub fn with_arena_extend_strategy(mut self, strategy: ArenaExtendStrategy) -> Self {
-		self.options.set(
-			"arena_extend_strategy",
-			match strategy {
-				ArenaExtendStrategy::NextPowerOfTwo => "kNextPowerOfTwo",
-				ArenaExtendStrategy::SameAsRequested => "kSameAsRequested"
-			}
-		);
-		self
-	}
+		/// Configure the strategy for extending the device's memory arena.
+		///
+		/// ```
+		/// # use ort::{ep::{self, ArenaExtendStrategy}, session::Session};
+		/// # fn main() -> ort::Result<()> {
+		/// let ep = ep::CUDA::default()
+		/// 	.with_arena_extend_strategy(ArenaExtendStrategy::SameAsRequested)
+		/// 	.build();
+		/// # Ok(())
+		/// # }
+		/// ```
+		pub fn with_arena_extend_strategy(mut self, strategy: ArenaExtendStrategy) -> Self = "arena_extend_strategy";
 
-	/// Controls the search mode used to select a kernel for `Conv` nodes.
-	///
-	/// cuDNN, the library used by ONNX Runtime's CUDA EP for many operations, provides many different implementations
-	/// of the `Conv` node. Each of these implementations has different performance characteristics depending on the
-	/// exact hardware and model/input size used. This option controls how cuDNN should determine which implementation
-	/// to use.
-	///
-	/// The default search algorithm, [`Exhaustive`][exh], will benchmark all available implementations and use the most
-	/// performant one. This option is very resource intensive (both computationally on first run and peak-memory-wise),
-	/// but ensures best performance. It is roughly equivalent to setting `torch.backends.cudnn.benchmark = True` with
-	/// PyTorch. See also [`CUDA::with_conv_max_workspace`] to configure how much memory the exhaustive
-	/// search can use (the default is unlimited).
-	///
-	/// A less resource-intensive option is [`Heuristic`][heu]. Rather than benchmarking every implementation,
-	/// an optimal implementation is chosen based on a set of heuristics, thus saving compute. [`Heuristic`][heu] should
-	/// generally choose an optimal convolution algorithm, except in some corner cases.
-	///
-	/// [`Default`][def] can also be passed to instruct cuDNN to always use the default implementation (which is rarely
-	/// the most optimal). Note that the "Default" here refers to the **default convolution algorithm** being used, it
-	/// is not the *default behavior* (that would be [`Exhaustive`][exh]).
-	///
-	/// ```
-	/// # use ort::{ep, session::Session};
-	/// # fn main() -> ort::Result<()> {
-	/// let ep = ep::CUDA::default()
-	/// 	.with_conv_algorithm_search(ep::cuda::ConvAlgorithmSearch::Heuristic)
-	/// 	.build();
-	/// # Ok(())
-	/// # }
-	/// ```
-	///
-	/// [exh]: ConvAlgorithmSearch::Exhaustive
-	/// [heu]: ConvAlgorithmSearch::Heuristic
-	/// [def]: ConvAlgorithmSearch::Default
-	#[must_use]
-	pub fn with_conv_algorithm_search(mut self, search: ConvAlgorithmSearch) -> Self {
-		self.options.set(
-			"cudnn_conv_algo_search",
-			match search {
-				ConvAlgorithmSearch::Exhaustive => "EXHAUSTIVE",
-				ConvAlgorithmSearch::Heuristic => "HEURISTIC",
-				ConvAlgorithmSearch::Default => "DEFAULT"
-			}
-		);
-		self
-	}
+		/// Controls the search mode used to select a kernel for `Conv` nodes.
+		///
+		/// cuDNN, the library used by ONNX Runtime's CUDA EP for many operations, provides many different implementations
+		/// of the `Conv` node. Each of these implementations has different performance characteristics depending on the
+		/// exact hardware and model/input size used. This option controls how cuDNN should determine which implementation
+		/// to use.
+		///
+		/// The default search algorithm, [`Exhaustive`][exh], will benchmark all available implementations and use the most
+		/// performant one. This option is very resource intensive (both computationally on first run and peak-memory-wise),
+		/// but ensures best performance. It is roughly equivalent to setting `torch.backends.cudnn.benchmark = True` with
+		/// PyTorch. See also [`CUDA::with_conv_max_workspace`] to configure how much memory the exhaustive
+		/// search can use (the default is unlimited).
+		///
+		/// A less resource-intensive option is [`Heuristic`][heu]. Rather than benchmarking every implementation,
+		/// an optimal implementation is chosen based on a set of heuristics, thus saving compute. [`Heuristic`][heu] should
+		/// generally choose an optimal convolution algorithm, except in some corner cases.
+		///
+		/// [`Default`][def] can also be passed to instruct cuDNN to always use the default implementation (which is rarely
+		/// the most optimal). Note that the "Default" here refers to the **default convolution algorithm** being used, it
+		/// is not the *default behavior* (that would be [`Exhaustive`][exh]).
+		///
+		/// ```
+		/// # use ort::{ep, session::Session};
+		/// # fn main() -> ort::Result<()> {
+		/// let ep = ep::CUDA::default()
+		/// 	.with_conv_algorithm_search(ep::cuda::ConvAlgorithmSearch::Heuristic)
+		/// 	.build();
+		/// # Ok(())
+		/// # }
+		/// ```
+		///
+		/// [exh]: ConvAlgorithmSearch::Exhaustive
+		/// [heu]: ConvAlgorithmSearch::Heuristic
+		/// [def]: ConvAlgorithmSearch::Default
+		pub fn with_conv_algorithm_search(mut self, search: ConvAlgorithmSearch) -> Self = "cudnn_conv_algo_search";
 
-	/// Configure whether the [`Exhaustive`][ConvAlgorithmSearch::Exhaustive] search can use as much memory as it
-	/// needs.
-	///
-	/// The default is `true`. When `false`, the memory used for the search is limited to 32 MB, which will impact its
-	/// ability to find an optimal convolution algorithm.
-	///
-	/// ```
-	/// # use ort::{ep, session::Session};
-	/// # fn main() -> ort::Result<()> {
-	/// let ep = ep::CUDA::default().with_conv_max_workspace(false).build();
-	/// # Ok(())
-	/// # }
-	/// ```
-	#[must_use]
-	pub fn with_conv_max_workspace(mut self, enable: bool) -> Self {
-		self.options.set("cudnn_conv_use_max_workspace", if enable { "1" } else { "0" });
-		self
-	}
+		/// Configure whether the [`Exhaustive`][ConvAlgorithmSearch::Exhaustive] search can use as much memory as it
+		/// needs.
+		///
+		/// The default is `true`. When `false`, the memory used for the search is limited to 32 MB, which will impact its
+		/// ability to find an optimal convolution algorithm.
+		///
+		/// ```
+		/// # use ort::{ep, session::Session};
+		/// # fn main() -> ort::Result<()> {
+		/// let ep = ep::CUDA::default().with_conv_max_workspace(false).build();
+		/// # Ok(())
+		/// # }
+		/// ```
+		pub fn with_conv_max_workspace(mut self, enable: bool) -> Self = "cudnn_conv_use_max_workspace";
 
-	// Here once lied `do_copy_in_default_stream`. After reading through upstream it doesn't seem like this option is
-	// used anymore, so the setter here was removed to reduce confusion.
+		// Here once lied `do_copy_in_default_stream`. After reading through upstream it doesn't seem like this option is
+		// used anymore, so the setter here was removed to reduce confusion.
 
-	/// Configure whether or not to pad 3-dimensional convolutions to `[N, C, 1, D]` (as opposed to the default `[N, C,
-	/// D, 1]`).
-	///
-	/// Enabling this option might significantly improve performance on devices like the A100. This does not affect
-	/// convolution operations that do not use 3-dimensional input shapes, or the *result* of such operations.
-	///
-	/// ```
-	/// # use ort::{ep, session::Session};
-	/// # fn main() -> ort::Result<()> {
-	/// let ep = ep::CUDA::default().with_conv1d_pad_to_nc1d(true).build();
-	/// # Ok(())
-	/// # }
-	/// ```
-	#[must_use]
-	pub fn with_conv1d_pad_to_nc1d(mut self, enable: bool) -> Self {
-		self.options.set("cudnn_conv1d_pad_to_nc1d", if enable { "1" } else { "0" });
-		self
-	}
+		/// Configure whether or not to pad 3-dimensional convolutions to `[N, C, 1, D]` (as opposed to the default `[N, C,
+		/// D, 1]`).
+		///
+		/// Enabling this option might significantly improve performance on devices like the A100. This does not affect
+		/// convolution operations that do not use 3-dimensional input shapes, or the *result* of such operations.
+		///
+		/// ```
+		/// # use ort::{ep, session::Session};
+		/// # fn main() -> ort::Result<()> {
+		/// let ep = ep::CUDA::default().with_conv1d_pad_to_nc1d(true).build();
+		/// # Ok(())
+		/// # }
+		/// ```
+		pub fn with_conv1d_pad_to_nc1d(mut self, enable: bool) -> Self = "cudnn_conv1d_pad_to_nc1d";
 
-	/// Configures whether to create a CUDA graph.
-	///
-	/// CUDA graphs eliminate the overhead of launching kernels sequentially by capturing the launch sequence into a
-	/// graph that is 'replayed' across runs, reducing CPU overhead and possibly improving performance.
-	///
-	/// Using CUDA graphs comes with limitations, notably:
-	/// - Models with control flow operators (like `If`, `Loop`, or `Scan`) are not supported.
-	/// - Input/output shapes cannot change across inference calls.
-	/// - The address of inputs/outputs cannot change across inference calls, so
-	///   [`IoBinding`](crate::session::IoBinding) must be used.
-	/// - `Session`s using CUDA graphs are technically not `Send` or `Sync`.
-	///
-	/// Consult the [ONNX Runtime documentation on CUDA graphs](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#using-cuda-graphs-preview) for more information.
-	///
-	/// ```
-	/// # use ort::{ep, session::Session};
-	/// # fn main() -> ort::Result<()> {
-	/// let ep = ep::CUDA::default().with_cuda_graph(true).build();
-	/// # Ok(())
-	/// # }
-	/// ```
-	#[must_use]
-	pub fn with_cuda_graph(mut self, enable: bool) -> Self {
-		self.options.set("enable_cuda_graph", if enable { "1" } else { "0" });
-		self
-	}
+		/// Configures whether to create a CUDA graph.
+		///
+		/// CUDA graphs eliminate the overhead of launching kernels sequentially by capturing the launch sequence into a
+		/// graph that is 'replayed' across runs, reducing CPU overhead and possibly improving performance.
+		///
+		/// Using CUDA graphs comes with limitations, notably:
+		/// - Models with control flow operators (like `If`, `Loop`, or `Scan`) are not supported.
+		/// - Input/output shapes cannot change across inference calls.
+		/// - The address of inputs/outputs cannot change across inference calls, so
+		///   [`IoBinding`](crate::session::IoBinding) must be used.
+		/// - `Session`s using CUDA graphs are technically not `Send` or `Sync`.
+		///
+		/// Consult the [ONNX Runtime documentation on CUDA graphs](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#using-cuda-graphs-preview) for more information.
+		///
+		/// ```
+		/// # use ort::{ep, session::Session};
+		/// # fn main() -> ort::Result<()> {
+		/// let ep = ep::CUDA::default().with_cuda_graph(true).build();
+		/// # Ok(())
+		/// # }
+		/// ```
+		pub fn with_cuda_graph(mut self, enable: bool) -> Self = "enable_cuda_graph";
 
-	/// Enable 'strict' mode for `SkipLayerNorm` nodes (created via fusion of `Add` & `LayerNorm` nodes).
-	///
-	/// `SkipLayerNorm`'s strict mode trades performance for accuracy. The default is `false` (strict mode disabled).
-	///
-	/// ```
-	/// # use ort::{ep, session::Session};
-	/// # fn main() -> ort::Result<()> {
-	/// let ep = ep::CUDA::default().with_skip_layer_norm_strict_mode(true).build();
-	/// # Ok(())
-	/// # }
-	/// ```
-	#[must_use]
-	pub fn with_skip_layer_norm_strict_mode(mut self, enable: bool) -> Self {
-		self.options.set("enable_skip_layer_norm_strict_mode", if enable { "1" } else { "0" });
-		self
-	}
+		/// Enable 'strict' mode for `SkipLayerNorm` nodes (created via fusion of `Add` & `LayerNorm` nodes).
+		///
+		/// `SkipLayerNorm`'s strict mode trades performance for accuracy. The default is `false` (strict mode disabled).
+		///
+		/// ```
+		/// # use ort::{ep, session::Session};
+		/// # fn main() -> ort::Result<()> {
+		/// let ep = ep::CUDA::default().with_skip_layer_norm_strict_mode(true).build();
+		/// # Ok(())
+		/// # }
+		/// ```
+		pub fn with_skip_layer_norm_strict_mode(mut self, enable: bool) -> Self = "enable_skip_layer_norm_strict_mode";
 
-	/// Enable the usage of the reduced-precision [TensorFloat-32](https://blogs.nvidia.com/blog/tensorfloat-32-precision-format/)
-	/// format for matrix multiplications & convolutions.
-	///
-	/// TensorFloat-32 is a reduced-precision floating point format available on NVIDIA GPUs since the Ampere
-	/// microarchitecture. It allows `MatMul` & `Conv` to run much faster on Ampere's Tensor cores. This option is
-	/// **disabled** by default.
-	///
-	/// This option is roughly equivalent to `torch.backends.cudnn.allow_tf32 = True` &
-	/// `torch.backends.cuda.matmul.allow_tf32 = True` or `torch.set_float32_matmul_precision("medium")` in PyTorch.
-	///
-	/// ```
-	/// # use ort::{ep, session::Session};
-	/// # fn main() -> ort::Result<()> {
-	/// let ep = ep::CUDA::default().with_tf32(true).build();
-	/// # Ok(())
-	/// # }
-	/// ```
-	#[must_use]
-	pub fn with_tf32(mut self, enable: bool) -> Self {
-		self.options.set("use_tf32", if enable { "1" } else { "0" });
-		self
-	}
+		/// Enable the usage of the reduced-precision [TensorFloat-32](https://blogs.nvidia.com/blog/tensorfloat-32-precision-format/)
+		/// format for matrix multiplications & convolutions.
+		///
+		/// TensorFloat-32 is a reduced-precision floating point format available on NVIDIA GPUs since the Ampere
+		/// microarchitecture. It allows `MatMul` & `Conv` to run much faster on Ampere's Tensor cores. This option is
+		/// **disabled** by default.
+		///
+		/// This option is roughly equivalent to `torch.backends.cudnn.allow_tf32 = True` &
+		/// `torch.backends.cuda.matmul.allow_tf32 = True` or `torch.set_float32_matmul_precision("medium")` in PyTorch.
+		///
+		/// ```
+		/// # use ort::{ep, session::Session};
+		/// # fn main() -> ort::Result<()> {
+		/// let ep = ep::CUDA::default().with_tf32(true).build();
+		/// # Ok(())
+		/// # }
+		/// ```
+		pub fn with_tf32(mut self, enable: bool) -> Self = "use_tf32";
 
-	/// Configure whether to prefer `[N, H, W, C]` layout operations over the default `[N, C, H, W]` layout.
-	///
-	/// Tensor cores usually operate more efficiently with the NHWC layout, so enabling this option for
-	/// convolution-heavy models on Tensor core-enabled GPUs may provide a significant performance improvement.
-	///
-	/// ```
-	/// # use ort::{ep, session::Session};
-	/// # fn main() -> ort::Result<()> {
-	/// let ep = ep::CUDA::default().with_prefer_nhwc(true).build();
-	/// # Ok(())
-	/// # }
-	/// ```
-	#[must_use]
-	pub fn with_prefer_nhwc(mut self, enable: bool) -> Self {
-		self.options.set("prefer_nhwc", if enable { "1" } else { "0" });
-		self
+		/// Configure whether to prefer `[N, H, W, C]` layout operations over the default `[N, C, H, W]` layout.
+		///
+		/// Tensor cores usually operate more efficiently with the NHWC layout, so enabling this option for
+		/// convolution-heavy models on Tensor core-enabled GPUs may provide a significant performance improvement.
+		///
+		/// ```
+		/// # use ort::{ep, session::Session};
+		/// # fn main() -> ort::Result<()> {
+		/// let ep = ep::CUDA::default().with_prefer_nhwc(true).build();
+		/// # Ok(())
+		/// # }
+		/// ```
+		pub fn with_prefer_nhwc(mut self, enable: bool) -> Self = "prefer_nhwc";
+
+		/// Configures the available backends used for `Attention` nodes.
+		///
+		/// ```
+		/// # use ort::{ep, session::Session};
+		/// # fn main() -> ort::Result<()> {
+		/// let ep = ep::CUDA::default()
+		/// 	.with_attention_backend(
+		/// 		ep::cuda::AttentionBackend::FLASH_ATTENTION | ep::cuda::AttentionBackend::TRT_FUSED_ATTENTION
+		/// 	)
+		/// 	.build();
+		/// # Ok(())
+		/// # }
+		/// ```
+		pub fn with_attention_backend(mut self, flags: AttentionBackend) -> Self = "sdpa_kernel";
+
+		pub fn with_fuse_conv_bias(mut self, enable: bool) -> Self = "fuse_conv_bias";
 	}
 
 	/// Use a custom CUDA device stream rather than the default one.
@@ -321,33 +301,8 @@ impl CUDA {
 	/// The provided `stream` must outlive the environment/session configured to use this execution provider.
 	#[must_use]
 	pub unsafe fn with_compute_stream(mut self, stream: *mut ()) -> Self {
-		self.options.set("has_user_compute_stream", "1");
-		self.options.set("user_compute_stream", (stream as usize).to_string());
-		self
-	}
-
-	/// Configures the available backends used for `Attention` nodes.
-	///
-	/// ```
-	/// # use ort::{ep, session::Session};
-	/// # fn main() -> ort::Result<()> {
-	/// let ep = ep::CUDA::default()
-	/// 	.with_attention_backend(
-	/// 		ep::cuda::AttentionBackend::FLASH_ATTENTION | ep::cuda::AttentionBackend::TRT_FUSED_ATTENTION
-	/// 	)
-	/// 	.build();
-	/// # Ok(())
-	/// # }
-	/// ```
-	#[must_use]
-	pub fn with_attention_backend(mut self, flags: AttentionBackend) -> Self {
-		self.options.set("sdpa_kernel", flags.0.to_string());
-		self
-	}
-
-	#[must_use]
-	pub fn with_fuse_conv_bias(mut self, enable: bool) -> Self {
-		self.options.set("fuse_conv_bias", if enable { "1" } else { "0" });
+		self.0.set("has_user_compute_stream", "1");
+		self.0.set("user_compute_stream", (stream as usize).to_string());
 		self
 	}
 
@@ -367,7 +322,7 @@ impl ExecutionProvider for CUDA {
 			ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
 		});
 
-		let ffi_options = self.options.to_ffi();
+		let ffi_options = self.0.to_ffi();
 		ortsys![unsafe UpdateCUDAProviderOptions(
 			cuda_options,
 			ffi_options.key_ptrs(),

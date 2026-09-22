@@ -1,45 +1,9 @@
-use std::{env, path::Path, process::Command};
+use std::{env, path::Path};
 
 use crate::{
 	log,
 	vars::{self}
 };
-
-pub fn macos_rtlib_search_dir() -> Option<String> {
-	let output = Command::new(vars::get("CC").unwrap_or_else(|| "clang".to_string()))
-		.arg("--print-search-dirs")
-		.output()
-		.ok()?;
-	if !output.status.success() {
-		log::warning!("couldn't determine macOS rtlib dir: failed to run `$CC --print-search-dirs` (exit code {:?})", output.status.code());
-		return None;
-	}
-
-	let stdout = String::from_utf8_lossy(&output.stdout);
-	for line in stdout.lines() {
-		if line.contains("libraries: =") {
-			let path = line.split('=').nth(1)?;
-			if !path.is_empty() && Path::new(path).is_dir() {
-				return Some(format!("{path}/lib/darwin"));
-			}
-		}
-	}
-
-	log::warning!("couldn't determine macOS rtlib dir: invalid output");
-
-	None
-}
-
-pub fn ios_rtlib_search_dir() -> Option<String> {
-	let output = Command::new("xcrun").args(["clang", "--print-resource-dir"]).output().ok()?;
-	if !output.status.success() {
-		log::warning!("couldn't determine iOS rtlib dir: failed to run `xcrun clang --print-resource-dir` (exit code {:?})", output.status.code());
-		return None;
-	}
-
-	let resource_dir = String::from_utf8_lossy(&output.stdout).trim().to_string();
-	Some(format!("{}/lib/darwin", resource_dir)).take_if(|p| Path::new(p).is_dir())
-}
 
 fn search_and_link_frameworks_in_sub_dir(sub_dir: &str) -> bool {
 	let Some(xcfwk_dir) = vars::get_any(vars::IOS_ONNX_XCFWK_PATH) else {

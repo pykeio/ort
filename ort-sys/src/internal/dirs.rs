@@ -182,13 +182,13 @@ fn cache_dir_default() -> Option<PathBuf> {
 		.or_else(|| self::unix::home_dir().map(|h| h.join(".cache").join(PYKE_ROOT)))
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(target_vendor = "apple")]
 #[must_use]
 fn cache_dir_default() -> Option<PathBuf> {
 	self::unix::home_dir().map(|h| h.join("Library/Caches").join(PYKE_ROOT))
 }
 
-#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+#[cfg(not(any(target_os = "windows", target_os = "linux", target_vendor = "apple")))]
 fn cache_dir_default() -> Option<PathBuf> {
 	None
 }

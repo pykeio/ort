@@ -526,7 +526,7 @@ impl<'a> MemoryInfo<'a> {
 	}
 
 	pub fn to_owned(&self) -> MemoryInfo<'static> {
-		MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default).expect("failed to create default memory info")
+		MemoryInfo::new(self.allocation_device(), self.device_id(), self.allocator_type(), self.memory_type()).expect("failed to clone memory info")
 	}
 }
 
@@ -538,7 +538,7 @@ impl Default for MemoryInfo<'_> {
 
 impl Clone for MemoryInfo<'_> {
 	fn clone(&self) -> Self {
-		MemoryInfo::new(self.allocation_device(), self.device_id(), self.allocator_type(), self.memory_type()).expect("failed to clone memory info")
+		self.to_owned()
 	}
 }
 
@@ -576,6 +576,7 @@ mod tests {
 		let a = MemoryInfo::new(AllocationDevice::CUDA, 1, AllocatorType::Device, MemoryType::Default)?;
 		let b = MemoryInfo::new(AllocationDevice::CUDA, 1, AllocatorType::Device, MemoryType::Default)?;
 		assert_eq!(a, b);
+		assert_eq!(a.to_owned(), a);
 		let c = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?;
 		assert_ne!(a, c);
 		Ok(())

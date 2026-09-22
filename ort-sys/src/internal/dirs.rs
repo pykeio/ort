@@ -101,91 +101,24 @@ fn cache_dir_default() -> Option<PathBuf> {
 	self::windows::known_folder_local_app_data().map(|h| h.join(PYKE_ROOT))
 }
 
-#[cfg(unix)]
-#[allow(non_camel_case_types)]
-mod unix {
-	use std::{
-		env,
-		ffi::{CStr, OsString, c_char, c_int, c_long},
-		mem,
-		os::unix::prelude::OsStringExt,
-		path::PathBuf,
-		ptr
-	};
-
-	type uid_t = u32;
-	type gid_t = u32;
-	type size_t = usize;
-	#[repr(C)]
-	struct passwd {
-		pub pw_name: *mut c_char,
-		pub pw_passwd: *mut c_char,
-		pub pw_uid: uid_t,
-		pub pw_gid: gid_t,
-		pub pw_gecos: *mut c_char,
-		pub pw_dir: *mut c_char,
-		pub pw_shell: *mut c_char
-	}
-
-	unsafe extern "C" {
-		fn sysconf(name: c_int) -> c_long;
-		fn getpwuid_r(uid: uid_t, pwd: *mut passwd, buf: *mut c_char, buflen: size_t, result: *mut *mut passwd) -> c_int;
-		fn getuid() -> uid_t;
-	}
-
-	const SC_GETPW_R_SIZE_MAX: c_int = 70;
-
-	#[must_use]
-	pub fn is_absolute_path(path: OsString) -> Option<PathBuf> {
-		let path = PathBuf::from(path);
-		if path.is_absolute() { Some(path) } else { None }
-	}
-
-	#[cfg(not(target_os = "windows"))]
-	#[must_use]
-	pub fn home_dir() -> Option<PathBuf> {
-		return env::var_os("HOME")
-			.and_then(|h| if h.is_empty() { None } else { Some(h) })
-			.or_else(|| unsafe { fallback() })
-			.map(PathBuf::from);
-
-		#[cfg(any(target_os = "android", target_os = "ios", target_os = "emscripten"))]
-		unsafe fn fallback() -> Option<OsString> {
-			None
-		}
-		#[cfg(not(any(target_os = "android", target_os = "ios", target_os = "emscripten")))]
-		unsafe fn fallback() -> Option<OsString> {
-			let amt = match unsafe { sysconf(SC_GETPW_R_SIZE_MAX) } {
-				n if n < 0 => 512,
-				n => n as usize
-			};
-			let mut buf = Vec::with_capacity(amt);
-			let mut passwd: passwd = unsafe { mem::zeroed() };
-			let mut result = ptr::null_mut();
-			match unsafe { getpwuid_r(getuid(), &mut passwd, buf.as_mut_ptr(), buf.capacity(), &mut result) } {
-				0 if !result.is_null() => {
-					let ptr = passwd.pw_dir as *const _;
-					let bytes = unsafe { CStr::from_ptr(ptr) }.to_bytes();
-					if bytes.is_empty() { None } else { Some(OsStringExt::from_vec(bytes.to_vec())) }
-				}
-				_ => None
-			}
-		}
-	}
+#[cfg(target_os = "linux")]
+fn is_absolute_path(path: std::ffi::OsString) -> Option<PathBuf> {
+	let path = PathBuf::from(path);
+	if path.is_absolute() { Some(path) } else { None }
 }
 
 #[cfg(target_os = "linux")]
 #[must_use]
 fn cache_dir_default() -> Option<PathBuf> {
 	std::env::var_os("XDG_CACHE_HOME")
-		.and_then(self::unix::is_absolute_path)
-		.or_else(|| self::unix::home_dir().map(|h| h.join(".cache").join(PYKE_ROOT)))
+		.and_then(is_absolute_path)
+		.or_else(|| std::env::home_dir().map(|h| h.join(".cache").join(PYKE_ROOT)))
 }
 
 #[cfg(target_os = "macos")]
 #[must_use]
 fn cache_dir_default() -> Option<PathBuf> {
-	self::unix::home_dir().map(|h| h.join("Library/Caches").join(PYKE_ROOT))
+	std::env::home_dir().map(|h| h.join("Library/Caches").join(PYKE_ROOT))
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]

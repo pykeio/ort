@@ -237,12 +237,7 @@ fn setup_api() -> ApiPointer {
 		} else {
 			let path: std::path::PathBuf = match std::env::var("ORT_DYLIB_PATH") {
 				Ok(s) if !s.is_empty() => s,
-				#[cfg(target_os = "windows")]
-				_ => "onnxruntime.dll".to_owned(),
-				#[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd"))]
-				_ => "libonnxruntime.so".to_owned(),
-				#[cfg(any(target_os = "macos", target_os = "ios"))]
-				_ => "libonnxruntime.dylib".to_owned()
+				_ => format!("{}onnxruntime{}", std::env::consts::DLL_PREFIX, std::env::consts::DLL_SUFFIX)
 			}
 			.into();
 			load_dynamic::init(&path).unwrap_or_else(|e| panic!("Failed to load ONNX Runtime dylib: {e}"));

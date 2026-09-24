@@ -155,6 +155,10 @@ fn main() -> ort::Result<()> {
 	}
 
 	{
+		let _ = Tensor::from_string_array(([2_usize], &["a\0b", "c"][..]));
+	}
+
+	{
 		let mut binding = session.create_binding()?;
 		binding.bind_input("input_1", &value1)?;
 		binding.bind_input("input_2", &value2)?;

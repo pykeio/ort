@@ -17,7 +17,7 @@ use crate::{
 	error::Result,
 	session::{SessionOutputs, SharedSessionInner, UntypedRunOptions},
 	util::{STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS},
-	value::{Value, ValueInner}
+	value::{DynValue, Value, ValueInner}
 };
 
 #[derive(Debug)]
@@ -109,7 +109,9 @@ pub(crate) struct AsyncInferenceContext<'r, 's> {
 	pub(crate) output_name_ptrs: SmallVec<[*const c_char; STACK_SESSION_OUTPUTS]>,
 	pub(crate) session_inner: &'s Arc<SharedSessionInner>,
 	pub(crate) output_names: SmallVec<[&'r str; STACK_SESSION_OUTPUTS]>,
-	pub(crate) output_value_ptrs: SmallVec<[*mut ort_sys::OrtValue; STACK_SESSION_OUTPUTS]>
+	pub(crate) output_value_ptrs: SmallVec<[*mut ort_sys::OrtValue; STACK_SESSION_OUTPUTS]>,
+	/// Preallocated outputs, which already own their `OrtValue`s.
+	pub(crate) output_values: SmallVec<[Option<DynValue>; STACK_SESSION_OUTPUTS]>
 }
 
 impl AsyncInferenceContext<'_, '_> {
@@ -137,8 +139,15 @@ pub(crate) extern "system" fn async_callback(user_data: *mut c_void, _: *mut *mu
 	let outputs = ctx
 		.output_value_ptrs
 		.into_iter()
-		.map(|tensor_ptr| unsafe {
-			Value::from_ptr(NonNull::new(tensor_ptr).expect("OrtValue ptr returned from session Run should not be null"), Some(Arc::clone(ctx.session_inner)))
+		.zip(ctx.output_values)
+		.map(|(tensor_ptr, value)| match value {
+			Some(value) => value,
+			None => unsafe {
+				Value::from_ptr(
+					NonNull::new(tensor_ptr).expect("OrtValue ptr returned from session Run should not be null"),
+					Some(Arc::clone(ctx.session_inner))
+				)
+			}
 		})
 		.collect();
 

@@ -1,8 +1,9 @@
 use ndarray::Array4;
 use ort::{
 	error::ErrorCode,
-	session::{RunOptions, Session},
-	value::TensorRef
+	memory::Allocator,
+	session::{OutputSelector, RunOptions, Session},
+	value::{Tensor, TensorRef}
 };
 
 #[test]
@@ -39,5 +40,28 @@ fn run_async_error_and_success() -> ort::Result<()> {
 		let outputs = rt.block_on(session.run_async(ort::inputs![TensorRef::from_array_view(&input)?], &options)?)?;
 		assert_eq!(&**outputs[0].shape(), &[1, 128, 128, 3]);
 	}
+	Ok(())
+}
+
+#[test]
+fn run_async_preallocated_output() -> ort::Result<()> {
+	let env = ort::test_util::test_env();
+	let mut session = Session::builder(env)?
+		.with_intra_threads(2)?
+		.commit_from_file("tests/data/upsample.onnx")?;
+	let input = Array4::<f32>::zeros((1, 64, 64, 3));
+	let output0 = session.outputs()[0].name().to_string();
+	let options = RunOptions::new()?.with_outputs(
+		OutputSelector::no_default()
+			.with(&output0)
+			.preallocate(&output0, Tensor::<f32>::new(&Allocator::default(), [1_usize, 128, 128, 3])?)
+	);
+
+	let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+	for _ in 0..3 {
+		let outputs = rt.block_on(session.run_async(ort::inputs![TensorRef::from_array_view(&input)?], &options)?)?;
+		assert_eq!(&**outputs[0].shape(), &[1, 128, 128, 3]);
+	}
+	drop(options);
 	Ok(())
 }

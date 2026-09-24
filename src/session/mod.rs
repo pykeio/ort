@@ -530,6 +530,7 @@ impl Session {
 			write(&raw mut (*ctx).output_name_ptrs, output_name_ptrs);
 			write(&raw mut (*ctx).output_names, output_names);
 			write(&raw mut (*ctx).output_value_ptrs, output_tensor_ptrs);
+			write(&raw mut (*ctx).output_values, output_tensors);
 			write(&raw mut (*ctx).session_inner, &self.inner);
 		};
 		let ctx = Box::leak(unsafe { ctx.assume_init() });

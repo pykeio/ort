@@ -1,6 +1,6 @@
 //! Types for managing memory & device allocations.
 
-use alloc::sync::Arc;
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::{
 	ffi::{CStr, c_char, c_int, c_void},
 	marker::PhantomData,
@@ -13,7 +13,8 @@ use crate::{
 	AsPointer,
 	error::Result,
 	ortsys,
-	session::{Session, SharedSessionInner}
+	session::{Session, SharedSessionInner},
+	util::Mutex
 };
 
 /// A device allocator used to manage the allocation of [`Value`]s.
@@ -257,7 +258,7 @@ impl Drop for AllocatedBlock<'_> {
 
 /// Represents possible devices that have their own device allocator.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-// &'static str should be valid here since they're only ever defined in C++ with `const char *` literals
+// Always null-terminated. Names read from ONNX Runtime are interned by `from_name` so they stay valid.
 pub struct AllocationDevice(&'static str);
 
 impl AllocationDevice {
@@ -277,11 +278,24 @@ impl AllocationDevice {
 	pub fn as_str(&self) -> &'static str {
 		&self.0[..self.0.len() - 1]
 	}
+
+	fn from_name(name: &CStr) -> AllocationDevice {
+		// Keep one leaked copy of each name, since the one ONNX Runtime gives us dies with its memory info.
+		static NAMES: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
+		let name = str::from_utf8(name.to_bytes_with_nul()).expect("invalid allocation device name");
+		let mut names = NAMES.lock();
+		if let Some(&known) = names.iter().find(|&&n| n == name) {
+			return AllocationDevice(known);
+		}
+		let leaked: &'static str = Box::leak(name.into());
+		names.push(leaked);
+		AllocationDevice(leaked)
+	}
 }
 
 impl PartialEq<str> for AllocationDevice {
 	fn eq(&self, other: &str) -> bool {
-		self.0 == other
+		self.as_str() == other
 	}
 }
 
@@ -485,9 +499,7 @@ impl<'a> MemoryInfo<'a> {
 	pub fn allocation_device(&self) -> AllocationDevice {
 		let mut name_ptr: *const c_char = ptr::null_mut();
 		ortsys![unsafe MemoryInfoGetName(self.ptr.as_ptr(), &mut name_ptr).expect("infallible"); nonNull(name_ptr)];
-		let name = unsafe { CStr::from_ptr(name_ptr.as_ptr()) };
-		// make sure we include the null byte
-		AllocationDevice(core::str::from_utf8(name.to_bytes_with_nul()).expect("invalid allocation device name"))
+		AllocationDevice::from_name(unsafe { CStr::from_ptr(name_ptr.as_ptr()) })
 	}
 
 	/// Returns the ID of the [`AllocationDevice`] described by this struct.
@@ -580,6 +592,20 @@ mod tests {
 		let c = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?;
 		assert_ne!(a, c);
 		Ok(())
+	}
+
+	#[test]
+	fn test_allocation_device_outlives_memory_info() -> crate::Result<()> {
+		let device = MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?.allocation_device();
+		let _other = MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?;
+		assert_eq!(device.as_str(), "Cuda");
+		Ok(())
+	}
+
+	#[test]
+	fn test_allocation_device_eq_str() {
+		assert!(AllocationDevice::CPU == *"Cpu");
+		assert!(AllocationDevice::CPU != *"Cuda");
 	}
 
 	#[test]

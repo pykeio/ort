@@ -112,13 +112,19 @@ pub(crate) struct AsyncInferenceContext<'r, 's> {
 	pub(crate) output_value_ptrs: SmallVec<[*mut ort_sys::OrtValue; STACK_SESSION_OUTPUTS]>
 }
 
+impl AsyncInferenceContext<'_, '_> {
+	/// Frees the input & output names, which were leaked from `CString`s by `run_inner_async`.
+	pub(crate) fn free_name_ptrs(&self) {
+		for &p in self.input_name_ptrs.iter().chain(self.output_name_ptrs.iter()) {
+			drop(unsafe { CString::from_raw(p.cast_mut()) });
+		}
+	}
+}
+
 pub(crate) extern "system" fn async_callback(user_data: *mut c_void, _: *mut *mut ort_sys::OrtValue, _: usize, status: ort_sys::OrtStatusPtr) {
 	let ctx = unsafe { Box::from_raw(user_data.cast::<AsyncInferenceContext<'_, '_>>()) };
 
-	// Reconvert name ptrs to CString so drop impl is called and memory is freed
-	for p in ctx.input_name_ptrs {
-		drop(unsafe { CString::from_raw(p.cast_mut().cast()) });
-	}
+	ctx.free_name_ptrs();
 
 	crate::logging::drop!(AsyncInferenceContext, user_data);
 

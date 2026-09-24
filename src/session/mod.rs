@@ -469,10 +469,22 @@ impl Session {
 		input_values: SmallVec<[&SessionInputValue<'v>; STACK_SESSION_INPUTS]>,
 		run_options: &'r Arc<UntypedRunOptions>
 	) -> Result<InferenceFut<'r, 'v>> {
+		// See the comment in `run_inner`; ONNX Runtime would read past the end of `input_name_ptrs`.
+		if input_values.len() > input_names.len() {
+			return Err(Error::new_with_code(
+				ErrorCode::InvalidArgument,
+				format!("{} inputs were provided, but the model only accepts {}.", input_values.len(), input_names.len())
+			));
+		}
+
+		// Convert every name before leaking any of them, so an invalid name doesn't leak the ones before it.
 		let input_name_ptrs = input_names
 			.into_iter()
-			.map(|name| CString::new(name.as_bytes()).map(|s| s.into_raw().cast_const()))
-			.collect::<Result<SmallVec<[*const c_char; STACK_SESSION_INPUTS]>, _>>()?;
+			.map(|name| CString::new(name.as_bytes()))
+			.collect::<Result<SmallVec<[CString; STACK_SESSION_INPUTS]>, _>>()?
+			.into_iter()
+			.map(|s| s.into_raw().cast_const())
+			.collect::<SmallVec<[*const c_char; STACK_SESSION_INPUTS]>>();
 
 		let mut input_inner_holders = SmallVec::with_capacity(input_values.len());
 		let mut input_ort_values = SmallVec::with_capacity(input_values.len());
@@ -523,7 +535,7 @@ impl Session {
 		let ctx = Box::leak(unsafe { ctx.assume_init() });
 		crate::logging::create!(AsyncInferenceContext, ctx);
 
-		ortsys![
+		let res = ortsys![@ort:
 			unsafe RunAsync(
 				self.inner.session_ptr.as_ptr(),
 				run_options.ptr.as_ptr(),
@@ -535,8 +547,15 @@ impl Session {
 				ctx.output_value_ptrs.as_mut_ptr(),
 				Some(self::r#async::async_callback),
 				ctx as *mut _ as *mut ort_sys::c_void
-			)?
+			) as Result
 		];
+		if let Err(e) = res {
+			// The callback is never called if `RunAsync` fails, so we have to free the context ourselves.
+			let ctx = unsafe { Box::from_raw(ctx as *mut AsyncInferenceContext<'_, '_>) };
+			crate::logging::drop!(AsyncInferenceContext, &*ctx);
+			ctx.free_name_ptrs();
+			return Err(e);
+		}
 
 		Ok(InferenceFut::new(async_inner))
 	}

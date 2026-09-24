@@ -216,7 +216,7 @@ impl IndexMut<String> for SessionOutputs<'_> {
 impl Index<usize> for SessionOutputs<'_> {
 	type Output = DynValue;
 	fn index(&self, index: usize) -> &Self::Output {
-		if index > self.values.len() {
+		if index >= self.values.len() {
 			panic!("attempted to index output #{index} when there are only {} outputs", self.values.len());
 		}
 		&self.values[index]
@@ -225,7 +225,7 @@ impl Index<usize> for SessionOutputs<'_> {
 
 impl IndexMut<usize> for SessionOutputs<'_> {
 	fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-		if index > self.values.len() {
+		if index >= self.values.len() {
 			panic!("attempted to index output #{index} when there are only {} outputs", self.values.len());
 		}
 		&mut self.values[index]

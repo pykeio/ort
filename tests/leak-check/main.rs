@@ -150,6 +150,11 @@ fn main() -> ort::Result<()> {
 	}
 
 	{
+		let session = Session::builder(&env)?.commit_from_file("tests/data/overridable_initializer.onnx")?;
+		let _ = session.overridable_initializers();
+	}
+
+	{
 		let mut binding = session.create_binding()?;
 		binding.bind_input("input_1", &value1)?;
 		binding.bind_input("input_2", &value2)?;

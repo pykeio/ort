@@ -355,3 +355,87 @@ fn test_variadic_io() -> crate::Result<()> {
 
 	Ok(())
 }
+
+/// Stands in for `CustomOpTwo`, recording the shape of the preallocated output it sees on each run.
+#[cfg(feature = "api-30")]
+struct PreallocatedOutputOp(Arc<crate::util::Mutex<alloc::vec::Vec<Option<alloc::vec::Vec<i64>>>>>);
+
+#[cfg(feature = "api-30")]
+impl Operator for PreallocatedOutputOp {
+	type Kernel<'attr> = BoxedKernel<'attr>;
+
+	fn name(&self) -> &str {
+		"CustomOpTwo"
+	}
+
+	fn inputs(&self) -> impl IntoIterator<Item = OperatorInput> {
+		[OperatorInput::required(TensorElementType::Float32)]
+	}
+
+	fn outputs(&self) -> impl IntoIterator<Item = OperatorOutput> {
+		[OperatorOutput::required(TensorElementType::Int32)]
+	}
+
+	fn create_kernel<'attr>(&self, _: &KernelContext<'attr>) -> crate::Result<Self::Kernel<'attr>> {
+		let seen = Arc::clone(&self.0);
+		Ok(Box::new(move |ctx: &ComputeContext| {
+			let x = ctx.input(0)?.ok_or_else(|| crate::Error::new("missing input"))?;
+			let (x_shape, _) = x.try_extract_tensor::<f32>()?;
+
+			let preallocated = ctx.preallocated_output(0)?;
+			seen.lock().push(preallocated.as_ref().map(|v| v.shape().to_vec()));
+
+			let mut z = match preallocated {
+				Some(z) => {
+					assert_eq!(z.shape(), x_shape);
+					z
+				}
+				None => ctx.output(0, x_shape.to_vec())?.ok_or_else(|| crate::Error::new("missing output"))?
+			};
+			let (_, z_ref) = z.try_extract_tensor_mut::<i32>()?;
+			for (i, z) in z_ref.iter_mut().enumerate() {
+				*z = i as i32 * 10;
+			}
+			Ok(())
+		}))
+	}
+}
+
+#[test]
+#[cfg(feature = "api-30")]
+fn test_preallocated_output() -> crate::Result<()> {
+	use crate::{
+		memory::Allocator,
+		session::{OutputSelector, RunOptions}
+	};
+
+	let seen = Arc::new(crate::util::Mutex::new(alloc::vec::Vec::new()));
+	let mut session = Session::builder(test_env())?
+		.with_operators(
+			OperatorDomain::new("test.customop")?
+				.add(CustomOpOne)?
+				.add(PreallocatedOutputOp(Arc::clone(&seen)))?
+		)?
+		.commit_from_file("tests/data/custom_op_test.onnx")?;
+
+	let x = Tensor::from_array(([3_usize, 5], alloc::vec![0.0_f32; 15]))?;
+	let y = Tensor::from_array(([3_usize, 5], alloc::vec![1.0_f32; 15]))?;
+	let expected: alloc::vec::Vec<i32> = (0..15).map(|i| i * 10).collect();
+
+	// without a preallocated output, the kernel has to allocate one
+	let outputs = session.run(crate::inputs![&x, &y])?;
+	assert_eq!(outputs[0].try_extract_tensor::<i32>()?.1, expected);
+	drop(outputs);
+
+	// with a preallocated output, the kernel writes straight into it
+	let output_name = session.outputs()[0].name().to_string();
+	let preallocated = Tensor::<i32>::new(&Allocator::default(), [3_usize, 5])?;
+	let preallocated_ptr = preallocated.data_ptr();
+	let options = RunOptions::new()?.with_outputs(OutputSelector::default().preallocate(output_name, preallocated));
+	let outputs = session.run_with_options(crate::inputs![&x, &y], &options)?;
+	assert_eq!(outputs[0].try_extract_tensor::<i32>()?.1, expected);
+	assert_eq!(outputs[0].downcast_ref::<crate::value::DynTensorValueType>()?.data_ptr(), preallocated_ptr);
+
+	assert_eq!(*seen.lock(), [None, Some(alloc::vec![3, 5])]);
+	Ok(())
+}

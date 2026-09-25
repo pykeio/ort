@@ -76,7 +76,7 @@ pub(crate) struct EnvironmentInner {
 	execution_providers: SmallVec<[ExecutionProviderDispatch; STACK_EXECUTION_PROVIDERS]>,
 	has_global_threadpool: bool,
 	_thread_manager: Option<Arc<dyn Any>>,
-	_logger: Option<LoggerFunction>
+	_logger: Option<Box<LoggerFunction>>
 }
 
 unsafe impl Send for EnvironmentInner {}
@@ -513,10 +513,11 @@ impl EnvironmentBuilder {
 			return Err(Error::new("only one environment is allowed per process"));
 		}
 
-		let logger = self
-			.logger
-			.as_ref()
-			.map(|c| (crate::logging::custom_logger as ort_sys::OrtLoggingFunction, c as *const _ as *mut c_void));
+		// The logger is passed to ONNX Runtime by pointer, so it needs a stable address that lives as long as the environment.
+		let logger_fn = self.logger.clone().map(Box::new);
+		let logger = logger_fn
+			.as_deref()
+			.map(|c| (crate::logging::custom_logger as ort_sys::OrtLoggingFunction, c as *const LoggerFunction as *mut c_void));
 		#[cfg(feature = "tracing")]
 		let logger = logger.or(Some((crate::logging::tracing_logger, ptr::null_mut())));
 
@@ -596,7 +597,7 @@ impl EnvironmentBuilder {
 				.global_thread_pool_options
 				.as_ref()
 				.and_then(|options| options.thread_manager.clone()),
-			_logger: self.logger.clone()
+			_logger: logger_fn
 		});
 		CURRENT_ENV.try_insert_with(|| Arc::downgrade(&inner));
 		Ok(Environment(inner))

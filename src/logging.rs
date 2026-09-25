@@ -148,7 +148,7 @@ pub(crate) extern "system" fn custom_logger(
 		return;
 	}
 
-	let category = unsafe { CStr::from_ptr(code_location) }.to_str().unwrap_or("<decode error>");
+	let category = unsafe { CStr::from_ptr(category) }.to_str().unwrap_or("<decode error>");
 	let code_location = unsafe { CStr::from_ptr(code_location) }.to_str().unwrap_or("<decode error>");
 	let message = unsafe { CStr::from_ptr(message) }.to_str().unwrap_or("<decode error>");
 	let id = unsafe { CStr::from_ptr(id) }.to_str().unwrap_or("<decode error>");

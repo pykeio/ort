@@ -25,6 +25,7 @@ mod impl_options;
 #[cfg(feature = "api-22")]
 #[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
 pub use self::editable::*;
+pub use self::impl_config_keys::GqaValueLayout;
 pub use self::impl_options::*;
 
 /// `Result` type returned by [`SessionBuilder`] methods.

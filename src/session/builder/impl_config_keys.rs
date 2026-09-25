@@ -149,4 +149,49 @@ impl SessionBuilder {
 	pub fn with_ep_context_source_model_path(self, path: impl AsRef<str>) -> BuilderResult {
 		self.with_config_entry("ep.context_source_model_path", path)
 	}
+
+	/// Enables or disables replaying the runtime optimizations saved in an ORT format model.
+	///
+	/// Saved runtime optimizations contain graph rewrite instructions, so this should only be enabled for trusted
+	/// models.
+	///
+	/// This option is **disabled** by default since ONNX Runtime v1.30; earlier versions always replay saved runtime
+	/// optimizations.
+	pub fn with_saved_runtime_optimizations(self, enable: bool) -> BuilderResult {
+		self.with_config_entry("session.enable_saved_runtime_optimizations", if enable { "1" } else { "0" })
+	}
+
+	/// Sets the maximum number of input channels accumulated per kernel call in MLAS NCHWc pointwise (1x1)
+	/// convolutions before intermediate results are flushed to the output.
+	///
+	/// The value is rounded up to a multiple of the NCHWc block size, and `0` uses the default of 128. Larger values
+	/// can speed up convolutions with many input channels at the cost of a larger cache working set. This option is
+	/// meant for performance tuning, and its default may change in future ONNX Runtime releases.
+	///
+	/// Requires ONNX Runtime v1.30 or later.
+	pub fn with_nchwc_pointwise_conv_max_input_channel_batch(self, channels: u32) -> BuilderResult {
+		self.with_config_entry("mlas.nchwc_pointwise_conv_max_input_channel_batch", channels.to_string())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::{session::Session, test_util::test_env, value::Tensor};
+
+	#[test]
+	fn test_1_30_config_keys() -> crate::Result<()> {
+		let input = Tensor::<f32>::from_array(([1_usize, 64, 64, 3], vec![0.5_f32; 64 * 64 * 3]))?;
+		for enable in [false, true] {
+			let mut session = Session::builder(test_env())?
+				.with_saved_runtime_optimizations(enable)?
+				.commit_from_file("tests/data/upsample.ort")?;
+			session.run(crate::inputs![&input])?;
+		}
+
+		let mut session = Session::builder(test_env())?
+			.with_nchwc_pointwise_conv_max_input_channel_batch(256)?
+			.commit_from_file("tests/data/upsample.onnx")?;
+		session.run(crate::inputs![&input])?;
+		Ok(())
+	}
 }

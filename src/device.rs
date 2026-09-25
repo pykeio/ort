@@ -176,9 +176,9 @@ impl<E: ExecutionProvider> CompatibilityInfo<E> {
 	pub fn from_compiled_model_file(path: impl AsRef<Path>, ep: &E) -> Result<Option<Self>> {
 		let path = crate::util::path_to_os_char(path);
 		let mut allocator = Allocator::default();
-		// In typical ONNX Runtime fashion there is zero information about what the hell `ep_type` is or what it comes from.
-		// I also can't get any EP to produce a compiled model that even has the compatibility info field to check. So I'll
-		// assume it's the EP name but of course that'll turn out to be wrong.
+		// In typical ONNX Runtime fashion there is zero information about what the hell `ep_type` is or what it comes
+		// from. I also can't get any EP to produce a compiled model that even has the compatibility info field
+		// to check. So I'll assume it's the EP name but of course that'll turn out to be wrong.
 		let ep_type = CString::new(ep.name())?;
 		let mut str = ptr::null_mut();
 		ortsys![unsafe GetCompatibilityInfoFromModel(path.as_ptr(), ep_type.as_ptr(), allocator.ptr_mut(), &mut str)?];

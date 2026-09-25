@@ -262,8 +262,8 @@ fn extract_tensor<Type: TensorValueTypeMarker + ?Sized>(value: &Value<Type>, exp
 	match value.dtype() {
 		ValueType::Tensor { ty, shape, .. } => {
 			let value: &DynTensor = unsafe { value.transmute_type_ref() };
-			// With `ort-web`, non-CPU tensors can still be extracted. `GetTensorMutableData` will throw an error if there is a
-			// problem; this check is not needed.
+			// With `ort-web`, non-CPU tensors can still be extracted. `GetTensorMutableData` will throw an error if
+			// there is a problem; this check is not needed.
 			#[cfg(not(target_arch = "wasm32"))]
 			{
 				let memory_info = value.memory_info();
@@ -290,14 +290,14 @@ unsafe fn data_ptr<T>(ptr: *mut ort_sys::OrtValue) -> Result<*mut T> {
 	ortsys![unsafe GetTensorMutableData(ptr, &mut output_array_ptr)?];
 
 	// Cast the pointer to the expected data type now.
-	// We do this here because the very next step is to replace the pointer with a dangling one in the case of zero-sized
-	// tensors. If we do this to a `c_void` pointer, the dangling pointer will be aligned to 1 byte, meaning casting to T
-	// afterwards is UB if T has alignment >= 2.
+	// We do this here because the very next step is to replace the pointer with a dangling one in the case of
+	// zero-sized tensors. If we do this to a `c_void` pointer, the dangling pointer will be aligned to 1 byte,
+	// meaning casting to T afterwards is UB if T has alignment >= 2.
 	let mut output_array_ptr = output_array_ptr.cast::<T>();
 
-	// Zero-sized tensors can have a null data pointer. An empty slice with a null data pointer is invalid, but it is valid
-	// to have an empty slice with a *dangling* pointer. Note that this function is only called when the data resides on
-	// the CPU, so this won't change semantics for non-CPU data.
+	// Zero-sized tensors can have a null data pointer. An empty slice with a null data pointer is invalid, but it is
+	// valid to have an empty slice with a *dangling* pointer. Note that this function is only called when the data
+	// resides on the CPU, so this won't change semantics for non-CPU data.
 	if output_array_ptr.is_null() {
 		output_array_ptr = NonNull::dangling().as_ptr();
 	}

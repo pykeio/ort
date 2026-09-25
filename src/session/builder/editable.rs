@@ -15,7 +15,8 @@ pub struct EditableSession<'b> {
 
 impl<'b> EditableSession<'b> {
 	pub(crate) fn new(session: NonNull<ort_sys::OrtSession>, builder: &'b mut SessionBuilder) -> Result<Self> {
-		// Prepacked weights are passed to `FinalizeModelEditorSession`; steal them from the builder so we can add them later.
+		// Prepacked weights are passed to `FinalizeModelEditorSession`; steal them from the builder so we can add them
+		// later.
 		let prepacked_weights = builder.prepacked_weights.clone();
 		Ok(Self {
 			session: builder.commit_finalize(session)?,

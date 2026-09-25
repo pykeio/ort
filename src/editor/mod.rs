@@ -184,9 +184,9 @@ impl Graph {
 			return Err(Error::new("Initializers must be unique"))?;
 		};
 		if value_inner.is_backed() {
-			// `AddInitializerToGraph` wants to take ownership of the value, so the memory needs to be managed by ONNX Runtime.
-			// The documentation technically recommends using non-managed memory when `as_external = true`, but it doesn't seem like
-			// that matters.
+			// `AddInitializerToGraph` wants to take ownership of the value, so the memory needs to be managed by ONNX
+			// Runtime. The documentation technically recommends using non-managed memory when `as_external
+			// = true`, but it doesn't seem like that matters.
 			return Err(Error::new("Initializers must be created via `Tensor::new`, not created from an array (try passing a `.clone()` of the value)"));
 		}
 

@@ -42,7 +42,9 @@ impl ExecutionProvider for ArmNN {
 	}
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
-		super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_ArmNN(options: *mut ort_sys::OrtSessionOptions, use_arena: ffi::c_int) -> ort_sys::OrtStatusPtr);
+		super::define_ep_register!(
+			OrtSessionOptionsAppendExecutionProvider_ArmNN(options: *mut ort_sys::OrtSessionOptions, use_arena: ffi::c_int) -> ort_sys::OrtStatusPtr
+		);
 		unsafe { Error::result_from_status(OrtSessionOptionsAppendExecutionProvider_ArmNN(session_builder.ptr_mut(), self.use_arena.into())) }
 	}
 }

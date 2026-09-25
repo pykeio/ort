@@ -257,8 +257,8 @@ impl ComputeContext {
 		Ok(unsafe { Logger::from_raw(logger) })
 	}
 
-	// TODO: STATUS_ACCESS_VIOLATION inside `KernelContext_GetScratchBuffer`. gonna assume this one is just an internal ONNX
-	// Runtime bug.
+	// TODO: STATUS_ACCESS_VIOLATION inside `KernelContext_GetScratchBuffer`. gonna assume this one is just an internal
+	// ONNX Runtime bug.
 	//
 	// pub fn allocate<T>(&self, memory_info: &MemoryInfo, len: usize) -> Result<ScratchBuffer<T>> {
 	// 	let mut buffer = ptr::null_mut();

@@ -477,8 +477,9 @@ impl<'s, T: DowncastableTarget> FromKernelContext<'s> for ValueRef<'s, T> {
 	where
 		Self: Sized
 	{
-		// TODO: This should probably be customizable - docs say the allocator is required for "internal tensor state", but it's
-		// not clear if this also includes tensor data (and thus it should instead be allocated on an appropriate device).
+		// TODO: This should probably be customizable - docs say the allocator is required for "internal tensor state",
+		// but it's not clear if this also includes tensor data (and thus it should instead be allocated on an
+		// appropriate device).
 		let allocator = Allocator::default();
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();

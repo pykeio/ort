@@ -149,9 +149,9 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 					Ok(vec)
 				} else {
 					let (key_tensor_shape, key_tensor) = key_value.try_extract_strings()?;
-					// SAFETY: `IntoTensorElementType` is a private trait, and we only map the `String` type to `TensorElementType::String`,
-					// so at this point, `K` is **always** the `String` type, and this transmute really does nothing but please the type
-					// checker.
+					// SAFETY: `IntoTensorElementType` is a private trait, and we only map the `String` type to
+					// `TensorElementType::String`, so at this point, `K` is **always** the `String`
+					// type, and this transmute really does nothing but please the type checker.
 					let key_tensor: Vec<K> = unsafe { mem::transmute(key_tensor) };
 
 					let mut value_tensor_ptr = ptr::null_mut();

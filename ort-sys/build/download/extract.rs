@@ -72,8 +72,8 @@ pub fn extract_tgz<R: Read>(reader: &mut R, output: &Path) -> Result<(), Error> 
 
 	loop {
 		let Some(header) = TarHeader::read_from(&mut tar).with_context(|| "Failed to read tar entry header")? else {
-			// actually ends with 1024 zero bytes, so read the remaining 512 to ensure we consume all the data so the hash is
-			// correct.
+			// actually ends with 1024 zero bytes, so read the remaining 512 to ensure we consume all the data so the
+			// hash is correct.
 			tar.read_exact(&mut pad_container)?;
 			return Ok(());
 		};

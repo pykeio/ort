@@ -184,8 +184,9 @@ impl Trainer {
 		let outputs = output_tensor_ptrs
 			.into_iter()
 			.map(|tensor_ptr| unsafe {
-				// TODO: `Value` should absolutely be refactored to accept a different backing pointer than `SharedSessionInner`.
-				// but for now, nobody should be using the loss tensor past the lifetime of the trainer... right...? 😣
+				// TODO: `Value` should absolutely be refactored to accept a different backing pointer than
+				// `SharedSessionInner`. but for now, nobody should be using the loss tensor past the
+				// lifetime of the trainer... right...? 😣
 				Value::from_ptr(NonNull::new(tensor_ptr).expect("OrtValue ptr returned from session Run should not be null"), None)
 			})
 			.collect();
@@ -245,8 +246,9 @@ impl Trainer {
 		let outputs = output_tensor_ptrs
 			.into_iter()
 			.map(|tensor_ptr| unsafe {
-				// TODO: `Value` should absolutely be refactored to accept a different backing pointer than `SharedSessionInner`.
-				// but for now, nobody should be using the loss tensor past the lifetime of the trainer... right...? 😣
+				// TODO: `Value` should absolutely be refactored to accept a different backing pointer than
+				// `SharedSessionInner`. but for now, nobody should be using the loss tensor past the
+				// lifetime of the trainer... right...? 😣
 				Value::from_ptr(NonNull::new(tensor_ptr).expect("OrtValue ptr returned from session Run should not be null"), None)
 			})
 			.collect();

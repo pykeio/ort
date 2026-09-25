@@ -315,10 +315,11 @@ impl Session {
 		run_options: Option<&'r UntypedRunOptions>
 	) -> Result<SessionOutputs<'r>> {
 		if input_values.len() > input_names.len() {
-			// If we provide more inputs than the model expects with `ort::inputs![a, b, c]`, then we get an `input_names` shorter
-			// than `inputs`. ONNX Runtime will attempt to look up the name of all inputs before doing any checks, thus going out of
-			// bounds of `input_names` and triggering a segfault, so we check that condition here. This will never trip for
-			// `ValueMap` inputs since the number of names & values are always equal as its a vec of tuples.
+			// If we provide more inputs than the model expects with `ort::inputs![a, b, c]`, then we get an
+			// `input_names` shorter than `inputs`. ONNX Runtime will attempt to look up the name of all
+			// inputs before doing any checks, thus going out of bounds of `input_names` and triggering a
+			// segfault, so we check that condition here. This will never trip for `ValueMap` inputs since
+			// the number of names & values are always equal as its a vec of tuples.
 			return Err(Error::new_with_code(
 				ErrorCode::InvalidArgument,
 				format!("{} inputs were provided, but the model only accepts {}.", input_values.len(), input_names.len())
@@ -501,17 +502,17 @@ impl Session {
 
 		let async_inner = Arc::new(InferenceFutInner::new(Arc::clone(run_options)));
 
-		// Avoid creating AsyncInferenceContext on the stack since it is a very large struct. Instead, create it on the heap and
-		// then fill it with values.
+		// Avoid creating AsyncInferenceContext on the stack since it is a very large struct. Instead, create it on the
+		// heap and then fill it with values.
 		let mut ctx = Box::<AsyncInferenceContext>::new_uninit();
 		unsafe {
 			use core::ptr::write;
 
 			let ctx = ctx.as_mut_ptr();
 			write(&raw mut (*ctx).inner, Arc::clone(&async_inner));
-			// everything allocated within `run_inner_async` needs to be kept alive until we are certain inference has completed and
-			// ONNX Runtime no longer needs the data - i.e. when `async_callback` is called. `async_callback` will free all of
-			// this data just like we do in `run_inner`
+			// everything allocated within `run_inner_async` needs to be kept alive until we are certain inference has
+			// completed and ONNX Runtime no longer needs the data - i.e. when `async_callback` is called.
+			// `async_callback` will free all of this data just like we do in `run_inner`
 			write(&raw mut (*ctx).input_ort_values, input_ort_values);
 			write(&raw mut (*ctx)._input_inner_holders, input_inner_holders);
 			write(&raw mut (*ctx).input_name_ptrs, input_name_ptrs);

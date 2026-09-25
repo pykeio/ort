@@ -199,9 +199,9 @@ impl IoBinding {
 		self.clear_outputs();
 	}
 
-	// technically the synchronize methods do not have to be &mut like the other methods, as they do not mutate any state
-	// on the C side - all they do is iterate through all nodes' EPs and call their device synchronize function
-	// (cudaDeviceSynchronize/hipDeviceSynchronize), which I assume would be thread-safe
+	// technically the synchronize methods do not have to be &mut like the other methods, as they do not mutate any
+	// state on the C side - all they do is iterate through all nodes' EPs and call their device synchronize
+	// function (cudaDeviceSynchronize/hipDeviceSynchronize), which I assume would be thread-safe
 
 	/// Synchronize all bound inputs, ensuring any pending asynchronous transfers are completed.
 	pub fn synchronize_inputs(&self) -> Result<()> {

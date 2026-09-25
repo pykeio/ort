@@ -23,12 +23,12 @@ fn main() {
 	println!("cargo:rustc-check-cfg=cfg(pyke)");
 
 	if env::var("DOCS_RS").is_ok() || cfg!(feature = "disable-linking") {
-		// On docs.rs, A) we don't need to link, and B) we don't have network, so we couldn't download anything if we wanted to.
-		// If `disable-linking` is specified, either:
-		// - `load-dynamic` is enabled, thus we don't need to link since we load the DLL at runtime, and we don't need to
-		//   download anything because we don't provide DLLs anymore.
-		// - The application intends to configure a custom backend. This build script only does ONNX Runtime, so no need to do
-		//   anything.
+		// On docs.rs, A) we don't need to link, and B) we don't have network, so we couldn't download anything if we
+		// wanted to. If `disable-linking` is specified, either:
+		// - `load-dynamic` is enabled, thus we don't need to link since we load the DLL at runtime, and we don't need
+		//   to download anything because we don't provide DLLs anymore.
+		// - The application intends to configure a custom backend. This build script only does ONNX Runtime, so no need
+		//   to do anything.
 		return;
 	}
 

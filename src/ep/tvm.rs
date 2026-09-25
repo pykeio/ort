@@ -56,7 +56,9 @@ impl ExecutionProvider for TVM {
 
 	#[allow(unused, unreachable_code)]
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
-		super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut ort_sys::OrtSessionOptions, opt_str: *const ffi::c_char) -> ort_sys::OrtStatusPtr);
+		super::define_ep_register!(
+			OrtSessionOptionsAppendExecutionProvider_Tvm(options: *mut ort_sys::OrtSessionOptions, opt_str: *const ffi::c_char) -> ort_sys::OrtStatusPtr
+		);
 		let mut option_string = Vec::new();
 		if let Some(check_hash) = self.check_hash {
 			option_string.push(format!("check_hash:{}", if check_hash { "True" } else { "False" }));

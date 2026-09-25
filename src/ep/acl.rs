@@ -40,7 +40,9 @@ impl ExecutionProvider for ACL {
 	}
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
-		super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut ort_sys::OrtSessionOptions, enable_fast_math: ffi::c_int) -> ort_sys::OrtStatusPtr);
+		super::define_ep_register!(
+			OrtSessionOptionsAppendExecutionProvider_ACL(options: *mut ort_sys::OrtSessionOptions, enable_fast_math: ffi::c_int) -> ort_sys::OrtStatusPtr
+		);
 		unsafe { Error::result_from_status(OrtSessionOptionsAppendExecutionProvider_ACL(session_builder.ptr_mut(), self.fast_math.into())) }
 	}
 }

@@ -243,7 +243,8 @@ pub(super) fn erase<O: Operator + 'static>(operator: O) -> Result<ErasedOperator
 	) -> usize {
 		let inplaces = O::INPLACES;
 		unsafe {
-			// ONNX Runtime only calls the release function if the list isn't empty, and allocating 0 bytes is UB anyway.
+			// ONNX Runtime only calls the release function if the list isn't empty, and allocating 0 bytes is UB
+			// anyway.
 			if inplaces.is_empty() {
 				*input_index = ptr::null_mut();
 				*output_index = ptr::null_mut();
@@ -274,7 +275,8 @@ pub(super) fn erase<O: Operator + 'static>(operator: O) -> Result<ErasedOperator
 	unsafe extern "system" fn get_may_alias<O: Operator + 'static>(input_index: *mut *mut core::ffi::c_int, output_index: *mut *mut core::ffi::c_int) -> usize {
 		let aliases = O::ALIASES;
 		unsafe {
-			// ONNX Runtime only calls the release function if the list isn't empty, and allocating 0 bytes is UB anyway.
+			// ONNX Runtime only calls the release function if the list isn't empty, and allocating 0 bytes is UB
+			// anyway.
 			if aliases.is_empty() {
 				*input_index = ptr::null_mut();
 				*output_index = ptr::null_mut();

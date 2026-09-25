@@ -513,7 +513,8 @@ impl EnvironmentBuilder {
 			return Err(Error::new("only one environment is allowed per process"));
 		}
 
-		// The logger is passed to ONNX Runtime by pointer, so it needs a stable address that lives as long as the environment.
+		// The logger is passed to ONNX Runtime by pointer, so it needs a stable address that lives as long as the
+		// environment.
 		let logger_fn = self.logger.clone().map(Box::new);
 		let logger = logger_fn
 			.as_deref()

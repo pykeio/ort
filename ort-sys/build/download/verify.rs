@@ -36,8 +36,8 @@ impl<R: Read> VerifyReader<R> {
 	}
 
 	pub fn finalize(mut self) -> io::Result<([u8; 32], R)> {
-		// For whatever reason, `lzma-rust2` leaves some data unread at the end of the stream. Make sure all of the stream is
-		// consumed so we get the correct hash.
+		// For whatever reason, `lzma-rust2` leaves some data unread at the end of the stream. Make sure all of the
+		// stream is consumed so we get the correct hash.
 		io::copy(&mut self, &mut io::sink())?;
 
 		Ok((self.state.finalize(), self.reader))

@@ -60,7 +60,9 @@ impl ExecutionProvider for NNAPI {
 
 	#[allow(unused, unreachable_code)]
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
-		super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut ort_sys::OrtSessionOptions, flags: u32) -> ort_sys::OrtStatusPtr);
+		super::define_ep_register!(
+			OrtSessionOptionsAppendExecutionProvider_Nnapi(options: *mut ort_sys::OrtSessionOptions, flags: u32) -> ort_sys::OrtStatusPtr
+		);
 		let mut flags = 0;
 		if self.use_fp16 {
 			flags |= 0x001;

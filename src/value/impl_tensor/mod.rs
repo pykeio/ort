@@ -124,8 +124,8 @@ impl DynTensor {
 			nonNull(value_ptr)
 		];
 
-		// `CreateTensorAsOrtValue` actually does not guarantee that the data allocated is zero'd out, so if we can, we should
-		// do it manually.
+		// `CreateTensorAsOrtValue` actually does not guarantee that the data allocated is zero'd out, so if we can, we
+		// should do it manually.
 		let memory_info = unsafe { MemoryInfo::from_value(value_ptr) }.expect("CreateTensorAsOrtValue returned non-tensor");
 		#[cfg(not(target_arch = "wasm32"))] // Data is not available at this point with `ort-web`, so this would just instantly fail
 		if memory_info.is_cpu_accessible() && data_type != TensorElementType::String {
@@ -341,7 +341,8 @@ impl From<Value<DynTensorValueType>> for DynValue {
 impl<T: IntoTensorElementType + Clone + Debug, const N: usize> Index<[i64; N]> for Tensor<T> {
 	type Output = T;
 	fn index(&self, index: [i64; N]) -> &Self::Output {
-		// Interestingly, the `TensorAt` API doesn't check if the tensor is on CPU, so we have to perform the check ourselves.
+		// Interestingly, the `TensorAt` API doesn't check if the tensor is on CPU, so we have to perform the check
+		// ourselves.
 		if !self.memory_info().is_cpu_accessible() {
 			panic!("Cannot directly index a tensor which is not allocated on the CPU.");
 		}

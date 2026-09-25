@@ -1,6 +1,31 @@
-use alloc::string::ToString;
+use alloc::{
+	format,
+	string::{String, ToString},
+	vec::Vec
+};
+use core::fmt::Write;
 
 use super::{BuilderResult, SessionBuilder};
+use crate::error::{Error, ErrorCode};
+
+/// Layout of the Value KV cache used by `GroupQueryAttention`, set with [`SessionBuilder::with_gqa_value_layout`].
+///
+/// Only the Value cache bound by the application (a `past_value` graph input and `present_value` graph output) is
+/// affected; the Key cache always uses BNSH.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum GqaValueLayout {
+	/// `(batch_size, num_heads, sequence_length, head_size)`, as in the operator schema. This is the default.
+	///
+	/// Committing fails if the model was already converted to BNHS.
+	BNSH,
+	/// `(batch_size, num_heads, head_size, sequence_length)`.
+	///
+	/// ONNX Runtime inserts transposes around each `GroupQueryAttention` node for execution providers that do not fuse
+	/// them, which costs a copy of the Value cache in each direction per step. Committing fails if a cache can't be
+	/// converted, such as with models in ORT format.
+	BNHS
+}
 
 // https://github.com/microsoft/onnxruntime/blob/main/include/onnxruntime/core/session/onnxruntime_session_options_config_keys.h
 
@@ -138,6 +163,68 @@ impl SessionBuilder {
 	/// This option is **disabled** by default. Requires ONNX Runtime v1.29 or later.
 	pub fn with_weightless(self) -> BuilderResult {
 		self.with_config_entry("ep.enable_weightless", "1")
+	}
+
+	/// Sets the largest shapes expected for the given model inputs, which ONNX Runtime uses to estimate workspace
+	/// requirements for models with dynamic shapes.
+	///
+	/// Symbolic dimensions are replaced by these values for estimation only; the shapes of inputs at runtime are not
+	/// limited by this option. Each name must match a model input, and dimensions must be positive. Input names
+	/// containing `:` or `;` are not supported.
+	///
+	/// ```
+	/// # use ort::session::Session;
+	/// # fn main() -> ort::Result<()> {
+	/// # let env = ort::test_util::test_env().clone();
+	/// let session = Session::builder(&env)?
+	/// 	.with_max_shape_override([("string_input", [16])])?
+	/// 	.commit_from_file("tests/data/vectorizer.onnx")?;
+	/// # Ok(())
+	/// # }
+	/// ```
+	///
+	/// Requires ONNX Runtime v1.29 or later.
+	pub fn with_max_shape_override<N: AsRef<str>, S: AsRef<[i64]>>(self, overrides: impl IntoIterator<Item = (N, S)>) -> BuilderResult {
+		let mut value = String::new();
+		for (name, shape) in overrides {
+			let name = name.as_ref();
+			if name.contains([':', ';']) {
+				return Err(
+					Error::new_with_code(ErrorCode::InvalidArgument, format!("input name `{name}` cannot be used in a max shape override")).with_recover(self)
+				);
+			}
+			if !value.is_empty() {
+				value.push(';');
+			}
+			let dims = shape.as_ref().iter().map(|d| d.to_string()).collect::<Vec<_>>().join(",");
+			let _ = write!(value, "{name}:[{dims}]");
+		}
+		self.with_config_entry("session.max_shape_override", value)
+	}
+
+	/// Sets the layout of the Value KV cache that the application binds to `GroupQueryAttention`'s `past_value` input
+	/// and `present_value` output. See [`GqaValueLayout`] for details.
+	///
+	/// ```
+	/// # use ort::session::{Session, builder::GqaValueLayout};
+	/// # fn main() -> ort::Result<()> {
+	/// # let env = ort::test_util::test_env().clone();
+	/// let session = Session::builder(&env)?
+	/// 	.with_gqa_value_layout(GqaValueLayout::BNHS)?
+	/// 	.commit_from_file("tests/data/upsample.onnx")?;
+	/// # Ok(())
+	/// # }
+	/// ```
+	///
+	/// Requires ONNX Runtime v1.29.1 or later.
+	pub fn with_gqa_value_layout(self, layout: GqaValueLayout) -> BuilderResult {
+		self.with_config_entry(
+			"session.gqa_value_layout",
+			match layout {
+				GqaValueLayout::BNSH => "BNSH",
+				GqaValueLayout::BNHS => "BNHS"
+			}
+		)
 	}
 
 	/// Sets the path to the original (source) model when creating a session from a weightless EPContext model, so the

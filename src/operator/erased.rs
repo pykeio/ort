@@ -243,6 +243,13 @@ pub(super) fn erase<O: Operator + 'static>(operator: O) -> Result<ErasedOperator
 	) -> usize {
 		let inplaces = O::INPLACES;
 		unsafe {
+			// ONNX Runtime only calls the release function if the list isn't empty, and allocating 0 bytes is UB anyway.
+			if inplaces.is_empty() {
+				*input_index = ptr::null_mut();
+				*output_index = ptr::null_mut();
+				return 0;
+			}
+
 			*input_index = alloc::alloc::alloc(Layout::from_size_align_unchecked(size_of::<u32>() * inplaces.len(), align_of::<u32>())).cast();
 			*output_index = alloc::alloc::alloc(Layout::from_size_align_unchecked(size_of::<u32>() * inplaces.len(), align_of::<u32>())).cast();
 
@@ -267,6 +274,13 @@ pub(super) fn erase<O: Operator + 'static>(operator: O) -> Result<ErasedOperator
 	unsafe extern "system" fn get_may_alias<O: Operator + 'static>(input_index: *mut *mut core::ffi::c_int, output_index: *mut *mut core::ffi::c_int) -> usize {
 		let aliases = O::ALIASES;
 		unsafe {
+			// ONNX Runtime only calls the release function if the list isn't empty, and allocating 0 bytes is UB anyway.
+			if aliases.is_empty() {
+				*input_index = ptr::null_mut();
+				*output_index = ptr::null_mut();
+				return 0;
+			}
+
 			*input_index = alloc::alloc::alloc(Layout::from_size_align_unchecked(size_of::<u32>() * aliases.len(), align_of::<u32>())).cast();
 			*output_index = alloc::alloc::alloc(Layout::from_size_align_unchecked(size_of::<u32>() * aliases.len(), align_of::<u32>())).cast();
 
@@ -326,4 +340,74 @@ pub(super) fn erase<O: Operator + 'static>(operator: O) -> Result<ErasedOperator
 		outputs,
 		operator: DynOperator::create(operator)
 	})
+}
+
+#[cfg(all(test, feature = "api-18"))]
+mod tests {
+	use alloc::boxed::Box;
+	use core::{ffi::c_int, ptr, slice};
+
+	use super::erase;
+	use crate::{
+		operator::{BoxedKernel, ComputeContext, KernelContext, Operator, OperatorInput, OperatorOutput},
+		value::TensorElementType
+	};
+
+	struct Pairs<const N: usize>;
+
+	impl<const N: usize> Operator for Pairs<N> {
+		type Kernel<'attr> = BoxedKernel<'attr>;
+
+		const INPLACES: &[(u32, u32)] = [(0, 0), (1, 0)].split_at(N).0;
+		const ALIASES: &[(u32, u32)] = [(1, 0), (0, 0)].split_at(N).0;
+
+		fn name(&self) -> &str {
+			"Pairs"
+		}
+
+		fn inputs(&self) -> impl IntoIterator<Item = OperatorInput> {
+			[OperatorInput::required(TensorElementType::Float32), OperatorInput::required(TensorElementType::Float32)]
+		}
+
+		fn outputs(&self) -> impl IntoIterator<Item = OperatorOutput> {
+			[OperatorOutput::required(TensorElementType::Float32)]
+		}
+
+		fn create_kernel<'attr>(&self, _: &KernelContext<'attr>) -> crate::Result<Self::Kernel<'attr>> {
+			Ok(Box::new(|_: &ComputeContext| Ok(())))
+		}
+	}
+
+	type GetPairs = unsafe extern "system" fn(*mut *mut c_int, *mut *mut c_int) -> usize;
+	type ReleasePairs = unsafe extern "system" fn(*mut c_int, *mut c_int);
+
+	/// Calls `get` like ONNX Runtime does, which only calls `release` when there are pairs.
+	fn read_pairs(get: Option<GetPairs>, release: Option<ReleasePairs>) -> Option<alloc::vec::Vec<(c_int, c_int)>> {
+		let (get, release) = (get.expect("missing get function"), release.expect("missing release function"));
+		let (mut input_index, mut output_index) = (ptr::null_mut(), ptr::null_mut());
+		let len = unsafe { get(&mut input_index, &mut output_index) };
+		if len == 0 {
+			assert!(input_index.is_null() && output_index.is_null(), "nothing should be allocated for an empty list");
+			return None;
+		}
+		let pairs = unsafe { slice::from_raw_parts(input_index, len) }
+			.iter()
+			.zip(unsafe { slice::from_raw_parts(output_index, len) })
+			.map(|(&i, &o)| (i, o))
+			.collect();
+		unsafe { release(input_index, output_index) };
+		Some(pairs)
+	}
+
+	#[test]
+	fn test_inplace_and_alias_pairs() -> crate::Result<()> {
+		let empty = erase(Pairs::<0>)?.implementation;
+		assert_eq!(read_pairs(empty.GetMayInplace, empty.ReleaseMayInplace), None);
+		assert_eq!(read_pairs(empty.GetAliasMap, empty.ReleaseAliasMap), None);
+
+		let two = erase(Pairs::<2>)?.implementation;
+		assert_eq!(read_pairs(two.GetMayInplace, two.ReleaseMayInplace), Some(alloc::vec![(0, 0), (1, 0)]));
+		assert_eq!(read_pairs(two.GetAliasMap, two.ReleaseAliasMap), Some(alloc::vec![(1, 0), (0, 0)]));
+		Ok(())
+	}
 }

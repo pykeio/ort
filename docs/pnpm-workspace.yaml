@@ -1,0 +1,6 @@
+allowBuilds:
+  sharp: true
+minimumReleaseAge: 3000
+overrides:
+  # https://github.com/shuding/nextra/discussions/4988#discussioncomment-18102986
+  "zod": "4.3.6"

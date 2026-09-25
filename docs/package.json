@@ -11,26 +11,21 @@
 	"dependencies": {
 		"@radix-ui/themes": "^3.3.0",
 		"canvas-confetti": "^1.9.4",
-		"next": "^16.2.2",
+		"next": "^16.3.5",
 		"nextra": "^4.6.1",
 		"nextra-theme-docs": "^4.6.1",
-		"react": "^19.2.4",
-		"react-dom": "^19.2.4",
-		"react-icons": "^5.6.0",
-		"zustand": "^5.0.12"
+		"react": "^19.3.0",
+		"react-dom": "^19.3.0",
+		"react-icons": "^5.7.0",
+		"zustand": "^5.0.15"
 	},
 	"devDependencies": {
 		"@types/canvas-confetti": "^1.9.0",
-		"@types/node": "^22.19.17",
-		"@types/react": "^19.2.14",
-		"@types/react-dom": "^19.2.3",
-		"pagefind": "^1.4.0",
+		"@types/node": "^22.20.4",
+		"@types/react": "^19.3.0",
+		"@types/react-dom": "^19.3.0",
+		"pagefind": "^1.5.2",
 		"typescript": "^5.9.3"
 	},
-	"packageManager": "pnpm@10.22.0+sha512.bf049efe995b28f527fd2b41ae0474ce29186f7edcb3bf545087bd61fbbebb2bf75362d1307fda09c2d288e1e499787ac12d4fcb617a974718a6051f2eee741c",
-	"pnpm": {
-		"onlyBuiltDependencies": [
-			"sharp"
-		]
-	}
+	"packageManager": "pnpm@11.7.0+sha512.19cc852c120c7125760f2443ee6be0ca5b40f9f50598de1a09a1f177503e010e57c23c77646e01e761de59bf874fb22a3398c33ab9691fc13eb946b6f0f4d620"
 }

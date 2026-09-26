@@ -218,6 +218,26 @@ impl ComputeContext {
 		Ok(NonNull::new(value_ptr).map(|c| ValueRefMut::new(unsafe { Value::from_ptr_nodrop(c, None) })))
 	}
 
+	/// Returns the value already allocated for output `idx`, or `None` if the output has not been allocated.
+	///
+	/// The value may have been preallocated by the caller of the session (i.e. with
+	/// [`OutputSelector::preallocate`](crate::session::OutputSelector::preallocate) or an
+	/// [`IoBinding`](crate::session::IoBinding)), or by ONNX Runtime for a subgraph. This never allocates a new value;
+	/// use [`ComputeContext::output`] for that.
+	///
+	/// For outputs with dynamic dimensions, ONNX Runtime does not check that the preallocated value matches the shape
+	/// the kernel will produce, so check its shape before writing to it. Calling [`ComputeContext::output`] afterwards
+	/// with a different shape returns an error instead of replacing the value.
+	///
+	/// Requires ONNX Runtime v1.30 or later.
+	#[cfg(feature = "api-30")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "api-30")))]
+	pub fn preallocated_output(&self, idx: usize) -> Result<Option<ValueRefMut<'_>>> {
+		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
+		ortsys![unsafe KernelContext_GetPreallocatedOutput(self.ptr.as_ptr(), idx, &mut value_ptr)?];
+		Ok(NonNull::new(value_ptr).map(|c| ValueRefMut::new(unsafe { Value::from_ptr_nodrop(c, None) })))
+	}
+
 	pub fn num_inputs(&self) -> Result<usize> {
 		let mut num = 0;
 		ortsys![unsafe KernelContext_GetInputCount(self.ptr.as_ptr(), &mut num)?];

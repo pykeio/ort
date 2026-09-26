@@ -6,6 +6,7 @@
 - [**`semantic-similarity`**](#semantic-similarity): Semantic textual similarity using [`all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) from [SentenceTransformers](https://sbert.net/index.html) (SBERT)
 - [**`modnet`**](#modnet): [MODNet](https://github.com/ZHKKKe/MODNet) portrait matting
     - [**`cudarc`**](#cudarc): A variant of `modnet` inferring directly from CUDA buffers using the [`cudarc`](https://crates.io/crates/cudarc) crate.
+    - [**`cutile`**](#cutile): A variant of `modnet` that preprocesses the image on the GPU with a [cuTile Rust](https://crates.io/crates/cutile) kernel before inference.
 - [**`phi-3-vision`**](#phi-3-vision): Multimodal text generation using Microsoft's [Phi-3 Vision](https://techcommunity.microsoft.com/blog/azure-ai-services-blog/phi-3-vision-%E2%80%93-catalyzing-multimodal-innovation/4170251) model
 - [**`model-info`**](#model-info): Simple CLI app to inspect an ONNX model's metadata
 - [**`train-clm`**](#train-clm): Trains a causal language model from scratch using `ort`
@@ -144,6 +145,15 @@ This example implements the [MODNet](https://arxiv.org/pdf/2011.11961.pdf) model
 > ⚠️ This example only supports CUDA with the default (ONNX Runtime) backend.
 
 This example is a variant of [`modnet`](#modnet) that loads the image into a CUDA buffer using [`cudarc`](https://crates.io/crates/cudarc), and then creates an `ort` tensor from it. This can be useful for more complex scenarios where you need to perform on-GPU processing before passing data to an `ort` model.
+
+## `cutile`
+**[🧑‍💻 View source](https://github.com/pykeio/ort/blob/main/examples/cutile/cutile.rs) | `examples/cutile/cutile.rs`**
+
+> ⚠️ This example only supports CUDA with the default (ONNX Runtime) backend.
+
+> ℹ️ [cuTile Rust](https://github.com/NVlabs/cutile-rs) requires CUDA 13.2+ and an `sm_80`+ (Ampere or newer) GPU. If CUDA isn't installed in a standard location like `/usr/local/cuda`, set `CUDA_TOOLKIT_PATH` to your toolkit's directory.
+
+This example is a variant of [`modnet`](#modnet) that normalizes the image on the GPU with a tile kernel written in Rust using [cuTile Rust](https://crates.io/crates/cutile), then passes the kernel's output buffer to `ort` directly — the input tensor never leaves the GPU. This is a good starting point for writing your own on-GPU pre- or post-processing kernels in pure Rust.
 
 ## `phi-3-vision`
 **[🧑‍💻 View source](https://github.com/pykeio/ort/blob/main/examples/phi-3-vision/src/main.rs) | `examples/phi-3-vision/src/main.rs` | Contributed by [web3nomad](https://github.com/web3nomad)**

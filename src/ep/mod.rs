@@ -91,7 +91,7 @@ impl<E: SimpleExecutionProvider> ExecutionProvider for E {
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		let ffi_options = self.options().to_ffi();
 		// 1.22 lets us use canonical EP names instead of the weird short names. Prefer those for clarity.
-		let name = alloc::ffi::CString::new(if cfg!(feature = "api-22") { Self::CANONICAL_NAME } else { Self::SHORT_NAME }).expect("EP name has no NUL");
+		let name = CString::new(if cfg!(feature = "api-22") { Self::CANONICAL_NAME } else { Self::SHORT_NAME }).expect("EP name has no NUL");
 		ortsys![unsafe SessionOptionsAppendExecutionProvider(
 			session_builder.ptr_mut(),
 			name.as_ptr(),

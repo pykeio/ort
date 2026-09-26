@@ -8,6 +8,7 @@ exclude = [
 	'backends/web',
 	'examples/async-gpt2-api',
 	'examples/cudarc',
+	'examples/cutile',
 	'examples/custom-ops',
 	'examples/gpt2',
 	'examples/model-info',

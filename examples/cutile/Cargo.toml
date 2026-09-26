@@ -1,0 +1,18 @@
+[package]
+publish = false
+name = "example-cutile"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ort = { path = "../../", features = [ "cuda", "fetch-models" ] }
+cutile = "0.4"
+anyhow = "1.0"
+image = { version = "0.25", default-features = false, features = [ "jpeg" ] }
+tracing = "0.1"
+show-image = { version = "0.14", features = [ "image", "raqote" ] }
+tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
+
+[[example]]
+name = "cutile"
+path = "cutile.rs"

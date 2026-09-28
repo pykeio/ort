@@ -120,22 +120,28 @@ impl Environment {
 		&self.0.execution_providers
 	}
 
-	/// Registers an execution provider library from the given `path`. Can be used to customize the path of a provider
-	/// library, or load new ones ONNX Runtime was not initially compiled with.
+	/// Registers an execution provider plugin from the given `path`. Execution providers from the plugin can then be
+	/// registered via [`SessionBuilder::with_devices`](crate::session::builder::SessionBuilder::with_devices).
 	///
 	/// `name` is semi-arbitrary - it should be unique per EP library. Adding the suffix `.virtual` to `name` allows the
 	/// EP library to create virtual [devices](crate::device).
 	///
-	/// Returns a handle that can be used to [unregister](ExecutionProviderLibrary::unregister) the library, should it
-	/// no longer be needed.
-	///
-	/// ```
+	/// ```no_run
+	/// # use ort::{session::Session, memory::DeviceType};
 	/// # fn main() -> ort::Result<()> {
 	/// # let env = ort::test_util::test_env().clone();
-	/// let _ = env.register_ep_library("CUDA", "/path/to/onnxruntime_providers_cuda.dll");
+	/// env.register_ep_library("CUDA", "/path/to/onnxruntime_providers_cuda.dll")?;
+	///
+	/// let mut session = Session::builder(&env)?
+	/// 	// plugin EPs go through the device API, not the traditional `ort::ep` API
+	/// 	.with_devices(env.devices().filter(|dev| dev.hardware_device().ty() == DeviceType::GPU), None)?
+	/// 	.commit_from_file("tests/data/upsample.onnx")?;
 	/// # Ok(())
 	/// # }
 	/// ```
+	///
+	/// Returns a handle that can be used to [unregister](ExecutionProviderLibrary::unregister) the library, should it
+	/// no longer be needed.
 	#[cfg(all(feature = "api-22", feature = "std"))]
 	#[cfg_attr(docsrs, doc(cfg(all(feature = "api-22", feature = "std"))))]
 	pub fn register_ep_library<P: AsRef<Path>>(&self, name: impl Into<String>, path: P) -> Result<ExecutionProviderLibrary> {

@@ -1,5 +1,3 @@
-#[cfg(feature = "api-24")]
-use alloc::ffi::CString;
 use core::{ffi::CStr, marker::PhantomData, ptr::NonNull};
 #[cfg(feature = "api-24")]
 use core::{ffi::c_char, ptr};
@@ -10,7 +8,7 @@ use std::path::Path;
 use crate::memory::MemoryInfo;
 use crate::{AsPointer, Error, Result, memory::DeviceType, ortsys};
 #[cfg(feature = "api-24")]
-use crate::{ep::ExecutionProvider, memory::Allocator};
+use crate::{ep::ExecutionProvider, memory::Allocator, util::with_cstr};
 
 pub struct Device<'e> {
 	ptr: NonNull<ort_sys::OrtEpDevice>,
@@ -173,24 +171,28 @@ pub struct CompatibilityInfo<E> {
 impl<E: ExecutionProvider> CompatibilityInfo<E> {
 	#[cfg(feature = "std")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-	pub fn from_compiled_model_file(path: impl AsRef<Path>, ep: &E) -> Result<Option<Self>> {
+	pub fn from_compiled_model_file(path: impl AsRef<Path>) -> Result<Option<Self>> {
 		let path = crate::util::path_to_os_char(path);
-		let mut allocator = Allocator::default();
+		let allocator = Allocator::default();
 		// In typical ONNX Runtime fashion there is zero information about what the hell `ep_type` is or what it comes
 		// from. I also can't get any EP to produce a compiled model that even has the compatibility info field
 		// to check. So I'll assume it's the EP name but of course that'll turn out to be wrong.
-		let ep_type = CString::new(ep.name())?;
-		let mut str = ptr::null_mut();
-		ortsys![unsafe GetCompatibilityInfoFromModel(path.as_ptr(), ep_type.as_ptr(), allocator.ptr_mut(), &mut str)?];
+		let str = with_cstr(E::NAME.as_bytes(), &|ep_type| {
+			let mut str = ptr::null_mut();
+			ortsys![unsafe GetCompatibilityInfoFromModel(path.as_ptr(), ep_type.as_ptr(), allocator.ptr().cast_mut(), &mut str)?];
+			Ok(str)
+		})?;
 		Ok(NonNull::new(str).map(|str| Self { str, allocator, _p: PhantomData }))
 	}
 
-	pub fn from_compiled_model_bytes(bytes: impl AsRef<[u8]>, ep: &E) -> Result<Option<Self>> {
+	pub fn from_compiled_model_bytes(bytes: impl AsRef<[u8]>) -> Result<Option<Self>> {
 		let bytes = bytes.as_ref();
-		let mut allocator = Allocator::default();
-		let ep_type = CString::new(ep.name())?;
-		let mut str = ptr::null_mut();
-		ortsys![unsafe GetCompatibilityInfoFromModelBytes(bytes.as_ptr().cast(), bytes.len(), ep_type.as_ptr(), allocator.ptr_mut(), &mut str)?];
+		let allocator = Allocator::default();
+		let str = with_cstr(E::NAME.as_bytes(), &|ep_type| {
+			let mut str = ptr::null_mut();
+			ortsys![unsafe GetCompatibilityInfoFromModelBytes(bytes.as_ptr().cast(), bytes.len(), ep_type.as_ptr(), allocator.ptr().cast_mut(), &mut str)?];
+			Ok(str)
+		})?;
 		Ok(NonNull::new(str).map(|str| Self { str, allocator, _p: PhantomData }))
 	}
 }

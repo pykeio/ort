@@ -35,9 +35,7 @@ impl ACL {
 }
 
 impl ExecutionProvider for ACL {
-	fn name(&self) -> &'static str {
-		"ACLExecutionProvider"
-	}
+	const NAME: &'static str = "ACLExecutionProvider";
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		super::define_ep_register!(

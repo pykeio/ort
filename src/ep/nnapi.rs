@@ -54,9 +54,7 @@ impl NNAPI {
 }
 
 impl ExecutionProvider for NNAPI {
-	fn name(&self) -> &'static str {
-		"NnapiExecutionProvider"
-	}
+	const NAME: &'static str = "NnapiExecutionProvider";
 
 	#[allow(unused, unreachable_code)]
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {

@@ -13,9 +13,7 @@ pub struct VSINPU;
 super::impl_ep!(VSINPU);
 
 impl ExecutionProvider for VSINPU {
-	fn name(&self) -> &'static str {
-		"VSINPUExecutionProvider"
-	}
+	const NAME: &'static str = "VSINPUExecutionProvider";
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_VSINPU(options: *mut ort_sys::OrtSessionOptions) -> ort_sys::OrtStatusPtr);

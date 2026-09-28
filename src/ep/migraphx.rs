@@ -184,9 +184,7 @@ impl MIGraphX {
 }
 
 impl ExecutionProvider for MIGraphX {
-	fn name(&self) -> &'static str {
-		"MIGraphXExecutionProvider"
-	}
+	const NAME: &'static str = "MIGraphXExecutionProvider";
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		let options = ort_sys::OrtMIGraphXProviderOptions {

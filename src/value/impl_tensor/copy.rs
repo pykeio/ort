@@ -322,7 +322,7 @@ impl IdentitySessionHandle {
 					.with_memory_pattern(false)?
 					.with_no_environment_execution_providers()?;
 				// Avoid registering the same EP twice, since that's an error.
-				if source_ep.inner.name() != target_ep.inner.name() {
+				if source_ep.name() != target_ep.name() {
 					builder = builder.with_execution_providers([source_ep, target_ep])?;
 				} else {
 					builder = builder.with_execution_providers([source_ep])?;

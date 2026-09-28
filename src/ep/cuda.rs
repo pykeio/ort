@@ -311,9 +311,7 @@ impl CUDA {
 }
 
 impl ExecutionProvider for CUDA {
-	fn name(&self) -> &'static str {
-		"CUDAExecutionProvider"
-	}
+	const NAME: &'static str = "CUDAExecutionProvider";
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		let mut cuda_options: *mut ort_sys::OrtCUDAProviderOptionsV2 = ptr::null_mut();

@@ -37,9 +37,7 @@ impl ArmNN {
 }
 
 impl ExecutionProvider for ArmNN {
-	fn name(&self) -> &'static str {
-		"ArmNNExecutionProvider"
-	}
+	const NAME: &'static str = "ArmNNExecutionProvider";
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		super::define_ep_register!(

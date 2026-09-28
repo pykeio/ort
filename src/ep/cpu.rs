@@ -27,12 +27,10 @@ impl CPU {
 }
 
 impl ExecutionProvider for CPU {
-	fn name(&self) -> &'static str {
-		"CPUExecutionProvider"
-	}
+	const NAME: &'static str = "CPUExecutionProvider";
 
 	// The CPU execution provider is always available.
-	fn is_available(&self) -> Result<bool> {
+	fn is_available() -> Result<bool> {
 		Ok(true)
 	}
 

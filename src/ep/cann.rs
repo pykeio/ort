@@ -168,9 +168,7 @@ impl CANN {
 }
 
 impl ExecutionProvider for CANN {
-	fn name(&self) -> &'static str {
-		"CANNExecutionProvider"
-	}
+	const NAME: &'static str = "CANNExecutionProvider";
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		let mut cann_options: *mut ort_sys::OrtCANNProviderOptions = ptr::null_mut();

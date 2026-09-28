@@ -90,9 +90,7 @@ impl DirectML {
 }
 
 impl ExecutionProvider for DirectML {
-	fn name(&self) -> &'static str {
-		"DmlExecutionProvider"
-	}
+	const NAME: &'static str = "DmlExecutionProvider";
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		let api = api().ok_or_else(|| Error::new("DirectML is not supported in this build of ONNX Runtime"))?;

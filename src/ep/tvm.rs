@@ -50,9 +50,7 @@ pub struct TVM {
 super::impl_ep!(TVM);
 
 impl ExecutionProvider for TVM {
-	fn name(&self) -> &'static str {
-		"TvmExecutionProvider"
-	}
+	const NAME: &'static str = "TvmExecutionProvider";
 
 	#[allow(unused, unreachable_code)]
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {

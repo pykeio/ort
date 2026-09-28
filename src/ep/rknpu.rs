@@ -11,9 +11,7 @@ pub struct RKNPU {}
 super::impl_ep!(RKNPU);
 
 impl ExecutionProvider for RKNPU {
-	fn name(&self) -> &'static str {
-		"RknpuExecutionProvider"
-	}
+	const NAME: &'static str = "RknpuExecutionProvider";
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		super::define_ep_register!(OrtSessionOptionsAppendExecutionProvider_RKNPU(options: *mut ort_sys::OrtSessionOptions) -> ort_sys::OrtStatusPtr);

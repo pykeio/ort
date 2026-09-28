@@ -103,9 +103,7 @@ impl TensorRT {
 }
 
 impl ExecutionProvider for TensorRT {
-	fn name(&self) -> &'static str {
-		"TensorrtExecutionProvider"
-	}
+	const NAME: &'static str = "TensorrtExecutionProvider";
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		let mut trt_options: *mut ort_sys::OrtTensorRTProviderOptionsV2 = ptr::null_mut();

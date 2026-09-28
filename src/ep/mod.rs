@@ -20,7 +20,6 @@ use alloc::{ffi::CString, string::ToString, sync::Arc, vec::Vec};
 #[cfg(feature = "api-22")]
 use alloc::{string::String, sync::Weak};
 use core::{
-	any::Any,
 	ffi::c_char,
 	fmt::{self, Debug},
 	ptr
@@ -36,12 +35,12 @@ use crate::{
 	util::{MiniMap, char_p_to_string, run_on_drop}
 };
 
-pub trait ExecutionProvider: Any + Send + Sync {
-	/// Returns the identifier of this execution provider used internally by ONNX Runtime.
+pub trait ExecutionProvider: Send + Sync {
+	/// The identifier of this execution provider used internally by ONNX Runtime.
 	///
 	/// This is the same as what's used in ONNX Runtime's Python API to register this execution provider, i.e.
 	/// [`TVM`]'s identifier is `TvmExecutionProvider`.
-	fn name(&self) -> &'static str;
+	const NAME: &'static str;
 
 	/// Returns `Ok(true)` if ONNX Runtime was *compiled with support* for this execution provider, and `Ok(false)`
 	/// otherwise.
@@ -54,8 +53,8 @@ pub trait ExecutionProvider: Any + Send + Sync {
 	/// dependencies during session creation. In most cases (i.e. showing the user an error message if CUDA could not be
 	/// enabled), you'll instead want to manually register this EP via [`ExecutionProvider::register`] and detect
 	/// and handle any errors returned by that function.
-	fn is_available(&self) -> Result<bool> {
-		is_ep_available(self.name())
+	fn is_available() -> Result<bool> {
+		is_ep_available(Self::NAME)
 	}
 
 	/// Attempts to register this execution provider on the given session.
@@ -84,9 +83,7 @@ pub(crate) trait SimpleExecutionProvider: ArbitrarilyConfigurableExecutionProvid
 }
 
 impl<E: SimpleExecutionProvider> ExecutionProvider for E {
-	fn name(&self) -> &'static str {
-		Self::CANONICAL_NAME
-	}
+	const NAME: &'static str = Self::CANONICAL_NAME;
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		let ffi_options = self.options().to_ffi();
@@ -103,23 +100,10 @@ impl<E: SimpleExecutionProvider> ExecutionProvider for E {
 	}
 }
 
-/// The strategy for extending the device memory arena.
-#[derive(Debug, Default, Clone)]
-pub enum ArenaExtendStrategy {
-	/// (Default) Subsequent extensions extend by larger amounts (multiplied by powers of two)
-	#[default]
-	NextPowerOfTwo,
-	/// Memory extends by the requested amount.
-	SameAsRequested
-}
-
-impl fmt::Display for ArenaExtendStrategy {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		match self {
-			Self::NextPowerOfTwo => f.write_str("kNextPowerOfTwo"),
-			Self::SameAsRequested => f.write_str("kSameAsRequested")
-		}
-	}
+struct ExecutionProviderVTable {
+	name: &'static str,
+	register: fn(*const (), session_builder: &mut SessionBuilder) -> Result<()>,
+	drop: fn(*mut ())
 }
 
 /// Dynamic execution provider container, used to provide a list of multiple types of execution providers when
@@ -127,16 +111,47 @@ impl fmt::Display for ArenaExtendStrategy {
 /// [`EnvironmentBuilder`](crate::environment::EnvironmentBuilder).
 ///
 /// See [`ExecutionProvider`] for more info on execution providers.
-#[derive(Clone)]
 pub struct ExecutionProviderDispatch {
-	pub(crate) inner: Arc<dyn ExecutionProvider>,
+	ep: *mut (),
+	vtable: &'static ExecutionProviderVTable,
 	error_on_failure: bool
 }
 
-impl ExecutionProviderDispatch {
-	pub(crate) fn new<E: ExecutionProvider + 'static>(ep: E) -> Self {
+impl Clone for ExecutionProviderDispatch {
+	fn clone(&self) -> Self {
+		unsafe { Arc::increment_strong_count(self.ep) };
+
 		ExecutionProviderDispatch {
-			inner: Arc::new(ep) as _,
+			ep: self.ep,
+			vtable: self.vtable,
+			error_on_failure: self.error_on_failure
+		}
+	}
+}
+
+// SAFETY: `self.ep` is an erased `Arc<dyn ExecutionProvider>`, which is `Send + Sync` when `T` is (and
+// `ExecutionProvider` requires `Send` + `Sync`)
+unsafe impl Send for ExecutionProviderDispatch {}
+unsafe impl Sync for ExecutionProviderDispatch {}
+
+impl ExecutionProviderDispatch {
+	pub(crate) fn new<E: ExecutionProvider>(ep: E) -> ExecutionProviderDispatch {
+		fn register<E: ExecutionProvider>(ep: *const (), session_builder: &mut SessionBuilder) -> Result<()> {
+			let ep = unsafe { &*ep.cast::<E>() };
+			ep.register(session_builder)
+		}
+
+		fn ep_drop<E: ExecutionProvider>(ep: *mut ()) {
+			let _ = unsafe { Arc::from_raw(ep.cast::<E>()) };
+		}
+
+		ExecutionProviderDispatch {
+			ep: (Arc::into_raw(Arc::new(ep)) as *mut E).cast(),
+			vtable: &ExecutionProviderVTable {
+				name: E::NAME,
+				register: register::<E>,
+				drop: ep_drop::<E>
+			},
 			error_on_failure: false
 		}
 	}
@@ -156,17 +171,39 @@ impl ExecutionProviderDispatch {
 		self
 	}
 
-	/// Attempt to downcast this execution provider to a concrete type `E`.
-	pub fn downcast_ref<E: ExecutionProvider>(&self) -> Option<&E> {
-		<dyn Any>::downcast_ref(&*self.inner)
+	#[inline(always)]
+	pub fn name(&self) -> &'static str {
+		self.vtable.name
+	}
+
+	#[inline(always)]
+	pub fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
+		(self.vtable.register)(self.ep, session_builder)
 	}
 }
 
-impl Debug for ExecutionProviderDispatch {
+impl Drop for ExecutionProviderDispatch {
+	fn drop(&mut self) {
+		(self.vtable.drop)(self.ep);
+	}
+}
+
+/// The strategy for extending the device memory arena.
+#[derive(Debug, Default, Clone)]
+pub enum ArenaExtendStrategy {
+	/// (Default) Subsequent extensions extend by larger amounts (multiplied by powers of two)
+	#[default]
+	NextPowerOfTwo,
+	/// Memory extends by the requested amount.
+	SameAsRequested
+}
+
+impl fmt::Display for ArenaExtendStrategy {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		f.debug_struct(self.inner.name())
-			.field("error_on_failure", &self.error_on_failure)
-			.finish()
+		match self {
+			Self::NextPowerOfTwo => f.write_str("kNextPowerOfTwo"),
+			Self::SameAsRequested => f.write_str("kSameAsRequested")
+		}
 	}
 }
 
@@ -283,15 +320,15 @@ pub(crate) use define_options;
 
 pub(crate) fn apply_execution_providers(session_builder: &mut SessionBuilder, eps: &[ExecutionProviderDispatch], source: &'static str) -> Result<()> {
 	fn register_inner(session_builder: &mut SessionBuilder, ep: &ExecutionProviderDispatch, #[allow(unused)] source: &'static str) -> Result<bool> {
-		if let Err(e) = ep.inner.register(session_builder) {
+		if let Err(e) = ep.register(session_builder) {
 			if ep.error_on_failure {
 				return Err(e)?;
 			}
 
-			crate::error!(%source, "An error occurred when attempting to register `{}`: {e}", ep.inner.name());
+			crate::error!(%source, "An error occurred when attempting to register `{}`: {e}", ep.vtable.name);
 			Ok(false)
 		} else {
-			crate::info!(%source, "Successfully registered `{}`", ep.inner.name());
+			crate::info!(%source, "Successfully registered `{}`", ep.vtable.name);
 			Ok(true)
 		}
 	}

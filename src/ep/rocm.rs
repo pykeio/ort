@@ -41,9 +41,7 @@ impl ROCm {
 }
 
 impl ExecutionProvider for ROCm {
-	fn name(&self) -> &'static str {
-		"ROCMExecutionProvider"
-	}
+	const NAME: &'static str = "ROCMExecutionProvider";
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		let mut rocm_options: *mut ort_sys::OrtROCMProviderOptions = ptr::null_mut();

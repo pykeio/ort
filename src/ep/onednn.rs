@@ -27,9 +27,7 @@ impl OneDNN {
 }
 
 impl ExecutionProvider for OneDNN {
-	fn name(&self) -> &'static str {
-		"DnnlExecutionProvider"
-	}
+	const NAME: &'static str = "DnnlExecutionProvider";
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
 		let mut dnnl_options: *mut ort_sys::OrtDnnlProviderOptions = ptr::null_mut();

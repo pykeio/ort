@@ -13,7 +13,7 @@ impl OpenVINO {
 	super::define_options! {
 		/// Overrides the accelerator hardware type and precision.
 		///
-		/// `device_type` should be in the format `CPU`, `NPU`, `GPU`, `GPU.0`, `GPU.1`, etc. Heterogenous combinations are
+		/// `device_type` should be in the format `CPU`, `NPU`, `GPU`, `GPU.0`, `GPU.1`, etc. Heterogeneous combinations are
 		/// also supported in the format `HETERO:NPU,GPU`.
 		///
 		/// ```

@@ -50,7 +50,7 @@ pub fn training_api() -> Result<&'static ort_sys::OrtTrainingApi> {
 			.0
 			.cast_mut()
 	)
-	.ok_or_else(|| Error::new("Training is not enbled in this build of ONNX Runtime."))?;
+	.ok_or_else(|| Error::new("Training is not enabled in this build of ONNX Runtime."))?;
 	Ok(unsafe { ptr.as_ref() })
 }
 

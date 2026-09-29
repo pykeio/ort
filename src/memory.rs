@@ -219,14 +219,14 @@ pub struct AllocatedBlock<'a> {
 impl<'a> AllocatedBlock<'a> {
 	/// Returns a pointer to the allocated memory.
 	///
-	/// Note that, depending on the exact allocator used, this may not a pointer to memory accessible by the CPU.
+	/// Note that, depending on the exact allocator used, this may not be a pointer to memory accessible by the CPU.
 	pub fn as_ptr(&self) -> *const c_void {
 		self.ptr.as_ptr()
 	}
 
 	/// Returns a mutable pointer to the allocated memory.
 	///
-	/// Note that, depending on the exact allocator used, this may not a pointer to memory accessible by the CPU.
+	/// Note that, depending on the exact allocator used, this may not be a pointer to memory accessible by the CPU.
 	pub fn as_mut_ptr(&mut self) -> *mut c_void {
 		self.ptr.as_ptr()
 	}

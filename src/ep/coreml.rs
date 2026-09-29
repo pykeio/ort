@@ -177,7 +177,7 @@ impl CoreML {
 		///
 		/// ## Updating the cache
 		/// The cached model will only be recompiled if the ONNX model's metadata or the structure of the graph changes. To
-		/// ensure a model updates when i.e. only weights change, you can add the hash of the model file as a custom
+		/// ensure a model updates when e.g. only weights change, you can add the hash of the model file as a custom
 		/// metadata option:
 		/// ```python
 		/// import onnx

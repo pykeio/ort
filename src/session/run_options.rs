@@ -302,7 +302,7 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 	/// });
 	///
 	/// let res = session.run_with_options(ort::inputs![input], &*run_options);
-	/// // upon termination, the session will return an `Error::SessionRun` error.`
+	/// // upon termination, the session will return an `Error::SessionRun` error.
 	/// assert_eq!(
 	/// 	&res.unwrap_err().to_string(),
 	/// 	"Failed to run inference on model: Exiting due to terminate flag being set to true."

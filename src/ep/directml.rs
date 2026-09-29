@@ -33,7 +33,7 @@ pub enum DeviceFilter {
 /// DirectX 12-enabled hardware on Windows.
 ///
 /// # Performance considerations
-/// The DirectML EP performs best when the size of inputs & outputs are known when the session is created. For graphs
+/// The DirectML EP performs best when the sizes of inputs & outputs are known when the session is created. For graphs
 /// with dynamically sized inputs, you can override individual dimensions by constructing the session with
 /// [`SessionBuilder::with_dimension_override`]:
 /// ```no_run

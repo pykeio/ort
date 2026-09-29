@@ -32,7 +32,7 @@ impl Session {
 		Ok(Session {
 			sentinel: SESSION_SENTINEL,
 			js: binding::InferenceSession::create_from_bytes(
-				// i'm fairly confident that the bytes are copied, at least when we're not using ONNX.js
+				// I'm fairly confident that the bytes are copied, at least when we're not using ONNX.js
 				&unsafe { Uint8Array::view(bytes) },
 				&options.js
 			)

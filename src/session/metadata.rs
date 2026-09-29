@@ -34,7 +34,7 @@ impl ModelMetadata<'_> {
 		}
 	}
 
-	/// Gets the model description, returning an error if no description is present.
+	/// Gets the model description, or `None` if no description is present.
 	pub fn description(&self) -> Option<String> {
 		let mut str_bytes: *mut c_char = ptr::null_mut();
 		ortsys![@ort: unsafe ModelMetadataGetDescription(self.ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes) as Result].ok()?;
@@ -52,7 +52,7 @@ impl ModelMetadata<'_> {
 			.map(|s| s.to_string())
 	}
 
-	/// Gets the model producer name, returning an error if no producer name is present.
+	/// Gets the model producer name, or `None` if no producer name is present.
 	pub fn producer(&self) -> Option<String> {
 		let mut str_bytes: *mut c_char = ptr::null_mut();
 		ortsys![@ort: unsafe ModelMetadataGetProducerName(self.ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes) as Result].ok()?;
@@ -61,7 +61,7 @@ impl ModelMetadata<'_> {
 			.map(|s| s.to_string())
 	}
 
-	/// Gets the model name, returning an error if no name is present.
+	/// Gets the model name, or `None` if no name is present.
 	pub fn name(&self) -> Option<String> {
 		let mut str_bytes: *mut c_char = ptr::null_mut();
 		ortsys![@ort: unsafe ModelMetadataGetGraphName(self.ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes) as Result].ok()?;
@@ -70,7 +70,7 @@ impl ModelMetadata<'_> {
 			.map(|s| s.to_string())
 	}
 
-	/// Returns the model's domain, returning an error if no name is present.
+	/// Returns the model's domain, or `None` if no domain is present.
 	pub fn domain(&self) -> Option<String> {
 		let mut str_bytes: *mut c_char = ptr::null_mut();
 		ortsys![@ort: unsafe ModelMetadataGetDomain(self.ptr.as_ptr(), self.allocator.ptr().cast_mut(), &mut str_bytes) as Result].ok()?;
@@ -79,7 +79,7 @@ impl ModelMetadata<'_> {
 			.map(|s| s.to_string())
 	}
 
-	/// Gets the model version, returning an error if no version is present.
+	/// Gets the model version, or `None` if no version is present.
 	pub fn version(&self) -> Option<i64> {
 		let mut ver = 0i64;
 		ortsys![@ort: unsafe ModelMetadataGetVersion(self.ptr.as_ptr(), &mut ver) as Result].ok()?;

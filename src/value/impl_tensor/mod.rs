@@ -136,19 +136,19 @@ impl DynTensor {
 			}
 		}
 
-		Ok(Value {
-			inner: ValueInner::new(
-				value_ptr,
-				ValueType::Tensor {
-					ty: data_type,
-					shape,
-					dimension_symbols: SymbolicDimensions::empty(shape_len)
-				},
-				Some(memory_info),
-				true
-			),
-			_markers: PhantomData
-		})
+		let mut inner = ValueInner::new(
+			value_ptr,
+			ValueType::Tensor {
+				ty: data_type,
+				shape,
+				dimension_symbols: SymbolicDimensions::empty(shape_len)
+			},
+			Some(memory_info),
+			true
+		);
+		// ONNX Runtime frees the data through `allocator`, so it has to outlive the tensor.
+		Arc::get_mut(&mut inner).expect("new value is unique").allocator = allocator.handle.clone();
+		Ok(Value { inner, _markers: PhantomData })
 	}
 }
 

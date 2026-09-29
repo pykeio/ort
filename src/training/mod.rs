@@ -1,6 +1,9 @@
 //! Provides [`Trainer`], a simple interface for on-device training/fine-tuning.
 
-use alloc::string::{String, ToString};
+use alloc::{
+	string::{String, ToString},
+	sync::Arc
+};
 use core::{
 	ffi::{CStr, c_char},
 	marker::PhantomData,
@@ -138,7 +141,10 @@ impl Checkpoint {
 			ortsys![@training: unsafe GetParameter(self.ptr.as_ptr(), name.as_ptr(), allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
 			Ok(value_ptr)
 		})?;
-		Ok(unsafe { DynTensor::from_ptr(value_ptr, None) })
+		let mut tensor = unsafe { DynTensor::from_ptr(value_ptr, None) };
+		// ONNX Runtime frees the data through `allocator`, so it has to outlive the tensor.
+		Arc::get_mut(&mut tensor.inner).expect("new value is unique").allocator = allocator.handle.clone();
+		Ok(tensor)
 	}
 
 	pub fn update_parameter<T: ValueTypeMarker>(&mut self, name: impl AsRef<str>, value: &Value<T>) -> Result<()> {

@@ -73,18 +73,33 @@ use crate::{
 #[derive(Debug)]
 pub struct Allocator {
 	ptr: NonNull<ort_sys::OrtAllocator>,
-	/// The 'default' CPU allocator, provided by `GetAllocatorWithDefaultOptions` and implemented by
-	/// [`Allocator::default`], should **not** be released, so this field marks whether or not we should call
-	/// `ReleaseAllocator` on drop.
-	is_default: bool,
 	info: MemoryInfo<'static>,
-	/// Hold a reference to the session if this allocator is tied to one.
-	_session_inner: Option<Arc<SharedSessionInner>>
+	/// Releases the allocator once it and every tensor created with it are dropped. `None` for the default CPU
+	/// allocator provided by `GetAllocatorWithDefaultOptions`, which must never be released.
+	pub(crate) handle: Option<Arc<AllocatorHandle>>
 }
 
 unsafe impl Send for Allocator {}
 // not all allocators appear to be Sync - specifically the CUDA allocator can sometimes crash when used on multiple
 // threads. CPU allocator doesn't seem to be affected though.
+
+#[derive(Debug)]
+pub(crate) struct AllocatorHandle {
+	ptr: NonNull<ort_sys::OrtAllocator>,
+	/// Hold a reference to the session if this allocator is tied to one.
+	_session_inner: Option<Arc<SharedSessionInner>>
+}
+
+// The handle is only used to release the allocator.
+unsafe impl Send for AllocatorHandle {}
+unsafe impl Sync for AllocatorHandle {}
+
+impl Drop for AllocatorHandle {
+	fn drop(&mut self) {
+		ortsys![unsafe ReleaseAllocator(self.ptr.as_ptr())];
+		crate::logging::drop!(Allocator, self.ptr);
+	}
+}
 
 impl Allocator {
 	pub(crate) unsafe fn from_raw(ptr: NonNull<ort_sys::OrtAllocator>, is_default: bool) -> Allocator {
@@ -93,11 +108,10 @@ impl Allocator {
 
 		Allocator {
 			ptr,
-			is_default,
 			info: MemoryInfo::from_raw(memory_info_ptr, false),
 			// currently, this function is only ever used in session creation, where we call `CreateAllocator` manually and store the allocator resulting from
 			// this function in the `SharedSessionInner` - we don't need to hold onto the session, because the session is holding onto us.
-			_session_inner: None
+			handle: (!is_default).then(|| Arc::new(AllocatorHandle { ptr, _session_inner: None }))
 		}
 	}
 
@@ -159,9 +173,11 @@ impl Allocator {
 		crate::logging::create!(Allocator, ptr);
 		Ok(Self {
 			ptr,
-			is_default: false,
 			info: memory_info.to_owned(),
-			_session_inner: Some(session.inner())
+			handle: Some(Arc::new(AllocatorHandle {
+				ptr,
+				_session_inner: Some(session.inner())
+			}))
 		})
 	}
 }
@@ -185,10 +201,8 @@ impl Default for Allocator {
 
 		Self {
 			ptr: allocator_ptr,
-			is_default: true,
 			info: MemoryInfo::from_raw(memory_info_ptr, false),
-			// The default allocator isn't tied to a session.
-			_session_inner: None
+			handle: None
 		}
 	}
 }
@@ -198,15 +212,6 @@ impl AsPointer for Allocator {
 
 	fn ptr(&self) -> *const Self::Sys {
 		self.ptr.as_ptr()
-	}
-}
-
-impl Drop for Allocator {
-	fn drop(&mut self) {
-		if !self.is_default {
-			ortsys![unsafe ReleaseAllocator(self.ptr.as_ptr())];
-			crate::logging::drop!(Allocator, self.ptr);
-		}
 	}
 }
 

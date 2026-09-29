@@ -166,6 +166,14 @@ fn main() -> ort::Result<()> {
 	}
 
 	{
+		// The tensor frees its data through the allocator, so it has to keep the allocator alive.
+		let allocator = Allocator::new(&session, MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?)?;
+		let tensor = Tensor::<f32>::new(&allocator, [16_usize])?;
+		drop(allocator);
+		drop(tensor);
+	}
+
+	{
 		let mut binding = session.create_binding()?;
 		binding.bind_input("input_1", &value1)?;
 		binding.bind_input("input_2", &value2)?;

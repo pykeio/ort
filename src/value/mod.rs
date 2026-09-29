@@ -46,7 +46,7 @@ pub use self::{
 use crate::{
 	AsPointer,
 	error::{Error, ErrorCode, Result},
-	memory::MemoryInfo,
+	memory::{AllocatorHandle, MemoryInfo},
 	ortsys,
 	session::SharedSessionInner
 };
@@ -57,6 +57,8 @@ pub(crate) struct ValueInner {
 	pub(crate) dtype: ValueType,
 	pub(crate) memory_info: Option<MemoryInfo<'static>>,
 	pub(crate) drop: bool,
+	/// The allocator this value's data was allocated with, which ONNX Runtime frees it through.
+	pub(crate) allocator: Option<Arc<AllocatorHandle>>,
 	_backing: Option<Box<dyn Any>>
 }
 
@@ -68,6 +70,7 @@ impl ValueInner {
 			dtype,
 			memory_info,
 			drop,
+			allocator: None,
 			_backing: None
 		})
 	}
@@ -85,6 +88,7 @@ impl ValueInner {
 			dtype,
 			memory_info,
 			drop,
+			allocator: None,
 			_backing: Some(backing)
 		})
 	}

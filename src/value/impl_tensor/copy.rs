@@ -11,14 +11,14 @@ use crate::{
 	memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
 	session::{IoBinding, NoSelectedOutputs, RunOptions, Session, builder::GraphOptimizationLevel},
 	util::{MiniMap, Mutex, MutexGuard},
-	value::{TensorValueTypeMarker, Value}
+	value::{TensorElementType, TensorValueTypeMarker, Value, ValueRef}
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct IdentitySessionKey {
-	src_device: AllocationDevice,
+	src_device: String,
 	src_device_id: i32,
-	target_device: AllocationDevice,
+	target_device: String,
 	target_device_id: i32,
 	dtype: ort_sys::ONNXTensorElementDataType
 }
@@ -32,7 +32,7 @@ struct IdentitySession {
 static IDENTITY_MODEL: &[u8] = include_bytes!("./identity.ort");
 static SESSIONS: OnceLock<Mutex<MiniMap<IdentitySessionKey, IdentitySession>>> = OnceLock::new();
 /// `RunOptions` with [`RunOptions::disable_device_sync`], shared across `to_async()` calls to reduce allocations.
-static IDENTITY_RUN_OPTIONS: OnceLock<RunOptions<NoSelectedOutputs>> = OnceLock::new();
+static ASYNC_RUN_OPTIONS: OnceLock<RunOptions<NoSelectedOutputs>> = OnceLock::new();
 
 fn ep_for_device(device: AllocationDevice, device_id: i32) -> Result<ep::ExecutionProviderDispatch> {
 	Ok(match device {
@@ -97,17 +97,23 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn to(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
-		self.copy_to_inner(device, device_id, |identity_session| {
-			let target_memory_info = MemoryInfo::new(device, device_id, AllocatorType::Device, MemoryType::Default)?;
-			identity_session.binding.bind_output_to_device("output", &target_memory_info)?;
+		let memory_info = self.memory_info();
+		let mut identity_session =
+			IdentitySessionHandle::new(self.view().into_dyn(), memory_info.allocation_device(), memory_info.device_id(), *self.data_type())?;
 
-			let output = identity_session
+		let target_memory_info = MemoryInfo::new(device, device_id, AllocatorType::Device, MemoryType::Default)?;
+		identity_session.binding.bind_output_to_device("output", &target_memory_info)?;
+
+		let output = {
+			let identity_session = &mut *identity_session;
+			identity_session
 				.session
 				.run_binding(&identity_session.binding)?
 				.remove("output")
-				.expect("identity model should have single output");
-			Ok(unsafe { output.transmute_type() })
-		})
+				.expect("identity model should have single output")
+		};
+
+		Ok(unsafe { output.transmute_type() })
 	}
 
 	/// Asynchronously copies the contents of this tensor to another device.
@@ -129,22 +135,27 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn to_async(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
-		self.copy_to_inner(device, device_id, |identity_session| {
-			let target_memory_info = MemoryInfo::new(device, device_id, AllocatorType::Device, MemoryType::Default)?;
-			identity_session.binding.bind_output_to_device("output", &target_memory_info)?;
+		let memory_info = self.memory_info();
+		let mut identity_session =
+			IdentitySessionHandle::new(self.view().into_dyn(), memory_info.allocation_device(), memory_info.device_id(), *self.data_type())?;
 
-			let options = IDENTITY_RUN_OPTIONS.get_or_try_init(|| -> Result<RunOptions> {
-				let mut options = RunOptions::new()?;
-				options.disable_device_sync()?;
-				Ok(options)
-			})?;
-			let output = identity_session
+		let options = ASYNC_RUN_OPTIONS.get_or_try_init(|| -> Result<RunOptions> {
+			let mut options = RunOptions::new()?;
+			options.disable_device_sync()?;
+			Ok(options)
+		})?;
+		let target_memory_info = MemoryInfo::new(device, device_id, AllocatorType::Device, MemoryType::Default)?;
+		identity_session.binding.bind_output_to_device("output", &target_memory_info)?;
+		let output = {
+			let identity_session = &mut *identity_session;
+			identity_session
 				.session
 				.run_binding_with_options(&identity_session.binding, options)?
 				.remove("output")
-				.expect("identity model should have single output");
-			Ok(unsafe { output.transmute_type() })
-		})
+				.expect("identity model should have single output")
+		};
+
+		Ok(unsafe { output.transmute_type() })
 	}
 
 	/// Copies the contents of this tensor to another tensor potentially residing on a separate device.
@@ -177,11 +188,16 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 		}
 
 		let target_memory_info = target.memory_info();
-		self.copy_to_inner(target_memory_info.allocation_device(), target_memory_info.device_id(), |identity_session| {
-			unsafe { identity_session.binding.bind_output_mut("output", target) }?;
+		let mut identity_session =
+			IdentitySessionHandle::new(self.view().into_dyn(), target_memory_info.allocation_device(), target_memory_info.device_id(), *self.data_type())?;
+
+		unsafe { identity_session.binding.bind_output_mut("output", target) }?;
+		{
+			let identity_session = &mut *identity_session;
 			identity_session.session.run_binding(&identity_session.binding)?;
-			Ok(())
-		})
+		}
+
+		Ok(())
 	}
 
 	/// Asynchronously copies the contents of this tensor to another tensor.
@@ -217,30 +233,21 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 		}
 
 		let target_memory_info = target.memory_info();
-		self.copy_to_inner(target_memory_info.allocation_device(), target_memory_info.device_id(), |identity_session| {
-			unsafe { identity_session.binding.bind_output_mut("output", target) }?;
-			let options = IDENTITY_RUN_OPTIONS.get_or_try_init(|| -> Result<RunOptions> {
-				let mut options = RunOptions::new()?;
-				options.disable_device_sync()?;
-				Ok(options)
-			})?;
+		let mut identity_session =
+			IdentitySessionHandle::new(self.view().into_dyn(), target_memory_info.allocation_device(), target_memory_info.device_id(), *self.data_type())?;
+
+		let options = ASYNC_RUN_OPTIONS.get_or_try_init(|| -> Result<RunOptions> {
+			let mut options = RunOptions::new()?;
+			options.disable_device_sync()?;
+			Ok(options)
+		})?;
+		unsafe { identity_session.binding.bind_output_mut("output", target) }?;
+		{
+			let identity_session = &mut *identity_session;
 			identity_session.session.run_binding_with_options(&identity_session.binding, options)?;
-			Ok(())
-		})
-	}
+		}
 
-	fn copy_to_inner<F, T>(&self, device: AllocationDevice, device_id: i32, runner: F) -> Result<T>
-	where
-		F: FnOnce(&mut IdentitySession) -> Result<T>
-	{
-		let source_memory_info = self.memory_info();
-		let tensor_type = ort_sys::ONNXTensorElementDataType::from(*self.data_type());
-
-		let mut identity_session = IdentitySessionHandle::new(source_memory_info, device, device_id, tensor_type)?;
-		identity_session.binding.bind_input("input", self)?;
-		let res = runner(&mut identity_session);
-		identity_session.binding.clear();
-		res
+		Ok(())
 	}
 }
 
@@ -274,22 +281,20 @@ impl<Type: TensorValueTypeMarker + ?Sized> Clone for Value<Type> {
 	}
 }
 
-struct IdentitySessionHandle {
+struct IdentitySessionHandle<'s> {
 	inner: &'static mut IdentitySession,
+	_src: ValueRef<'s>,
 	_guard: MutexGuard<'static, MiniMap<IdentitySessionKey, IdentitySession>>
 }
 
-impl IdentitySessionHandle {
-	fn new(
-		source_memory_info: &MemoryInfo,
-		target_device: AllocationDevice,
-		target_device_id: i32,
-		tensor_type: ort_sys::ONNXTensorElementDataType
-	) -> Result<Self> {
+impl<'s> IdentitySessionHandle<'s> {
+	fn new(src: ValueRef<'s>, target_device: AllocationDevice<'_>, target_device_id: i32, dtype: TensorElementType) -> Result<Self> {
+		let tensor_type = ort_sys::ONNXTensorElementDataType::from(dtype);
+		let src_memory_info = src.memory_info();
 		let session_key = IdentitySessionKey {
-			src_device: source_memory_info.allocation_device(),
-			src_device_id: source_memory_info.device_id(),
-			target_device,
+			src_device: src_memory_info.allocation_device().as_str().to_string(),
+			src_device_id: src_memory_info.device_id(),
+			target_device: target_device.as_str().to_string(),
 			target_device_id,
 			dtype: tensor_type
 		};
@@ -305,7 +310,7 @@ impl IdentitySessionHandle {
 				let (source_ep, target_ep) = (
 					// We enable `.error_on_failure()` here since `IoBinding::bind_output_to_device` will silently fall back to binding to CPU if the target
 					// device doesn't have an EP registered.
-					ep_for_device(source_memory_info.allocation_device(), source_memory_info.device_id())?.error_on_failure(),
+					ep_for_device(src_memory_info.allocation_device(), src_memory_info.device_id())?.error_on_failure(),
 					ep_for_device(target_device, target_device_id)?.error_on_failure()
 				);
 
@@ -335,23 +340,33 @@ impl IdentitySessionHandle {
 			}
 		};
 
+		identity_session.binding.bind_input("input", &src)?;
+
 		Ok(Self {
 			inner: unsafe { core::mem::transmute::<&mut IdentitySession, &'static mut IdentitySession>(identity_session) },
+			_src: src,
 			_guard: sessions
 		})
 	}
 }
 
-impl Deref for IdentitySessionHandle {
+impl Deref for IdentitySessionHandle<'_> {
 	type Target = IdentitySession;
 	fn deref(&self) -> &Self::Target {
 		self.inner
 	}
 }
 
-impl DerefMut for IdentitySessionHandle {
+impl DerefMut for IdentitySessionHandle<'_> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		self.inner
+	}
+}
+
+impl Drop for IdentitySessionHandle<'_> {
+	fn drop(&mut self) {
+		// dont let the binding continue to hold onto the source or target
+		self.binding.clear();
 	}
 }
 

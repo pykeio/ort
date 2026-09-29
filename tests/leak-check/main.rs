@@ -155,6 +155,10 @@ fn main() -> ort::Result<()> {
 	}
 
 	{
+		let _ = Tensor::from_string_array(([2_usize], &["a\0b", "c"][..]));
+	}
+
+	{
 		// CPU-only builds can't create a CUDA allocator, so the commit fails after the session is created.
 		let cuda = MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUOutput)?;
 		let mut builder = Session::builder(&env)?.with_allocator(cuda)?;

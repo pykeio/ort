@@ -4,7 +4,7 @@ use core::{
 	ffi::c_void,
 	fmt::Debug,
 	marker::PhantomData,
-	mem::size_of,
+	mem::{self, size_of},
 	ptr::{self, NonNull}
 };
 
@@ -17,6 +17,7 @@ use crate::{
 	error::{Error, ErrorCode, Result},
 	memory::{Allocator, MemoryInfo},
 	ortsys,
+	util::run_on_drop,
 	value::{IntoShape, Value, ValueInner, ValueType}
 };
 
@@ -51,12 +52,6 @@ impl Tensor<String> {
 		let shape_ptr: *const i64 = shape.as_ptr();
 		let shape_len = shape.len();
 
-		// create tensor without data -- data is filled in later
-		ortsys![
-			unsafe CreateTensorAsOrtValue(Allocator::default().ptr_mut(), shape_ptr, shape_len, TensorElementType::String.into(), &mut value_ptr)?;
-			nonNull(value_ptr)
-		];
-
 		// create null-terminated copies of each string, as per `FillStringTensor` docs
 		let null_terminated_copies: Vec<CString> = data
 			.iter()
@@ -68,7 +63,15 @@ impl Tensor<String> {
 
 		let string_pointers = null_terminated_copies.iter().map(|cstring| cstring.as_ptr()).collect::<Vec<_>>();
 
+		// create tensor without data -- data is filled in later
+		ortsys![
+			unsafe CreateTensorAsOrtValue(Allocator::default().ptr_mut(), shape_ptr, shape_len, TensorElementType::String.into(), &mut value_ptr)?;
+			nonNull(value_ptr)
+		];
+
+		let guard = run_on_drop(|| ortsys![unsafe ReleaseValue(value_ptr.as_ptr())]);
 		ortsys![unsafe FillStringTensor(value_ptr.as_ptr(), string_pointers.as_ptr(), string_pointers.len())?];
+		mem::forget(guard);
 
 		Ok(Value {
 			inner: ValueInner::new(

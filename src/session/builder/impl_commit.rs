@@ -5,6 +5,7 @@ use core::{
 	any::Any,
 	ffi::c_void,
 	marker::PhantomData,
+	mem,
 	ptr::{self, NonNull}
 };
 #[cfg(feature = "std")]
@@ -27,7 +28,8 @@ use crate::{
 	error::Result,
 	memory::Allocator,
 	ortsys,
-	session::{InMemorySession, Outlet, Session, SharedSessionInner, io}
+	session::{InMemorySession, Outlet, Session, SharedSessionInner, io},
+	util::run_on_drop
 };
 
 impl SessionBuilder {
@@ -161,6 +163,9 @@ impl SessionBuilder {
 	}
 
 	pub(crate) fn commit_finalize(&self, ptr: NonNull<ort_sys::OrtSession>) -> Result<Session> {
+		// Release the session if anything below fails; `SharedSessionInner` takes over once it's built.
+		let session_guard = run_on_drop(|| ortsys![unsafe ReleaseSession(ptr.as_ptr())]);
+
 		let allocator = match &self.memory_info {
 			Some(info) => {
 				let mut allocator_ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
@@ -197,6 +202,7 @@ impl SessionBuilder {
 			extras.push(logger as Arc<dyn Any>);
 		}
 
+		mem::forget(session_guard);
 		crate::logging::create!(Session, ptr);
 
 		Ok(Session {

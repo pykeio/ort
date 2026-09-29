@@ -1,6 +1,6 @@
 use alloc::borrow::Cow;
 use core::{
-	fmt,
+	fmt, mem,
 	ptr::{self, NonNull}
 };
 use std::path::Path;
@@ -15,7 +15,7 @@ use crate::{
 	memory::Allocator,
 	ortsys,
 	session::{SessionInputValue, SessionInputs, SessionOutputs, builder::SessionBuilder},
-	util::{char_p_to_string, with_cstr_ptr_array},
+	util::{char_p_to_string, run_on_drop, with_cstr_ptr_array},
 	value::{IntoTensorElementType, Tensor, Value}
 };
 
@@ -110,6 +110,9 @@ impl Trainer {
 	}
 
 	fn new_inner(ptr: NonNull<ort_sys::OrtTrainingSession>, environment: &Environment, allocator: Allocator, ckpt: Checkpoint) -> Result<Self> {
+		// Release the session if reading the names fails; `Drop` takes over once `Self` is built.
+		let session_guard = run_on_drop(|| ortsys![@training: unsafe ReleaseTrainingSession(ptr.as_ptr())]);
+
 		let api = training_api()?;
 		let train_output_names =
 			extract_io_names(ptr, &allocator, api.TrainingSessionGetTrainingModelOutputCount, api.TrainingSessionGetTrainingModelOutputName)?;
@@ -118,6 +121,7 @@ impl Trainer {
 		let train_input_names = extract_io_names(ptr, &allocator, api.TrainingSessionGetTrainingModelInputCount, api.TrainingSessionGetTrainingModelInputName)?;
 		let eval_input_names = extract_io_names(ptr, &allocator, api.TrainingSessionGetEvalModelInputCount, api.TrainingSessionGetEvalModelInputName)?;
 
+		mem::forget(session_guard);
 		crate::logging::create!(Trainer, ptr);
 
 		Ok(Self {

@@ -272,7 +272,7 @@ mod tests {
 	use core::sync::atomic::{AtomicBool, Ordering};
 
 	use super::SessionBuilder;
-	use crate::test_util::test_env;
+	use crate::{AsPointer, ortsys, test_util::test_env};
 
 	#[test]
 	fn test_session_builder_clone() -> crate::Result<()> {
@@ -287,6 +287,19 @@ mod tests {
 		drop(builder);
 		let _session = builder2.commit_from_file("tests/data/upsample.onnx")?;
 		assert!(was_called.load(Ordering::Acquire));
+		Ok(())
+	}
+
+	#[test]
+	fn test_commit_from_memory_directly_turns_zero_copy_off() -> crate::Result<()> {
+		let model = std::fs::read("tests/data/upsample.ort").expect("failed to read model");
+		let mut builder = SessionBuilder::new(test_env())?;
+		let _session = builder.commit_from_memory_directly(&model)?;
+
+		let mut value = [0u8; 2];
+		let mut len = value.len();
+		ortsys![unsafe GetSessionConfigEntry(builder.ptr(), c"session.use_ort_model_bytes_directly".as_ptr(), value.as_mut_ptr().cast(), &mut len)?];
+		assert_eq!(&value, b"0\0");
 		Ok(())
 	}
 }

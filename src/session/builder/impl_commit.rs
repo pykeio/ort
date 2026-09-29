@@ -83,12 +83,22 @@ impl SessionBuilder {
 	/// facilitate creating self-referential structs, such as [`ouroboros`](https://github.com/joshua-maros/ouroboros).
 	#[cfg(not(target_arch = "wasm32"))]
 	pub fn commit_from_memory_directly<'m>(&mut self, model_bytes: &'m [u8]) -> Result<InMemorySession<'m>> {
-		// Enable zero-copy deserialization for models in `.ort` format.
-		let _ = self.add_config_entry("session.use_ort_model_bytes_directly", "1");
-		let _ = self.add_config_entry("session.use_ort_model_bytes_for_initializers", "1");
+		const KEYS: [&str; 2] = ["session.use_ort_model_bytes_directly", "session.use_ort_model_bytes_for_initializers"];
 
-		let session = self.commit_from_memory(model_bytes)?;
-		Ok(InMemorySession { session, phantom: PhantomData })
+		// Enable zero-copy deserialization for models in `.ort` format, only for this commit; if left on, later
+		// `commit_from_memory` calls would borrow the model bytes without a lifetime tying the session to them.
+		for key in KEYS {
+			let _ = self.add_config_entry(key, "1");
+		}
+		let session = self.commit_from_memory(model_bytes);
+		for key in KEYS {
+			let _ = self.add_config_entry(key, "0");
+		}
+
+		Ok(InMemorySession {
+			session: session?,
+			phantom: PhantomData
+		})
 	}
 
 	/// Load an ONNX graph from memory and commit the session.

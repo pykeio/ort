@@ -155,6 +155,13 @@ fn main() -> ort::Result<()> {
 	}
 
 	{
+		// CPU-only builds can't create a CUDA allocator, so the commit fails after the session is created.
+		let cuda = MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUOutput)?;
+		let mut builder = Session::builder(&env)?.with_allocator(cuda)?;
+		assert!(builder.commit_from_file("tests/data/upsample.onnx").is_err());
+	}
+
+	{
 		let mut binding = session.create_binding()?;
 		binding.bind_input("input_1", &value1)?;
 		binding.bind_input("input_2", &value2)?;

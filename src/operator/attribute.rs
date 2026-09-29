@@ -216,20 +216,19 @@ impl ToAttribute for String {
 	where
 		Self: Sized
 	{
-		with_cstr(self.as_bytes(), &|contents| {
-			let mut out = ptr::null_mut();
-			ortsys![
-				unsafe CreateOpAttr(
-					name,
-					contents.as_ptr().cast(),
-					1,
-					ort_sys::OrtOpAttrType::ORT_OP_ATTR_STRING,
-					&mut out
-				)?;
-				nonNull(out)
-			];
-			Ok(out)
-		})
+		// ONNX Runtime reads exactly `len` bytes, so no null terminator is needed.
+		let mut out = ptr::null_mut();
+		ortsys![
+			unsafe CreateOpAttr(
+				name,
+				self.as_ptr().cast(),
+				self.len() as _,
+				ort_sys::OrtOpAttrType::ORT_OP_ATTR_STRING,
+				&mut out
+			)?;
+			nonNull(out)
+		];
+		Ok(out)
 	}
 
 	private_impl!();
@@ -488,4 +487,27 @@ impl<'s, T: DowncastableTarget> FromKernelContext<'s> for ValueRef<'s, T> {
 	}
 
 	private_impl!();
+}
+
+#[cfg(test)]
+mod tests {
+	use alloc::string::{String, ToString};
+	use core::ptr;
+
+	use super::{Attribute, FromOpAttr};
+	use crate::{Result, ortsys};
+
+	fn read<T: FromOpAttr>(attr: &Attribute) -> Result<T> {
+		let mut len = 0;
+		let _ = ortsys![@ort: unsafe ReadOpAttr(attr.0.as_ptr(), T::attr_type(), ptr::null_mut(), 0, &mut len) as Result];
+		unsafe { T::from_op_attr(attr.0.as_ptr(), len) }
+	}
+
+	#[test]
+	fn test_string_attribute() -> Result<()> {
+		let _env = crate::test_util::test_env();
+		let attr = Attribute::new("mode", "linear".to_string())?;
+		assert_eq!(read::<String>(&attr)?, "linear");
+		Ok(())
+	}
 }

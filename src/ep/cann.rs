@@ -1,8 +1,8 @@
 use alloc::string::ToString;
-use core::{fmt, ptr};
+use core::fmt;
 
 use super::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderOptions};
-use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder, util};
+use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -171,23 +171,14 @@ impl ExecutionProvider for CANN {
 	const NAME: &'static str = "CANNExecutionProvider";
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
-		let mut cann_options: *mut ort_sys::OrtCANNProviderOptions = ptr::null_mut();
-		ortsys![unsafe CreateCANNProviderOptions(&mut cann_options)?];
-		let _guard = util::run_on_drop(|| {
-			ortsys![unsafe ReleaseCANNProviderOptions(cann_options)];
-		});
-
-		let ffi_options = self.0.to_ffi();
-
-		ortsys![unsafe UpdateCANNProviderOptions(
-			cann_options,
-			ffi_options.key_ptrs(),
-			ffi_options.value_ptrs(),
-			ffi_options.len()
-		)?];
-
-		ortsys![unsafe SessionOptionsAppendExecutionProvider_CANN(session_builder.ptr_mut(), cann_options)?];
-
-		Ok(())
+		super::register_with_options_struct!(
+			self.0,
+			session_builder,
+			ort_sys::OrtCANNProviderOptions,
+			CreateCANNProviderOptions,
+			UpdateCANNProviderOptions,
+			ReleaseCANNProviderOptions,
+			SessionOptionsAppendExecutionProvider_CANN
+		)
 	}
 }

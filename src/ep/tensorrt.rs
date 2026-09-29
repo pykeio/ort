@@ -1,8 +1,7 @@
 use alloc::string::ToString;
-use core::ptr;
 
 use super::{ExecutionProvider, ExecutionProviderOptions};
-use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder, util};
+use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 
 #[derive(Debug, Default, Clone)]
 pub struct TensorRT(ExecutionProviderOptions);
@@ -106,22 +105,14 @@ impl ExecutionProvider for TensorRT {
 	const NAME: &'static str = "TensorrtExecutionProvider";
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
-		let mut trt_options: *mut ort_sys::OrtTensorRTProviderOptionsV2 = ptr::null_mut();
-		ortsys![unsafe CreateTensorRTProviderOptions(&mut trt_options)?];
-		let _guard = util::run_on_drop(|| {
-			ortsys![unsafe ReleaseTensorRTProviderOptions(trt_options)];
-		});
-
-		let ffi_options = self.0.to_ffi();
-		ortsys![unsafe UpdateTensorRTProviderOptions(
-			trt_options,
-			ffi_options.key_ptrs(),
-			ffi_options.value_ptrs(),
-			ffi_options.len()
-		)?];
-
-		ortsys![unsafe SessionOptionsAppendExecutionProvider_TensorRT_V2(session_builder.ptr_mut(), trt_options)?];
-
-		Ok(())
+		super::register_with_options_struct!(
+			self.0,
+			session_builder,
+			ort_sys::OrtTensorRTProviderOptionsV2,
+			CreateTensorRTProviderOptions,
+			UpdateTensorRTProviderOptions,
+			ReleaseTensorRTProviderOptions,
+			SessionOptionsAppendExecutionProvider_TensorRT_V2
+		)
 	}
 }

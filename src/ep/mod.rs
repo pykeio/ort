@@ -271,6 +271,23 @@ macro_rules! define_ep_register {
 #[allow(unused)]
 pub(crate) use define_ep_register;
 
+/// Registers an EP whose options go through a `Create*ProviderOptions` struct, filled via `Update*ProviderOptions`.
+#[allow(unused)]
+macro_rules! register_with_options_struct {
+	($options:expr, $session_builder:expr, $ty:ty, $create:ident, $update:ident, $release:ident, $append:ident) => {{
+		let mut options: *mut $ty = ::core::ptr::null_mut();
+		$crate::ortsys![unsafe $create(&mut options)?];
+		let _guard = $crate::util::run_on_drop(|| $crate::ortsys![unsafe $release(options)]);
+
+		let ffi_options = $options.to_ffi();
+		$crate::ortsys![unsafe $update(options, ffi_options.key_ptrs(), ffi_options.value_ptrs(), ffi_options.len())?];
+		$crate::ortsys![unsafe $append($session_builder.ptr_mut(), options)?];
+		Ok(())
+	}};
+}
+#[allow(unused)]
+pub(crate) use register_with_options_struct;
+
 macro_rules! impl_ep {
 	(arbitrary; $symbol:ident) => {
 		$crate::ep::impl_ep!($symbol);

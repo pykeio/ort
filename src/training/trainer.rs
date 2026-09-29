@@ -10,7 +10,6 @@ use ort_sys::c_char;
 use super::{Checkpoint, Optimizer, training_api};
 use crate::{
 	AsPointer,
-	environment::Environment,
 	error::{Error, Result},
 	memory::Allocator,
 	ortsys,
@@ -19,7 +18,6 @@ use crate::{
 	value::{IntoTensorElementType, Tensor, Value}
 };
 
-#[derive(Debug)]
 pub struct Trainer {
 	ptr: NonNull<ort_sys::OrtTrainingSession>,
 	train_output_names: Vec<String>,
@@ -28,7 +26,22 @@ pub struct Trainer {
 	eval_input_names: Vec<String>,
 	ckpt: Checkpoint,
 	_allocator: Allocator,
-	_environment: Environment
+	// The training session keeps using the builder's operator domains, logger and thread manager, so they have to live
+	// as long as it does.
+	_session_options: SessionBuilder
+}
+
+impl fmt::Debug for Trainer {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.debug_struct("Trainer")
+			.field("ptr", &self.ptr)
+			.field("train_output_names", &self.train_output_names)
+			.field("eval_output_names", &self.eval_output_names)
+			.field("train_input_names", &self.train_input_names)
+			.field("eval_input_names", &self.eval_input_names)
+			.field("ckpt", &self.ckpt)
+			.finish_non_exhaustive()
+	}
 }
 
 impl Trainer {
@@ -57,7 +70,7 @@ impl Trainer {
 			)?;
 			nonNull(ptr)
 		];
-		Self::new_inner(ptr, &session_options.environment, allocator, ckpt)
+		Self::new_inner(ptr, session_options, allocator, ckpt)
 	}
 
 	pub fn new_from_artifacts(
@@ -106,10 +119,10 @@ impl Trainer {
 			)?;
 			nonNull(ptr)
 		];
-		Self::new_inner(ptr, &session_options.environment, allocator, ckpt)
+		Self::new_inner(ptr, session_options, allocator, ckpt)
 	}
 
-	fn new_inner(ptr: NonNull<ort_sys::OrtTrainingSession>, environment: &Environment, allocator: Allocator, ckpt: Checkpoint) -> Result<Self> {
+	fn new_inner(ptr: NonNull<ort_sys::OrtTrainingSession>, session_options: SessionBuilder, allocator: Allocator, ckpt: Checkpoint) -> Result<Self> {
 		// Release the session if reading the names fails; `Drop` takes over once `Self` is built.
 		let session_guard = run_on_drop(|| ortsys![@training: unsafe ReleaseTrainingSession(ptr.as_ptr())]);
 
@@ -132,7 +145,7 @@ impl Trainer {
 			eval_input_names,
 			ckpt,
 			_allocator: allocator,
-			_environment: environment.clone()
+			_session_options: session_options
 		})
 	}
 

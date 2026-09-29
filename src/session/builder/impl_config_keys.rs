@@ -124,14 +124,14 @@ impl SessionBuilder {
 
 	/// Enable/disable allowing the inter-op threads to spin for a short period before blocking.
 	///
-	/// This option is **enabled** by defualt.
+	/// This option is **enabled** by default.
 	pub fn with_inter_op_spinning(self, enable: bool) -> BuilderResult {
 		self.with_config_entry("session.inter_op.allow_spinning", if enable { "1" } else { "0" })
 	}
 
 	/// Enable/disable allowing the intra-op threads to spin for a short period before blocking.
 	///
-	/// This option is **enabled** by defualt.
+	/// This option is **enabled** by default.
 	pub fn with_intra_op_spinning(self, enable: bool) -> BuilderResult {
 		self.with_config_entry("session.intra_op.allow_spinning", if enable { "1" } else { "0" })
 	}

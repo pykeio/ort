@@ -270,7 +270,7 @@ impl Session {
 	/// });
 	///
 	/// let res = session.run_with_options(ort::inputs![&input], &*run_options);
-	/// // upon termination, the session will return an `Error::SessionRun` error.`
+	/// // upon termination, the session will return an `Error::SessionRun` error.
 	/// assert_eq!(
 	/// 	&res.unwrap_err().to_string(),
 	/// 	"Failed to run inference on model: Exiting due to terminate flag being set to true."
@@ -319,7 +319,7 @@ impl Session {
 			// `input_names` shorter than `inputs`. ONNX Runtime will attempt to look up the name of all
 			// inputs before doing any checks, thus going out of bounds of `input_names` and triggering a
 			// segfault, so we check that condition here. This will never trip for `ValueMap` inputs since
-			// the number of names & values are always equal as its a vec of tuples.
+			// the number of names & values is always equal as it's a vec of tuples.
 			return Err(Error::new_with_code(
 				ErrorCode::InvalidArgument,
 				format!("{} inputs were provided, but the model only accepts {}.", input_values.len(), input_names.len())
@@ -745,7 +745,7 @@ pub enum WorkloadType {
 	/// Prioritize performance. This is the default behavior when the workload type is not overridden.
 	#[default]
 	Default,
-	/// Prioritize efficiency, by i.e. reducing scheduling priority and/or offloading to efficiency cores.
+	/// Prioritize efficiency, e.g. by reducing scheduling priority and/or offloading to efficiency cores.
 	Efficient
 }
 

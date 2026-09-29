@@ -99,7 +99,7 @@ pub struct Adapter {
 impl Adapter {
 	/// Loads an [`Adapter`] from a file.
 	///
-	/// An optional [`Allocator`] can be provided to specify the device on which the inputs should be allocated on.
+	/// An optional [`Allocator`] can be provided to specify the device on which the inputs should be allocated.
 	/// Note that providing a CPU allocator will return an error; only device allocators are expected.
 	///
 	/// ```
@@ -148,7 +148,7 @@ impl Adapter {
 	/// Loads an [`Adapter`] from memory. The adapter's values will be **copied**, either to the CPU or the given
 	/// allocator if one is provided.
 	///
-	/// An [`Allocator`] can be provided to specify the device on which the inputs should be allocated on.
+	/// An [`Allocator`] can be provided to specify the device on which the inputs should be allocated.
 	/// Note that providing a CPU allocator will return an error; only device allocators are expected.
 	///
 	/// ```

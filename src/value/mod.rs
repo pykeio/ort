@@ -347,7 +347,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// If the value belongs to a session (i.e. if it is the result of an inference run), you must provide the
 	/// [`SharedSessionInner`] (acquired from [`Session::inner`](crate::session::Session::inner)). This ensures the
-	/// session is not dropped until any values owned by it is.
+	/// session is not dropped until any values owned by it are.
 	///
 	/// # Safety
 	///

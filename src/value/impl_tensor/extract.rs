@@ -90,7 +90,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 		})
 	}
 
-	/// Attempt to extract the underlying data of type `T` into a mutable read-only [`ndarray::ArrayViewMut`].
+	/// Attempt to extract the underlying data of type `T` into a mutable [`ndarray::ArrayViewMut`].
 	///
 	/// See also the infallible counterpart, [`Tensor::extract_array_mut`], for typed [`Tensor<T>`]s.
 	///
@@ -401,7 +401,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 		self.try_extract_tensor().expect("Failed to extract tensor")
 	}
 
-	/// Extracts the underlying data into a view tuple, consisting of the tensor's shapes and a mutable view
+	/// Extracts the underlying data into a view tuple, consisting of the tensor's shape and a mutable view
 	/// into its data.
 	///
 	/// ```

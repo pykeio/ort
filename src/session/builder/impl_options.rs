@@ -73,7 +73,7 @@ impl SessionBuilder {
 	/// Enable/disable the parallel execution mode for this session. By default, this is disabled.
 	///
 	/// Parallel execution can improve performance for models with many branches, at the cost of higher memory usage.
-	/// You can configure the amount of threads used to parallelize the execution of the graph via
+	/// You can configure the number of threads used to parallelize the execution of the graph via
 	/// [`SessionBuilder::with_inter_threads()`].
 	pub fn with_parallel_execution(mut self, parallel_execution: bool) -> BuilderResult {
 		let execution_mode = if parallel_execution {
@@ -110,7 +110,7 @@ impl SessionBuilder {
 		}
 	}
 
-	/// Enables profiling. Profile information will be writen to `profiling_file` after calling
+	/// Enables profiling. Profile information will be written to `profiling_file` after calling
 	/// [`Session::end_profiling`].
 	///
 	/// [`Session::end_profiling`]: crate::session::Session::end_profiling
@@ -268,7 +268,7 @@ impl SessionBuilder {
 		Ok(self)
 	}
 
-	/// Configures this environment to use its own thread pool instead of defaulting to the
+	/// Configures this session to use its own thread pool instead of defaulting to the
 	/// [`Environment`](crate::environment::Environment)'s global thread pool if one was defined.
 	pub fn with_independent_thread_pool(mut self) -> BuilderResult {
 		self.no_global_thread_pool = true;
@@ -469,8 +469,8 @@ impl SessionBuilder {
 /// graph-level transformations, ranging from small graph simplifications and node eliminations to more complex node
 /// fusions and layout optimizations.
 ///
-/// Graph optimizations are divided in several categories (or levels) based on their complexity and functionality. They
-/// can be performed either online or offline. In online mode, the optimizations are done before performing the
+/// Graph optimizations are divided into several categories (or levels) based on their complexity and functionality.
+/// They can be performed either online or offline. In online mode, the optimizations are done before performing the
 /// inference, while in offline mode, the runtime saves the optimized graph to disk (most commonly used when converting
 /// an ONNX model to an ONNX Runtime model).
 ///

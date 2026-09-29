@@ -36,7 +36,7 @@ pub use self::{impl_config_keys::GqaValueLayout, impl_options::*};
 /// # let env = ort::test_util::test_env().clone();
 /// let session = Session::builder(&env)?
 /// 	.with_optimization_level(GraphOptimizationLevel::All)
-/// 	// Optimization isn't enabled in minimal builds of ONNX Runtime, so throws an error. We can just ignore it.
+/// 	// Optimization isn't enabled in minimal builds of ONNX Runtime, so it throws an error. We can just ignore it.
 /// 	.unwrap_or_else(|e| e.recover())
 /// 	.commit_from_file("tests/data/upsample.onnx")?;
 /// # Ok(())

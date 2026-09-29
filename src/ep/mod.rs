@@ -373,13 +373,7 @@ fn is_ep_available(name: &str) -> Result<bool> {
 	let _guard = run_on_drop(|| ortsys![unsafe ReleaseAvailableProviders(providers, num_providers).expect("infallible")]);
 
 	for i in 0..num_providers {
-		let avail = match char_p_to_string(unsafe { *providers.offset(i as isize) }) {
-			Ok(avail) => avail,
-			Err(e) => {
-				return Err(e);
-			}
-		};
-		if name == avail {
+		if name == char_p_to_string(unsafe { *providers.offset(i as isize) })? {
 			return Ok(true);
 		}
 	}

@@ -71,7 +71,7 @@ fn ep_for_device(device: AllocationDevice, device_id: i32) -> Result<ep::Executi
 			.with_exhaustive_conv_search(false)
 			.with_device_id(device_id)
 			.build(),
-		_ => return Err(crate::Error::new("Unsupported allocation device {device} for tensor copy target"))
+		_ => return Err(crate::Error::new(format!("Unsupported allocation device `{}` for tensor copy target", device.as_str())))
 	})
 }
 

@@ -211,6 +211,8 @@ See [Runtime dylib loading](/setup/linking#runtime-dylib-loading) for more infor
 ### CUDA
 <Ort/> provides binaries for CUDA ≥ 13.2 and targets cuDNN ≥ 9.23. Make sure compatible versions of CUDA and cuDNN are installed and available on the `PATH`.
 
+On x86_64, compute capabilities 7.5 (`sm_75`, RTX 16xx/20xx), 8.x (`sm_80`, RTX 30xx/40xx), 9.x (`sm_90`), and 12.x (`sm_120`, RTX 50xx) are supported. On aarch64, Jetson Orin/Thor (`sm_87`/`sm_110`), Grace Hopper/Blackwell (`sm_90`/`sm_100`), and DGX Spark (`sm_121`) are supported. If your device's compute capability is not listed, you will need to compile ONNX Runtime from source.
+
 ### WebGPU
 The WebGPU EP is **experimental** and may produce incorrect results/crashes; these issues should be reported upstream as there's unfortunately nothing we can do about them.
 

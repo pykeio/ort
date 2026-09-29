@@ -152,7 +152,7 @@ impl DynTensor {
 	}
 }
 
-impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
+impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// Returns a mutable pointer to the tensor's data. The pointer may be null in the case of zero-sized tensors.
 	///
 	/// It's important to note that the resulting pointer may not point to CPU-accessible memory. In the case of a
@@ -251,7 +251,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	}
 }
 
-impl<T: IntoTensorElementType + Debug> Tensor<T> {
+impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// Converts from a strongly-typed [`Tensor<T>`] to a type-erased [`DynTensor`].
 	///
 	/// ```

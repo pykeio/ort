@@ -14,7 +14,7 @@ use crate::{
 	memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
 	session::{IoBinding, NoSelectedOutputs, RunOptions, Session, builder::GraphOptimizationLevel},
 	util::{MiniMap, Mutex, MutexGuard},
-	value::{TensorElementType, TensorValueTypeMarker, Value, ValueRef}
+	value::{DefiniteTensorValueTypeMarker, DynTensorRef, TensorElementType, Value}
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -75,7 +75,7 @@ fn ep_for_device(device: AllocationDevice, device_id: i32) -> Result<ep::Executi
 	})
 }
 
-impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
+impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// Copies the contents of this tensor to another device, returning the newly created tensor value.
 	///
 	/// ```
@@ -101,8 +101,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn to(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
 		let memory_info = self.memory_info();
-		let mut identity_session =
-			IdentitySessionHandle::new(self.view().into_dyn(), memory_info.allocation_device(), memory_info.device_id(), *self.data_type())?;
+		let mut identity_session = IdentitySessionHandle::new(self.upcast_ref(), memory_info.allocation_device(), memory_info.device_id(), *self.data_type())?;
 
 		let target_memory_info = MemoryInfo::new(device, device_id, AllocatorType::Device, MemoryType::Default)?;
 		identity_session.binding.bind_output_to_device("output", &target_memory_info)?;
@@ -139,8 +138,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn to_async(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
 		let memory_info = self.memory_info();
-		let mut identity_session =
-			IdentitySessionHandle::new(self.view().into_dyn(), memory_info.allocation_device(), memory_info.device_id(), *self.data_type())?;
+		let mut identity_session = IdentitySessionHandle::new(self.upcast_ref(), memory_info.allocation_device(), memory_info.device_id(), *self.data_type())?;
 
 		let options = ASYNC_RUN_OPTIONS.get_or_try_init(|| -> Result<RunOptions> {
 			let mut options = RunOptions::new()?;
@@ -192,7 +190,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 
 		let target_memory_info = target.memory_info();
 		let mut identity_session =
-			IdentitySessionHandle::new(self.view().into_dyn(), target_memory_info.allocation_device(), target_memory_info.device_id(), *self.data_type())?;
+			IdentitySessionHandle::new(self.upcast_ref(), target_memory_info.allocation_device(), target_memory_info.device_id(), *self.data_type())?;
 
 		unsafe { identity_session.binding.bind_output_mut("output", target) }?;
 		{
@@ -237,7 +235,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 
 		let target_memory_info = target.memory_info();
 		let mut identity_session =
-			IdentitySessionHandle::new(self.view().into_dyn(), target_memory_info.allocation_device(), target_memory_info.device_id(), *self.data_type())?;
+			IdentitySessionHandle::new(self.upcast_ref(), target_memory_info.allocation_device(), target_memory_info.device_id(), *self.data_type())?;
 
 		let options = ASYNC_RUN_OPTIONS.get_or_try_init(|| -> Result<RunOptions> {
 			let mut options = RunOptions::new()?;
@@ -255,7 +253,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 }
 
 #[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
-impl<Type: TensorValueTypeMarker + ?Sized> Clone for Value<Type> {
+impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Clone for Value<Type> {
 	/// Creates a copy of this tensor and its data on the same device it resides on.
 	///
 	/// ```
@@ -286,12 +284,12 @@ impl<Type: TensorValueTypeMarker + ?Sized> Clone for Value<Type> {
 
 struct IdentitySessionHandle<'s> {
 	inner: &'static mut IdentitySession,
-	_src: ValueRef<'s>,
+	_src: DynTensorRef<'s>,
 	_guard: MutexGuard<'static, MiniMap<IdentitySessionKey, IdentitySession>>
 }
 
 impl<'s> IdentitySessionHandle<'s> {
-	fn new(src: ValueRef<'s>, target_device: AllocationDevice<'_>, target_device_id: i32, dtype: TensorElementType) -> Result<Self> {
+	fn new(src: DynTensorRef<'s>, target_device: AllocationDevice<'_>, target_device_id: i32, dtype: TensorElementType) -> Result<Self> {
 		let tensor_type = ort_sys::ONNXTensorElementDataType::from(dtype);
 		let src_memory_info = src.memory_info();
 		let session_key = IdentitySessionKey {
@@ -410,8 +408,8 @@ mod tests {
 		let mut target_bad_shape = Tensor::<f32>::new(&Allocator::default(), [3i64])?;
 		assert!(tensor.copy_into(&mut target_bad_shape).is_err());
 
-		let mut target_f64 = Tensor::<f64>::new(&Allocator::default(), [1i64, 5])?.into_dyn();
-		assert!(tensor.into_dyn().copy_into(&mut target_f64).is_err());
+		let mut target_f64 = Tensor::<f64>::new(&Allocator::default(), [1i64, 5])?.upcast();
+		assert!(tensor.upcast().copy_into(&mut target_f64).is_err());
 
 		Ok(())
 	}

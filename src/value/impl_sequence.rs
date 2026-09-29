@@ -215,11 +215,16 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized> Iterator for IntoI
 		self.i += 1;
 		val
 	}
+
+	fn size_hint(&self) -> (usize, Option<usize>) {
+		let len = self.len();
+		(len, Some(len))
+	}
 }
 
 impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized> ExactSizeIterator for IntoIter<T> {
 	fn len(&self) -> usize {
-		self.value.len()
+		self.value.len().saturating_sub(self.i)
 	}
 }
 
@@ -255,6 +260,13 @@ mod tests {
 		for (i, tensor) in seq.iter().enumerate() {
 			assert_eq!(tensors[i].extract_tensor(), tensor.extract_tensor());
 		}
+		let mut iter = Sequence::new(tensors.clone())?.into_iter();
+		assert_eq!(iter.len(), 3);
+		iter.next();
+		assert_eq!(iter.len(), 2);
+		assert_eq!(iter.by_ref().count(), 2);
+		assert_eq!(iter.len(), 0);
+
 		for (i, tensor) in seq.into_iter().enumerate() {
 			assert_eq!(tensors[i].extract_tensor(), tensor.extract_tensor());
 		}

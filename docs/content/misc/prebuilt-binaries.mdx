@@ -5,14 +5,15 @@ ONNX Runtime is a huge library that takes over an hour to compile. Being a C++ l
 
 Depending on the platform, the way we compile these binaries may influence the requirements of your or your users' systems:
 - **All x86-64 binaries** are compiled with a baseline requirement of [x86-64-v3](https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels) - that's Intel Haswell (Cores/Xeons after 2013), Intel Gracemont (Atoms after Nov 2021), AMD Excavator or later, or any AMD Ryzen processor.
-- Linux binaries are compiled with Clang, not GCC, and depend on `libc++`.
+- **Linux binaries** depend on glibc ≥ 2.39 and GCC's `libstdc++` ≥ 13.2 (Ubuntu ≥ 24.04, Debian ≥ 13).
+- **Apple & Android binaries** require macOS ≥ 13.4, iOS ≥ 15.1, or Android ≥ 7.0 (API 24).
 
 These restrictions aren't hard requirements set by ONNX Runtime, but are chosen by pyke.io to balance developer experience (both for you and us) and performance. Unfortunately, it's only practical for us to target a select few build configurations, and that ends up alienating some users -- in the case of the x86-64-v3 baseline, that's most owners of lower-cost Intel chips, like Pentiums. While you can absolutely use <Ort/>'s prebuilt binaries in production, we encourage you to research what hardware your user base is running, and compile ONNX Runtime yourself against a configuration that gives the best experience for as many of your users as possible.
 
 Because there are also an innumerable quantity of EP combinations, we typically only provide builds for one or a few EPs at a time; some EPs may also be available in all builds:
-- All Windows builds come with the DirectML EP enabled.
-- All macOS builds come with the CoreML EP enabled.
-- CUDA and TensorRT always ship together.
+- All Windows builds, except the WebGPU build, come with the DirectML EP enabled.
+- All macOS & iOS builds come with the CoreML EP enabled.
+- CUDA, TensorRT, and TensorRT RTX always ship together. TensorRT RTX is also available on its own for Windows x64 and Linux x64.
 
 While there may be both a WebGPU build *and* a CUDA build for a certain platform, enabling both the `cuda` and `webgpu` features will result in a compile error because no build including *both* CUDA + WebGPU exists. ONNX Runtime is in the process of making some EPs behave more like "plugins" (not requiring the base ONNX Runtime library to be recompiled with each EP config), so such combinations may be possible in the future.
 
@@ -26,21 +27,25 @@ When updating to a new version of <Ort/>, check the `build/download/dist.tsv` fi
 
 To verify a build, download the archive from the URL and use GitHub's [`gh` CLI](https://cli.github.com/) to verify the file:
 ```shell
-$ gh attestation verify --owner pykeio ./x86_64-pc-windows-msvc+cu13.tar.lzma2
-Loaded digest sha256:e96616510082108be228ad6ea026246a31650b7d446b330c6b9671fcb9ae6267 for file://./x86_64-pc-windows-msvc+cu13.tar.lzma2
+$ gh attestation verify --owner pykeio ./x86_64-unknown-linux-gnu.tar.lzma2
+Loaded digest sha256:3ed2eb9c3c13f9d38d1990aab429d4560841b621119aeafc08693fc23fafb292 for file://x86_64-unknown-linux-gnu.tar.lzma2
 Loaded 1 attestation from GitHub API
 
 The following policy criteria will be enforced:
-- OIDC Issuer must match:................... https://token.actions.githubusercontent.com
-- Source Repository Owner URI must match:... https://github.com/pykeio
 - Predicate type must match:................ https://slsa.dev/provenance/v1
-- Subject Alternative Name must match regex: (?i)^https://github.com/pykeio/
+- Source Repository Owner URI must match:... https://github.com/pykeio
+- Subject Alternative Name must match regex: (?i)^https://github\.com/pykeio/
+- OIDC Issuer must match:................... https://token.actions.githubusercontent.com
 
 ✓ Verification succeeded!
 
-sha256:e96616510082108be228ad6ea026246a31650b7d446b330c6b9671fcb9ae6267 was attested by:
-REPO                  PREDICATE_TYPE                  WORKFLOW
-pykeio/ort-artifacts  https://slsa.dev/provenance/v1  .github/workflows/build-runner.yml@refs/heads/main
+The following 1 attestation matched the policy criteria
+
+- Attestation #1
+  - Build repo:..... pykeio/ort-artifacts
+  - Build workflow:. .github/workflows/build.yml@refs/heads/main
+  - Signer repo:.... pykeio/ort-artifacts
+  - Signer workflow: .github/workflows/build-runner.yml@refs/heads/main
 ```
 
 Additionally, make sure that the SHA-256 hash in `dist.tsv` matches the hash calculated by `gh` -- `ort-sys`'s download logic will always check its calculated hash against `dist.tsv` as well.

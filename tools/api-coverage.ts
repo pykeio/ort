@@ -47,7 +47,7 @@ const IGNORED_SYMBOLS = new Set<string>([
 	'UpdateTensorRTProviderOptionsWithValue',
 	'UpdateCUDAProviderOptionsWithValue',
 	'GetBoundOutputNames',
-	'GetTensorShapeElementCount', // calculatd by us
+	'GetTensorShapeElementCount', // calculated by us
 	// string tensors have special extraction & aren't mutable
 	'GetStringTensorElementLength',
 	'GetStringTensorElement',

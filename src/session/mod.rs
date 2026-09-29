@@ -208,9 +208,10 @@ impl Session {
 		let allocator = Allocator::default();
 		(0..size)
 			.map(|i| {
-				let mut name: *mut c_char = ptr::null_mut();
-				ortsys![unsafe SessionGetOverridableInitializerName(self.ptr(), i, allocator.ptr().cast_mut(), &mut name).expect("infallible")];
-				let name = unsafe { CStr::from_ptr(name) }.to_string_lossy().into_owned();
+				let mut name_ptr: *mut c_char = ptr::null_mut();
+				ortsys![unsafe SessionGetOverridableInitializerName(self.ptr(), i, allocator.ptr().cast_mut(), &mut name_ptr).expect("infallible")];
+				let name = unsafe { CStr::from_ptr(name_ptr) }.to_string_lossy().into_owned();
+				unsafe { allocator.free(name_ptr) };
 				let mut typeinfo_ptr: *mut ort_sys::OrtTypeInfo = ptr::null_mut();
 				ortsys![unsafe SessionGetOverridableInitializerTypeInfo(self.ptr(), i, &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
 				let dtype = unsafe { ValueType::from_type_info(typeinfo_ptr) };

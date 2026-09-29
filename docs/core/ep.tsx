@@ -27,7 +27,7 @@ export const EXECUTION_PROVIDER_ARRAY: ExecutionProvider[] = [
 		feature: 'cuda',
 		note: <>Supports CUDA 13. See <Link href='/perf/execution-providers#cuda'>here</Link> for more info.</>,
 		platforms: [ { os: 'windows', arch: 'x64' }, { os: 'linux', arch: 'x64' }, { os: 'linux', arch: 'arm64' } ],
-		binaries: [ { os: 'windows', arch: 'x64' }, { os: 'linux', arch: 'x64' } ]
+		binaries: [ { os: 'windows', arch: 'x64' }, { os: 'linux', arch: 'x64' }, { os: 'linux', arch: 'arm64' } ]
 	},
 	{
 		icon: <SiNvidia style={{ color: '#7bbb08' }} />,
@@ -35,15 +35,15 @@ export const EXECUTION_PROVIDER_ARRAY: ExecutionProvider[] = [
 		name: 'TensorRT',
 		feature: 'tensorrt',
 		platforms: [ { os: 'windows', arch: 'x64' }, { os: 'linux', arch: 'x64' }, { os: 'linux', arch: 'arm64' } ],
-		binaries: [ { os: 'windows', arch: 'x64' }, { os: 'linux', arch: 'x64' } ]
+		binaries: [ { os: 'windows', arch: 'x64' }, { os: 'linux', arch: 'x64' }, { os: 'linux', arch: 'arm64' } ]
 	},
 	{
 		icon: <SiNvidia style={{ color: '#7bbb08' }} />,
 		vendor: 'NVIDIA',
 		name: 'TensorRT RTX',
 		feature: 'nvrtx',
-		platforms: [ { os: 'windows', arch: 'x64' }, { os: 'linux', arch: 'x64' } ],
-		binaries: [ { os: 'windows', arch: 'x64' }, { os: 'linux', arch: 'x64' } ]
+		platforms: [ { os: 'windows', arch: 'x64' }, { os: 'linux', arch: 'x64' }, { os: 'linux', arch: 'arm64' } ],
+		binaries: [ { os: 'windows', arch: 'x64' }, { os: 'linux', arch: 'x64' }, { os: 'linux', arch: 'arm64' } ]
 	},
 	{
 		icon: <svg width="1em" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22"><path fill="#f35325" d="M0 0h10v10H0z"/><path fill="#81bc06" d="M12 0h10v10H12z"/><path fill="#05a6f0" d="M0 12h10v10H0z"/><path fill="#ffba08" d="M12 12h10v10H12z"/></svg>,

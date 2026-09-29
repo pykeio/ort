@@ -123,15 +123,13 @@ impl Checkpoint {
 		})
 		.ok()?;
 
-		Some(match property_type {
+		let property = match property_type {
 			ort_sys::OrtPropertyType::OrtIntProperty => Property::Int(unsafe { *property_value.cast::<i64>() }),
 			ort_sys::OrtPropertyType::OrtFloatProperty => Property::Float(unsafe { *property_value.cast::<f32>() }),
-			ort_sys::OrtPropertyType::OrtStringProperty => {
-				let value = unsafe { CStr::from_ptr(property_value.cast::<c_char>()) }.to_string_lossy().into();
-				unsafe { allocator.free(property_value.cast_mut()) };
-				Property::String(value)
-			}
-		})
+			ort_sys::OrtPropertyType::OrtStringProperty => Property::String(unsafe { CStr::from_ptr(property_value.cast::<c_char>()) }.to_string_lossy().into())
+		};
+		unsafe { allocator.free(property_value.cast_mut()) };
+		Some(property)
 	}
 
 	pub fn get_parameter(&self, name: impl AsRef<str>, allocator: &Allocator) -> Result<DynTensor> {

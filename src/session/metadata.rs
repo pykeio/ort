@@ -86,7 +86,7 @@ impl ModelMetadata<'_> {
 		Some(ver)
 	}
 
-	/// Fetch the value of a custom metadata key. Returns `Ok(None)` if the key is not found.
+	/// Fetch the value of a custom metadata key. Returns `None` if the key is not found.
 	pub fn custom(&self, key: &str) -> Option<String> {
 		let str_bytes = with_cstr(key.as_bytes(), &|key| {
 			let mut str_bytes: *mut c_char = ptr::null_mut();
@@ -94,6 +94,10 @@ impl ModelMetadata<'_> {
 			Ok(str_bytes)
 		})
 		.ok()?;
+		// ONNX Runtime returns a null pointer when the key doesn't exist.
+		if str_bytes.is_null() {
+			return None;
+		}
 		unsafe { AllocatedString::from_ptr(str_bytes, &self.allocator) }
 			.ok()
 			.map(|s| s.to_string())
@@ -132,5 +136,17 @@ impl Drop for ModelMetadata<'_> {
 	fn drop(&mut self) {
 		ortsys![unsafe ReleaseModelMetadata(self.ptr.as_ptr())];
 		crate::logging::drop!(ModelMetadata, self.ptr);
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::{session::Session, test_util::test_env};
+
+	#[test]
+	fn test_custom_missing_key() -> crate::Result<()> {
+		let session = Session::builder(test_env())?.commit_from_file("tests/data/upsample.onnx")?;
+		assert_eq!(session.metadata()?.custom("does-not-exist"), None);
+		Ok(())
 	}
 }

@@ -1,7 +1,10 @@
 //! ONNX Runtime doesn't (currently) expose an API for inter-device copies, so we instead use a dummy model to copy the
 //! tensor & `IoBinding` to configure where the copy ends up.
 
-use alloc::{format, string::ToString};
+use alloc::{
+	format,
+	string::{String, ToString}
+};
 use core::ops::{Deref, DerefMut};
 
 use crate::{

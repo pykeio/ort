@@ -57,7 +57,7 @@ impl TensorElementType {
 	/// Returns the size in bytes that a container of this type occupies according to its total capacity.
 	pub fn byte_size(&self, container_capacity: usize) -> Option<usize> {
 		Some(match self {
-			TensorElementType::Uint4 | TensorElementType::Int4 => container_capacity / 2,
+			TensorElementType::Uint4 | TensorElementType::Int4 => container_capacity.div_ceil(2),
 			TensorElementType::Bool | TensorElementType::Int8 | TensorElementType::Uint8 => container_capacity,
 			TensorElementType::Int16 | TensorElementType::Uint16 => container_capacity * 2,
 			TensorElementType::Int32 | TensorElementType::Uint32 => container_capacity * 4,
@@ -276,7 +276,10 @@ mod tests {
 	use core::ptr::NonNull;
 
 	use super::TensorElementType;
-	use crate::value::{Shape, SymbolicDimensions, TensorRef, TensorValueType, ValueType, r#type::extract_data_type_from_tensor_info};
+	use crate::{
+		memory::Allocator,
+		value::{DynTensor, Shape, SymbolicDimensions, TensorRef, TensorValueType, ValueType, r#type::extract_data_type_from_tensor_info}
+	};
 
 	#[test]
 	fn test_value_types() -> crate::Result<()> {
@@ -310,6 +313,16 @@ mod tests {
 				dimension_symbols: SymbolicDimensions::empty(0)
 			};
 			assert_eq!(unsafe { extract_data_type_from_tensor_info(NonNull::new(value_type.to_tensor_type_info().expect("")).expect("")) }, value_type);
+		}
+		Ok(())
+	}
+
+	#[test]
+	fn test_4bit_byte_size() -> crate::Result<()> {
+		for ty in [TensorElementType::Int4, TensorElementType::Uint4] {
+			let tensor = DynTensor::new(&Allocator::default(), ty, [3_usize])?;
+			assert_eq!(ty.byte_size(3), Some(2));
+			assert_eq!(tensor.size(), ty.byte_size(3));
 		}
 		Ok(())
 	}

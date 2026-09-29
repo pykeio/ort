@@ -274,7 +274,9 @@ impl<'x> Iterator for Values<'x, '_> {
 		loop {
 			match self.key_iter.next() {
 				None => return None,
-				Some(&"") => continue,
+				Some(&"") => {
+					self.value_iter.next();
+				}
 				Some(_) => {
 					self.effective_len -= 1;
 					return self.value_iter.next().map(DynValue::view);
@@ -304,7 +306,9 @@ impl<'x> Iterator for ValuesMut<'x, '_> {
 		loop {
 			match self.key_iter.next() {
 				None => return None,
-				Some(&"") => continue,
+				Some(&"") => {
+					self.value_iter.next();
+				}
 				Some(_) => {
 					self.effective_len -= 1;
 					return self.value_iter.next().map(DynValue::view_mut);
@@ -334,7 +338,9 @@ impl<'x, 'k> Iterator for Iter<'x, 'k> {
 		loop {
 			match self.key_iter.next() {
 				None => return None,
-				Some(&"") => continue,
+				Some(&"") => {
+					self.value_iter.next();
+				}
 				Some(key) => {
 					self.effective_len -= 1;
 					return self.value_iter.next().map(|v| (*key, v.view()));
@@ -364,7 +370,9 @@ impl<'x, 'k> Iterator for IterMut<'x, 'k> {
 		loop {
 			match self.key_iter.next() {
 				None => return None,
-				Some(&"") => continue,
+				Some(&"") => {
+					self.value_iter.next();
+				}
 				Some(key) => {
 					self.effective_len -= 1;
 					return self.value_iter.next().map(|v| (*key, v.view_mut()));
@@ -394,7 +402,9 @@ impl<'r> Iterator for IntoIter<'r> {
 		loop {
 			match self.keys.next() {
 				None => return None,
-				Some("") => continue,
+				Some("") => {
+					self.values.next();
+				}
 				Some(key) => {
 					self.effective_len -= 1;
 					return self.values.next().map(|v| (key, v));
@@ -410,3 +420,27 @@ impl<'r> Iterator for IntoIter<'r> {
 
 impl ExactSizeIterator for IntoIter<'_> {}
 impl FusedIterator for IntoIter<'_> {}
+
+#[cfg(test)]
+mod tests {
+	use smallvec::smallvec;
+
+	use super::SessionOutputs;
+	use crate::{AsPointer, value::Tensor};
+
+	#[test]
+	fn test_iter_after_remove() -> crate::Result<()> {
+		let tensor = || Tensor::from_array(([1_usize], vec![0.0_f32])).map(|t| t.into_dyn());
+		let mut outputs = SessionOutputs::new(smallvec!["a", "b", "c"], smallvec![tensor()?, tensor()?, tensor()?]);
+		outputs.remove("b");
+
+		// The last item of every iterator must be output `c`, not the removed `b`.
+		let c = outputs["c"].ptr();
+		assert_eq!(outputs.iter().last().map(|(k, v)| (k, v.ptr())), Some(("c", c)));
+		assert_eq!(outputs.values().last().map(|v| v.ptr()), Some(c));
+		assert_eq!(outputs.iter_mut().last().map(|(k, v)| (k, v.ptr())), Some(("c", c)));
+		assert_eq!(outputs.values_mut().last().map(|v| v.ptr()), Some(c));
+		assert_eq!(outputs.into_iter().last().map(|(k, v)| (k, v.ptr())), Some(("c", c)));
+		Ok(())
+	}
+}

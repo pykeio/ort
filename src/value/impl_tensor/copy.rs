@@ -76,6 +76,12 @@ fn ep_for_device(device: AllocationDevice, device_id: i32) -> Result<ep::Executi
 }
 
 impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
+	/// Like [`Value::memory_info`], but also callable on a [`DynValue`](crate::value::DynValue), which may not be a
+	/// tensor.
+	fn tensor_memory_info(&self) -> Result<&MemoryInfo<'_>> {
+		self.inner.memory_info.as_ref().ok_or_else(|| Error::new("value is not a tensor"))
+	}
+
 	/// Copies the contents of this tensor to another device, returning the newly created tensor value.
 	///
 	/// ```
@@ -100,7 +106,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn to(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
-		let memory_info = self.memory_info();
+		let memory_info = self.tensor_memory_info()?;
 		let mut identity_session =
 			IdentitySessionHandle::new(self.view().into_dyn(), memory_info.allocation_device(), memory_info.device_id(), *self.data_type())?;
 
@@ -138,7 +144,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn to_async(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
-		let memory_info = self.memory_info();
+		let memory_info = self.tensor_memory_info()?;
 		let mut identity_session =
 			IdentitySessionHandle::new(self.view().into_dyn(), memory_info.allocation_device(), memory_info.device_id(), *self.data_type())?;
 
@@ -190,7 +196,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 			return Err(Error::new("target shape does not match source shape"));
 		}
 
-		let target_memory_info = target.memory_info();
+		let target_memory_info = target.tensor_memory_info()?;
 		let mut identity_session =
 			IdentitySessionHandle::new(self.view().into_dyn(), target_memory_info.allocation_device(), target_memory_info.device_id(), *self.data_type())?;
 
@@ -235,7 +241,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 			return Err(Error::new("target shape does not match source shape"));
 		}
 
-		let target_memory_info = target.memory_info();
+		let target_memory_info = target.tensor_memory_info()?;
 		let mut identity_session =
 			IdentitySessionHandle::new(self.view().into_dyn(), target_memory_info.allocation_device(), target_memory_info.device_id(), *self.data_type())?;
 
@@ -278,7 +284,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Clone for Value<Type> {
 	/// ```
 	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	fn clone(&self) -> Self {
-		let memory_info = self.memory_info();
+		let memory_info = self.tensor_memory_info().expect("Failed to clone tensor");
 		self.to(memory_info.allocation_device(), memory_info.device_id())
 			.expect("Failed to clone tensor")
 	}
@@ -293,7 +299,7 @@ struct IdentitySessionHandle<'s> {
 impl<'s> IdentitySessionHandle<'s> {
 	fn new(src: ValueRef<'s>, target_device: AllocationDevice<'_>, target_device_id: i32, dtype: TensorElementType) -> Result<Self> {
 		let tensor_type = ort_sys::ONNXTensorElementDataType::from(dtype);
-		let src_memory_info = src.memory_info();
+		let src_memory_info = src.tensor_memory_info()?;
 		let session_key = IdentitySessionKey {
 			src_device: src_memory_info.allocation_device().as_str().to_string(),
 			src_device_id: src_memory_info.device_id(),
@@ -378,8 +384,16 @@ mod tests {
 	use crate::{
 		memory::{AllocationDevice, Allocator},
 		test_util::test_env,
-		value::Tensor
+		value::{Sequence, Tensor}
 	};
+
+	#[test]
+	fn test_copy_non_tensor() -> crate::Result<()> {
+		let _env = test_env();
+		let sequence = Sequence::new([Tensor::from_array(([1_usize], vec![1i32]))?])?.into_dyn();
+		assert!(sequence.to(AllocationDevice::CPU, 0).is_err());
+		Ok(())
+	}
 
 	#[test]
 	fn test_clone_tensor() -> crate::Result<()> {

@@ -355,35 +355,31 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	/// - `session` must be `Some` for values returned from a session.
 	#[must_use]
 	pub unsafe fn from_ptr(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value<Type> {
-		let mut typeinfo_ptr = ptr::null_mut();
-		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
-
-		let dtype = unsafe { ValueType::from_type_info(typeinfo_ptr) };
-		let memory_info = unsafe { MemoryInfo::from_value(ptr) };
-
-		Value {
-			inner: match session {
-				Some(session) => ValueInner::new_backed(ptr, dtype, memory_info, true, Box::new(session)),
-				None => ValueInner::new(ptr, dtype, memory_info, true)
-			},
-			_markers: PhantomData
-		}
+		unsafe { Self::from_ptr_inner(ptr, session, true) }
 	}
 
 	/// A variant of [`Value::from_ptr`] that does not release the value upon dropping. Used in operator kernel
 	/// contexts.
 	#[must_use]
 	pub(crate) unsafe fn from_ptr_nodrop(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value<Type> {
-		let mut typeinfo_ptr = ptr::null_mut();
-		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
+		unsafe { Self::from_ptr_inner(ptr, session, false) }
+	}
 
-		let dtype = unsafe { ValueType::from_type_info(typeinfo_ptr) };
+	unsafe fn from_ptr_inner(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>, drop: bool) -> Value<Type> {
+		// Only tensors have memory info, and their type can be read without building a whole `OrtTypeInfo`.
 		let memory_info = unsafe { MemoryInfo::from_value(ptr) };
+		let dtype = if memory_info.is_some() {
+			unsafe { ValueType::from_tensor_value(ptr) }
+		} else {
+			let mut typeinfo_ptr = ptr::null_mut();
+			ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
+			unsafe { ValueType::from_type_info(typeinfo_ptr) }
+		};
 
 		Value {
 			inner: match session {
-				Some(session) => ValueInner::new_backed(ptr, dtype, memory_info, false, Box::new(session)),
-				None => ValueInner::new(ptr, dtype, memory_info, false)
+				Some(session) => ValueInner::new_backed(ptr, dtype, memory_info, drop, Box::new(session)),
+				None => ValueInner::new(ptr, dtype, memory_info, drop)
 			},
 			_markers: PhantomData
 		}

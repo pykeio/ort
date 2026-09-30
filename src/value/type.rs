@@ -153,6 +153,43 @@ impl ValueType {
 		}
 	}
 
+	/// Reads the type of a value known to be a tensor. This is cheaper than [`ValueType::from_type_info`], which needs
+	/// ONNX Runtime to build a whole `OrtTypeInfo` first.
+	pub(crate) unsafe fn from_tensor_value(value_ptr: NonNull<ort_sys::OrtValue>) -> Self {
+		#[cfg(feature = "api-24")]
+		{
+			use core::sync::atomic::{AtomicBool, Ordering};
+
+			// Alternative backends don't implement this, so after the first failure we stop trying.
+			static UNSUPPORTED: AtomicBool = AtomicBool::new(false);
+			if !UNSUPPORTED.load(Ordering::Relaxed) {
+				let mut ty = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+				let mut dims: *const i64 = ptr::null();
+				let mut num_dims = 0;
+				let status = ortsys![@ort: unsafe GetTensorElementTypeAndShapeDataReference(value_ptr.as_ptr(), &mut ty, &mut dims, &mut num_dims) as Result];
+				if status.is_ok() {
+					// A value's shape is concrete, so it has no symbolic dimensions.
+					let shape = if num_dims == 0 {
+						Shape::empty(0)
+					} else {
+						Shape::new(unsafe { core::slice::from_raw_parts(dims, num_dims) }.iter().copied())
+					};
+					return ValueType::Tensor {
+						ty: ty.into(),
+						shape,
+						dimension_symbols: SymbolicDimensions::empty(num_dims)
+					};
+				}
+				UNSUPPORTED.store(true, Ordering::Relaxed);
+			}
+		}
+
+		let mut info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = ptr::null_mut();
+		ortsys![unsafe GetTensorTypeAndShape(value_ptr.as_ptr(), &mut info_ptr).expect("infallible"); nonNull(info_ptr)];
+		let _guard = run_on_drop(|| ortsys![unsafe ReleaseTensorTypeAndShapeInfo(info_ptr.as_ptr())]);
+		unsafe { extract_data_type_from_tensor_info(info_ptr) }
+	}
+
 	pub(crate) fn to_tensor_type_info(&self) -> Option<*mut ort_sys::OrtTensorTypeAndShapeInfo> {
 		match self {
 			Self::Tensor { ty, shape, dimension_symbols } => {
@@ -443,6 +480,22 @@ mod tests {
 		ortsys,
 		value::{Shape, SymbolicDimensions, TensorElementType}
 	};
+
+	#[test]
+	fn test_from_tensor_value_matches_type_info() -> crate::Result<()> {
+		use crate::{AsPointer, value::Tensor};
+
+		for shape in [vec![], vec![0], vec![2, 3]] {
+			let n = shape.iter().product::<i64>() as usize;
+			let tensor = Tensor::from_array((shape, vec![0.0_f32; n]))?;
+			let ptr = NonNull::new(tensor.ptr().cast_mut()).expect("non-null");
+
+			let mut typeinfo_ptr = core::ptr::null_mut();
+			ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr)?; nonNull(typeinfo_ptr)];
+			assert_eq!(unsafe { ValueType::from_tensor_value(ptr) }, unsafe { ValueType::from_type_info(typeinfo_ptr) });
+		}
+		Ok(())
+	}
 
 	#[test]
 	fn test_tensor_to_from_tensor_info() -> crate::Result<()> {

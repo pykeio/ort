@@ -57,7 +57,9 @@ pub(crate) struct ValueInner {
 	pub(crate) dtype: ValueType,
 	pub(crate) memory_info: Option<MemoryInfo<'static>>,
 	pub(crate) drop: bool,
-	_backing: Option<Box<dyn Any>>
+	_backing: Option<Box<dyn Any>>,
+	/// The session a value returned from a session run came from, kept alive for as long as the value.
+	session: Option<Arc<SharedSessionInner>>
 }
 
 impl ValueInner {
@@ -68,7 +70,8 @@ impl ValueInner {
 			dtype,
 			memory_info,
 			drop,
-			_backing: None
+			_backing: None,
+			session: None
 		})
 	}
 
@@ -85,12 +88,13 @@ impl ValueInner {
 			dtype,
 			memory_info,
 			drop,
-			_backing: Some(backing)
+			_backing: Some(backing),
+			session: None
 		})
 	}
 
 	pub(crate) fn is_backed(&self) -> bool {
-		self._backing.is_some()
+		self._backing.is_some() || self.session.is_some()
 	}
 }
 
@@ -376,13 +380,9 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 			unsafe { ValueType::from_type_info(typeinfo_ptr) }
 		};
 
-		Value {
-			inner: match session {
-				Some(session) => ValueInner::new_backed(ptr, dtype, memory_info, drop, Box::new(session)),
-				None => ValueInner::new(ptr, dtype, memory_info, drop)
-			},
-			_markers: PhantomData
-		}
+		let mut inner = ValueInner::new(ptr, dtype, memory_info, drop);
+		Arc::get_mut(&mut inner).expect("new value is unique").session = session;
+		Value { inner, _markers: PhantomData }
 	}
 
 	/// Create a view of this value's data.

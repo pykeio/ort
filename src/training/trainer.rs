@@ -14,7 +14,7 @@ use crate::{
 	error::{Error, Result},
 	memory::Allocator,
 	ortsys,
-	session::{RunOptions, SessionInputValue, SessionInputs, SessionOutputs, builder::SessionBuilder},
+	session::{SessionInputValue, SessionInputs, SessionOutputs, builder::SessionBuilder},
 	util::{char_p_to_string, with_cstr_ptr_array},
 	value::{IntoTensorElementType, Tensor, Value}
 };
@@ -137,61 +137,7 @@ impl Trainer {
 		inputs: impl Into<SessionInputs<'i1, 'v1, N1>>,
 		labels: impl Into<SessionInputs<'i2, 'v2, N2>>
 	) -> Result<SessionOutputs<'s>> {
-		match inputs.into() {
-			SessionInputs::ValueSlice(input_values) => match labels.into() {
-				SessionInputs::ValueSlice(labels) => self.step_inner(input_values.iter().chain(labels).map(Some), None),
-				SessionInputs::ValueArray(labels) => self.step_inner(input_values.iter().chain(labels.iter()).map(Some), None),
-				SessionInputs::ValueMap(labels) => {
-					let labels = mapped_inputs(&self.train_input_names, &labels);
-					self.step_inner(input_values.iter().map(Some).chain(labels), None)
-				}
-			},
-			SessionInputs::ValueArray(input_values) => match labels.into() {
-				SessionInputs::ValueSlice(labels) => self.step_inner(input_values.iter().chain(labels).map(Some), None),
-				SessionInputs::ValueArray(labels) => self.step_inner(input_values.iter().chain(labels.iter()).map(Some), None),
-				SessionInputs::ValueMap(labels) => {
-					let labels = mapped_inputs(&self.train_input_names, &labels);
-					self.step_inner(input_values.iter().map(Some).chain(labels), None)
-				}
-			},
-			SessionInputs::ValueMap(input_values) => {
-				let input_values = mapped_inputs(&self.train_input_names, &input_values);
-				match labels.into() {
-					SessionInputs::ValueSlice(labels) => self.step_inner(input_values.into_iter().chain(labels.iter().map(Some)), None),
-					SessionInputs::ValueArray(labels) => self.step_inner(input_values.into_iter().chain(labels.iter().map(Some)), None),
-					SessionInputs::ValueMap(labels) => {
-						let labels = mapped_inputs(&self.train_input_names, &labels);
-						self.step_inner(input_values.into_iter().chain(labels), None)
-					}
-				}
-			}
-		}
-	}
-
-	fn step_inner<'r, 's: 'r, 'i1, 'v1: 'i1, 'i2, 'v2: 'i2>(
-		&'s self,
-		input_values: impl Iterator<Item = Option<&'i1 SessionInputValue<'v1>>>,
-		run_options: Option<&'r RunOptions>
-	) -> Result<SessionOutputs<'r>> {
-		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![ptr::null_mut(); self.train_output_names.len()];
-
-		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.map(|v| v.map_or(ptr::null(), |v| v.ptr())).collect();
-
-		let run_options_ptr = if let Some(run_options) = &run_options { run_options.ptr() } else { ptr::null() };
-
-		ortsys![@training: unsafe TrainStep(self.ptr.as_ptr(), run_options_ptr, input_ort_values.len(), input_ort_values.as_ptr(), output_tensor_ptrs.len(), output_tensor_ptrs.as_mut_ptr())?];
-
-		let outputs = output_tensor_ptrs
-			.into_iter()
-			.map(|tensor_ptr| unsafe {
-				// TODO: `Value` should absolutely be refactored to accept a different backing pointer than
-				// `SharedSessionInner`. but for now, nobody should be using the loss tensor past the
-				// lifetime of the trainer... right...? 😣
-				Value::from_ptr(NonNull::new(tensor_ptr).expect("OrtValue ptr returned from session Run should not be null"), None)
-			})
-			.collect();
-
-		Ok(SessionOutputs::new(self.train_output_names.iter().map(String::as_str).collect(), outputs))
+		self.run_step(Step::Train, &inputs.into(), &labels.into())
 	}
 
 	pub fn eval_step<'s, 'i1, 'v1: 'i1, 'i2: 'i1, 'v2: 'i2 + 'i1, const N1: usize, const N2: usize>(
@@ -199,49 +145,41 @@ impl Trainer {
 		inputs: impl Into<SessionInputs<'i1, 'v1, N1>>,
 		labels: impl Into<SessionInputs<'i2, 'v2, N2>>
 	) -> Result<SessionOutputs<'s>> {
-		match inputs.into() {
-			SessionInputs::ValueSlice(input_values) => match labels.into() {
-				SessionInputs::ValueSlice(labels) => self.eval_step_inner(input_values.iter().chain(labels).map(Some), None),
-				SessionInputs::ValueArray(labels) => self.eval_step_inner(input_values.iter().chain(labels.iter()).map(Some), None),
-				SessionInputs::ValueMap(labels) => {
-					let labels = mapped_inputs(&self.eval_input_names, &labels);
-					self.eval_step_inner(input_values.iter().map(Some).chain(labels), None)
-				}
-			},
-			SessionInputs::ValueArray(input_values) => match labels.into() {
-				SessionInputs::ValueSlice(labels) => self.eval_step_inner(input_values.iter().chain(labels).map(Some), None),
-				SessionInputs::ValueArray(labels) => self.eval_step_inner(input_values.iter().chain(labels.iter()).map(Some), None),
-				SessionInputs::ValueMap(labels) => {
-					let labels = mapped_inputs(&self.eval_input_names, &labels);
-					self.eval_step_inner(input_values.iter().map(Some).chain(labels), None)
-				}
-			},
-			SessionInputs::ValueMap(input_values) => {
-				let input_values = mapped_inputs(&self.eval_input_names, &input_values);
-				match labels.into() {
-					SessionInputs::ValueSlice(labels) => self.eval_step_inner(input_values.into_iter().chain(labels.iter().map(Some)), None),
-					SessionInputs::ValueArray(labels) => self.eval_step_inner(input_values.into_iter().chain(labels.iter().map(Some)), None),
-					SessionInputs::ValueMap(labels) => {
-						let labels = mapped_inputs(&self.eval_input_names, &labels);
-						self.eval_step_inner(input_values.into_iter().chain(labels), None)
-					}
-				}
-			}
-		}
+		self.run_step(Step::Eval, &inputs.into(), &labels.into())
 	}
 
-	fn eval_step_inner<'r, 's: 'r, 'i1, 'v1: 'i1, 'i2, 'v2: 'i2>(
+	fn run_step<'s, 'i1, 'v1: 'i1, 'i2: 'i1, 'v2: 'i2 + 'i1, const N1: usize, const N2: usize>(
 		&'s self,
-		input_values: impl Iterator<Item = Option<&'i1 SessionInputValue<'v1>>>,
-		run_options: Option<&'r RunOptions>
-	) -> Result<SessionOutputs<'r>> {
-		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![ptr::null_mut(); self.eval_output_names.len()];
+		step: Step,
+		inputs: &SessionInputs<'i1, 'v1, N1>,
+		labels: &SessionInputs<'i2, 'v2, N2>
+	) -> Result<SessionOutputs<'s>> {
+		let (input_names, output_names) = match step {
+			Step::Train => (&self.train_input_names, &self.train_output_names),
+			Step::Eval => (&self.eval_input_names, &self.eval_output_names)
+		};
+		let input_ort_values: Vec<*const ort_sys::OrtValue> = resolve_inputs(input_names, inputs)
+			.into_iter()
+			.chain(resolve_inputs(input_names, labels))
+			.map(|v| v.map_or(ptr::null(), |v| v.ptr()))
+			.collect();
+		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![ptr::null_mut(); output_names.len()];
 
-		let input_ort_values: Vec<*const ort_sys::OrtValue> = input_values.map(|v| v.map_or(ptr::null(), |v| v.ptr())).collect();
-
-		let run_options_ptr = if let Some(run_options) = &run_options { run_options.ptr() } else { ptr::null() };
-
-		ortsys![@training: unsafe EvalStep(self.ptr.as_ptr(), run_options_ptr, input_ort_values.len(), input_ort_values.as_ptr(), output_tensor_ptrs.len(), output_tensor_ptrs.as_mut_ptr())?];
+		let api = training_api()?;
+		let run = match step {
+			Step::Train => api.TrainStep,
+			Step::Eval => api.EvalStep
+		};
+		unsafe {
+			Error::result_from_status(run(
+				self.ptr.as_ptr(),
+				ptr::null(),
+				input_ort_values.len(),
+				input_ort_values.as_ptr(),
+				output_tensor_ptrs.len(),
+				output_tensor_ptrs.as_mut_ptr()
+			))
+		}?;
 
 		let outputs = output_tensor_ptrs
 			.into_iter()
@@ -253,7 +191,7 @@ impl Trainer {
 			})
 			.collect();
 
-		Ok(SessionOutputs::new(self.eval_output_names.iter().map(String::as_str).collect(), outputs))
+		Ok(SessionOutputs::new(output_names.iter().map(String::as_str).collect(), outputs))
 	}
 
 	pub fn export<O: AsRef<str>>(&self, out_path: impl AsRef<Path>, output_names: impl AsRef<[O]>) -> Result<()> {
@@ -302,6 +240,20 @@ impl Drop for Trainer {
 	fn drop(&mut self) {
 		crate::logging::drop!(Trainer, self.ptr);
 		ortsys![@training: unsafe ReleaseTrainingSession(self.ptr.as_ptr())];
+	}
+}
+
+#[derive(Clone, Copy)]
+enum Step {
+	Train,
+	Eval
+}
+
+fn resolve_inputs<'a, 'v, const N: usize>(input_names: &[String], inputs: &'a SessionInputs<'_, 'v, N>) -> Vec<Option<&'a SessionInputValue<'v>>> {
+	match inputs {
+		SessionInputs::ValueSlice(values) => values.iter().map(Some).collect(),
+		SessionInputs::ValueArray(values) => values.iter().map(Some).collect(),
+		SessionInputs::ValueMap(values) => mapped_inputs(input_names, values)
 	}
 }
 

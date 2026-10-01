@@ -1,8 +1,8 @@
 use alloc::string::ToString;
-use core::{fmt, ops::BitOr, ptr};
+use core::{fmt, ops::BitOr};
 
 use super::{ArenaExtendStrategy, ExecutionProvider, ExecutionProviderOptions};
-use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder, util};
+use crate::{AsPointer, error::Result, ortsys, session::builder::SessionBuilder};
 
 // https://github.com/microsoft/onnxruntime/blob/ffceed9d44f2f3efb9dd69fa75fea51163c91d91/onnxruntime/contrib_ops/cpu/bert/attention_common.h#L160-L171
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -314,23 +314,15 @@ impl ExecutionProvider for CUDA {
 	const NAME: &'static str = "CUDAExecutionProvider";
 
 	fn register(&self, session_builder: &mut SessionBuilder) -> Result<()> {
-		let mut cuda_options: *mut ort_sys::OrtCUDAProviderOptionsV2 = ptr::null_mut();
-		ortsys![unsafe CreateCUDAProviderOptions(&mut cuda_options)?];
-		let _guard = util::run_on_drop(|| {
-			ortsys![unsafe ReleaseCUDAProviderOptions(cuda_options)];
-		});
-
-		let ffi_options = self.0.to_ffi();
-		ortsys![unsafe UpdateCUDAProviderOptions(
-			cuda_options,
-			ffi_options.key_ptrs(),
-			ffi_options.value_ptrs(),
-			ffi_options.len()
-		)?];
-
-		ortsys![unsafe SessionOptionsAppendExecutionProvider_CUDA_V2(session_builder.ptr_mut(), cuda_options)?];
-
-		Ok(())
+		super::register_with_options_struct!(
+			self.0,
+			session_builder,
+			ort_sys::OrtCUDAProviderOptionsV2,
+			CreateCUDAProviderOptions,
+			UpdateCUDAProviderOptions,
+			ReleaseCUDAProviderOptions,
+			SessionOptionsAppendExecutionProvider_CUDA_V2
+		)
 	}
 }
 

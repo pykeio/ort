@@ -651,7 +651,7 @@ impl Session {
 				None => unsafe {
 					Value::from_ptr(
 						NonNull::new(output_value_ptrs[i]).expect("OrtValue ptr returned from session Run should not be null"),
-						Some(Arc::clone(&self.inner))
+						Some(&self.inner.allocator)
 					)
 				}
 			})

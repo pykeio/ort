@@ -9,12 +9,7 @@ use core::{
 	str
 };
 
-use crate::{
-	AsPointer,
-	error::Result,
-	ortsys,
-	session::{Session, SharedSessionInner}
-};
+use crate::{AsPointer, error::Result, ortsys, session::Session};
 
 /// A device allocator used to manage the allocation of [`Value`]s.
 ///
@@ -73,21 +68,19 @@ use crate::{
 #[derive(Debug)]
 pub struct Allocator {
 	ptr: NonNull<ort_sys::OrtAllocator>,
-	info: MemoryInfo<'static>,
-	/// Releases the allocator once it and every tensor created with it are dropped. `None` for the default CPU
-	/// allocator provided by `GetAllocatorWithDefaultOptions`, which must never be released.
-	pub(crate) handle: Option<Arc<AllocatorHandle>>
+	pub(crate) handle: Arc<AllocatorHandle>
 }
 
 unsafe impl Send for Allocator {}
 // not all allocators appear to be Sync - specifically the CUDA allocator can sometimes crash when used on multiple
 // threads. CPU allocator doesn't seem to be affected though.
 
+/// Handle that tensors can hold onto so the underlying allocator stays alive until all tensors are freed.
 #[derive(Debug)]
 pub(crate) struct AllocatorHandle {
-	ptr: NonNull<ort_sys::OrtAllocator>,
-	/// Hold a reference to the session if this allocator is tied to one.
-	_session_inner: Option<Arc<SharedSessionInner>>
+	pub(crate) info: MemoryInfo<'static>,
+	/// `None` for the default CPU allocator provided by `GetAllocatorWithDefaultOptions`, which must never be released.
+	_drop_ptr: Option<NonNull<ort_sys::OrtAllocator>>
 }
 
 // The handle is only used to release the allocator.
@@ -96,8 +89,10 @@ unsafe impl Sync for AllocatorHandle {}
 
 impl Drop for AllocatorHandle {
 	fn drop(&mut self) {
-		ortsys![unsafe ReleaseAllocator(self.ptr.as_ptr())];
-		crate::logging::drop!(Allocator, self.ptr);
+		if let Some(ptr) = self._drop_ptr {
+			ortsys![unsafe ReleaseAllocator(ptr.as_ptr())];
+			crate::logging::drop!(Allocator, ptr);
+		}
 	}
 }
 
@@ -108,10 +103,10 @@ impl Allocator {
 
 		Allocator {
 			ptr,
-			info: MemoryInfo::from_raw(memory_info_ptr, false),
-			// currently, this function is only ever used in session creation, where we call `CreateAllocator` manually and store the allocator resulting from
-			// this function in the `SharedSessionInner` - we don't need to hold onto the session, because the session is holding onto us.
-			handle: (!is_default).then(|| Arc::new(AllocatorHandle { ptr, _session_inner: None }))
+			handle: Arc::new(AllocatorHandle {
+				info: MemoryInfo::from_raw(memory_info_ptr, false),
+				_drop_ptr: (!is_default).then_some(ptr)
+			})
 		}
 	}
 
@@ -162,7 +157,7 @@ impl Allocator {
 
 	/// Returns the [`MemoryInfo`] describing this allocator.
 	pub fn memory_info<'a>(&'a self) -> &'a MemoryInfo<'a> {
-		&self.info
+		&self.handle.info
 	}
 
 	/// Creates a new [`Allocator`] for the given session, to allocate memory on the device described in the
@@ -173,11 +168,10 @@ impl Allocator {
 		crate::logging::create!(Allocator, ptr);
 		Ok(Self {
 			ptr,
-			info: memory_info.to_owned(),
-			handle: Some(Arc::new(AllocatorHandle {
-				ptr,
-				_session_inner: Some(session.inner())
-			}))
+			handle: Arc::new(AllocatorHandle {
+				info: memory_info.to_owned(),
+				_drop_ptr: Some(ptr)
+			})
 		})
 	}
 }
@@ -201,8 +195,10 @@ impl Default for Allocator {
 
 		Self {
 			ptr: allocator_ptr,
-			info: MemoryInfo::from_raw(memory_info_ptr, false),
-			handle: None
+			handle: Arc::new(AllocatorHandle {
+				info: MemoryInfo::from_raw(memory_info_ptr, false),
+				_drop_ptr: None
+			})
 		}
 	}
 }
@@ -390,6 +386,10 @@ pub struct MemoryInfo<'a> {
 	should_release: bool,
 	_p: PhantomData<&'a ()>
 }
+
+// SAFETY: `MemoryInfo` is read-only.
+unsafe impl Send for MemoryInfo<'_> {}
+unsafe impl Sync for MemoryInfo<'_> {}
 
 impl MemoryInfo<'static> {
 	/// Creates a [`MemoryInfo`], describing a memory location on a device allocator.

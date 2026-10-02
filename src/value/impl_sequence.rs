@@ -134,14 +134,14 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized + 'static> Value<Se
 			nonNull(value_ptr)
 		];
 		Ok(Value {
-			inner: ValueInner::new_backed(
+			inner: ValueInner::new(
 				value_ptr,
 				// 1. `CreateValue` enforces that we have at least 1 value
 				// 2. `CreateValue` internally uses the first value to determine the element type, so we do the same here
 				ValueType::Sequence(Box::new(values[0].inner.dtype.clone())),
 				None,
 				true,
-				Box::new(values)
+				Some(Box::new(values))
 			),
 			_markers: PhantomData
 		})
@@ -199,7 +199,7 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized> Value<SequenceValu
 fn extract_from_sequence(ptr: *const ort_sys::OrtValue, i: usize, allocator: &Allocator) -> Result<DynValue> {
 	let mut value_ptr = ptr::null_mut();
 	ortsys![unsafe GetValue(ptr, i as _, allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
-	Ok(unsafe { Value::from_ptr(value_ptr, None) })
+	Ok(unsafe { Value::from_ptr(value_ptr, Some(allocator)) })
 }
 
 pub struct IntoIter<T: ValueTypeMarker + DowncastableTarget + Debug + Sized> {

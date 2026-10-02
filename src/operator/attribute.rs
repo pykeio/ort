@@ -483,7 +483,7 @@ impl<'s, T: DowncastableTarget> FromKernelContext<'s> for ValueRef<'s, T> {
 
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 		ortsys![unsafe KernelInfoGetAttribute_tensor(info, name, allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
-		unsafe { ValueRef::new(DynValue::from_ptr(value_ptr, None)) }.downcast()
+		unsafe { ValueRef::new(DynValue::from_ptr(value_ptr, Some(&allocator))) }.downcast()
 	}
 
 	private_impl!();

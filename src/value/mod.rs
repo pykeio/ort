@@ -46,50 +46,31 @@ pub use self::{
 use crate::{
 	AsPointer,
 	error::{Error, ErrorCode, Result},
-	memory::{AllocatorHandle, MemoryInfo},
-	ortsys,
-	session::SharedSessionInner
+	memory::{Allocator, AllocatorHandle},
+	ortsys
 };
 
 #[derive(Debug)]
 pub(crate) struct ValueInner {
 	pub(crate) ptr: NonNull<ort_sys::OrtValue>,
 	pub(crate) dtype: ValueType,
-	pub(crate) memory_info: Option<MemoryInfo<'static>>,
 	pub(crate) drop: bool,
-	/// The allocator this value's data was allocated with, which ONNX Runtime frees it through.
+	/// the value needs the allocator to stay alive so it can drop its memory. maps/sequences don't use their own
+	/// allocators, though, hence this is optional
 	pub(crate) allocator: Option<Arc<AllocatorHandle>>,
+	// additional things like element `Value` handles for `Sequence`s
 	_backing: Option<Box<dyn Any>>
 }
 
 impl ValueInner {
-	pub fn new(ptr: NonNull<ort_sys::OrtValue>, dtype: ValueType, memory_info: Option<MemoryInfo<'static>>, drop: bool) -> Arc<Self> {
+	pub fn new(ptr: NonNull<ort_sys::OrtValue>, dtype: ValueType, allocator: Option<&Allocator>, drop: bool, backing: Option<Box<dyn Any>>) -> Arc<Self> {
 		crate::logging::create!(Value, ptr);
 		Arc::new(Self {
 			ptr,
 			dtype,
-			memory_info,
 			drop,
-			allocator: None,
-			_backing: None
-		})
-	}
-
-	pub fn new_backed(
-		ptr: NonNull<ort_sys::OrtValue>,
-		dtype: ValueType,
-		memory_info: Option<MemoryInfo<'static>>,
-		drop: bool,
-		backing: Box<dyn Any>
-	) -> Arc<Self> {
-		crate::logging::create!(Value, ptr);
-		Arc::new(Self {
-			ptr,
-			dtype,
-			memory_info,
-			drop,
-			allocator: None,
-			_backing: Some(backing)
+			allocator: allocator.map(|a| a.handle.clone()),
+			_backing: backing
 		})
 	}
 
@@ -349,27 +330,28 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 
 	/// Construct a [`Value`] from a C++ [`ort_sys::OrtValue`] pointer. Takes ownership of `ptr`.
 	///
-	/// If the value belongs to a session (i.e. if it is the result of an inference run), you must provide the
-	/// [`SharedSessionInner`] (acquired from [`Session::inner`](crate::session::Session::inner)). This ensures the
-	/// session is not dropped until any values owned by it are.
+	/// If the value is a *tensor*, you must provide the allocator it was created with. Failure to do so will result in
+	/// a panic.
 	///
 	/// # Safety
 	///
 	/// - `ptr` must be a valid pointer to an [`ort_sys::OrtValue`].
 	/// - `session` must be `Some` for values returned from a session.
 	#[must_use]
-	pub unsafe fn from_ptr(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value<Type> {
+	pub unsafe fn from_ptr(ptr: NonNull<ort_sys::OrtValue>, allocator: Option<&Allocator>) -> Value<Type> {
 		let mut typeinfo_ptr = ptr::null_mut();
 		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
 
 		let dtype = unsafe { ValueType::from_type_info(typeinfo_ptr) };
-		let memory_info = unsafe { MemoryInfo::from_value(ptr) };
+
+		let mut is_tensor = 0;
+		ortsys![unsafe IsTensor(ptr.as_ptr(), &mut is_tensor).expect("infallible")];
+		if is_tensor != 0 && allocator.is_none() {
+			panic!("tensor values require the allocator it was created with to be passed to `Value::from_ptr`");
+		}
 
 		Value {
-			inner: match session {
-				Some(session) => ValueInner::new_backed(ptr, dtype, memory_info, true, Box::new(session)),
-				None => ValueInner::new(ptr, dtype, memory_info, true)
-			},
+			inner: ValueInner::new(ptr, dtype, allocator, true, None),
 			_markers: PhantomData
 		}
 	}
@@ -377,18 +359,16 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	/// A variant of [`Value::from_ptr`] that does not release the value upon dropping. Used in operator kernel
 	/// contexts.
 	#[must_use]
-	pub(crate) unsafe fn from_ptr_nodrop(ptr: NonNull<ort_sys::OrtValue>, session: Option<Arc<SharedSessionInner>>) -> Value<Type> {
+	pub(crate) unsafe fn from_ptr_nodrop(ptr: NonNull<ort_sys::OrtValue>, allocator: Option<&Allocator>) -> Value<Type> {
 		let mut typeinfo_ptr = ptr::null_mut();
 		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
 
 		let dtype = unsafe { ValueType::from_type_info(typeinfo_ptr) };
-		let memory_info = unsafe { MemoryInfo::from_value(ptr) };
+
+		// allocator check for tensors not needed because, well, we don't drop!
 
 		Value {
-			inner: match session {
-				Some(session) => ValueInner::new_backed(ptr, dtype, memory_info, false, Box::new(session)),
-				None => ValueInner::new(ptr, dtype, memory_info, false)
-			},
+			inner: ValueInner::new(ptr, dtype, allocator, false, None),
 			_markers: PhantomData
 		}
 	}

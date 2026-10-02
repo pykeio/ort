@@ -47,6 +47,7 @@ impl Tensor<String> {
 	/// ```
 	pub fn from_string_array<T: Utf8Data>(input: impl TensorArrayData<T>) -> Result<Tensor<String>> {
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
+		let mut allocator = Allocator::default();
 
 		let (shape, data, _guard) = input.ref_parts()?;
 		let shape_ptr: *const i64 = shape.as_ptr();
@@ -65,7 +66,7 @@ impl Tensor<String> {
 
 		// create tensor without data -- data is filled in later
 		ortsys![
-			unsafe CreateTensorAsOrtValue(Allocator::default().ptr_mut(), shape_ptr, shape_len, TensorElementType::String.into(), &mut value_ptr)?;
+			unsafe CreateTensorAsOrtValue(allocator.ptr_mut(), shape_ptr, shape_len, TensorElementType::String.into(), &mut value_ptr)?;
 			nonNull(value_ptr)
 		];
 
@@ -81,8 +82,9 @@ impl Tensor<String> {
 					shape,
 					dimension_symbols: SymbolicDimensions::empty(shape_len)
 				},
-				unsafe { MemoryInfo::from_value(value_ptr) },
-				true
+				Some(&allocator),
+				true,
+				None
 			),
 			_markers: PhantomData
 		})
@@ -176,10 +178,7 @@ fn tensor_from_array(
 	};
 
 	Ok(DynTensor {
-		inner: match guard {
-			Some(backing) => ValueInner::new_backed(value_ptr, dtype, Some(memory_info), true, backing),
-			None => ValueInner::new(value_ptr, dtype, Some(memory_info), true)
-		},
+		inner: ValueInner::new(value_ptr, dtype, None, true, guard),
 		_markers: PhantomData
 	})
 }

@@ -236,71 +236,64 @@ pub(super) fn erase<O: Operator + 'static>(operator: O) -> Result<ErasedOperator
 		erased.operator.infer_shape(&mut ctx).into_status()
 	}
 
+	/// Writes `pairs` into two newly allocated arrays for ONNX Runtime and returns how many there are.
+	#[cfg(feature = "api-18")]
+	unsafe fn write_index_pairs(pairs: &[(u32, u32)], input_index: *mut *mut core::ffi::c_int, output_index: *mut *mut core::ffi::c_int) -> usize {
+		unsafe {
+			// ONNX Runtime only calls the release function if the list isn't empty, and allocating 0 bytes is UB
+			// anyway.
+			if pairs.is_empty() {
+				*input_index = ptr::null_mut();
+				*output_index = ptr::null_mut();
+				return 0;
+			}
+
+			*input_index = alloc::alloc::alloc(index_pairs_layout(pairs.len())).cast();
+			*output_index = alloc::alloc::alloc(index_pairs_layout(pairs.len())).cast();
+
+			let (input_index, output_index) = (*input_index, *output_index);
+			for (i, &(input, output)) in pairs.iter().enumerate() {
+				*input_index.add(i) = input as _;
+				*output_index.add(i) = output as _;
+			}
+		}
+		pairs.len()
+	}
+
+	#[cfg(feature = "api-18")]
+	unsafe fn free_index_pairs(len: usize, input_index: *mut core::ffi::c_int, output_index: *mut core::ffi::c_int) {
+		unsafe {
+			alloc::alloc::dealloc(input_index.cast(), index_pairs_layout(len));
+			alloc::alloc::dealloc(output_index.cast(), index_pairs_layout(len));
+		}
+	}
+
+	#[cfg(feature = "api-18")]
+	fn index_pairs_layout(len: usize) -> Layout {
+		unsafe { Layout::from_size_align_unchecked(size_of::<u32>() * len, align_of::<u32>()) }
+	}
+
 	#[cfg(feature = "api-18")]
 	unsafe extern "system" fn get_may_inplace<O: Operator + 'static>(
 		input_index: *mut *mut core::ffi::c_int,
 		output_index: *mut *mut core::ffi::c_int
 	) -> usize {
-		let inplaces = O::INPLACES;
-		unsafe {
-			// ONNX Runtime only calls the release function if the list isn't empty, and allocating 0 bytes is UB
-			// anyway.
-			if inplaces.is_empty() {
-				*input_index = ptr::null_mut();
-				*output_index = ptr::null_mut();
-				return 0;
-			}
-
-			*input_index = alloc::alloc::alloc(Layout::from_size_align_unchecked(size_of::<u32>() * inplaces.len(), align_of::<u32>())).cast();
-			*output_index = alloc::alloc::alloc(Layout::from_size_align_unchecked(size_of::<u32>() * inplaces.len(), align_of::<u32>())).cast();
-
-			let (input_index, output_index) = (*input_index, *output_index);
-			for (i, &(input, output)) in inplaces.iter().enumerate() {
-				*input_index.add(i) = input as _;
-				*output_index.add(i) = output as _;
-			}
-		}
-		inplaces.len()
+		unsafe { write_index_pairs(O::INPLACES, input_index, output_index) }
 	}
 
 	#[cfg(feature = "api-18")]
 	unsafe extern "system" fn release_may_inplace<O: Operator + 'static>(input_index: *mut core::ffi::c_int, output_index: *mut core::ffi::c_int) {
-		unsafe {
-			alloc::alloc::dealloc(input_index.cast(), Layout::from_size_align_unchecked(size_of::<u32>() * O::INPLACES.len(), align_of::<u32>()));
-			alloc::alloc::dealloc(output_index.cast(), Layout::from_size_align_unchecked(size_of::<u32>() * O::INPLACES.len(), align_of::<u32>()));
-		}
+		unsafe { free_index_pairs(O::INPLACES.len(), input_index, output_index) }
 	}
 
 	#[cfg(feature = "api-18")]
 	unsafe extern "system" fn get_may_alias<O: Operator + 'static>(input_index: *mut *mut core::ffi::c_int, output_index: *mut *mut core::ffi::c_int) -> usize {
-		let aliases = O::ALIASES;
-		unsafe {
-			// ONNX Runtime only calls the release function if the list isn't empty, and allocating 0 bytes is UB
-			// anyway.
-			if aliases.is_empty() {
-				*input_index = ptr::null_mut();
-				*output_index = ptr::null_mut();
-				return 0;
-			}
-
-			*input_index = alloc::alloc::alloc(Layout::from_size_align_unchecked(size_of::<u32>() * aliases.len(), align_of::<u32>())).cast();
-			*output_index = alloc::alloc::alloc(Layout::from_size_align_unchecked(size_of::<u32>() * aliases.len(), align_of::<u32>())).cast();
-
-			let (input_index, output_index) = (*input_index, *output_index);
-			for (i, &(input, output)) in aliases.iter().enumerate() {
-				*input_index.add(i) = input as _;
-				*output_index.add(i) = output as _;
-			}
-		}
-		aliases.len()
+		unsafe { write_index_pairs(O::ALIASES, input_index, output_index) }
 	}
 
 	#[cfg(feature = "api-18")]
 	unsafe extern "system" fn release_may_alias<O: Operator + 'static>(input_index: *mut core::ffi::c_int, output_index: *mut core::ffi::c_int) {
-		unsafe {
-			alloc::alloc::dealloc(input_index.cast(), Layout::from_size_align_unchecked(size_of::<u32>() * O::ALIASES.len(), align_of::<u32>()));
-			alloc::alloc::dealloc(output_index.cast(), Layout::from_size_align_unchecked(size_of::<u32>() * O::ALIASES.len(), align_of::<u32>()));
-		}
+		unsafe { free_index_pairs(O::ALIASES.len(), input_index, output_index) }
 	}
 
 	Ok(ErasedOperator {

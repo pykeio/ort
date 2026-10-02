@@ -1,6 +1,5 @@
 use alloc::{ffi::CString, sync::Arc};
 use core::{
-	cell::UnsafeCell,
 	ffi::{c_char, c_void},
 	future::Future,
 	marker::PhantomData,
@@ -8,7 +7,6 @@ use core::{
 	ptr::NonNull,
 	task::{Context, Poll, Waker}
 };
-use std::sync::Mutex;
 
 use smallvec::SmallVec;
 
@@ -16,40 +14,37 @@ use crate::{
 	Error,
 	error::Result,
 	session::{SessionOutputs, SharedSessionInner, UntypedRunOptions},
-	util::{STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS},
+	util::{Mutex, STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS},
 	value::{DynValue, Value, ValueInner}
 };
 
-#[derive(Debug)]
+struct InferenceFutState<'r> {
+	value: Option<Result<SessionOutputs<'r>>>,
+	waker: Option<Waker>
+}
+
 pub(crate) struct InferenceFutInner<'r> {
-	value: UnsafeCell<Option<Result<SessionOutputs<'r>>>>,
-	waker: Mutex<Option<Waker>>,
+	// The value and waker share one lock so the callback can't complete between `poll` checking the value and storing
+	// its waker.
+	state: Mutex<InferenceFutState<'r>>,
 	run_options: Arc<UntypedRunOptions>
 }
 
 impl<'r> InferenceFutInner<'r> {
 	pub(crate) fn new(run_options: Arc<UntypedRunOptions>) -> Self {
 		InferenceFutInner {
-			waker: Mutex::new(None),
-			value: UnsafeCell::new(None),
+			state: Mutex::new(InferenceFutState { value: None, waker: None }),
 			run_options
 		}
 	}
 
-	pub(crate) fn try_take(&self) -> Option<Result<SessionOutputs<'r>>> {
-		unsafe { &mut *self.value.get() }.take()
-	}
-
-	pub(crate) fn emplace_value(&self, value: Result<SessionOutputs<'r>>) {
-		unsafe { &mut *self.value.get() }.replace(value);
-	}
-
-	pub(crate) fn set_waker(&self, waker: Option<&Waker>) {
-		*self.waker.lock().expect("Poisoned waker mutex") = waker.map(|c| c.to_owned());
-	}
-
-	pub(crate) fn wake(&self) {
-		if let Some(waker) = self.waker.lock().expect("Poisoned waker mutex").take() {
+	pub(crate) fn complete(&self, value: Result<SessionOutputs<'r>>) {
+		let waker = {
+			let mut state = self.state.lock();
+			state.value = Some(value);
+			state.waker.take()
+		};
+		if let Some(waker) = waker {
 			waker.wake();
 		}
 	}
@@ -82,12 +77,13 @@ impl<'r> Future for InferenceFut<'r, '_> {
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		let this = Pin::into_inner(self);
 
-		if let Some(v) = this.inner.try_take() {
+		let mut state = this.inner.state.lock();
+		if let Some(v) = state.value.take() {
 			this.did_receive = true;
 			return Poll::Ready(v);
 		}
 
-		this.inner.set_waker(Some(cx.waker()));
+		state.waker = Some(cx.waker().clone());
 		Poll::Pending
 	}
 }
@@ -96,7 +92,7 @@ impl Drop for InferenceFut<'_, '_> {
 	fn drop(&mut self) {
 		if !self.did_receive {
 			let _ = self.inner.run_options.terminate();
-			self.inner.set_waker(None);
+			self.inner.state.lock().waker = None;
 		}
 	}
 }
@@ -131,8 +127,7 @@ pub(crate) extern "system" fn async_callback(user_data: *mut c_void, _: *mut *mu
 	crate::logging::drop!(AsyncInferenceContext, user_data);
 
 	if let Err(e) = unsafe { Error::result_from_status(status) } {
-		ctx.inner.emplace_value(Err(e));
-		ctx.inner.wake();
+		ctx.inner.complete(Err(e));
 		return;
 	}
 
@@ -151,6 +146,5 @@ pub(crate) extern "system" fn async_callback(user_data: *mut c_void, _: *mut *mu
 		})
 		.collect();
 
-	ctx.inner.emplace_value(Ok(SessionOutputs::new(ctx.output_names, outputs)));
-	ctx.inner.wake();
+	ctx.inner.complete(Ok(SessionOutputs::new(ctx.output_names, outputs)));
 }

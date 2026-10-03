@@ -1,25 +1,25 @@
-use alloc::borrow::Cow;
+use alloc::{borrow::Cow, sync::Arc};
 use core::{
-	fmt,
+	any::Any,
+	fmt, mem,
 	ptr::{self, NonNull}
 };
 use std::path::Path;
 
 use ort_sys::c_char;
+use smallvec::SmallVec;
 
 use super::{Checkpoint, Optimizer, training_api};
 use crate::{
 	AsPointer,
-	environment::Environment,
 	error::{Error, Result},
 	memory::Allocator,
 	ortsys,
 	session::{SessionInputValue, SessionInputs, SessionOutputs, builder::SessionBuilder},
-	util::{char_p_to_string, with_cstr_ptr_array},
+	util::{char_p_to_string, run_on_drop, with_cstr_ptr_array},
 	value::{IntoTensorElementType, Tensor, Value}
 };
 
-#[derive(Debug)]
 pub struct Trainer {
 	ptr: NonNull<ort_sys::OrtTrainingSession>,
 	train_output_names: Vec<String>,
@@ -28,7 +28,21 @@ pub struct Trainer {
 	eval_input_names: Vec<String>,
 	ckpt: Checkpoint,
 	_allocator: Allocator,
-	_environment: Environment
+	// hold onto operators/logger/thread manager/etc
+	_extras: SmallVec<[Arc<dyn Any>; 4]>
+}
+
+impl fmt::Debug for Trainer {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.debug_struct("Trainer")
+			.field("ptr", &self.ptr)
+			.field("train_output_names", &self.train_output_names)
+			.field("eval_output_names", &self.eval_output_names)
+			.field("train_input_names", &self.train_input_names)
+			.field("eval_input_names", &self.eval_input_names)
+			.field("ckpt", &self.ckpt)
+			.finish_non_exhaustive()
+	}
 }
 
 impl Trainer {
@@ -57,7 +71,7 @@ impl Trainer {
 			)?;
 			nonNull(ptr)
 		];
-		Self::new_inner(ptr, &session_options.environment, allocator, ckpt)
+		Self::new_inner(ptr, session_options, allocator, ckpt)
 	}
 
 	pub fn new_from_artifacts(
@@ -106,10 +120,12 @@ impl Trainer {
 			)?;
 			nonNull(ptr)
 		];
-		Self::new_inner(ptr, &session_options.environment, allocator, ckpt)
+		Self::new_inner(ptr, session_options, allocator, ckpt)
 	}
 
-	fn new_inner(ptr: NonNull<ort_sys::OrtTrainingSession>, environment: &Environment, allocator: Allocator, ckpt: Checkpoint) -> Result<Self> {
+	fn new_inner(ptr: NonNull<ort_sys::OrtTrainingSession>, session_options: SessionBuilder, allocator: Allocator, ckpt: Checkpoint) -> Result<Self> {
+		let session_guard = run_on_drop(|| ortsys![@training: unsafe ReleaseTrainingSession(ptr.as_ptr())]);
+
 		let api = training_api()?;
 		let train_output_names =
 			extract_io_names(ptr, &allocator, api.TrainingSessionGetTrainingModelOutputCount, api.TrainingSessionGetTrainingModelOutputName)?;
@@ -118,6 +134,7 @@ impl Trainer {
 		let train_input_names = extract_io_names(ptr, &allocator, api.TrainingSessionGetTrainingModelInputCount, api.TrainingSessionGetTrainingModelInputName)?;
 		let eval_input_names = extract_io_names(ptr, &allocator, api.TrainingSessionGetEvalModelInputCount, api.TrainingSessionGetEvalModelInputName)?;
 
+		mem::forget(session_guard);
 		crate::logging::create!(Trainer, ptr);
 
 		Ok(Self {
@@ -128,7 +145,7 @@ impl Trainer {
 			eval_input_names,
 			ckpt,
 			_allocator: allocator,
-			_environment: environment.clone()
+			_extras: session_options.extras()
 		})
 	}
 

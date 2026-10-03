@@ -21,7 +21,7 @@ use crate::{
 	env::{Environment, TelemetryEvent},
 	memory::{Allocator, MemoryInfo},
 	session::{RunOptions, Session, SessionOptions},
-	tensor::{SyncDirection, Tensor, TensorData, TypeInfo, create_buffer, onnx_to_dtype},
+	tensor::{SyncDirection, Tensor, TensorData, TypeInfo, create_buffer, dtype_to_onnx, onnx_to_dtype},
 	util::value_to_string
 };
 
@@ -470,6 +470,21 @@ unsafe extern "system" fn GetTensorTypeAndShape(value: *const OrtValue, out: *mu
 	OrtStatusPtr::default()
 }
 
+unsafe extern "system" fn GetTensorElementTypeAndShapeDataReference(
+	value: *const OrtValue,
+	elem_type: *mut ONNXTensorElementDataType,
+	shape_data: *mut *const i64,
+	shape_data_count: *mut usize
+) -> OrtStatusPtr {
+	let tensor = unsafe { &*value.cast::<Tensor>() };
+	unsafe {
+		*elem_type = dtype_to_onnx(tensor.js.dtype());
+		*shape_data = tensor.shape.as_ptr();
+		*shape_data_count = tensor.shape.len();
+	};
+	OrtStatusPtr::default()
+}
+
 unsafe extern "system" fn GetTypeInfo(value: *const OrtValue, out: *mut *mut OrtTypeInfo) -> OrtStatusPtr {
 	let tensor = unsafe { &*value.cast::<Tensor>() };
 	unsafe { out.write(TypeInfo::new_sys_from_tensor(tensor)) };
@@ -674,6 +689,7 @@ pub const fn api() -> OrtApi {
 		CreateRunOptions,
 		ReleaseRunOptions,
 		SessionOptionsAppendExecutionProvider,
+		GetTensorElementTypeAndShapeDataReference,
 		..ort_sys::stub::api()
 	}
 }

@@ -1,4 +1,34 @@
+use std::ops::{Deref, DerefMut};
+
 use tract_onnx::prelude::DatumType;
+
+pub struct Tensor {
+	pub inner: tract_onnx::prelude::Tensor,
+	pub shape: Vec<i64>
+}
+
+impl From<tract_onnx::prelude::Tensor> for Tensor {
+	fn from(tensor: tract_onnx::prelude::Tensor) -> Self {
+		Self {
+			shape: tensor.shape().iter().map(|x| *x as i64).collect(),
+			inner: tensor
+		}
+	}
+}
+
+impl Deref for Tensor {
+	type Target = tract_onnx::prelude::Tensor;
+
+	fn deref(&self) -> &Self::Target {
+		&self.inner
+	}
+}
+
+impl DerefMut for Tensor {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.inner
+	}
+}
 
 pub struct TypeInfo {
 	pub dtype: DatumType,

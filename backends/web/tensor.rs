@@ -29,7 +29,8 @@ pub struct Tensor {
 	sentinel: [u8; 4],
 	pub js: binding::Tensor,
 	pub data: TensorData,
-	pub memory_info: MemoryInfo
+	pub memory_info: MemoryInfo,
+	pub shape: Vec<i64>
 }
 
 impl Tensor {
@@ -38,6 +39,7 @@ impl Tensor {
 		Ok(Self {
 			sentinel: TENSOR_SENTINEL,
 			memory_info: MemoryInfo { location: tensor.location() },
+			shape: tensor.dims(),
 			js: tensor,
 			data: TensorData::RustView { ptr, byte_len }
 		})
@@ -47,6 +49,7 @@ impl Tensor {
 		Self {
 			sentinel: TENSOR_SENTINEL,
 			memory_info: MemoryInfo { location: tensor.location() },
+			shape: tensor.dims(),
 			js: tensor,
 			data: TensorData::External { buffer: None }
 		}
@@ -186,7 +189,7 @@ pub fn onnx_to_dtype(dtype: ort_sys::ONNXTensorElementDataType) -> Option<bindin
 
 pub struct TypeInfo {
 	pub dtype: ort_sys::ONNXTensorElementDataType,
-	pub shape: Vec<i32>
+	pub shape: Vec<i64>
 }
 
 impl TypeInfo {
@@ -203,14 +206,14 @@ impl TypeInfo {
 				.unwrap()
 				.iter()
 				.map(|el| match el {
-					binding::ShapeElement::Value(v) => *v as i32,
+					binding::ShapeElement::Value(v) => *v,
 					binding::ShapeElement::Named(_) => -1
 				})
 				.collect()
 		)
 	}
 
-	pub fn new_sys(dtype: DataType, shape: Vec<i32>) -> *mut ort_sys::OrtTypeInfo {
+	pub fn new_sys(dtype: DataType, shape: Vec<i64>) -> *mut ort_sys::OrtTypeInfo {
 		(Box::leak(Box::new(Self { dtype: dtype_to_onnx(dtype), shape })) as *mut TypeInfo).cast()
 	}
 
@@ -242,8 +245,8 @@ impl<T: ValueTypeMarker> ValueExt for ort::value::Value<T> {
 
 	async fn sync(&mut self, direction: SyncDirection) -> crate::Result<()> {
 		let ptr = self.ptr_mut();
-		// definitely safe regardless of what backend is used since it's highly improbable that a backend's tensor would be
-		// smaller than 4 bytes (which is pointer size on wasm32)
+		// definitely safe regardless of what backend is used since it's highly improbable that a backend's tensor would
+		// be smaller than 4 bytes (which is pointer size on wasm32)
 		let sentinel: [u8; 4] = unsafe { core::ptr::read(ptr.cast()) };
 		if sentinel != TENSOR_SENTINEL {
 			return Err(Error::new("Cannot synchronize Value that was not created by ort-web"));

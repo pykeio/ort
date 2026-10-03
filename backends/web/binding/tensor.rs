@@ -197,7 +197,7 @@ extern "C" {
 	#[wasm_bindgen(structural, method, getter, js_name = size)]
 	pub fn size(this: &Tensor) -> usize;
 	#[wasm_bindgen(structural, method, getter, js_name = dims)]
-	pub fn dims(this: &Tensor) -> Vec<i32>;
+	pub fn dims(this: &Tensor) -> Vec<i64>;
 
 	#[wasm_bindgen(structural, catch, method, js_name = getData)]
 	pub async fn get_data(this: &Tensor) -> Result<JsValue, JsValue>;

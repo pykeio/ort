@@ -342,13 +342,17 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 		let mut typeinfo_ptr = ptr::null_mut();
 		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
 
-		let dtype = unsafe { ValueType::from_type_info(typeinfo_ptr) };
-
 		let mut is_tensor = 0;
 		ortsys![unsafe IsTensor(ptr.as_ptr(), &mut is_tensor).expect("infallible")];
 		if is_tensor != 0 && allocator.is_none() {
 			panic!("tensor values require the allocator it was created with to be passed to `Value::from_ptr`");
 		}
+
+		let dtype = if is_tensor != 0 {
+			unsafe { ValueType::from_tensor_value(ptr) }
+		} else {
+			unsafe { ValueType::from_type_info(typeinfo_ptr) }
+		};
 
 		Value {
 			inner: ValueInner::new(ptr, dtype, allocator, true, None),
@@ -363,9 +367,13 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 		let mut typeinfo_ptr = ptr::null_mut();
 		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
 
-		let dtype = unsafe { ValueType::from_type_info(typeinfo_ptr) };
-
-		// allocator check for tensors not needed because, well, we don't drop!
+		let mut is_tensor = 0;
+		ortsys![unsafe IsTensor(ptr.as_ptr(), &mut is_tensor).expect("infallible")];
+		let dtype = if is_tensor != 0 {
+			unsafe { ValueType::from_tensor_value(ptr) }
+		} else {
+			unsafe { ValueType::from_type_info(typeinfo_ptr) }
+		};
 
 		Value {
 			inner: ValueInner::new(ptr, dtype, allocator, false, None),

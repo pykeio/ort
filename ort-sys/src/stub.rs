@@ -1623,7 +1623,7 @@ unsafe extern "system" fn SetSymbolicDimensions(
 	dim_params: *mut *const ::core::ffi::c_char,
 	dim_params_length: usize
 ) -> OrtStatusPtr {
-	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+	OrtStatusPtr::default()
 }
 
 unsafe extern "system" fn ReadOpAttr(

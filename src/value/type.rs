@@ -153,6 +153,32 @@ impl ValueType {
 		}
 	}
 
+	pub(crate) unsafe fn from_tensor_value(value_ptr: NonNull<ort_sys::OrtValue>) -> Self {
+		#[cfg(feature = "api-24")]
+		{
+			let mut ty = ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+			let mut dims: *const i64 = ptr::null();
+			let mut dims_len = 0;
+			ortsys![unsafe GetTensorElementTypeAndShapeDataReference(value_ptr.as_ptr(), &mut ty, &mut dims, &mut dims_len).expect("infallible")];
+			ValueType::Tensor {
+				ty: ty.into(),
+				shape: if dims_len == 0 {
+					Shape::empty(0) // dims might be null so can't create a slice
+				} else {
+					Shape::new(unsafe { core::slice::from_raw_parts(dims, dims_len) }.iter().copied())
+				},
+				dimension_symbols: SymbolicDimensions::empty(dims_len)
+			}
+		}
+		#[cfg(not(feature = "api-24"))]
+		{
+			let mut info_ptr: *mut ort_sys::OrtTensorTypeAndShapeInfo = ptr::null_mut();
+			ortsys![unsafe GetTensorTypeAndShape(value_ptr.as_ptr(), &mut info_ptr).expect("infallible"); nonNull(info_ptr)];
+			let _guard = run_on_drop(|| ortsys![unsafe ReleaseTensorTypeAndShapeInfo(info_ptr.as_ptr())]);
+			unsafe { extract_data_type_from_tensor_info(info_ptr) }
+		}
+	}
+
 	pub(crate) fn to_tensor_type_info(&self) -> Option<*mut ort_sys::OrtTensorTypeAndShapeInfo> {
 		match self {
 			Self::Tensor { ty, shape, dimension_symbols } => {

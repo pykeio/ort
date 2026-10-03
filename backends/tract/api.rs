@@ -14,7 +14,7 @@ use crate::{
 	Environment, Error, convert_datum_type_to_sys, convert_sys_to_datum_type,
 	memory::Allocator,
 	session::{Session, SessionOptions},
-	tensor::TypeInfo
+	tensor::{Tensor, TypeInfo}
 };
 
 // TODO: remove on ort-sys bump
@@ -121,13 +121,13 @@ unsafe extern "system" fn Run(
 ) -> OrtStatusPtr {
 	let session = unsafe { &*session.cast::<Session>() };
 
-	let inputs: Vec<(String, Tensor)> = std::slice::from_raw_parts(input_names, input_len)
+	let inputs: Vec<(String, tract_onnx::prelude::Tensor)> = std::slice::from_raw_parts(input_names, input_len)
 		.iter()
 		.zip(std::slice::from_raw_parts(inputs, input_len))
 		.map(|(&name, &input)| {
 			let name = unsafe { CStr::from_ptr(name) };
 			let input = unsafe { &*input.cast::<Tensor>() };
-			(name.to_string_lossy().to_string(), input.clone())
+			(name.to_string_lossy().to_string(), input.inner.clone())
 		})
 		.collect();
 
@@ -145,7 +145,7 @@ unsafe extern "system" fn Run(
 					.zip(output_view.iter_mut())
 					.find_map(|(o_name, output)| if name == *o_name { Some(output) } else { None })
 				{
-					*index = Box::leak(Box::new(tensor));
+					*index = Box::leak(Box::new(tensor.into()));
 				}
 			}
 
@@ -275,9 +275,9 @@ unsafe extern "system" fn CreateTensorAsOrtValue(
 		Ok(dtype) => dtype,
 		Err(e) => return e.into_sys()
 	};
-	match Tensor::zero_dt(dtype, &shape) {
+	match tract_onnx::prelude::Tensor::zero_dt(dtype, &shape) {
 		Ok(tensor) => {
-			*out = (Box::leak(Box::new(tensor)) as *mut Tensor).cast();
+			*out = (Box::leak(Box::new(Tensor::from(tensor))) as *mut Tensor).cast();
 			OrtStatusPtr::default()
 		}
 		Err(e) => Error::new_sys(OrtErrorCode::ORT_EP_FAIL, format!("Failed to create tensor: {e}"))
@@ -303,9 +303,9 @@ unsafe extern "system" fn CreateTensorWithDataAsOrtValue(
 		Ok(dtype) => dtype,
 		Err(e) => return e.into_sys()
 	};
-	match Tensor::from_raw_dt(dtype, &shape, data_slice) {
+	match tract_onnx::prelude::Tensor::from_raw_dt(dtype, &shape, data_slice) {
 		Ok(tensor) => {
-			*out = (Box::leak(Box::new(tensor)) as *mut Tensor).cast();
+			*out = (Box::leak(Box::new(Tensor::from(tensor))) as *mut Tensor).cast();
 			OrtStatusPtr::default()
 		}
 		Err(e) => Error::new_sys(OrtErrorCode::ORT_EP_FAIL, format!("Failed to create tensor: {e}"))
@@ -399,6 +399,21 @@ unsafe extern "system" fn GetTensorShapeElementCount(info: *const OrtTensorTypeA
 unsafe extern "system" fn GetTensorTypeAndShape(value: *const OrtValue, out: *mut *mut OrtTensorTypeAndShapeInfo) -> OrtStatusPtr {
 	let tensor = unsafe { &*value.cast::<Tensor>() };
 	*out = TypeInfo::new_sys(tensor.datum_type(), tensor.shape().iter().map(|c| *c as i64).collect()).cast();
+	OrtStatusPtr::default()
+}
+
+unsafe extern "system" fn GetTensorElementTypeAndShapeDataReference(
+	value: *const OrtValue,
+	elem_type: *mut ONNXTensorElementDataType,
+	shape_data: *mut *const i64,
+	shape_data_count: *mut usize
+) -> OrtStatusPtr {
+	let tensor = unsafe { &*value.cast::<Tensor>() };
+	unsafe {
+		*elem_type = convert_datum_type_to_sys(tensor.datum_type());
+		*shape_data = tensor.shape.as_ptr();
+		*shape_data_count = tensor.shape.len();
+	};
 	OrtStatusPtr::default()
 }
 
@@ -591,6 +606,7 @@ pub const fn api() -> OrtApi {
 		ReleaseAllocator,
 		GetTensorMemoryInfo,
 		GetBuildInfoString,
+		GetTensorElementTypeAndShapeDataReference,
 		..ort_sys::stub::api()
 	}
 }

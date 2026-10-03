@@ -1,11 +1,13 @@
-use alloc::borrow::Cow;
+use alloc::{borrow::Cow, sync::Arc};
 use core::{
+	any::Any,
 	fmt, mem,
 	ptr::{self, NonNull}
 };
 use std::path::Path;
 
 use ort_sys::c_char;
+use smallvec::SmallVec;
 
 use super::{Checkpoint, Optimizer, training_api};
 use crate::{
@@ -26,9 +28,8 @@ pub struct Trainer {
 	eval_input_names: Vec<String>,
 	ckpt: Checkpoint,
 	_allocator: Allocator,
-	// The training session keeps using the builder's operator domains, logger and thread manager, so they have to live
-	// as long as it does.
-	_session_options: SessionBuilder
+	// hold onto operators/logger/thread manager/etc
+	_extras: SmallVec<[Arc<dyn Any>; 4]>
 }
 
 impl fmt::Debug for Trainer {
@@ -123,7 +124,6 @@ impl Trainer {
 	}
 
 	fn new_inner(ptr: NonNull<ort_sys::OrtTrainingSession>, session_options: SessionBuilder, allocator: Allocator, ckpt: Checkpoint) -> Result<Self> {
-		// Release the session if reading the names fails; `Drop` takes over once `Self` is built.
 		let session_guard = run_on_drop(|| ortsys![@training: unsafe ReleaseTrainingSession(ptr.as_ptr())]);
 
 		let api = training_api()?;
@@ -145,7 +145,7 @@ impl Trainer {
 			eval_input_names,
 			ckpt,
 			_allocator: allocator,
-			_session_options: session_options
+			_extras: session_options.extras()
 		})
 	}
 

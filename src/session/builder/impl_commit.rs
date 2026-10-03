@@ -195,6 +195,24 @@ impl SessionBuilder {
 			.map(|i| io::extract_output(ptr, &allocator, i))
 			.collect::<Result<Vec<Outlet>>>()?;
 
+		let extras = self.extras();
+
+		mem::forget(session_guard);
+		crate::logging::create!(Session, ptr);
+
+		Ok(Session {
+			inner: Arc::new(SharedSessionInner {
+				session_ptr: ptr,
+				allocator,
+				_extras: extras,
+				_environment: self.environment.clone()
+			}),
+			inputs,
+			outputs
+		})
+	}
+
+	pub(crate) fn extras(&self) -> SmallVec<[Arc<dyn Any>; 4]> {
 		let mut extras: SmallVec<[Arc<dyn Any>; 4]> = SmallVec::new();
 		for op_domain in self.operator_domains.iter().cloned() {
 			extras.push(op_domain as Arc<dyn Any>);
@@ -211,20 +229,7 @@ impl SessionBuilder {
 		if let Some(logger) = self.logger.clone() {
 			extras.push(logger as Arc<dyn Any>);
 		}
-
-		mem::forget(session_guard);
-		crate::logging::create!(Session, ptr);
-
-		Ok(Session {
-			inner: Arc::new(SharedSessionInner {
-				session_ptr: ptr,
-				allocator,
-				_extras: extras,
-				_environment: self.environment.clone()
-			}),
-			inputs,
-			outputs
-		})
+		extras
 	}
 
 	#[cfg(all(feature = "std", feature = "api-22"))]

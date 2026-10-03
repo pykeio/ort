@@ -9,12 +9,7 @@ use core::{
 	str
 };
 
-use crate::{
-	AsPointer,
-	error::Result,
-	ortsys,
-	session::{Session, SharedSessionInner}
-};
+use crate::{AsPointer, error::Result, ortsys, session::Session};
 
 /// A device allocator used to manage the allocation of [`Value`]s.
 ///
@@ -73,18 +68,33 @@ use crate::{
 #[derive(Debug)]
 pub struct Allocator {
 	ptr: NonNull<ort_sys::OrtAllocator>,
-	/// The 'default' CPU allocator, provided by `GetAllocatorWithDefaultOptions` and implemented by
-	/// [`Allocator::default`], should **not** be released, so this field marks whether or not we should call
-	/// `ReleaseAllocator` on drop.
-	is_default: bool,
-	info: MemoryInfo<'static>,
-	/// Hold a reference to the session if this allocator is tied to one.
-	_session_inner: Option<Arc<SharedSessionInner>>
+	pub(crate) handle: Arc<AllocatorHandle>
 }
 
 unsafe impl Send for Allocator {}
 // not all allocators appear to be Sync - specifically the CUDA allocator can sometimes crash when used on multiple
 // threads. CPU allocator doesn't seem to be affected though.
+
+/// Handle that tensors can hold onto so the underlying allocator stays alive until all tensors are freed.
+#[derive(Debug)]
+pub(crate) struct AllocatorHandle {
+	pub(crate) info: MemoryInfo<'static>,
+	/// `None` for the default CPU allocator provided by `GetAllocatorWithDefaultOptions`, which must never be released.
+	_drop_ptr: Option<NonNull<ort_sys::OrtAllocator>>
+}
+
+// The handle is only used to release the allocator.
+unsafe impl Send for AllocatorHandle {}
+unsafe impl Sync for AllocatorHandle {}
+
+impl Drop for AllocatorHandle {
+	fn drop(&mut self) {
+		if let Some(ptr) = self._drop_ptr {
+			ortsys![unsafe ReleaseAllocator(ptr.as_ptr())];
+			crate::logging::drop!(Allocator, ptr);
+		}
+	}
+}
 
 impl Allocator {
 	pub(crate) unsafe fn from_raw(ptr: NonNull<ort_sys::OrtAllocator>, is_default: bool) -> Allocator {
@@ -93,11 +103,10 @@ impl Allocator {
 
 		Allocator {
 			ptr,
-			is_default,
-			info: MemoryInfo::from_raw(memory_info_ptr, false),
-			// currently, this function is only ever used in session creation, where we call `CreateAllocator` manually and store the allocator resulting from
-			// this function in the `SharedSessionInner` - we don't need to hold onto the session, because the session is holding onto us.
-			_session_inner: None
+			handle: Arc::new(AllocatorHandle {
+				info: MemoryInfo::from_raw(memory_info_ptr, false),
+				_drop_ptr: (!is_default).then_some(ptr)
+			})
 		}
 	}
 
@@ -148,7 +157,7 @@ impl Allocator {
 
 	/// Returns the [`MemoryInfo`] describing this allocator.
 	pub fn memory_info<'a>(&'a self) -> &'a MemoryInfo<'a> {
-		&self.info
+		&self.handle.info
 	}
 
 	/// Creates a new [`Allocator`] for the given session, to allocate memory on the device described in the
@@ -159,9 +168,10 @@ impl Allocator {
 		crate::logging::create!(Allocator, ptr);
 		Ok(Self {
 			ptr,
-			is_default: false,
-			info: memory_info.to_owned(),
-			_session_inner: Some(session.inner())
+			handle: Arc::new(AllocatorHandle {
+				info: memory_info.to_owned(),
+				_drop_ptr: Some(ptr)
+			})
 		})
 	}
 }
@@ -185,10 +195,10 @@ impl Default for Allocator {
 
 		Self {
 			ptr: allocator_ptr,
-			is_default: true,
-			info: MemoryInfo::from_raw(memory_info_ptr, false),
-			// The default allocator isn't tied to a session.
-			_session_inner: None
+			handle: Arc::new(AllocatorHandle {
+				info: MemoryInfo::from_raw(memory_info_ptr, false),
+				_drop_ptr: None
+			})
 		}
 	}
 }
@@ -198,15 +208,6 @@ impl AsPointer for Allocator {
 
 	fn ptr(&self) -> *const Self::Sys {
 		self.ptr.as_ptr()
-	}
-}
-
-impl Drop for Allocator {
-	fn drop(&mut self) {
-		if !self.is_default {
-			ortsys![unsafe ReleaseAllocator(self.ptr.as_ptr())];
-			crate::logging::drop!(Allocator, self.ptr);
-		}
 	}
 }
 
@@ -385,6 +386,10 @@ pub struct MemoryInfo<'a> {
 	should_release: bool,
 	_p: PhantomData<&'a ()>
 }
+
+// SAFETY: `MemoryInfo` is read-only.
+unsafe impl Send for MemoryInfo<'_> {}
+unsafe impl Sync for MemoryInfo<'_> {}
 
 impl MemoryInfo<'static> {
 	/// Creates a [`MemoryInfo`], describing a memory location on a device allocator.

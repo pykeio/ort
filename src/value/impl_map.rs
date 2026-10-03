@@ -100,7 +100,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 
 				let mut key_tensor_ptr = ptr::null_mut();
 				ortsys![unsafe GetValue(self.ptr(), 0, allocator.ptr().cast_mut(), &mut key_tensor_ptr)?; nonNull(key_tensor_ptr)];
-				let key_value: DynTensor = unsafe { Value::from_ptr(key_tensor_ptr, None) };
+				let key_value: DynTensor = unsafe { Value::from_ptr(key_tensor_ptr, Some(&allocator)) };
 				if K::into_tensor_element_type() != TensorElementType::String {
 					let dtype = key_value.dtype();
 					let (key_tensor_shape, key_tensor) = match dtype {
@@ -135,7 +135,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 
 					let mut value_tensor_ptr = ptr::null_mut();
 					ortsys![unsafe GetValue(self.ptr(), 1, allocator.ptr().cast_mut(), &mut value_tensor_ptr)?; nonNull(value_tensor_ptr)];
-					let value_value: DynTensor = unsafe { Value::from_ptr(value_tensor_ptr, None) };
+					let value_value: DynTensor = unsafe { Value::from_ptr(value_tensor_ptr, Some(&allocator)) };
 					let (value_tensor_shape, value_tensor) = value_value.try_extract_tensor::<V>()?;
 
 					assert_eq!(key_tensor_shape.len(), 1);
@@ -156,7 +156,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 
 					let mut value_tensor_ptr = ptr::null_mut();
 					ortsys![unsafe GetValue(self.ptr(), 1, allocator.ptr().cast_mut(), &mut value_tensor_ptr)?; nonNull(value_tensor_ptr)];
-					let value_value: DynTensor = unsafe { Value::from_ptr(value_tensor_ptr, None) };
+					let value_value: DynTensor = unsafe { Value::from_ptr(value_tensor_ptr, Some(&allocator)) };
 					let (value_tensor_shape, value_tensor) = value_value.try_extract_tensor::<V>()?;
 
 					assert_eq!(key_tensor_shape.len(), 1);
@@ -257,7 +257,7 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq + 'static, V: IntoTens
 			nonNull(value_ptr)
 		];
 		Ok(Value {
-			inner: ValueInner::new_backed(
+			inner: ValueInner::new(
 				value_ptr,
 				ValueType::Map {
 					key: K::into_tensor_element_type(),
@@ -265,7 +265,7 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq + 'static, V: IntoTens
 				},
 				None,
 				true,
-				Box::new(values)
+				Some(Box::new(values))
 			),
 			_markers: PhantomData
 		})

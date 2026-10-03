@@ -23,7 +23,8 @@ use crate::{
 	AsPointer,
 	error::Result,
 	memory::{Allocator, MemoryInfo},
-	ortsys
+	ortsys,
+	util::OnceLock
 };
 
 pub trait TensorValueTypeMarker: ValueTypeMarker {
@@ -136,19 +137,18 @@ impl DynTensor {
 			}
 		}
 
-		Ok(Value {
-			inner: ValueInner::new(
-				value_ptr,
-				ValueType::Tensor {
-					ty: data_type,
-					shape,
-					dimension_symbols: SymbolicDimensions::empty(shape_len)
-				},
-				Some(memory_info),
-				true
-			),
-			_markers: PhantomData
-		})
+		let inner = ValueInner::new(
+			value_ptr,
+			ValueType::Tensor {
+				ty: data_type,
+				shape,
+				dimension_symbols: SymbolicDimensions::empty(shape_len)
+			},
+			Some(allocator),
+			true,
+			None
+		);
+		Ok(Value { inner, _markers: PhantomData })
 	}
 }
 
@@ -227,7 +227,15 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # }
 	/// ```
 	pub fn memory_info(&self) -> &MemoryInfo<'_> {
-		unsafe { self.inner.memory_info.as_ref().unwrap_unchecked() }
+		if let Some(allocator) = self.inner.allocator.as_ref() {
+			&allocator.info
+		} else {
+			// There are two cases where a tensor may not store the allocator handle: when it's created from an array
+			// (so there is no `OrtAllocator` to keep track of), or when the allocator is the default one. In both
+			// cases, the tensor resides on CPU, the same as described by `MemoryInfo::default`.
+			static DEFAULT_MEMORY_INFO: OnceLock<MemoryInfo> = OnceLock::new();
+			DEFAULT_MEMORY_INFO.get_or_init(MemoryInfo::default)
+		}
 	}
 
 	/// Returns the size of the tensor's data in bytes, or `None` in the case of string tensors.

@@ -138,7 +138,8 @@ impl Checkpoint {
 			ortsys![@training: unsafe GetParameter(self.ptr.as_ptr(), name.as_ptr(), allocator.ptr().cast_mut(), &mut value_ptr)?; nonNull(value_ptr)];
 			Ok(value_ptr)
 		})?;
-		Ok(unsafe { DynTensor::from_ptr(value_ptr, None) })
+		let tensor = unsafe { DynTensor::from_ptr(value_ptr, Some(allocator)) };
+		Ok(tensor)
 	}
 
 	pub fn update_parameter<T: ValueTypeMarker>(&mut self, name: impl AsRef<str>, value: &Value<T>) -> Result<()> {

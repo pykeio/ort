@@ -368,7 +368,7 @@ impl Session {
 				None => unsafe {
 					Value::from_ptr(
 						NonNull::new(output_value_ptrs[i]).expect("OrtValue ptr returned from session Run should not be null"),
-						Some(Arc::clone(&self.inner))
+						Some(&self.inner.allocator)
 					)
 				}
 			})
@@ -413,7 +413,10 @@ impl Session {
 			let output_values = unsafe { slice::from_raw_parts(output_values_ptr.as_ptr(), count) }
 				.iter()
 				.map(|ptr| unsafe {
-					DynValue::from_ptr(NonNull::new(*ptr).expect("OrtValue ptrs returned by GetBoundOutputValues should not be null"), Some(self.inner()))
+					DynValue::from_ptr(
+						NonNull::new(*ptr).expect("OrtValue ptrs returned by GetBoundOutputValues should not be null"),
+						Some(&self.inner.allocator)
+					)
 				})
 				.collect();
 
@@ -648,7 +651,7 @@ impl Session {
 				None => unsafe {
 					Value::from_ptr(
 						NonNull::new(output_value_ptrs[i]).expect("OrtValue ptr returned from session Run should not be null"),
-						Some(Arc::clone(&self.inner))
+						Some(&self.inner.allocator)
 					)
 				}
 			})

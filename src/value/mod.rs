@@ -46,8 +46,9 @@ pub use self::{
 use crate::{
 	AsPointer,
 	error::{Error, ErrorCode, Result},
-	memory::{Allocator, AllocatorHandle},
-	ortsys
+	memory::{Allocator, AllocatorHandle, MemoryInfo},
+	ortsys,
+	session::SharedSessionInner
 };
 
 #[derive(Debug)]
@@ -57,19 +58,25 @@ pub(crate) struct ValueInner {
 	pub(crate) drop: bool,
 	/// the value needs the allocator to stay alive so it can drop its memory. maps/sequences don't use their own
 	/// allocators, though, hence this is optional
-	pub(crate) allocator: Option<Arc<AllocatorHandle>>,
+	pub(crate) allocator_handle: Option<Arc<AllocatorHandle>>,
 	// additional things like element `Value` handles for `Sequence`s
 	_backing: Option<Box<dyn Any>>
 }
 
 impl ValueInner {
-	pub fn new(ptr: NonNull<ort_sys::OrtValue>, dtype: ValueType, allocator: Option<&Allocator>, drop: bool, backing: Option<Box<dyn Any>>) -> Arc<Self> {
+	pub fn new(
+		ptr: NonNull<ort_sys::OrtValue>,
+		dtype: ValueType,
+		allocator_handle: Option<Arc<AllocatorHandle>>,
+		drop: bool,
+		backing: Option<Box<dyn Any>>
+	) -> Arc<Self> {
 		crate::logging::create!(Value, ptr);
 		Arc::new(Self {
 			ptr,
 			dtype,
 			drop,
-			allocator: allocator.map(|a| a.handle.clone()),
+			allocator_handle,
 			_backing: backing
 		})
 	}
@@ -355,8 +362,47 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 		};
 
 		Value {
-			inner: ValueInner::new(ptr, dtype, allocator, true, None),
+			inner: ValueInner::new(ptr, dtype, allocator.map(|a| a.handle.clone()), true, None),
 			_markers: PhantomData
+		}
+	}
+
+	#[must_use]
+	#[inline]
+	pub(crate) unsafe fn from_session_output_ptr(ptr: NonNull<ort_sys::OrtValue>, session_inner: &SharedSessionInner) -> Value<Type> {
+		let mut typeinfo_ptr = ptr::null_mut();
+		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
+
+		let mut is_tensor = 0;
+		ortsys![unsafe IsTensor(ptr.as_ptr(), &mut is_tensor).expect("infallible")];
+		if is_tensor != 0 {
+			let dtype = unsafe { ValueType::from_tensor_value(ptr) };
+			let memory_info = unsafe { MemoryInfo::from_value(ptr) }.expect("infallible");
+
+			// keep in mind CreateAllocator doesn't actually create an allocator, just a smart pointer to an allocator
+			// the session already created when it was committed. also, this cannot fail because the value is coming
+			// from a session output, so the session absolutely has an allocator that supports this `MemoryInfo`.
+			let allocator_handle = {
+				// not a fan of the repetition but we need it because Allocator::new only accepts Session, which
+				// run_async callback doesn't have access to
+				let mut ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
+				ortsys![unsafe CreateAllocator(session_inner.ptr(), memory_info.ptr(), &mut ptr).expect("infallible"); nonNull(ptr)];
+				crate::logging::create!(Allocator, ptr);
+				Arc::new(AllocatorHandle {
+					info: memory_info,
+					_drop_ptr: Some(ptr)
+				})
+			};
+			Value {
+				inner: ValueInner::new(ptr, dtype, Some(allocator_handle), true, None),
+				_markers: PhantomData
+			}
+		} else {
+			let dtype = unsafe { ValueType::from_type_info(typeinfo_ptr) };
+			Value {
+				inner: ValueInner::new(ptr, dtype, Some(session_inner.allocator.handle.clone()), true, None),
+				_markers: PhantomData
+			}
 		}
 	}
 
@@ -375,8 +421,10 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 			unsafe { ValueType::from_type_info(typeinfo_ptr) }
 		};
 
+		// allocator check for tensors not needed because, well, we don't drop!
+
 		Value {
-			inner: ValueInner::new(ptr, dtype, allocator, false, None),
+			inner: ValueInner::new(ptr, dtype, allocator.map(|a| a.handle.clone()), false, None),
 			_markers: PhantomData
 		}
 	}

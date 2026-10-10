@@ -138,9 +138,9 @@ pub(crate) extern "system" fn async_callback(user_data: *mut c_void, _: *mut *mu
 		.map(|(tensor_ptr, value)| match value {
 			Some(value) => value,
 			None => unsafe {
-				Value::from_ptr(
+				DynValue::from_session_output_ptr(
 					NonNull::new(tensor_ptr).expect("OrtValue ptr returned from session Run should not be null"),
-					Some(&ctx.session_inner.allocator)
+					&ctx.session_inner
 				)
 			}
 		})

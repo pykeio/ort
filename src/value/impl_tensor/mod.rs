@@ -144,7 +144,7 @@ impl DynTensor {
 				shape,
 				dimension_symbols: SymbolicDimensions::empty(shape_len)
 			},
-			Some(allocator),
+			Some(allocator.handle.clone()),
 			true,
 			None
 		);
@@ -227,7 +227,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # }
 	/// ```
 	pub fn memory_info(&self) -> &MemoryInfo<'_> {
-		if let Some(allocator) = self.inner.allocator.as_ref() {
+		if let Some(allocator) = self.inner.allocator_handle.as_ref() {
 			&allocator.info
 		} else {
 			// There are two cases where a tensor may not store the allocator handle: when it's created from an array

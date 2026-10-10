@@ -100,8 +100,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn to(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
-		let memory_info = self.memory_info();
-		let mut identity_session = IdentitySessionHandle::new(self.upcast_ref(), memory_info.allocation_device(), memory_info.device_id(), *self.data_type())?;
+		let mut identity_session = IdentitySessionHandle::new(self.upcast_ref(), device, device_id, *self.data_type())?;
 
 		let target_memory_info = MemoryInfo::new(device, device_id, AllocatorType::Device, MemoryType::Default)?;
 		identity_session.binding.bind_output_to_device("output", &target_memory_info)?;
@@ -137,8 +136,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn to_async(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
-		let memory_info = self.memory_info();
-		let mut identity_session = IdentitySessionHandle::new(self.upcast_ref(), memory_info.allocation_device(), memory_info.device_id(), *self.data_type())?;
+		let mut identity_session = IdentitySessionHandle::new(self.upcast_ref(), device, device_id, *self.data_type())?;
 
 		let options = ASYNC_RUN_OPTIONS.get_or_try_init(|| -> Result<RunOptions> {
 			let mut options = RunOptions::new()?;

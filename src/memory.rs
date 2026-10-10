@@ -80,7 +80,7 @@ unsafe impl Send for Allocator {}
 pub(crate) struct AllocatorHandle {
 	pub(crate) info: MemoryInfo<'static>,
 	/// `None` for the default CPU allocator provided by `GetAllocatorWithDefaultOptions`, which must never be released.
-	_drop_ptr: Option<NonNull<ort_sys::OrtAllocator>>
+	pub(crate) _drop_ptr: Option<NonNull<ort_sys::OrtAllocator>>
 }
 
 // The handle is only used to release the allocator.

@@ -82,7 +82,7 @@ impl Tensor<String> {
 					shape,
 					dimension_symbols: SymbolicDimensions::empty(shape_len)
 				},
-				Some(&allocator),
+				Some(allocator.handle),
 				true,
 				None
 			),

@@ -1,6 +1,6 @@
 [package]
 name = "ort-sys"
-description = "Unsafe Rust bindings for ONNX Runtime 1.30 - Optimize and Accelerate Machine Learning Inferencing"
+description = "Unsafe Rust bindings for ONNX Runtime 1.31 - Optimize and Accelerate Machine Learning Inferencing"
 version = "2.0.0-rc.13"
 edition = "2024"
 rust-version = "1.92"
@@ -43,6 +43,7 @@ api-27 = [ "api-26" ]
 api-28 = [ "api-27" ]
 api-29 = [ "api-28" ]
 api-30 = [ "api-29" ]
+api-31 = [ "api-30" ]
 
 cuda = []
 tensorrt = []

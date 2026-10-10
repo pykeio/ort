@@ -339,7 +339,7 @@ pub(crate) fn apply_execution_providers(session_builder: &mut SessionBuilder, ep
 	fn register_inner(session_builder: &mut SessionBuilder, ep: &ExecutionProviderDispatch, #[allow(unused)] source: &'static str) -> Result<bool> {
 		if let Err(e) = ep.register(session_builder) {
 			if ep.error_on_failure {
-				return Err(e)?;
+				return Err(e);
 			}
 
 			crate::error!(%source, "An error occurred when attempting to register `{}`: {e}", ep.vtable.name);

@@ -27,9 +27,6 @@ pub type os_char = c_ushort;
 #[cfg(not(target_os = "windows"))]
 pub type os_char = c_char;
 
-#[deprecated = "use `os_char` instead"]
-pub type ortchar = os_char;
-
 #[repr(i32)]
 #[doc = " Copied from TensorProto::DataType\n Currently, Ort doesn't support complex64, complex128"]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]

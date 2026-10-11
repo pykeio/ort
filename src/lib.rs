@@ -56,13 +56,6 @@ pub mod api {
 	pub use super::{compiler::compile_api as compile, editor::editor_api as editor};
 }
 
-#[deprecated = "import execution providers from `ort::ep` instead"]
-#[doc(hidden)]
-pub mod execution_providers {
-	#[deprecated = "import execution providers from `ort::ep` instead"]
-	pub use super::ep::*;
-}
-
 use alloc::boxed::Box;
 use core::{ffi::CStr, ptr::NonNull, str};
 

@@ -2572,6 +2572,20 @@ unsafe extern "system" fn KernelContext_GetPreallocatedOutput(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
+#[cfg(feature = "api-31")]
+unsafe extern "system" fn SessionOptionsSetEpContextDataReadFunc(
+	options: *mut OrtSessionOptions,
+	read_func: OrtReadNamedBufferFunc,
+	state: *mut c_void
+) -> OrtStatusPtr {
+	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
+}
+
+#[cfg(feature = "api-31")]
+unsafe extern "system" fn GetModelPackageApi() -> *const OrtModelPackageApi {
+	ptr::null()
+}
+
 pub const fn api() -> OrtApi {
 	OrtApi {
 		CreateStatus,
@@ -3149,6 +3163,10 @@ pub const fn api() -> OrtApi {
 		#[cfg(feature = "api-29")]
 		SessionOptionsSetWeightlessSourceModelBuffer,
 		#[cfg(feature = "api-30")]
-		KernelContext_GetPreallocatedOutput
+		KernelContext_GetPreallocatedOutput,
+		#[cfg(feature = "api-31")]
+		SessionOptionsSetEpContextDataReadFunc,
+		#[cfg(feature = "api-31")]
+		GetModelPackageApi
 	}
 }

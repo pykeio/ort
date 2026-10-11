@@ -352,6 +352,21 @@ pub struct OrtEpAssignedSubgraph {
 pub struct OrtEpAssignedNode {
 	_unused: [u8; 0]
 }
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OrtModelPackageOptions {
+	_unused: [u8; 0]
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OrtModelPackageContext {
+	_unused: [u8; 0]
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OrtModelPackageComponentContext {
+	_unused: [u8; 0]
+}
 #[repr(transparent)]
 #[derive(Debug, Copy, Clone)]
 #[must_use = "statuses must be freed with `OrtApi::ReleaseStatus` if they are not null"]
@@ -487,6 +502,17 @@ pub type EpSelectionDelegate = Option<
 	) -> OrtStatusPtr
 >;
 pub type OrtWriteBufferFunc = Option<unsafe extern "system" fn(state: *mut c_void, buffer: *const c_void, buffer_num_bytes: usize) -> OrtStatusPtr>;
+pub type OrtWriteNamedBufferFunc =
+	Option<unsafe extern "system" fn(state: *mut c_void, name: *const c_char, buffer: *const c_void, buffer_num_bytes: usize) -> OrtStatusPtr>;
+pub type OrtReadNamedBufferFunc = Option<
+	unsafe extern "system" fn(
+		state: *mut c_void,
+		name: *const c_char,
+		allocator: *mut OrtAllocator,
+		buffer: *mut *mut c_void,
+		data_size: *mut usize
+	) -> OrtStatusPtr
+>;
 pub type OrtGetInitializerLocationFunc = Option<
 	unsafe extern "system" fn(
 		state: *mut c_void,
@@ -2065,7 +2091,12 @@ pub struct OrtApi {
 		unsafe extern "system" fn(options: *mut OrtSessionOptions, source_model_data: *const c_void, source_model_data_length: usize) -> OrtStatusPtr,
 	#[cfg(feature = "api-30")]
 	pub KernelContext_GetPreallocatedOutput:
-		unsafe extern "system" fn(context: *const OrtKernelContext, output_index: usize, output: *mut *mut OrtValue) -> OrtStatusPtr
+		unsafe extern "system" fn(context: *const OrtKernelContext, output_index: usize, output: *mut *mut OrtValue) -> OrtStatusPtr,
+	#[cfg(feature = "api-31")]
+	pub SessionOptionsSetEpContextDataReadFunc:
+		unsafe extern "system" fn(options: *mut OrtSessionOptions, read_func: OrtReadNamedBufferFunc, state: *mut c_void) -> OrtStatusPtr,
+	#[cfg(feature = "api-31")]
+	pub GetModelPackageApi: unsafe extern "system" fn() -> *const OrtModelPackageApi
 }
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
@@ -2109,6 +2140,57 @@ pub struct OrtCustomOp {
 	pub GetAliasMap: Option<unsafe extern "system" fn(input_index: *mut *mut core::ffi::c_int, output_index: *mut *mut core::ffi::c_int) -> usize>,
 	#[cfg(feature = "api-18")]
 	pub ReleaseAliasMap: Option<unsafe extern "system" fn(input_index: *mut core::ffi::c_int, output_index: *mut core::ffi::c_int)>
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OrtModelPackageApi {
+	pub CreateModelPackageOptionsFromSessionOptions:
+		unsafe extern "system" fn(env: *const OrtEnv, session_options: *const OrtSessionOptions, out: *mut *mut OrtModelPackageOptions) -> OrtStatusPtr,
+	pub ReleaseModelPackageOptions: unsafe extern "system" fn(value: *mut OrtModelPackageOptions),
+	pub CreateModelPackageContext: unsafe extern "system" fn(pacakge_root: *const os_char, out: *mut *mut OrtModelPackageContext) -> OrtStatusPtr,
+	pub ReleaseModelPackageContext: unsafe extern "system" fn(value: *mut OrtModelPackageContext),
+	pub ModelPackage_GetSchemaVersion: unsafe extern "system" fn(ctx: *const OrtModelPackageContext, out_version: *mut i64) -> OrtStatusPtr,
+	pub ModelPackage_GetComponentCount: unsafe extern "system" fn(ctx: *const OrtModelPackageContext, out_version: *mut usize) -> OrtStatusPtr,
+	pub ModelPackage_GetComponentNames:
+		unsafe extern "system" fn(ctx: *const OrtModelPackageContext, out_names: *mut *const *const c_char, out_count: *mut usize) -> OrtStatusPtr,
+	pub ModelPackage_GetVariantCount:
+		unsafe extern "system" fn(ctx: *const OrtModelPackageContext, component_name: *const c_char, out_count: *mut usize) -> OrtStatusPtr,
+	pub ModelPackage_GetVariantNames: unsafe extern "system" fn(
+		ctx: *const OrtModelPackageContext,
+		component_name: *const c_char,
+		out_variant_names: *mut *const *const c_char,
+		out_count: *mut usize
+	) -> OrtStatusPtr,
+	pub ModelPackage_GetVariantEpName: unsafe extern "system" fn(
+		ctx: *const OrtModelPackageContext,
+		component_name: *const c_char,
+		variant_name: *const c_char,
+		out_ep: *mut *const c_char
+	) -> OrtStatusPtr,
+	pub ModelPackage_ResolveStringRef: unsafe extern "system" fn(
+		ctx: *const OrtModelPackageContext,
+		base_dir: *const c_char,
+		input: *const c_char,
+		must_exist: bool,
+		out_path: *mut *const c_char
+	) -> OrtStatusPtr,
+	pub SelectComponent: unsafe extern "system" fn(
+		ctx: *const OrtModelPackageContext,
+		component_name: *const c_char,
+		options: *const OrtModelPackageOptions,
+		out: *mut *mut OrtModelPackageComponentContext
+	) -> OrtStatusPtr,
+	pub ReleaseModelPackageComponentContext: unsafe extern "system" fn(value: *mut OrtModelPackageComponentContext),
+	pub ModelPackageComponent_GetSelectedVariantName:
+		unsafe extern "system" fn(ctx: *const OrtModelPackageComponentContext, out_name: *mut *const c_char) -> OrtStatusPtr,
+	pub ModelPackageComponent_GetSelectedVariantFolderPath:
+		unsafe extern "system" fn(ctx: *const OrtModelPackageComponentContext, folder_path: *mut *const os_char) -> OrtStatusPtr,
+	pub CreateSession: unsafe extern "system" fn(
+		env: *const OrtEnv,
+		ctx: *const OrtModelPackageComponentContext,
+		session_options: *const OrtSessionOptions,
+		session: *mut *mut OrtSession
+	) -> OrtStatusPtr
 }
 unsafe extern "system" {
 	pub fn OrtSessionOptionsAppendExecutionProvider_CUDA(options: *mut OrtSessionOptions, device_id: core::ffi::c_int) -> OrtStatusPtr;

@@ -14,7 +14,7 @@ const FEATURES_ALL = FEATURES_WEBGL | FEATURES_WEBGPU;
  * @property {Record<'main' | 'wrapper' | 'binary', string> | null} integrities
  */
 
-const DEFAULT_DIST_BASE = 'https://cdn.pyke.io/0/pyke:ort-rs/web@1.27.0/';
+const DEFAULT_DIST_BASE = 'https://cdn.pyke.io/0/pyke:ort-rs/web@1.30.0/';
 
 /** @type {Record<number, Dist>} */
 const DEFAULT_DIST = {
@@ -23,9 +23,9 @@ const DEFAULT_DIST = {
 		scriptName: 'ort.wasm.min.js',
 		binaryName: 'ort-wasm-simd-threaded.wasm',
 		integrities: {
-			main: 'tfUvHgp9/GSRWo8HC27M+k72kO9DXscoOHJVFMMo17my+b613YTj9vpom0og1Cwe',
-			wrapper: 'QwBuCPwkZ1hn48SSG/YP1rd25hKczDIg103x2AtlotnwUzVF919IZz1uRnLp9IOw',
-			binary: 'ZBv2MGQL3EUHCYbVm9I410F+QZX7GWFj9a556jISGqlE2TiRaeEWLu6jxd8ZYMGC'
+			main: 'Bw6URI+Gvoadw0do7/QrSHUC9D1vCYYK5OSqChFyhyV5mzPL4oe2rOAFljAnS8Sq',
+			wrapper: 'XcXA/MtAf0WpB8e023xQH9CM7RIjiugakT7x99DIwpFf7k56BIFFcAPerIF7FDad',
+			binary: 'vjBJ1z7qrhkTyYsNqKeF6c7N+nOJSU94czEo+tvZcu8G75JparGq9kB+kTnEUNVM'
 		}
 	},
 	[FEATURES_WEBGL]: {
@@ -33,9 +33,9 @@ const DEFAULT_DIST = {
 		scriptName: 'ort.webgl.min.js',
 		binaryName: 'ort-wasm-simd-threaded.wasm',
 		integrities: {
-			main: 'LXzScLvNEhm413eMpAqQVWHzPW+FRbGjfJ+u33IO6bHCV8rfBfd2eGdAwpKAdvIQ',
-			wrapper: 'QwBuCPwkZ1hn48SSG/YP1rd25hKczDIg103x2AtlotnwUzVF919IZz1uRnLp9IOw',
-			binary: 'ZBv2MGQL3EUHCYbVm9I410F+QZX7GWFj9a556jISGqlE2TiRaeEWLu6jxd8ZYMGC'
+			main: '1bLj2rkGOwkzpfv9FmPoYNfEZMR+0sniZJQyRhUO6hw1oytXWrtWrTsxYTVNNa7u',
+			wrapper: 'XcXA/MtAf0WpB8e023xQH9CM7RIjiugakT7x99DIwpFf7k56BIFFcAPerIF7FDad',
+			binary: 'vjBJ1z7qrhkTyYsNqKeF6c7N+nOJSU94czEo+tvZcu8G75JparGq9kB+kTnEUNVM'
 		}
 	},
 	[FEATURES_WEBGPU]: {
@@ -43,9 +43,9 @@ const DEFAULT_DIST = {
 		scriptName: 'ort.webgpu.min.js',
 		binaryName: 'ort-wasm-simd-threaded.jsep.wasm',
 		integrities: {
-			main: 'vRrDQHAbl9gWevu3ErZ/gXohErGlZmJy4wyowACQUyuTXCTWAgX8fpBBg70OGWVv',
-			wrapper: 'UnMnZc4hekoMygc89hIyX3b7KuuNwqJTMOZJdeAQjuvGC/WVdTT+w+HmwWCANfli',
-			binary: 'NRkAqXy32zY6LuDA4go2FTF1Cy85jvEfSu6DPTevOmSu441+7WhVZocyqdhT1kNB'
+			main: '6BOUZhMpgaXRZBIj89pTWET0c7xcMe1yHACreuaBy2kUZwLd2tzCmv7MzwZccHYH',
+			wrapper: 'oE7XJ3WFQfuTdk0T1EGXViKSjtupvq5xVNx8ODzs7dq8qjGnN5P2tZBPr8XKceJ4',
+			binary: 'Ueht0ynFKexyaENvQBCXJQmjjdEzUgnesolNNQPAhnDeYvh1YA53nYHw1mrWvaM1'
 		}
 	},
 	[FEATURES_ALL]: {
@@ -53,9 +53,9 @@ const DEFAULT_DIST = {
 		scriptName: 'ort.all.min.js',
 		binaryName: 'ort-wasm-simd-threaded.jsep.wasm',
 		integrities: {
-			main: 'PbfZfzjTjLQV5yWsBfBwAOzKd0qqPbvuTgfGZfgg+7lQQM8HvS3E0M4mYM1kD4zq',
-			wrapper: 'UnMnZc4hekoMygc89hIyX3b7KuuNwqJTMOZJdeAQjuvGC/WVdTT+w+HmwWCANfli',
-			binary: 'NRkAqXy32zY6LuDA4go2FTF1Cy85jvEfSu6DPTevOmSu441+7WhVZocyqdhT1kNB'
+			main: '5URwgKAGS31PQX06sHDOIB6bk/2FTNB7z3n4trPAWV9sCv5xwV+qiGRxPkuHv6Gf',
+			wrapper: 'oE7XJ3WFQfuTdk0T1EGXViKSjtupvq5xVNx8ODzs7dq8qjGnN5P2tZBPr8XKceJ4',
+			binary: 'Ueht0ynFKexyaENvQBCXJQmjjdEzUgnesolNNQPAhnDeYvh1YA53nYHw1mrWvaM1'
 		}
 	}
 };

@@ -39,7 +39,7 @@ Rather than trying to link ONNX Runtime into your Rust application, `ort-web` in
 ### Install `ort-web`
 ```toml filename="Cargo.toml"
 [dependencies]
-ort-web = "0.2.2+1.27"
+ort-web = "0.4.0+1.30"
 ...
 ```
 
@@ -48,7 +48,7 @@ This instructs <Ort/> to not try its usual linking steps.
 
 ```toml filename="Cargo.toml"
 [dependencies.ort]
-version = "=2.0.0-rc.13"
+version = "=2.0.0-rc.14"
 default-features = false # Disables the `download-binaries` feature since we don't need it
 features = [
     "std",

@@ -985,17 +985,17 @@ pub struct OrtApi {
 	) -> OrtStatusPtr,
 	pub EnableTelemetryEvents: unsafe extern "system" fn(env: *const OrtEnv) -> OrtStatusPtr,
 	pub DisableTelemetryEvents: unsafe extern "system" fn(env: *const OrtEnv) -> OrtStatusPtr,
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 	pub CreateSession:
 		unsafe extern "system" fn(env: *const OrtEnv, model_path: *const os_char, options: *const OrtSessionOptions, out: *mut *mut OrtSession) -> OrtStatusPtr,
-	#[cfg(target_arch = "wasm32")]
+	#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 	pub CreateSession: unsafe fn(
 		env: *const OrtEnv,
 		model_path: &str,
 		options: *const OrtSessionOptions,
 		out: *mut *mut OrtSession
 	) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = OrtStatusPtr>>>,
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 	pub CreateSessionFromArray: unsafe extern "system" fn(
 		env: *const OrtEnv,
 		model_data: *const core::ffi::c_void,
@@ -1003,7 +1003,7 @@ pub struct OrtApi {
 		options: *const OrtSessionOptions,
 		out: *mut *mut OrtSession
 	) -> OrtStatusPtr,
-	#[cfg(target_arch = "wasm32")]
+	#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 	pub CreateSessionFromArray: unsafe fn(
 		env: *const OrtEnv,
 		model_data: &[u8],
@@ -1582,7 +1582,7 @@ pub struct OrtApi {
 		provider_options_values: *const *const core::ffi::c_char,
 		num_keys: usize
 	) -> OrtStatusPtr,
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 	pub RunAsync: unsafe extern "system" fn(
 		session: *mut OrtSession,
 		run_options: *const OrtRunOptions,
@@ -1595,7 +1595,7 @@ pub struct OrtApi {
 		run_async_callback: RunAsyncCallbackFn,
 		user_data: *mut core::ffi::c_void
 	) -> OrtStatusPtr,
-	#[cfg(target_arch = "wasm32")]
+	#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 	pub RunAsync: unsafe fn(
 		session: *mut OrtSession,
 		run_options: *const OrtRunOptions,

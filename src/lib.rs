@@ -61,7 +61,7 @@ use core::{ffi::CStr, ptr::NonNull, str};
 
 pub use ort_sys as sys;
 
-#[cfg(all(feature = "load-dynamic", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "load-dynamic", not(all(target_family = "wasm", target_os = "unknown"))))]
 pub use self::environment::init_from;
 pub(crate) use self::logging::{debug, error, info, trace, warning as warn};
 #[doc(hidden)]
@@ -79,7 +79,7 @@ pub use self::{
 /// the API.
 pub const MINOR_VERSION: u32 = ort_sys::ORT_API_VERSION;
 
-#[cfg(all(feature = "load-dynamic", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "load-dynamic", not(all(target_family = "wasm", target_os = "unknown"))))]
 pub(crate) mod load_dynamic {
 	use core::{ffi::CStr, fmt};
 	use std::path::PathBuf;
@@ -177,7 +177,7 @@ pub(crate) mod load_dynamic {
 		Ok(inserter.is_none())
 	}
 }
-#[cfg(all(feature = "load-dynamic", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "load-dynamic", not(all(target_family = "wasm", target_os = "unknown"))))]
 pub use self::load_dynamic::LoadError as LoadDynamicError;
 
 /// Returns information about the build of ONNX Runtime used, including version, Git commit, and compile flags.
@@ -206,19 +206,19 @@ static G_ORT_API: OnceLock<ApiPointer> = OnceLock::new();
 /// - Loading the ONNX Runtime dynamic library fails if the `load-dynamic` feature is enabled.
 #[inline]
 pub fn api() -> &'static ort_sys::OrtApi {
-	#[cfg(any(feature = "alternative-backend", target_arch = "wasm32"))]
+	#[cfg(any(feature = "alternative-backend", all(target_family = "wasm", target_os = "unknown")))]
 	let ptr = G_ORT_API
 		.get()
 		.expect(
 			"attempted to use `ort` APIs before initializing a backend\nwhen the `alternative-backend` feature is enabled, `ort::set_api` must be called first to configure the `OrtApi` used by the library"
 		)
 		.0;
-	#[cfg(not(any(feature = "alternative-backend", target_arch = "wasm32")))]
+	#[cfg(not(any(feature = "alternative-backend", all(target_family = "wasm", target_os = "unknown"))))]
 	let ptr = G_ORT_API.get_or_init(setup_api).0;
 	unsafe { ptr.as_ref() }
 }
 
-#[cfg(not(any(feature = "alternative-backend", target_arch = "wasm32")))]
+#[cfg(not(any(feature = "alternative-backend", all(target_family = "wasm", target_os = "unknown"))))]
 #[cold]
 fn setup_api() -> ApiPointer {
 	#[cfg(feature = "load-dynamic")]

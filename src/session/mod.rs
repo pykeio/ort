@@ -44,7 +44,7 @@ use crate::{
 
 #[cfg(feature = "api-20")]
 mod adapter;
-#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
 mod r#async;
 pub mod builder;
 mod input;
@@ -55,9 +55,9 @@ mod run_options;
 #[cfg(feature = "api-20")]
 #[cfg_attr(docsrs, doc(cfg(feature = "api-20")))]
 pub use self::adapter::Adapter;
-#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
 pub use self::r#async::InferenceFut;
-#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
 use self::r#async::{AsyncInferenceContext, InferenceFutInner};
 use self::{builder::SessionBuilder, run_options::UntypedRunOptions};
 pub use self::{
@@ -237,7 +237,7 @@ impl Session {
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 	pub fn run<'s, 'i, 'v: 'i, const N: usize>(&'s mut self, input_values: impl Into<SessionInputs<'i, 'v, N>>) -> Result<SessionOutputs<'s>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
@@ -279,7 +279,7 @@ impl Session {
 	/// # 	Ok(())
 	/// # }
 	/// ```
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 	pub fn run_with_options<'r, 's: 'r, 'i, 'v: 'i, O: SelectedOutputMarker, const N: usize>(
 		&'s mut self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>>,
@@ -298,7 +298,7 @@ impl Session {
 		}
 	}
 
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 	fn run_inner<'i, 'r, 's: 'r, 'v: 'i>(
 		// Yes, the internal run functions take `&self`. In a perfect world, the public functions would take `&self` too. But we don't live in a perfect world,
 		// and ONNX Runtime's own `Run` is **not thread safe** (despite Microsoft saying it should be years ago!). You may modify those functions to take
@@ -377,12 +377,12 @@ impl Session {
 		Ok(SessionOutputs::new(output_names, outputs))
 	}
 
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 	pub fn run_binding<'b, 's: 'b>(&'s mut self, binding: &'b IoBinding) -> Result<SessionOutputs<'b>> {
 		self.run_binding_inner(binding, None)
 	}
 
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 	pub fn run_binding_with_options<'r, 'b, 's: 'b>(
 		&'s mut self,
 		binding: &'b IoBinding,
@@ -391,7 +391,7 @@ impl Session {
 		self.run_binding_inner(binding, Some(run_options))
 	}
 
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 	fn run_binding_inner<'r, 'b, 's: 'b>(
 		&'s self, // `RunWithBinding` is also not thread safe.
 		binding: &'b IoBinding,
@@ -447,7 +447,7 @@ impl Session {
 	/// # 	Ok(())
 	/// # }) }
 	/// ```
-	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
 	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn run_async<'r, 's: 'r, 'i, 'v: 'i + 's, O: SelectedOutputMarker, const N: usize>(
 		&'s mut self,
@@ -467,7 +467,7 @@ impl Session {
 		}
 	}
 
-	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
 	fn run_inner_async<'i, 'r, 's: 'r, 'v: 'i + 's>(
 		&'s self, // Yes, `RunAsync` is also not thread safe. That doesn't make a whole lot of sense.
 		input_names: SmallVec<[&str; STACK_SESSION_INPUTS]>,
@@ -584,7 +584,7 @@ impl Session {
 	/// # 	Ok(())
 	/// # }) }
 	/// ```
-	#[cfg(target_arch = "wasm32")]
+	#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 	pub async fn run_async<'r, 's: 'r, 'i, 'v: 'i + 's, O: SelectedOutputMarker, const N: usize>(
 		&'s mut self,
 		input_values: impl Into<SessionInputs<'i, 'v, N>>,
@@ -606,7 +606,7 @@ impl Session {
 		}
 	}
 
-	#[cfg(target_arch = "wasm32")]
+	#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 	async fn run_inner_async<'i, 'r, 's: 'r, 'v: 'i + 's>(
 		&'s self,
 		input_names: SmallVec<[&str; STACK_SESSION_INPUTS]>,

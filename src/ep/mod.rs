@@ -247,7 +247,7 @@ impl ExecutionProviderOptionsFFI {
 #[allow(unused)]
 macro_rules! define_ep_register {
 	($symbol:ident($($id:ident: $type:ty),*) -> $rt:ty) => {
-		#[cfg(all(feature = "load-dynamic", not(target_arch = "wasm32")))]
+		#[cfg(all(feature = "load-dynamic", not(all(target_family = "wasm", target_os = "unknown"))))]
 		#[allow(non_snake_case)]
 		let $symbol = unsafe {
 			let dylib = $crate::load_dynamic::G_ORT_LIB.get().expect("dylib not yet initialized");
@@ -262,7 +262,7 @@ macro_rules! define_ep_register {
 				}
 			}
 		};
-		#[cfg(not(all(feature = "load-dynamic", not(target_arch = "wasm32"))))]
+		#[cfg(not(all(feature = "load-dynamic", not(all(target_family = "wasm", target_os = "unknown")))))]
 		unsafe extern "C" {
 			fn $symbol($($id: $type),*) -> $rt;
 		}
@@ -528,11 +528,11 @@ pub mod rknpu;
 #[cfg(feature = "rknpu")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rknpu")))]
 pub use self::rknpu::RKNPU;
-#[cfg(any(target_arch = "wasm32", feature = "webgpu"))]
-#[cfg_attr(docsrs, doc(cfg(any(target_arch = "wasm32", feature = "webgpu"))))]
+#[cfg(any(all(target_family = "wasm", target_os = "unknown"), feature = "webgpu"))]
+#[cfg_attr(docsrs, doc(cfg(any(all(target_family = "wasm", target_os = "unknown"), feature = "webgpu"))))]
 pub mod webgpu;
-#[cfg(any(target_arch = "wasm32", feature = "webgpu"))]
-#[cfg_attr(docsrs, doc(cfg(any(target_arch = "wasm32", feature = "webgpu"))))]
+#[cfg(any(all(target_family = "wasm", target_os = "unknown"), feature = "webgpu"))]
+#[cfg_attr(docsrs, doc(cfg(any(all(target_family = "wasm", target_os = "unknown"), feature = "webgpu"))))]
 pub use self::webgpu::WebGPU;
 #[cfg(feature = "azure")]
 #[cfg_attr(docsrs, doc(cfg(feature = "azure")))]
@@ -552,9 +552,9 @@ pub mod nvrtx;
 #[cfg(feature = "nvrtx")]
 #[cfg_attr(docsrs, doc(cfg(feature = "nvrtx")))]
 pub use self::nvrtx::NVRTX;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 pub mod wasm;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 pub mod webnn;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 pub use self::{wasm::WASM, webnn::WebNN};

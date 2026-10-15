@@ -354,9 +354,6 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	/// - `session` must be `Some` for values returned from a session.
 	#[must_use]
 	pub unsafe fn from_ptr(ptr: NonNull<ort_sys::OrtValue>, allocator: Option<&Allocator>) -> Value<Type> {
-		let mut typeinfo_ptr = ptr::null_mut();
-		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
-
 		let mut is_tensor = 0;
 		ortsys![unsafe IsTensor(ptr.as_ptr(), &mut is_tensor).expect("infallible")];
 		if is_tensor != 0 && allocator.is_none() {
@@ -366,6 +363,8 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 		let dtype = if is_tensor != 0 {
 			unsafe { ValueType::from_tensor_value(ptr) }
 		} else {
+			let mut typeinfo_ptr = ptr::null_mut();
+			ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
 			unsafe { ValueType::from_type_info(typeinfo_ptr) }
 		};
 
@@ -378,9 +377,6 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	#[must_use]
 	#[inline]
 	pub(crate) unsafe fn from_session_output_ptr(ptr: NonNull<ort_sys::OrtValue>, session_inner: &SharedSessionInner) -> Value<Type> {
-		let mut typeinfo_ptr = ptr::null_mut();
-		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
-
 		let mut is_tensor = 0;
 		ortsys![unsafe IsTensor(ptr.as_ptr(), &mut is_tensor).expect("infallible")];
 		if is_tensor != 0 {
@@ -401,11 +397,14 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 					_drop_ptr: Some(ptr)
 				})
 			};
+
 			Value {
 				inner: ValueInner::new(ptr, dtype, Some(allocator_handle), ValueFlags::DROP | ValueFlags::UPGRADABLE, None),
 				_markers: PhantomData
 			}
 		} else {
+			let mut typeinfo_ptr = ptr::null_mut();
+			ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
 			let dtype = unsafe { ValueType::from_type_info(typeinfo_ptr) };
 			Value {
 				inner: ValueInner::new(ptr, dtype, Some(session_inner.allocator.handle.clone()), ValueFlags::DROP | ValueFlags::UPGRADABLE, None),
@@ -418,14 +417,13 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	/// contexts.
 	#[must_use]
 	pub(crate) unsafe fn from_ptr_nodrop(ptr: NonNull<ort_sys::OrtValue>, allocator: Option<&Allocator>) -> Value<Type> {
-		let mut typeinfo_ptr = ptr::null_mut();
-		ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
-
 		let mut is_tensor = 0;
 		ortsys![unsafe IsTensor(ptr.as_ptr(), &mut is_tensor).expect("infallible")];
 		let dtype = if is_tensor != 0 {
 			unsafe { ValueType::from_tensor_value(ptr) }
 		} else {
+			let mut typeinfo_ptr = ptr::null_mut();
+			ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
 			unsafe { ValueType::from_type_info(typeinfo_ptr) }
 		};
 

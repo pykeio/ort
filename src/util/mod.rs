@@ -12,19 +12,12 @@ use crate::{Result, memory::Allocator};
 mod mutex_spin;
 #[cfg(any(test, feature = "std"))]
 mod mutex_std;
-#[cfg(any(test, not(feature = "std")))]
-mod once_lock_spin;
-#[cfg(any(test, feature = "std"))]
-mod once_lock_std;
+mod once_lock;
 
 #[cfg(not(feature = "std"))]
 use mutex_spin as mutex;
 #[cfg(feature = "std")]
 use mutex_std as mutex;
-#[cfg(not(feature = "std"))]
-use once_lock_spin as once_lock;
-#[cfg(feature = "std")]
-use once_lock_std as once_lock;
 
 mod map;
 mod stack;

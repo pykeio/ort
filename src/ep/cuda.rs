@@ -382,7 +382,7 @@ pub const CUDNN_DYLIBS: &[&str] = &[
 /// let _ = ep::cuda::preload_dylibs(None, Some(cudnn_root));
 /// ```
 #[cfg_attr(docsrs, doc(cfg(any(feature = "preload-dylibs", feature = "load-dynamic"))))]
-#[cfg(all(feature = "preload-dylibs", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "preload-dylibs", not(all(target_family = "wasm", target_os = "unknown"))))]
 pub fn preload_dylibs(cuda_root_dir: Option<&std::path::Path>, cudnn_root_dir: Option<&std::path::Path>) -> Result<()> {
 	use crate::util::preload_dylib;
 	if let Some(cuda_root_dir) = cuda_root_dir {

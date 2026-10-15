@@ -63,7 +63,7 @@ pub use self::ndarray::ArrayExt;
 /// let _ = ort::util::preload_dylib(application_dir.join("DirectML.dll"));
 /// ```
 #[cfg_attr(docsrs, doc(cfg(any(feature = "preload-dylibs", feature = "load-dynamic"))))]
-#[cfg(all(feature = "preload-dylibs", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "preload-dylibs", not(all(target_family = "wasm", target_os = "unknown"))))]
 pub fn preload_dylib<P: libloading::AsFilename>(path: P) -> Result<(), libloading::Error> {
 	let library = unsafe { libloading::Library::new(path) }?;
 	// Do not run `FreeLibrary` so the library remains in the loaded modules list.
@@ -79,7 +79,7 @@ pub fn preload_dylib<P: libloading::AsFilename>(path: P) -> Result<(), libloadin
 /// assert_eq!(ort::util::probe("libonnxruntime.so.1.26"), Some(26));
 /// ```
 #[cfg_attr(docsrs, doc(cfg(feature = "load-dynamic")))]
-#[cfg(all(feature = "load-dynamic", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "load-dynamic", not(all(target_family = "wasm", target_os = "unknown"))))]
 pub fn probe<P: AsRef<std::path::Path>>(path: P) -> Option<u32> {
 	use crate::load_dynamic;
 	let (lib, absolute_path) = load_dynamic::load_library(path.as_ref()).ok()?;

@@ -264,7 +264,7 @@ fn extract_tensor<Type: TensorValueTypeMarker + ?Sized>(value: &Value<Type>, exp
 			let value: &DynTensor = unsafe { value.transmute_type_ref() };
 			// With `ort-web`, non-CPU tensors can still be extracted. `GetTensorMutableData` will throw an error if
 			// there is a problem; this check is not needed.
-			#[cfg(not(target_arch = "wasm32"))]
+			#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 			{
 				let memory_info = value.memory_info();
 				if !memory_info.is_cpu_accessible() {

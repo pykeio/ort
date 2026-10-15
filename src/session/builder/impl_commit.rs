@@ -18,9 +18,9 @@ use smallvec::SmallVec;
 #[cfg(feature = "api-22")]
 use super::EditableSession;
 use super::SessionBuilder;
-#[cfg(any(target_arch = "wasm32", feature = "std"))]
+#[cfg(any(all(target_family = "wasm", target_os = "unknown"), feature = "std"))]
 use crate::error::{Error, ErrorCode};
-#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
 use crate::util::OsCharArray;
 use crate::{
 	AsPointer,
@@ -34,7 +34,7 @@ use crate::{
 
 impl SessionBuilder {
 	/// Downloads a pre-trained ONNX model from the given URL and builds the session.
-	#[cfg(all(feature = "fetch-models", feature = "std", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "fetch-models", feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
 	#[cfg_attr(docsrs, doc(cfg(all(feature = "fetch-models", feature = "std"))))]
 	pub fn commit_from_url(&mut self, model_url: impl AsRef<str>) -> Result<Session> {
 		let downloaded_path = download_model(model_url.as_ref())?;
@@ -42,7 +42,7 @@ impl SessionBuilder {
 	}
 
 	/// Loads an ONNX model from a file and builds the session.
-	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
 	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 	pub fn commit_from_file<P>(&mut self, model_path: P) -> Result<Session>
 	where
@@ -57,7 +57,7 @@ impl SessionBuilder {
 		self.commit_from_file_inner(model_path.as_ref())
 	}
 
-	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
 	fn commit_from_file_inner(&mut self, model_path: &<OsCharArray as core::ops::Deref>::Target) -> Result<Session> {
 		self.pre_commit()?;
 
@@ -81,7 +81,7 @@ impl SessionBuilder {
 	///
 	/// If you need to store the model bytes and the [`InMemorySession`] in the same struct, there are crates that can
 	/// facilitate creating self-referential structs, such as [`ouroboros`](https://github.com/joshua-maros/ouroboros).
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 	pub fn commit_from_memory_directly<'m>(&mut self, model_bytes: &'m [u8]) -> Result<InMemorySession<'m>> {
 		const KEYS: [&str; 2] = ["session.use_ort_model_bytes_directly", "session.use_ort_model_bytes_for_initializers"];
 
@@ -102,7 +102,7 @@ impl SessionBuilder {
 	}
 
 	/// Load an ONNX graph from memory and commit the session.
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 	pub fn commit_from_memory(&mut self, model_bytes: &[u8]) -> Result<Session> {
 		self.pre_commit()?;
 
@@ -128,7 +128,7 @@ impl SessionBuilder {
 	}
 
 	/// Downloads a pre-trained ONNX model from the given URL and builds the session.
-	#[cfg(target_arch = "wasm32")]
+	#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 	pub async fn commit_from_url(&mut self, model_url: impl AsRef<str>) -> Result<Session> {
 		self.pre_commit()?;
 
@@ -144,7 +144,7 @@ impl SessionBuilder {
 	}
 
 	/// Load an ONNX graph from memory and commit the session.
-	#[cfg(target_arch = "wasm32")]
+	#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 	pub async fn commit_from_memory(&mut self, model_bytes: &[u8]) -> Result<Session> {
 		self.pre_commit()?;
 
@@ -274,7 +274,7 @@ impl SessionBuilder {
 	}
 }
 
-#[cfg(all(feature = "fetch-models", feature = "std", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "fetch-models", feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
 fn download_model(url: &str) -> Result<PathBuf> {
 	use ureq::{
 		config::Config,

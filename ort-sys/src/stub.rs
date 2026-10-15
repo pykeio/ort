@@ -84,7 +84,7 @@ unsafe extern "system" fn DisableTelemetryEvents(env: *const OrtEnv) -> OrtStatu
 	OrtStatusPtr::default()
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 unsafe extern "system" fn CreateSession(
 	env: *const OrtEnv,
 	model_path: *const os_char,
@@ -94,7 +94,7 @@ unsafe extern "system" fn CreateSession(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 unsafe fn CreateSession(
 	env: *const OrtEnv,
 	model_path: &str,
@@ -104,7 +104,7 @@ unsafe fn CreateSession(
 	Box::pin(async { Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented") })
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 unsafe extern "system" fn CreateSessionFromArray(
 	env: *const OrtEnv,
 	model_data: *const ::core::ffi::c_void,
@@ -115,7 +115,7 @@ unsafe extern "system" fn CreateSessionFromArray(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 unsafe fn CreateSessionFromArray(
 	env: *const OrtEnv,
 	model_data: &[u8],
@@ -1513,7 +1513,7 @@ unsafe extern "system" fn CreateAndRegisterAllocatorV2(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 unsafe extern "system" fn RunAsync(
 	session: *mut OrtSession,
 	run_options: *const OrtRunOptions,
@@ -1529,7 +1529,7 @@ unsafe extern "system" fn RunAsync(
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 unsafe fn RunAsync(
 	session: *mut OrtSession,
 	run_options: *const OrtRunOptions,

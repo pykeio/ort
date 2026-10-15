@@ -652,7 +652,7 @@ pub fn init() -> EnvironmentBuilder {
 /// ```
 ///
 /// [`Session`]: crate::session::Session
-#[cfg(all(feature = "load-dynamic", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "load-dynamic", not(all(target_family = "wasm", target_os = "unknown"))))]
 #[cfg_attr(docsrs, doc(cfg(feature = "load-dynamic")))]
 #[must_use = "an environment is required to create sessions"]
 pub fn init_from<P: AsRef<std::path::Path>>(path: P) -> Result<EnvironmentBuilder, crate::LoadDynamicError> {

@@ -351,6 +351,13 @@ impl SessionBuilder {
 	/// Automatically select & register an execution provider according to the given [`policy`](AutoDevicePolicy), based
 	/// on available hardware devices.
 	///
+	/// The default is [`AutoDevicePolicy::MaxEfficiency`]; on macOS, this always registers the CoreML EP, which may be
+	/// incompatible with some models or slower than CPU. Setting to [`AutoDevicePolicy::PreferCPU`] will never
+	/// automatically register any EPs.
+	///
+	/// EPs manually registered with [`SessionBuilder::with_execution_providers`] also always take precedence over
+	/// automatically registered EPs.
+	///
 	/// For finer control over device selection, and to configure EP options, see [`SessionBuilder::with_devices`].
 	///
 	/// ```no_run

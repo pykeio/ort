@@ -120,7 +120,6 @@ impl SessionBuilder {
 		ortsys![unsafe CreateSessionOptions(&mut session_options_ptr)?; nonNull(session_options_ptr)];
 
 		// target on-device usage; prefer efficiency by default
-		// .with_execution_providers/.with_auto_ep will override this
 		#[cfg(feature = "api-22")]
 		let _ = ortsys![@ort: unsafe SessionOptionsSetEpSelectionPolicy(session_options_ptr.as_ptr(), AutoDevicePolicy::MaxEfficiency.into()) as Result];
 

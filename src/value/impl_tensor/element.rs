@@ -50,6 +50,14 @@ pub enum TensorElementType {
 	Uint4,
 	/// 4-bit signed integer.
 	Int4,
+	/// 4-bit floating point number with 2 exponent bits and 1 mantissa bit.
+	Float4E2M1,
+	/// 2-bit unsigned integer.
+	Uint2,
+	/// 2-bit signed integer.
+	Int2,
+	/// 8-bit floating point number with 8 exponent bits and no mantissa bits.
+	Float8E8M0, // what could this possibly even be used for?
 	Undefined
 }
 
@@ -57,14 +65,17 @@ impl TensorElementType {
 	/// Returns the size in bytes that a container of this type occupies according to its total capacity.
 	pub fn byte_size(&self, container_capacity: usize) -> Option<usize> {
 		Some(match self {
-			TensorElementType::Uint4 | TensorElementType::Int4 => container_capacity.div_ceil(2),
+			TensorElementType::Uint2 | TensorElementType::Int2 => container_capacity.div_ceil(4),
+			TensorElementType::Uint4 | TensorElementType::Int4 | TensorElementType::Float4E2M1 => container_capacity.div_ceil(2),
 			TensorElementType::Bool | TensorElementType::Int8 | TensorElementType::Uint8 => container_capacity,
 			TensorElementType::Int16 | TensorElementType::Uint16 => container_capacity * 2,
 			TensorElementType::Int32 | TensorElementType::Uint32 => container_capacity * 4,
 			TensorElementType::Int64 | TensorElementType::Uint64 => container_capacity * 8,
-			TensorElementType::Float8E4M3FN | TensorElementType::Float8E4M3FNUZ | TensorElementType::Float8E5M2 | TensorElementType::Float8E5M2FNUZ => {
-				container_capacity
-			}
+			TensorElementType::Float8E4M3FN
+			| TensorElementType::Float8E4M3FNUZ
+			| TensorElementType::Float8E5M2
+			| TensorElementType::Float8E5M2FNUZ
+			| TensorElementType::Float8E8M0 => container_capacity,
 			TensorElementType::Float16 | TensorElementType::Bfloat16 => container_capacity * 2,
 			TensorElementType::Float32 => container_capacity * 4,
 			TensorElementType::Float64 => container_capacity * 8,
@@ -91,12 +102,14 @@ impl fmt::Display for TensorElementType {
 			TensorElementType::Int64 => "i64",
 			TensorElementType::Int8 => "i8",
 			TensorElementType::Int4 => "i4",
+			TensorElementType::Int2 => "i2",
 			TensorElementType::String => "String",
 			TensorElementType::Uint16 => "u16",
 			TensorElementType::Uint32 => "u32",
 			TensorElementType::Uint64 => "u64",
 			TensorElementType::Uint8 => "u8",
 			TensorElementType::Uint4 => "u4",
+			TensorElementType::Uint2 => "u2", // songs of innocence was NOT good enough to put it on everyones iphones. im still mad about that
 			TensorElementType::Complex64 => "c64",
 			TensorElementType::Complex128 => "c128",
 			// these really need more memorable (and easier to type) names. like Gerald or perhaps Alexa
@@ -104,6 +117,8 @@ impl fmt::Display for TensorElementType {
 			TensorElementType::Float8E4M3FNUZ => "f8_e4m3fnuz",
 			TensorElementType::Float8E5M2 => "f8_e5m2",
 			TensorElementType::Float8E5M2FNUZ => "f8_e5m2fnuz",
+			TensorElementType::Float4E2M1 => "f4_e2m1",
+			TensorElementType::Float8E8M0 => "f8_e8m0",
 			TensorElementType::Undefined => "undefined"
 		})
 	}
@@ -134,7 +149,11 @@ impl From<TensorElementType> for ort_sys::ONNXTensorElementDataType {
 			TensorElementType::Float8E4M3FN => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E4M3FN,
 			TensorElementType::Float8E4M3FNUZ => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E4M3FNUZ,
 			TensorElementType::Float8E5M2 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E5M2,
-			TensorElementType::Float8E5M2FNUZ => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E5M2FNUZ
+			TensorElementType::Float8E5M2FNUZ => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E5M2FNUZ,
+			TensorElementType::Float4E2M1 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT4E2M1,
+			TensorElementType::Uint2 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT2,
+			TensorElementType::Int2 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT2,
+			TensorElementType::Float8E8M0 => ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E8M0
 		}
 	}
 }
@@ -163,7 +182,11 @@ impl From<ort_sys::ONNXTensorElementDataType> for TensorElementType {
 			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E4M3FN => TensorElementType::Float8E4M3FN,
 			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E4M3FNUZ => TensorElementType::Float8E4M3FNUZ,
 			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E5M2 => TensorElementType::Float8E5M2,
-			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E5M2FNUZ => TensorElementType::Float8E5M2FNUZ
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E5M2FNUZ => TensorElementType::Float8E5M2FNUZ,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT4E2M1 => TensorElementType::Float4E2M1,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT2 => TensorElementType::Uint2,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_INT2 => TensorElementType::Int2,
+			ort_sys::ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT8E8M0 => TensorElementType::Float8E8M0
 		}
 	}
 }

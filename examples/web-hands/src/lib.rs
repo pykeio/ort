@@ -2,7 +2,7 @@ use std::slice;
 
 use ort::{
 	session::{RunOptions, Session},
-	value::{Tensor, TensorRef}
+	value::{Shape, Tensor}
 };
 use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
@@ -20,7 +20,6 @@ use crate::{
 #[wasm_bindgen]
 pub struct HandDetector {
 	session: Session,
-	resized_buffer: Box<[f32]>,
 	anchors: Box<[Anchor]>,
 	resizer: Option<LetterboxedResizer<RGBA8ToF32>>,
 	nms: NonMaximumSuppression,
@@ -41,7 +40,6 @@ impl HandDetector {
 		let session = Session::builder(&env)?.commit_from_url(url).await?;
 		Ok(Self {
 			session,
-			resized_buffer: vec![0.0_f32; INPUT_SIZE * INPUT_SIZE * 3].into_boxed_slice(),
 			last_image_size: (0, 0),
 			anchors: calculate_ssd_anchors(INPUT_SIZE as _, INPUT_SIZE as _, 0.1484375, 0.75, 4, vec![8, 16, 16, 16]),
 			resizer: None,
@@ -64,7 +62,6 @@ impl HandDetector {
 
 	async fn predict(&mut self, image: &[u8], image_size: (u32, u32)) -> anyhow::Result<&[Detection]> {
 		if image_size != self.last_image_size {
-			self.resized_buffer = vec![0.0f32; INPUT_SIZE * INPUT_SIZE * 3].into_boxed_slice();
 			self.resizer = Some(LetterboxedResizer::new(image_size.0 as _, image_size.1 as _, INPUT_SIZE, INPUT_SIZE, RGBA8ToF32::ZERO_TO_1));
 			self.last_image_size = image_size;
 		}
@@ -75,30 +72,32 @@ impl HandDetector {
 
 		self.candidates.clear();
 
-		resizer.resize(unsafe { slice::from_raw_parts(image.as_ptr().cast(), image.len() / 4) }, unsafe {
-			slice::from_raw_parts_mut(self.resized_buffer.as_mut_ptr().cast(), self.resized_buffer.len() / 3)
-		});
+		// Typically, `resized_image` would be a `Tensor` we created via `Tensor::new` rather than a normal Rust `Vec`.
+		// However, use of `Tensor::new` is heavily discouraged with `ort-web`, since it creates the tensor in ONNX
+		// Runtime's WASM context, requiring a useless copy of empty data before it can be used in Rust.
+		let shape = Shape::new([1, INPUT_SIZE as i64, INPUT_SIZE as i64, 3]);
+		let buf = vec![0.0_f32; shape.num_elements()];
+		let mut resized_image = Tensor::from_array((shape, buf))?;
 
-		// Typically, `resized_buffer` would be a `Tensor` we created via `Tensor::new` rather than a normal Rust `Vec`.
-		// However, use of `Tensor::new` is heavily discouraged with `ort-web`, since it creates the tensor in ONNX Runtime's
-		// WASM context, requiring a useless copy of empty data before it can be used. `TensorRef::from_array_view` is the most
-		// efficient solution.
-		let input = TensorRef::from_array_view(([1, INPUT_SIZE, INPUT_SIZE, 3], &*self.resized_buffer))?;
+		resizer.resize(unsafe { slice::from_raw_parts(image.as_ptr().cast(), image.len() / 4) }, unsafe {
+			let resized_buffer = resized_image.extract_tensor_mut().1;
+			slice::from_raw_parts_mut(resized_buffer.as_mut_ptr().cast(), resized_buffer.len() / 3)
+		});
 
 		// Run the model! Note that `ort-web` only supports `run_async`.
 		// `run_async` requires a `RunOptions`, but we don't use it. We keep a dummy one in the struct to avoid
 		// needlessly reallocating on every `predict` call.
-		let mut outputs = self.session.run_async(ort::inputs![input], &self._run_options).await?;
+		let mut outputs = self.session.run_async(ort::inputs![resized_image], &self._run_options).await?;
 
-		// The outputs' data lies in ONNX Runtime's WASM context and is inaccessible to us. We need to synchronize them to get
-		// their data. For more information on synchronization, see https://ort.pyke.io/backends/web#synchronization.
+		// The outputs' data lies in ONNX Runtime's WASM context and is inaccessible to us. We need to synchronize them
+		// to get their data. For more information on synchronization, see https://ort.pyke.io/backends/web#synchronization.
 		//
-		// We do use all of the model's outputs, so we can use the handy `sync_outputs` helper to synchronize all outputs at
-		// once.
+		// We do use all of the model's outputs, so we can use the handy `sync_outputs` helper to synchronize all
+		// outputs at once.
 		ort_web::sync_outputs(&mut outputs).await?;
 
-		// If the model outputs more tensors than you actually use, it's best to manually synchronize only the outputs you need
-		// with `ort_web::TensorExt::sync()`. That would look like:
+		// If the model outputs more tensors than you actually use, it's best to manually synchronize only the outputs
+		// you need with `ort_web::TensorExt::sync()`. That would look like:
 		// ```
 		// use ort_web::{SyncDirection, TensorExt};
 		// let classificators: Tensor<f32> = outputs.remove("Identity_1").unwrap().downcast().unwrap();
@@ -135,8 +134,8 @@ impl HandDetector {
 		self.nms.process_inplace(&mut self.candidates);
 
 		for detection in &mut self.candidates {
-			// Detections are centered on the palm; shift boxes up by 50% to center near MCP joints, then expand by 2.6x to include
-			// fingers.
+			// Detections are centered on the palm; shift boxes up by 50% to center near MCP joints, then expand by 2.6x
+			// to include fingers.
 			detection.to_roi(image_size, -0.5, 2.6);
 		}
 

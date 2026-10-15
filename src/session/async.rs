@@ -2,7 +2,6 @@ use alloc::{ffi::CString, sync::Arc};
 use core::{
 	ffi::{c_char, c_void},
 	future::Future,
-	marker::PhantomData,
 	pin::Pin,
 	ptr::NonNull,
 	task::{Context, Poll, Waker}
@@ -53,25 +52,20 @@ impl<'r> InferenceFutInner<'r> {
 unsafe impl Send for InferenceFutInner<'_> {}
 unsafe impl Sync for InferenceFutInner<'_> {}
 
-pub struct InferenceFut<'r, 'v> {
+pub struct InferenceFut<'r> {
 	inner: Arc<InferenceFutInner<'r>>,
-	did_receive: bool,
-	_inputs: PhantomData<&'v ()>
+	did_receive: bool
 }
 
-unsafe impl Send for InferenceFut<'_, '_> {}
+unsafe impl Send for InferenceFut<'_> {}
 
-impl<'r> InferenceFut<'r, '_> {
+impl<'r> InferenceFut<'r> {
 	pub(crate) fn new(inner: Arc<InferenceFutInner<'r>>) -> Self {
-		Self {
-			inner,
-			did_receive: false,
-			_inputs: PhantomData
-		}
+		Self { inner, did_receive: false }
 	}
 }
 
-impl<'r> Future for InferenceFut<'r, '_> {
+impl<'r> Future for InferenceFut<'r> {
 	type Output = Result<SessionOutputs<'r>>;
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -88,7 +82,7 @@ impl<'r> Future for InferenceFut<'r, '_> {
 	}
 }
 
-impl Drop for InferenceFut<'_, '_> {
+impl Drop for InferenceFut<'_> {
 	fn drop(&mut self) {
 		if !self.did_receive {
 			let _ = self.inner.run_options.terminate();

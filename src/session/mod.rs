@@ -437,23 +437,27 @@ impl Session {
 	///
 	/// ```
 	/// # use std::sync::Arc;
-	/// # use ort::{session::{Session, RunOptions}, value::{Value, ValueType, TensorRef, TensorElementType}};
+	/// # use ort::{session::{Session, RunOptions}, value::{Value, ValueType, Tensor, TensorElementType}};
 	/// # fn main() -> ort::Result<()> { tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
 	/// # let env = ort::test_util::test_env().clone();
 	/// let mut session = Session::builder(&env)?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 	/// let options = RunOptions::new()?;
-	/// let outputs = session.run_async(ort::inputs![TensorRef::from_array_view(&input)?], &options)?.await?;
+	/// let outputs = session.run_async(ort::inputs![Tensor::from_array(input)?], &options)?.await?;
 	/// # 	Ok(())
 	/// # }) }
 	/// ```
+	///
+	/// ## Cancellation safety
+	/// This function is *cancel-safe*, though note that ONNX Runtime will not terminate execution immediately (only
+	/// between kernel launches). It is for this reason that **only owned tensors** are accepted.
 	#[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
 	#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-	pub fn run_async<'r, 's: 'r, 'i, 'v: 'i + 's, O: SelectedOutputMarker, const N: usize>(
+	pub fn run_async<'r, 's: 'r, 'i, O: SelectedOutputMarker, const N: usize>(
 		&'s mut self,
-		input_values: impl Into<SessionInputs<'i, 'v, N>>,
+		input_values: impl Into<SessionInputs<'i, 'static, N>>,
 		run_options: &'r RunOptions<O>
-	) -> Result<InferenceFut<'r, 'v>> {
+	) -> Result<InferenceFut<'r>> {
 		match input_values.into() {
 			SessionInputs::ValueSlice(input_values) => {
 				self.run_inner_async(self.inputs.iter().map(|input| input.name()).collect(), input_values.iter().collect(), &run_options.inner)
@@ -468,12 +472,12 @@ impl Session {
 	}
 
 	#[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
-	fn run_inner_async<'i, 'r, 's: 'r, 'v: 'i + 's>(
+	fn run_inner_async<'i, 'r, 's: 'r>(
 		&'s self, // Yes, `RunAsync` is also not thread safe. That doesn't make a whole lot of sense.
 		input_names: SmallVec<[&str; STACK_SESSION_INPUTS]>,
-		input_values: SmallVec<[&SessionInputValue<'v>; STACK_SESSION_INPUTS]>,
+		input_values: SmallVec<[&SessionInputValue<'static>; STACK_SESSION_INPUTS]>,
 		run_options: &'r Arc<UntypedRunOptions>
-	) -> Result<InferenceFut<'r, 'v>> {
+	) -> Result<InferenceFut<'r>> {
 		// See the comment in `run_inner`; ONNX Runtime would read past the end of `input_name_ptrs`.
 		if input_values.len() > input_names.len() {
 			return Err(Error::new_with_code(
@@ -585,9 +589,9 @@ impl Session {
 	/// # }) }
 	/// ```
 	#[cfg(all(target_family = "wasm", target_os = "unknown"))]
-	pub async fn run_async<'r, 's: 'r, 'i, 'v: 'i + 's, O: SelectedOutputMarker, const N: usize>(
+	pub async fn run_async<'r, 's: 'r, 'i, O: SelectedOutputMarker, const N: usize>(
 		&'s mut self,
-		input_values: impl Into<SessionInputs<'i, 'v, N>>,
+		input_values: impl Into<SessionInputs<'i, 'static, N>>,
 		run_options: &'r RunOptions<O>
 	) -> Result<SessionOutputs<'r>> {
 		match input_values.into() {
@@ -607,10 +611,10 @@ impl Session {
 	}
 
 	#[cfg(all(target_family = "wasm", target_os = "unknown"))]
-	async fn run_inner_async<'i, 'r, 's: 'r, 'v: 'i + 's>(
+	async fn run_inner_async<'i, 'r, 's: 'r>(
 		&'s self,
 		input_names: SmallVec<[&str; STACK_SESSION_INPUTS]>,
-		input_values: SmallVec<[&SessionInputValue<'v>; STACK_SESSION_INPUTS]>,
+		input_values: SmallVec<[&SessionInputValue<'static>; STACK_SESSION_INPUTS]>,
 		run_options: &'r UntypedRunOptions
 	) -> Result<SessionOutputs<'r>> {
 		if input_values.len() > input_names.len() {

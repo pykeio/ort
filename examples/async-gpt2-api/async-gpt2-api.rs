@@ -12,7 +12,7 @@ use axum::{
 use futures::Stream;
 use ort::{
 	session::{RunOptions, Session, builder::GraphOptimizationLevel},
-	value::TensorRef
+	value::Tensor
 };
 use rand::Rng;
 use tokenizers::Tokenizer;
@@ -80,11 +80,12 @@ fn generate_stream(
 ) -> impl Stream<Item = ort::Result<Event>> + Send {
 	async_stream_lite::try_async_stream(|yielder| async move {
 		for _ in 0..gen_tokens {
-			let input = TensorRef::from_array_view((vec![1, 1, tokens.len() as i64], tokens.as_slice()))?;
 			let probabilities = {
 				let mut session = session.lock().await;
 				let options = RunOptions::new()?;
-				let outputs = session.run_async(ort::inputs![input], &options)?.await?;
+				let outputs = session
+					.run_async(ort::inputs![Tensor::from_array((vec![1, 1, tokens.len() as i64], tokens.clone()))?], &options)?
+					.await?;
 				let (dim, probabilities) = outputs["output1"].try_extract_tensor()?;
 
 				// Collect and sort logits

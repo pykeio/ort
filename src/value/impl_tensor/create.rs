@@ -18,7 +18,7 @@ use crate::{
 	memory::{Allocator, MemoryInfo},
 	ortsys,
 	util::run_on_drop,
-	value::{IntoShape, Value, ValueInner, ValueType}
+	value::{IntoShape, Value, ValueFlags, ValueInner, ValueType}
 };
 
 impl Tensor<String> {
@@ -83,7 +83,7 @@ impl Tensor<String> {
 					dimension_symbols: SymbolicDimensions::empty(shape_len)
 				},
 				Some(allocator.handle),
-				true,
+				ValueFlags::DROP | ValueFlags::UPGRADABLE,
 				None
 			),
 			_markers: PhantomData
@@ -143,7 +143,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 	/// Creating string tensors requires a separate method; see [`Tensor::from_string_array`].
 	pub fn from_array(input: impl OwnedTensorArrayData<T>) -> Result<Tensor<T>> {
 		let TensorArrayDataParts { shape, ptr, guard } = input.into_parts()?;
-		tensor_from_array(MemoryInfo::default(), shape, ptr.as_ptr().cast(), size_of::<T>(), T::into_tensor_element_type(), guard)
+		tensor_from_array(MemoryInfo::default(), shape, true, ptr.as_ptr().cast(), size_of::<T>(), T::into_tensor_element_type(), guard)
 			.map(|tensor| unsafe { tensor.transmute_type() })
 	}
 }
@@ -151,6 +151,7 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 fn tensor_from_array(
 	memory_info: MemoryInfo<'static>,
 	shape: Shape,
+	owned: bool,
 	data: *mut c_void,
 	element_size: usize,
 	element_type: TensorElementType,
@@ -177,8 +178,13 @@ fn tensor_from_array(
 		shape
 	};
 
+	let mut flags = ValueFlags::DROP;
+	if owned {
+		flags = flags | ValueFlags::UPGRADABLE;
+	}
+
 	Ok(DynTensor {
-		inner: ValueInner::new(value_ptr, dtype, None, true, guard),
+		inner: ValueInner::new(value_ptr, dtype, None, flags, guard),
 		_markers: PhantomData
 	})
 }
@@ -215,11 +221,8 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRef<'a, T> {
 	/// returned. See [`ndarray::ArrayRef::as_standard_layout`] to convert an array to a contiguous layout.
 	pub fn from_array_view(input: impl TensorArrayData<T> + 'a) -> Result<TensorRef<'a, T>> {
 		let (shape, data, guard) = input.ref_parts()?;
-		tensor_from_array(MemoryInfo::default(), shape, data.as_ptr() as *mut _, size_of::<T>(), T::into_tensor_element_type(), guard).map(|tensor| {
-			let mut tensor: TensorRef<'_, T> = TensorRef::new(unsafe { tensor.transmute_type() });
-			tensor.upgradable = false;
-			tensor
-		})
+		tensor_from_array(MemoryInfo::default(), shape, false, data.as_ptr() as *mut _, size_of::<T>(), T::into_tensor_element_type(), guard)
+			.map(|tensor| TensorRef::new(unsafe { tensor.transmute_type() }))
 	}
 }
 
@@ -254,11 +257,8 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 	/// returned. See [`ndarray::ArrayRef::as_standard_layout`] to convert an array to a contiguous layout.
 	pub fn from_array_view_mut(mut input: impl TensorArrayDataMut<T>) -> Result<TensorRefMut<'a, T>> {
 		let (shape, data, guard) = input.ref_parts_mut()?;
-		tensor_from_array(MemoryInfo::default(), shape, data.as_ptr() as *mut _, size_of::<T>(), T::into_tensor_element_type(), guard).map(|tensor| {
-			let mut tensor: TensorRefMut<'_, T> = TensorRefMut::new(unsafe { tensor.transmute_type() });
-			tensor.upgradable = false;
-			tensor
-		})
+		tensor_from_array(MemoryInfo::default(), shape, false, data.as_ptr() as *mut _, size_of::<T>(), T::into_tensor_element_type(), guard)
+			.map(|tensor| TensorRefMut::new(unsafe { tensor.transmute_type() }))
 	}
 
 	/// Create a mutable tensor view from a raw pointer and shape.
@@ -285,11 +285,8 @@ impl<'a, T: PrimitiveTensorElementType + Debug> TensorRefMut<'a, T> {
 	/// - The pointer must be valid for the device description provided by `MemoryInfo`.
 	/// - The returned tensor must outlive the data described by the data pointer.
 	pub unsafe fn from_raw(info: MemoryInfo, data: *mut ort_sys::c_void, shape: Shape) -> Result<TensorRefMut<'a, T>> {
-		tensor_from_array(info.to_owned(), shape, data, size_of::<T>(), T::into_tensor_element_type(), None).map(|tensor| {
-			let mut tensor: TensorRefMut<'_, T> = TensorRefMut::new(unsafe { tensor.transmute_type() });
-			tensor.upgradable = false;
-			tensor
-		})
+		tensor_from_array(info.to_owned(), shape, false, data, size_of::<T>(), T::into_tensor_element_type(), None)
+			.map(|tensor| TensorRefMut::new(unsafe { tensor.transmute_type() }))
 	}
 }
 

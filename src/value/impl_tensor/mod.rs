@@ -24,7 +24,8 @@ use crate::{
 	error::Result,
 	memory::{Allocator, MemoryInfo},
 	ortsys,
-	util::OnceLock
+	util::OnceLock,
+	value::ValueFlags
 };
 
 pub trait TensorValueTypeMarker: ValueTypeMarker {
@@ -145,7 +146,7 @@ impl DynTensor {
 				dimension_symbols: SymbolicDimensions::empty(shape_len)
 			},
 			Some(allocator.handle.clone()),
-			true,
+			ValueFlags::DROP | ValueFlags::UPGRADABLE,
 			None
 		);
 		Ok(Value { inner, _markers: PhantomData })

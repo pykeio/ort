@@ -11,7 +11,7 @@ use crate::{
 	error::{Error, Result},
 	memory::Allocator,
 	ortsys,
-	value::DynValue
+	value::{DynValue, ValueFlags}
 };
 
 pub trait SequenceValueTypeMarker: ValueTypeMarker {
@@ -140,7 +140,7 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized + 'static> Value<Se
 				// 2. `CreateValue` internally uses the first value to determine the element type, so we do the same here
 				ValueType::Sequence(Box::new(values[0].inner.dtype.clone())),
 				None,
-				true,
+				ValueFlags::DROP | ValueFlags::UPGRADABLE,
 				Some(Box::new(values))
 			),
 			_markers: PhantomData

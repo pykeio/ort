@@ -22,7 +22,7 @@ use core::{
 	fmt::{self, Debug},
 	marker::PhantomData,
 	mem::transmute,
-	ops::{Deref, DerefMut},
+	ops::{BitOr, Deref, DerefMut},
 	ptr::{self, NonNull}
 };
 
@@ -51,11 +51,33 @@ use crate::{
 	session::SharedSessionInner
 };
 
+#[derive(Default, Debug)]
+pub(crate) struct ValueFlags(u8);
+
+impl ValueFlags {
+	pub const DROP: ValueFlags = ValueFlags(1 << 0);
+	pub const UPGRADABLE: ValueFlags = ValueFlags(1 << 1);
+
+	pub const fn drop(&self) -> bool {
+		self.0 & Self::DROP.0 != 0
+	}
+	pub const fn upgradable(&self) -> bool {
+		self.0 & Self::UPGRADABLE.0 != 0
+	}
+}
+
+impl BitOr for ValueFlags {
+	type Output = ValueFlags;
+	fn bitor(self, rhs: Self) -> Self::Output {
+		ValueFlags(self.0 | rhs.0)
+	}
+}
+
 #[derive(Debug)]
 pub(crate) struct ValueInner {
 	pub(crate) ptr: NonNull<ort_sys::OrtValue>,
 	pub(crate) dtype: ValueType,
-	pub(crate) drop: bool,
+	pub(crate) flags: ValueFlags,
 	/// the value needs the allocator to stay alive so it can drop its memory. maps/sequences don't use their own
 	/// allocators, though, hence this is optional
 	pub(crate) allocator_handle: Option<Arc<AllocatorHandle>>,
@@ -68,14 +90,14 @@ impl ValueInner {
 		ptr: NonNull<ort_sys::OrtValue>,
 		dtype: ValueType,
 		allocator_handle: Option<Arc<AllocatorHandle>>,
-		drop: bool,
+		flags: ValueFlags,
 		backing: Option<Box<dyn Any>>
 	) -> Arc<Self> {
 		crate::logging::create!(Value, ptr);
 		Arc::new(Self {
 			ptr,
 			dtype,
-			drop,
+			flags,
 			allocator_handle,
 			_backing: backing
 		})
@@ -96,7 +118,7 @@ impl AsPointer for ValueInner {
 
 impl Drop for ValueInner {
 	fn drop(&mut self) {
-		if self.drop {
+		if self.flags.drop() {
 			ortsys![unsafe ReleaseValue(self.ptr_mut())];
 			crate::logging::drop!(Value, self.ptr());
 		}
@@ -107,19 +129,12 @@ impl Drop for ValueInner {
 #[derive(Debug)]
 pub struct ValueRef<'v, Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
 	inner: Value<Type>,
-	pub(crate) upgradable: bool,
 	lifetime: PhantomData<&'v ()>
 }
 
 impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 	pub(crate) fn new(inner: Value<Type>) -> Self {
-		ValueRef {
-			// We cannot upgrade a value which we cannot drop, i.e. `ValueRef`s used in operator kernels. Those only last for the
-			// duration of the kernel, allowing an upgrade would allow a UAF.
-			upgradable: inner.inner.drop,
-			inner,
-			lifetime: PhantomData
-		}
+		ValueRef { inner, lifetime: PhantomData }
 	}
 
 	/// Attempts to downcast a temporary dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed
@@ -136,7 +151,7 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 
 	/// Attempts to upgrade this `ValueRef` to an owned [`Value`] holding the same data.
 	pub fn try_upgrade(self) -> Result<Value<Type>, Self> {
-		if !self.upgradable {
+		if Arc::strong_count(&self.inner.inner) != 1 || !self.inner.inner.flags.upgradable() {
 			return Err(self);
 		}
 
@@ -160,19 +175,12 @@ impl<Type: ValueTypeMarker + ?Sized> Deref for ValueRef<'_, Type> {
 #[derive(Debug)]
 pub struct ValueRefMut<'v, Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
 	inner: Value<Type>,
-	pub(crate) upgradable: bool,
 	lifetime: PhantomData<&'v ()>
 }
 
 impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 	pub(crate) fn new(inner: Value<Type>) -> Self {
-		ValueRefMut {
-			// We cannot upgrade a value which we cannot drop, i.e. `ValueRef`s used in operator kernels. Those only last for the
-			// duration of the kernel, allowing an upgrade would allow a UAF.
-			upgradable: inner.inner.drop,
-			inner,
-			lifetime: PhantomData
-		}
+		ValueRefMut { inner, lifetime: PhantomData }
 	}
 
 	/// Attempts to downcast a temporary mutable dynamic value (like [`DynValue`] or [`DynTensor`]) to a more
@@ -189,7 +197,7 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
 
 	/// Attempts to upgrade this `ValueRefMut` to an owned [`Value`] holding the same data.
 	pub fn try_upgrade(self) -> Result<Value<Type>, Self> {
-		if !self.upgradable {
+		if Arc::strong_count(&self.inner.inner) != 1 || !self.inner.inner.flags.upgradable() {
 			return Err(self);
 		}
 
@@ -362,7 +370,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 		};
 
 		Value {
-			inner: ValueInner::new(ptr, dtype, allocator.map(|a| a.handle.clone()), true, None),
+			inner: ValueInner::new(ptr, dtype, allocator.map(|a| a.handle.clone()), ValueFlags::DROP | ValueFlags::UPGRADABLE, None),
 			_markers: PhantomData
 		}
 	}
@@ -394,13 +402,13 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 				})
 			};
 			Value {
-				inner: ValueInner::new(ptr, dtype, Some(allocator_handle), true, None),
+				inner: ValueInner::new(ptr, dtype, Some(allocator_handle), ValueFlags::DROP | ValueFlags::UPGRADABLE, None),
 				_markers: PhantomData
 			}
 		} else {
 			let dtype = unsafe { ValueType::from_type_info(typeinfo_ptr) };
 			Value {
-				inner: ValueInner::new(ptr, dtype, Some(session_inner.allocator.handle.clone()), true, None),
+				inner: ValueInner::new(ptr, dtype, Some(session_inner.allocator.handle.clone()), ValueFlags::DROP | ValueFlags::UPGRADABLE, None),
 				_markers: PhantomData
 			}
 		}
@@ -424,7 +432,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 		// allocator check for tensors not needed because, well, we don't drop!
 
 		Value {
-			inner: ValueInner::new(ptr, dtype, allocator.map(|a| a.handle.clone()), false, None),
+			inner: ValueInner::new(ptr, dtype, allocator.map(|a| a.handle.clone()), ValueFlags::default(), None),
 			_markers: PhantomData
 		}
 	}

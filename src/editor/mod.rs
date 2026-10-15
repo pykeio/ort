@@ -13,7 +13,7 @@ use crate::{
 	ortsys,
 	session::{Session, builder::SessionBuilder},
 	util::{with_cstr, with_cstr_ptr_array},
-	value::{Outlet, TensorValueTypeMarker, Value}
+	value::{Outlet, TensorValueTypeMarker, Value, ValueFlags}
 };
 
 #[cfg(test)]
@@ -197,7 +197,7 @@ impl Graph {
 
 		// Allow the `ValueInner` to be dropped so the `Arc` strong count is decremented, but don't allow it to actually
 		// *release* the underlying value, since it's now owned by ONNX Runtime.
-		value_inner.drop = false;
+		value_inner.flags = ValueFlags::default();
 
 		Ok(())
 	}

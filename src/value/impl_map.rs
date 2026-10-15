@@ -19,7 +19,8 @@ use crate::{
 	AsPointer, ErrorCode,
 	error::{Error, Result},
 	memory::Allocator,
-	ortsys
+	ortsys,
+	value::ValueFlags
 };
 
 pub trait MapValueTypeMarker: ValueTypeMarker {
@@ -264,7 +265,7 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq + 'static, V: IntoTens
 					value: V::into_tensor_element_type()
 				},
 				None,
-				true,
+				ValueFlags::DROP | ValueFlags::UPGRADABLE,
 				Some(Box::new(values))
 			),
 			_markers: PhantomData

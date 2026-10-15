@@ -346,7 +346,7 @@ impl Drop for GlobalThreadPoolOptions {
 /// ```
 ///
 /// [session]: crate::session::builder::SessionBuilder::with_thread_manager
-pub trait ThreadManager {
+pub trait ThreadManager: Send {
 	/// A handle to a spawned thread; used to [`join`](ThreadManager::join) it later.
 	type Thread;
 

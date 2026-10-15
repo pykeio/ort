@@ -18,13 +18,13 @@ use crate::{
 	value::{DowncastableTarget, DynValue, IntoShape, Outlet, Value, ValueRef, ValueRefMut, ValueType}
 };
 
-pub trait Kernel {
+pub trait Kernel: Send {
 	fn compute(&mut self, ctx: &ComputeContext) -> crate::Result<()>;
 }
 
 impl<F> Kernel for F
 where
-	F: FnMut(&ComputeContext) -> crate::Result<()>
+	F: FnMut(&ComputeContext) -> crate::Result<()> + Send
 {
 	fn compute(&mut self, ctx: &ComputeContext) -> crate::Result<()> {
 		self(ctx)

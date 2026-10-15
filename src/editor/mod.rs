@@ -98,8 +98,8 @@ impl Node {
 		with_cstr(operator_name.as_ref().as_bytes(), &|operator_name| {
 			with_cstr(domain_name.as_ref().as_bytes(), &|domain_name| {
 				with_cstr(node_name.as_ref().as_bytes(), &|node_name| {
-					with_cstr_ptr_array(inputs.as_ref(), &|inputs| {
-						with_cstr_ptr_array(outputs.as_ref(), &|outputs| {
+					with_cstr_ptr_array(inputs.as_ref(), &mut |inputs| {
+						with_cstr_ptr_array(outputs.as_ref(), &mut |outputs| {
 							let attributes = attributes.as_ref();
 							let mut out = ptr::null_mut();
 							ortsys![@editor:

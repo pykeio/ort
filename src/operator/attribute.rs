@@ -373,7 +373,7 @@ impl ToAttribute for &[String] {
 	where
 		Self: Sized
 	{
-		with_cstr_ptr_array(self, &|strings| {
+		with_cstr_ptr_array(self, &mut |strings| {
 			let mut out = ptr::null_mut();
 			ortsys![
 				unsafe CreateOpAttr(
@@ -397,7 +397,7 @@ impl ToAttribute for &[&str] {
 	where
 		Self: Sized
 	{
-		with_cstr_ptr_array(self, &|strings| {
+		with_cstr_ptr_array(self, &mut |strings| {
 			let mut out = ptr::null_mut();
 			ortsys![
 				unsafe CreateOpAttr(

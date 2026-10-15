@@ -50,27 +50,27 @@ pub(crate) fn with_cstr<T>(bytes: &[u8], f: &dyn Fn(&CStr) -> Result<T>) -> Resu
 }
 
 #[inline]
-pub(crate) fn with_cstr_ptr_array<T, R>(strings: &[T], f: &dyn Fn(&[*const c_char]) -> Result<R>) -> Result<R>
+pub(crate) fn with_cstr_ptr_array<T, R>(strings: &[T], f: &mut dyn FnMut(&mut [*const c_char]) -> Result<R>) -> Result<R>
 where
 	T: AsRef<str>
 {
-	fn run_with_heap_cstr_array<T: AsRef<str>, R>(strings: &[T], f: &dyn Fn(&[*const c_char]) -> Result<R>) -> Result<R> {
-		let strings: SmallVec<[*const c_char; STACK_CSTR_ARRAY_MAX_ELEMENTS]> = strings
+	fn run_with_heap_cstr_array<T: AsRef<str>, R>(strings: &[T], f: &mut dyn FnMut(&mut [*const c_char]) -> Result<R>) -> Result<R> {
+		let mut strings: SmallVec<[*const c_char; STACK_CSTR_ARRAY_MAX_ELEMENTS]> = strings
 			.iter()
 			.map(|s| CString::new(s.as_ref()).map(|s| s.into_raw().cast_const()))
 			.collect::<Result<SmallVec<[*const c_char; STACK_CSTR_ARRAY_MAX_ELEMENTS]>, NulError>>()?;
-		let res = f(&strings);
+		let res = f(&mut strings);
 		for string in strings {
 			drop(unsafe { CString::from_raw(string.cast_mut()) });
 		}
 		res
 	}
 
-	fn run_with_stack_cstr_array<T: AsRef<str>, R>(strings: &[T], f: &dyn Fn(&[*const c_char]) -> Result<R>) -> Result<R> {
+	fn run_with_stack_cstr_array<T: AsRef<str>, R>(strings: &[T], f: &mut dyn FnMut(&mut [*const c_char]) -> Result<R>) -> Result<R> {
 		let mut buf = MaybeUninit::<[c_char; STACK_CSTR_ARRAY_MAX_TOTAL]>::uninit();
 		let mut buf_ptr = buf.as_mut_ptr() as *mut c_char;
 
-		let strings: SmallVec<[*const c_char; STACK_CSTR_ARRAY_MAX_ELEMENTS]> = strings
+		let mut strings: SmallVec<[*const c_char; STACK_CSTR_ARRAY_MAX_ELEMENTS]> = strings
 			.iter()
 			.map(|s| {
 				let s = s.as_ref();
@@ -85,7 +85,7 @@ where
 			})
 			.collect();
 
-		f(&strings)
+		f(&mut strings)
 	}
 
 	let total_bytes = strings.iter().fold(0, |acc, s| acc + s.as_ref().len() + 1);

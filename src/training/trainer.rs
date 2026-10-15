@@ -213,7 +213,7 @@ impl Trainer {
 
 	pub fn export<O: AsRef<str>>(&self, out_path: impl AsRef<Path>, output_names: impl AsRef<[O]>) -> Result<()> {
 		let out_path = crate::util::path_to_os_char(out_path);
-		with_cstr_ptr_array(output_names.as_ref(), &|output_name_ptrs| {
+		with_cstr_ptr_array(output_names.as_ref(), &mut |output_name_ptrs| {
 			ortsys![@training: unsafe ExportModelForInferencing(self.ptr.as_ptr(), out_path.as_ptr(), output_name_ptrs.len(), output_name_ptrs.as_ptr())?];
 			Ok(())
 		})?;

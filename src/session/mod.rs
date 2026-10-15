@@ -331,7 +331,7 @@ impl Session {
 			Some(r) => r.outputs.resolve_outputs(&self.outputs),
 			None => (self.outputs.iter().map(|o| o.name()).collect(), iter::repeat_with(|| None).take(self.outputs.len()).collect())
 		};
-		let output_value_ptrs: SmallVec<[*mut ort_sys::OrtValue; STACK_SESSION_OUTPUTS]> = output_tensors
+		let mut output_value_ptrs: SmallVec<[*mut ort_sys::OrtValue; STACK_SESSION_OUTPUTS]> = output_tensors
 			.iter_mut()
 			.map(|c| match c {
 				Some(v) => v.ptr_mut(),
@@ -342,8 +342,8 @@ impl Session {
 
 		let run_options_ptr = if let Some(run_options) = &run_options { run_options.ptr.as_ptr() } else { ptr::null() };
 
-		with_cstr_ptr_array(&input_names, &|input_name_ptrs| {
-			with_cstr_ptr_array(&output_names, &|output_name_ptrs| {
+		with_cstr_ptr_array(&input_names, &mut |input_name_ptrs| {
+			with_cstr_ptr_array(&output_names, &mut |output_name_ptrs| {
 				ortsys![
 					unsafe Run(
 						self.inner.session_ptr.as_ptr(),
@@ -353,7 +353,7 @@ impl Session {
 						input_value_ptrs.len(),
 						output_name_ptrs.as_ptr(),
 						output_name_ptrs.len(),
-						output_value_ptrs.as_ptr().cast_mut()
+						output_value_ptrs.as_mut_ptr()
 					)?
 				];
 				Ok(())

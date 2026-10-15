@@ -186,7 +186,7 @@ impl ValueType {
 				ortsys![unsafe CreateTensorTypeAndShapeInfo(&mut info_ptr).expect("infallible")];
 				ortsys![unsafe SetTensorElementType(info_ptr, (*ty).into()).expect("infallible")];
 				ortsys![unsafe SetDimensions(info_ptr, shape.as_ptr(), shape.len()).expect("infallible")];
-				with_cstr_ptr_array(dimension_symbols, &|ptrs| {
+				with_cstr_ptr_array(dimension_symbols, &mut |ptrs| {
 					ortsys![unsafe SetSymbolicDimensions(info_ptr, ptrs.as_ptr().cast_mut(), dimension_symbols.len()).expect("infallible")];
 					Ok(())
 				})

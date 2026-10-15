@@ -182,7 +182,7 @@ impl<'a> Logger<'a> {
 	///
 	/// For more convenient usage, see the [`log!`](crate::log) macro.
 	pub fn log(&self, level: LogLevel, message: &str, file_path: &str, line: u32, func_name: &str) {
-		let _ = with_cstr_ptr_array(&[message, func_name], &|arr| {
+		let _ = with_cstr_ptr_array(&[message, func_name], &mut |arr| {
 			let (message, func_name) = (arr[0], arr[1]);
 			#[cfg(target_family = "windows")]
 			{

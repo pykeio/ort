@@ -443,8 +443,8 @@ impl SessionBuilder {
 		for (_, group) in device_groups.iter() {
 			let ptr = self.ptr_mut();
 			let env_ptr = self.environment.ptr().cast_mut();
-			if let Err(e) = with_cstr_ptr_array(&group.option_keys, &|option_keys| {
-				with_cstr_ptr_array(&group.option_values, &|option_values| {
+			if let Err(e) = with_cstr_ptr_array(&group.option_keys, &mut |option_keys| {
+				with_cstr_ptr_array(&group.option_values, &mut |option_values| {
 					ortsys![unsafe SessionOptionsAppendExecutionProvider_V2(
 						ptr,
 						env_ptr,

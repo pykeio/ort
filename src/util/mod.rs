@@ -247,8 +247,8 @@ mod tests {
 	fn test_with_cstr_arr() {
 		let normal_str = "hello world";
 		let few_normal_strs = vec![normal_str; 4];
-		with_cstr_ptr_array(&few_normal_strs, &|arr| {
-			for &ptr in arr {
+		with_cstr_ptr_array(&few_normal_strs, &mut |arr| {
+			for &mut ptr in arr {
 				let cstr = unsafe { CStr::from_ptr(ptr) };
 				assert_eq!(cstr.to_string_lossy(), normal_str);
 			}
@@ -257,8 +257,8 @@ mod tests {
 		.unwrap();
 
 		let many_normal_strs = vec![normal_str; 1000];
-		with_cstr_ptr_array(&many_normal_strs, &|arr| {
-			for &ptr in arr {
+		with_cstr_ptr_array(&many_normal_strs, &mut |arr| {
+			for &mut ptr in arr {
 				let cstr = unsafe { CStr::from_ptr(ptr) };
 				assert_eq!(cstr.to_string_lossy(), normal_str);
 			}
@@ -269,7 +269,7 @@ mod tests {
 		let longer_str = "HyperSuperUltraLongInputNameLikeAReallyLongNameSoLongInFactThatItDoesntFitOnTheStackAsSpecifiedInTheSTACK_CSTR_ARRAY_MAX_TOTAL_ConstantDefinedInUtilDotRsThisStringIsSoLongThatImStartingToRunOutOfThingsToSaySoIllJustPutZeros000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000hi0000000000000000000000000000000000000000000000000000000000000000000000000000000";
 		let mut mixed_strs = vec![normal_str; 3];
 		mixed_strs[1] = longer_str;
-		with_cstr_ptr_array(&mixed_strs, &|arr| {
+		with_cstr_ptr_array(&mixed_strs, &mut |arr| {
 			for (i, &ptr) in arr.iter().enumerate() {
 				let cstr = unsafe { CStr::from_ptr(ptr) };
 				if i != 1 {
@@ -283,8 +283,8 @@ mod tests {
 		.unwrap();
 
 		let many_longer_strs = vec![longer_str; 200];
-		with_cstr_ptr_array(&many_longer_strs, &|arr| {
-			for &ptr in arr {
+		with_cstr_ptr_array(&many_longer_strs, &mut |arr| {
+			for &mut ptr in arr {
 				let cstr = unsafe { CStr::from_ptr(ptr) };
 				assert_eq!(cstr.to_string_lossy(), longer_str);
 			}

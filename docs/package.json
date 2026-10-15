@@ -11,7 +11,7 @@
 	"dependencies": {
 		"@radix-ui/themes": "^3.3.0",
 		"canvas-confetti": "^1.9.4",
-		"next": "^16.3.5",
+		"next": "^16.4.0",
 		"nextra": "^4.6.1",
 		"nextra-theme-docs": "^4.6.1",
 		"react": "^19.3.0",
@@ -21,7 +21,7 @@
 	},
 	"devDependencies": {
 		"@types/canvas-confetti": "^1.9.0",
-		"@types/node": "^22.20.4",
+		"@types/node": "^22.20.5",
 		"@types/react": "^19.3.0",
 		"@types/react-dom": "^19.3.0",
 		"pagefind": "^1.5.2",

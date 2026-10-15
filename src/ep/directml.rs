@@ -7,7 +7,7 @@ use super::ExecutionProvider;
 use crate::{
 	AsPointer,
 	error::{Error, Result},
-	memory::Allocator,
+	memory::{AllocationDevice, Allocator},
 	ortsys,
 	session::builder::SessionBuilder,
 	util::OnceLock
@@ -147,6 +147,10 @@ pub struct DMLResource(*mut ort_sys::c_void);
 
 impl DMLResource {
 	pub fn d3d_resource(&self, allocator: &Allocator) -> Result<*mut ()> {
+		if allocator.memory_info().allocation_device() != AllocationDevice::DIRECTML {
+			return Err(Error::new("allocator must be a DirectML allocator"));
+		}
+
 		let mut ptr: *mut ort_sys::c_void = ptr::null_mut();
 		let dml_api = api().ok_or_else(|| Error::new("DirectML is not supported in this build of ONNX Runtime"))?;
 		unsafe { Error::result_from_status((dml_api.GetD3D12ResourceFromAllocation)(allocator.ptr().cast_mut(), self.0.cast(), &mut ptr)) }?;

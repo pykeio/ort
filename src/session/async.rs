@@ -15,7 +15,7 @@ use crate::{
 	error::Result,
 	session::{SessionOutputs, SharedSessionInner, UntypedRunOptions},
 	util::{Mutex, STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS},
-	value::{DynValue, Value, ValueInner}
+	value::{DynValue, ValueInner}
 };
 
 struct InferenceFutState<'r> {
@@ -97,20 +97,20 @@ impl Drop for InferenceFut<'_, '_> {
 	}
 }
 
-pub(crate) struct AsyncInferenceContext<'r, 's> {
+pub(crate) struct AsyncInferenceContext<'r> {
 	pub(crate) inner: Arc<InferenceFutInner<'r>>,
 	pub(crate) input_ort_values: SmallVec<[*const ort_sys::OrtValue; STACK_SESSION_INPUTS]>,
 	pub(crate) _input_inner_holders: SmallVec<[Arc<ValueInner>; STACK_SESSION_INPUTS]>,
 	pub(crate) input_name_ptrs: SmallVec<[*const c_char; STACK_SESSION_INPUTS]>,
 	pub(crate) output_name_ptrs: SmallVec<[*const c_char; STACK_SESSION_OUTPUTS]>,
-	pub(crate) session_inner: &'s Arc<SharedSessionInner>,
+	pub(crate) session_inner: Arc<SharedSessionInner>,
 	pub(crate) output_names: SmallVec<[&'r str; STACK_SESSION_OUTPUTS]>,
 	pub(crate) output_value_ptrs: SmallVec<[*mut ort_sys::OrtValue; STACK_SESSION_OUTPUTS]>,
 	/// Preallocated outputs, which already own their `OrtValue`s.
 	pub(crate) output_values: SmallVec<[Option<DynValue>; STACK_SESSION_OUTPUTS]>
 }
 
-impl AsyncInferenceContext<'_, '_> {
+impl AsyncInferenceContext<'_> {
 	/// Frees the input & output names, which were leaked from `CString`s by `run_inner_async`.
 	pub(crate) fn free_name_ptrs(&self) {
 		for &p in self.input_name_ptrs.iter().chain(self.output_name_ptrs.iter()) {
@@ -120,7 +120,7 @@ impl AsyncInferenceContext<'_, '_> {
 }
 
 pub(crate) extern "system" fn async_callback(user_data: *mut c_void, _: *mut *mut ort_sys::OrtValue, _: usize, status: ort_sys::OrtStatusPtr) {
-	let ctx = unsafe { Box::from_raw(user_data.cast::<AsyncInferenceContext<'_, '_>>()) };
+	let ctx = unsafe { Box::from_raw(user_data.cast::<AsyncInferenceContext<'_>>()) };
 
 	ctx.free_name_ptrs();
 

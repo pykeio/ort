@@ -39,7 +39,7 @@ use crate::{
 	memory::Allocator,
 	ortsys,
 	util::{AllocatedString, STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS, with_cstr, with_cstr_ptr_array},
-	value::{DynValue, Outlet, Value, ValueType}
+	value::{DynValue, Outlet, ValueType}
 };
 
 #[cfg(feature = "api-20")]
@@ -536,7 +536,7 @@ impl Session {
 			write(&raw mut (*ctx).output_names, output_names);
 			write(&raw mut (*ctx).output_value_ptrs, output_tensor_ptrs);
 			write(&raw mut (*ctx).output_values, output_tensors);
-			write(&raw mut (*ctx).session_inner, &self.inner);
+			write(&raw mut (*ctx).session_inner, Arc::clone(&self.inner));
 		};
 		let ctx = Box::leak(unsafe { ctx.assume_init() });
 		crate::logging::create!(AsyncInferenceContext, ctx);
@@ -557,7 +557,7 @@ impl Session {
 		];
 		if let Err(e) = res {
 			// The callback is never called if `RunAsync` fails, so we have to free the context ourselves.
-			let ctx = unsafe { Box::from_raw(ctx as *mut AsyncInferenceContext<'_, '_>) };
+			let ctx = unsafe { Box::from_raw(ctx as *mut AsyncInferenceContext<'_>) };
 			crate::logging::drop!(AsyncInferenceContext, &*ctx);
 			ctx.free_name_ptrs();
 			return Err(e);

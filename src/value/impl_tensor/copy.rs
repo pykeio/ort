@@ -37,42 +37,59 @@ static SESSIONS: OnceLock<Mutex<MiniMap<IdentitySessionKey, IdentitySession>>> =
 /// `RunOptions` with [`RunOptions::disable_device_sync`], shared across `to_async()` calls to reduce allocations.
 static ASYNC_RUN_OPTIONS: OnceLock<RunOptions<NoSelectedOutputs>> = OnceLock::new();
 
-fn ep_for_device(device: AllocationDevice, device_id: i32) -> Result<ep::ExecutionProviderDispatch> {
-	Ok(match device {
-		AllocationDevice::CPU => ep::CPU::default().with_arena_allocator(false).build(),
-		#[cfg(feature = "cuda")]
-		AllocationDevice::CUDA | AllocationDevice::CUDA_PINNED => ep::CUDA::default()
+fn ep_for_device(device: &AllocationDevice, device_id: i32) -> Result<ep::ExecutionProviderDispatch> {
+	if *device == AllocationDevice::CPU {
+		return Ok(ep::CPU::default().with_arena_allocator(false).build());
+	}
+	#[cfg(feature = "cuda")]
+	if *device == AllocationDevice::CUDA || *device == AllocationDevice::CUDA_PINNED {
+		return Ok(ep::CUDA::default()
 			.with_device_id(device_id)
 			.with_arena_extend_strategy(ep::ArenaExtendStrategy::SameAsRequested)
 			.with_conv_max_workspace(false)
 			.with_conv_algorithm_search(ep::cuda::ConvAlgorithmSearch::Default)
-			.build(),
-		#[cfg(feature = "directml")]
-		AllocationDevice::DIRECTML => ep::DirectML::default().with_device_id(device_id).build(),
-		#[cfg(feature = "cann")]
-		AllocationDevice::CANN | AllocationDevice::CANN_PINNED => ep::CANN::default()
+			.build());
+	};
+	#[cfg(feature = "directml")]
+	if *device == AllocationDevice::DIRECTML {
+		return Ok(ep::DirectML::default().with_device_id(device_id).build());
+	}
+	#[cfg(feature = "cann")]
+	if *device == AllocationDevice::CANN || *device == AllocationDevice::CANN_PINNED {
+		return Ok(ep::CANN::default()
 			.with_arena_extend_strategy(ep::ArenaExtendStrategy::SameAsRequested)
 			.with_cann_graph(false)
 			.with_device_id(device_id)
-			.build(),
-		#[cfg(feature = "openvino")]
-		AllocationDevice::OPENVINO_CPU | AllocationDevice::OPENVINO_GPU => ep::OpenVINO::default()
+			.build());
+	}
+	#[cfg(feature = "openvino")]
+	if *device == AllocationDevice::OPENVINO_CPU || *device == AllocationDevice::OPENVINO_GPU {
+		return Ok(ep::OpenVINO::default()
 			.with_num_threads(1)
-			.with_device_type(if device == AllocationDevice::OPENVINO_CPU {
+			.with_device_type(if *device == AllocationDevice::OPENVINO_CPU {
 				"CPU".to_string()
 			} else {
 				format!("GPU.{device_id}")
 			})
-			.build(),
+			.build());
+	}
+	#[cfg(any(feature = "migraphx", feature = "rocm"))]
+	#[allow(unreachable_code)]
+	if *device == AllocationDevice::HIP || *device == AllocationDevice::HIP_PINNED {
+		#[cfg(feature = "migraphx")]
+		return Ok(ep::MIGraphX::default()
+			.with_arena_extend_strategy(ep::ArenaExtendStrategy::SameAsRequested)
+			.build());
 		#[cfg(feature = "rocm")]
-		AllocationDevice::HIP | AllocationDevice::HIP_PINNED => ep::ROCm::default()
+		return Ok(ep::ROCm::default()
 			.with_arena_extend_strategy(ep::ArenaExtendStrategy::SameAsRequested)
 			.with_hip_graph(false)
 			.with_exhaustive_conv_search(false)
 			.with_device_id(device_id)
-			.build(),
-		_ => return Err(crate::Error::new(format!("Unsupported allocation device `{}` for tensor copy target", device.as_str())))
-	})
+			.build());
+	}
+
+	Err(crate::Error::new(format!("Unsupported allocation device `{}` for tensor copy target", device.as_str())))
 }
 
 impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
@@ -100,7 +117,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn to(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
-		let mut identity_session = IdentitySessionHandle::new(self.upcast_ref(), device, device_id, *self.data_type())?;
+		let mut identity_session = IdentitySessionHandle::new(self.upcast_ref(), &device, device_id, *self.data_type())?;
 
 		let target_memory_info = MemoryInfo::new(device, device_id, AllocatorType::Device, MemoryType::Default)?;
 		identity_session.binding.bind_output_to_device("output", &target_memory_info)?;
@@ -136,7 +153,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 	pub fn to_async(&self, device: AllocationDevice, device_id: i32) -> Result<Value<Type>> {
-		let mut identity_session = IdentitySessionHandle::new(self.upcast_ref(), device, device_id, *self.data_type())?;
+		let mut identity_session = IdentitySessionHandle::new(self.upcast_ref(), &device, device_id, *self.data_type())?;
 
 		let options = ASYNC_RUN_OPTIONS.get_or_try_init(|| -> Result<RunOptions> {
 			let mut options = RunOptions::new()?;
@@ -188,7 +205,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 
 		let target_memory_info = target.memory_info();
 		let mut identity_session =
-			IdentitySessionHandle::new(self.upcast_ref(), target_memory_info.allocation_device(), target_memory_info.device_id(), *self.data_type())?;
+			IdentitySessionHandle::new(self.upcast_ref(), &target_memory_info.allocation_device(), target_memory_info.device_id(), *self.data_type())?;
 
 		unsafe { identity_session.binding.bind_output_mut("output", target) }?;
 		{
@@ -233,7 +250,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 
 		let target_memory_info = target.memory_info();
 		let mut identity_session =
-			IdentitySessionHandle::new(self.upcast_ref(), target_memory_info.allocation_device(), target_memory_info.device_id(), *self.data_type())?;
+			IdentitySessionHandle::new(self.upcast_ref(), &target_memory_info.allocation_device(), target_memory_info.device_id(), *self.data_type())?;
 
 		let options = ASYNC_RUN_OPTIONS.get_or_try_init(|| -> Result<RunOptions> {
 			let mut options = RunOptions::new()?;
@@ -287,7 +304,7 @@ struct IdentitySessionHandle<'s> {
 }
 
 impl<'s> IdentitySessionHandle<'s> {
-	fn new(src: DynTensorRef<'s>, target_device: AllocationDevice<'_>, target_device_id: i32, dtype: TensorElementType) -> Result<Self> {
+	fn new(src: DynTensorRef<'s>, target_device: &AllocationDevice<'_>, target_device_id: i32, dtype: TensorElementType) -> Result<Self> {
 		let tensor_type = ort_sys::ONNXTensorElementDataType::from(dtype);
 		let src_memory_info = src.memory_info();
 		let session_key = IdentitySessionKey {
@@ -309,7 +326,7 @@ impl<'s> IdentitySessionHandle<'s> {
 				let (source_ep, target_ep) = (
 					// We enable `.error_on_failure()` here since `IoBinding::bind_output_to_device` will silently fall back to binding to CPU if the target
 					// device doesn't have an EP registered.
-					ep_for_device(src_memory_info.allocation_device(), src_memory_info.device_id())?.error_on_failure(),
+					ep_for_device(&src_memory_info.allocation_device(), src_memory_info.device_id())?.error_on_failure(),
 					ep_for_device(target_device, target_device_id)?.error_on_failure()
 				);
 

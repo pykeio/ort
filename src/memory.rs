@@ -1,12 +1,12 @@
 //! Types for managing memory & device allocations.
 
-use alloc::sync::Arc;
+use alloc::{borrow::Cow, ffi::CString, sync::Arc};
 use core::{
 	ffi::{CStr, c_char, c_int, c_void},
 	marker::PhantomData,
 	mem,
 	ptr::{self, NonNull},
-	str
+	str::{self, FromStr}
 };
 
 use crate::{AsPointer, error::Result, ortsys, session::Session};
@@ -257,36 +257,36 @@ impl Drop for AllocatedBlock<'_> {
 }
 
 /// Represents possible devices that have their own device allocator.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-// &'static str should be valid here since they're only ever defined in C++ with `const char *` literals
-pub struct AllocationDevice<'s>(&'s str);
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AllocationDevice<'s>(Cow<'s, CStr>);
 
 impl<'s> AllocationDevice<'s> {
-	pub const CPU: AllocationDevice<'static> = AllocationDevice("Cpu\0");
-	pub const CUDA: AllocationDevice<'static> = AllocationDevice("Cuda\0");
-	pub const CUDA_PINNED: AllocationDevice<'static> = AllocationDevice("CudaPinned\0");
-	pub const CANN: AllocationDevice<'static> = AllocationDevice("Cann\0");
-	pub const CANN_PINNED: AllocationDevice<'static> = AllocationDevice("CannPinned\0");
-	pub const DIRECTML: AllocationDevice<'static> = AllocationDevice("DML\0");
-	pub const HIP: AllocationDevice<'static> = AllocationDevice("Hip\0");
-	pub const HIP_PINNED: AllocationDevice<'static> = AllocationDevice("HipPinned\0");
-	pub const OPENVINO_CPU: AllocationDevice<'static> = AllocationDevice("OpenVINO_CPU\0");
-	pub const OPENVINO_GPU: AllocationDevice<'static> = AllocationDevice("OpenVINO_GPU\0");
-	pub const QNN_HTP_SHARED: AllocationDevice<'static> = AllocationDevice("QnnHtpShared\0");
-	pub const WEBGPU_BUFFER: AllocationDevice<'static> = AllocationDevice("WebGPU_Buffer\0");
+	pub const CPU: AllocationDevice<'static> = AllocationDevice(Cow::Borrowed(c"Cpu"));
+	pub const CUDA: AllocationDevice<'static> = AllocationDevice(Cow::Borrowed(c"Cuda"));
+	pub const CUDA_PINNED: AllocationDevice<'static> = AllocationDevice(Cow::Borrowed(c"CudaPinned"));
+	pub const CANN: AllocationDevice<'static> = AllocationDevice(Cow::Borrowed(c"Cann"));
+	pub const CANN_PINNED: AllocationDevice<'static> = AllocationDevice(Cow::Borrowed(c"CannPinned"));
+	pub const DIRECTML: AllocationDevice<'static> = AllocationDevice(Cow::Borrowed(c"DML"));
+	pub const HIP: AllocationDevice<'static> = AllocationDevice(Cow::Borrowed(c"Hip"));
+	pub const HIP_PINNED: AllocationDevice<'static> = AllocationDevice(Cow::Borrowed(c"HipPinned"));
+	pub const OPENVINO_CPU: AllocationDevice<'static> = AllocationDevice(Cow::Borrowed(c"OpenVINO_CPU"));
+	pub const OPENVINO_GPU: AllocationDevice<'static> = AllocationDevice(Cow::Borrowed(c"OpenVINO_GPU"));
+	pub const QNN_HTP_SHARED: AllocationDevice<'static> = AllocationDevice(Cow::Borrowed(c"QnnHtpShared"));
+	pub const WEBGPU_BUFFER: AllocationDevice<'static> = AllocationDevice(Cow::Borrowed(c"WebGPU_Buffer"));
 
-	pub fn new(name: &'s str) -> Self {
-		AllocationDevice(name)
+	pub fn new(name: &str) -> Self {
+		AllocationDevice(Cow::Owned(CString::from_str(name).expect("invalid device name")))
 	}
 
-	pub fn as_str(&self) -> &'s str {
-		&self.0[..self.0.len() - 1]
+	pub fn as_str(&self) -> &str {
+		// SAFETY: device names coming from C are all checked for ASCII; ::new() takes &str which is already valid UTF-8
+		unsafe { str::from_utf8_unchecked(self.0.as_ref().to_bytes()) }
 	}
 }
 
 impl PartialEq<str> for AllocationDevice<'_> {
 	fn eq(&self, other: &str) -> bool {
-		self.0 == other
+		self.as_str() == other
 	}
 }
 
@@ -495,8 +495,8 @@ impl<'a> MemoryInfo<'a> {
 		let mut name_ptr: *const c_char = ptr::null_mut();
 		ortsys![unsafe MemoryInfoGetName(self.ptr.as_ptr(), &mut name_ptr).expect("infallible"); nonNull(name_ptr)];
 		let name = unsafe { CStr::from_ptr(name_ptr.as_ptr()) };
-		// make sure we include the null byte
-		AllocationDevice(core::str::from_utf8(name.to_bytes_with_nul()).expect("invalid allocation device name"))
+		assert!(name.to_str().is_ok(), "invalid device name");
+		AllocationDevice(Cow::Borrowed(name))
 	}
 
 	/// Returns the ID of the [`AllocationDevice`] described by this struct.

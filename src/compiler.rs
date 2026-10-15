@@ -238,11 +238,15 @@ impl Drop for CompiledModel {
 
 #[cfg(test)]
 mod tests {
-	use crate::{compiler::ModelCompiler, session::builder::SessionBuilder, test_util::test_env};
+	use crate::{
+		compiler::ModelCompiler,
+		session::builder::{AutoDevicePolicy, SessionBuilder},
+		test_util::test_env
+	};
 
 	#[test]
 	fn test_compile_in_memory() -> crate::Result<()> {
-		let compiled_model = ModelCompiler::new(SessionBuilder::new(test_env())?)?
+		let compiled_model = ModelCompiler::new(SessionBuilder::new(test_env())?.with_auto_device(AutoDevicePolicy::PreferCPU)?)?
 			.with_embed_ep_context()?
 			.with_model_from_file("tests/data/upsample.onnx")?
 			.compile_to_buffer()?;

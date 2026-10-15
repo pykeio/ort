@@ -296,14 +296,17 @@ pub enum AllocatorType {
 	/// Default device-specific allocator.
 	Device,
 	/// Arena allocator.
-	Arena
+	Arena,
+	/// Read-only allocator (for initializers)
+	ReadOnly
 }
 
 impl From<AllocatorType> for ort_sys::OrtAllocatorType {
 	fn from(val: AllocatorType) -> Self {
 		match val {
 			AllocatorType::Device => ort_sys::OrtAllocatorType::OrtDeviceAllocator,
-			AllocatorType::Arena => ort_sys::OrtAllocatorType::OrtArenaAllocator
+			AllocatorType::Arena => ort_sys::OrtAllocatorType::OrtArenaAllocator,
+			AllocatorType::ReadOnly => ort_sys::OrtAllocatorType::OrtReadOnlyAllocator
 		}
 	}
 }
@@ -478,7 +481,8 @@ impl<'a> MemoryInfo<'a> {
 		match raw_type {
 			ort_sys::OrtAllocatorType::OrtArenaAllocator => AllocatorType::Arena,
 			ort_sys::OrtAllocatorType::OrtDeviceAllocator => AllocatorType::Device,
-			_ => unreachable!()
+			ort_sys::OrtAllocatorType::OrtReadOnlyAllocator => AllocatorType::ReadOnly,
+			ort_sys::OrtAllocatorType::OrtInvalidAllocator => unreachable!("memory info has invalid allocator type")
 		}
 	}
 

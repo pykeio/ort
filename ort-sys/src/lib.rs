@@ -442,7 +442,8 @@ pub struct OrtKernelContext {
 pub enum OrtAllocatorType {
 	OrtInvalidAllocator = -1,
 	OrtDeviceAllocator = 0,
-	OrtArenaAllocator = 1
+	OrtArenaAllocator = 1,
+	OrtReadOnlyAllocator = 2
 }
 impl OrtMemType {
 	pub const OrtMemTypeCPU: OrtMemType = OrtMemType::OrtMemTypeCPUOutput;

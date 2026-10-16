@@ -11,7 +11,7 @@ use smallvec::SmallVec;
 
 use super::{Checkpoint, Optimizer, training_api};
 use crate::{
-	AsPointer,
+	AsPointer, ErrorCode,
 	error::{Error, Result},
 	memory::Allocator,
 	ortsys,
@@ -175,10 +175,10 @@ impl Trainer {
 			Step::Train => (&self.train_input_names, &self.train_output_names),
 			Step::Eval => (&self.eval_input_names, &self.eval_output_names)
 		};
-		let input_ort_values: Vec<*const ort_sys::OrtValue> = resolve_inputs(input_names, inputs)
+		let input_ort_values: Vec<*const ort_sys::OrtValue> = resolve_inputs(input_names, inputs)?
 			.into_iter()
-			.chain(resolve_inputs(input_names, labels))
-			.map(|v| v.map_or(ptr::null(), |v| v.ptr()))
+			.chain(resolve_inputs(input_names, labels)?)
+			.map(|v| v.ptr())
 			.collect();
 		let mut output_tensor_ptrs: Vec<*mut ort_sys::OrtValue> = vec![ptr::null_mut(); output_names.len()];
 
@@ -266,26 +266,26 @@ enum Step {
 	Eval
 }
 
-fn resolve_inputs<'a, 'v, const N: usize>(input_names: &[String], inputs: &'a SessionInputs<'_, 'v, N>) -> Vec<Option<&'a SessionInputValue<'v>>> {
+fn resolve_inputs<'a, 'v, const N: usize>(input_names: &[String], inputs: &'a SessionInputs<'_, 'v, N>) -> Result<Vec<&'a SessionInputValue<'v>>> {
 	match inputs {
-		SessionInputs::ValueSlice(values) => values.iter().map(Some).collect(),
-		SessionInputs::ValueArray(values) => values.iter().map(Some).collect(),
+		SessionInputs::ValueSlice(values) => Ok(values.iter().collect()),
+		SessionInputs::ValueArray(values) => Ok(values.iter().collect()),
 		SessionInputs::ValueMap(values) => mapped_inputs(input_names, values)
 	}
 }
 
-fn mapped_inputs<'v, 'a>(input_names: &[String], values: &'a [(Cow<'_, str>, SessionInputValue<'v>)]) -> Vec<Option<&'a SessionInputValue<'v>>> {
+fn mapped_inputs<'v, 'a>(input_names: &[String], values: &'a [(Cow<'_, str>, SessionInputValue<'v>)]) -> Result<Vec<&'a SessionInputValue<'v>>> {
 	let mut out = Vec::with_capacity(input_names.len());
 	'o: for want_name in input_names {
 		for (name, value) in values {
 			if want_name == name {
-				out.push(Some(value));
+				out.push(value);
 				continue 'o;
 			}
 		}
-		out.push(None);
+		return Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("missing input '{want_name}'")));
 	}
-	out
+	Ok(out)
 }
 
 fn extract_io_names(

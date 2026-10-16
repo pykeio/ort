@@ -58,8 +58,6 @@ use std::path::Path;
 
 use smallvec::SmallVec;
 
-#[cfg(feature = "api-22")]
-use crate::ep::ExecutionProviderLibrary;
 use crate::{
 	AsPointer,
 	ep::ExecutionProviderDispatch,
@@ -144,14 +142,15 @@ impl Environment {
 	/// no longer be needed.
 	#[cfg(all(feature = "api-22", feature = "std"))]
 	#[cfg_attr(docsrs, doc(cfg(all(feature = "api-22", feature = "std"))))]
-	pub fn register_ep_library<P: AsRef<Path>>(&self, name: impl Into<String>, path: P) -> Result<ExecutionProviderLibrary> {
+	pub fn register_ep_library<P: AsRef<Path>>(&self, name: impl Into<String>, path: P) -> Result<()> {
 		let name = name.into();
 		let path = crate::util::path_to_os_char(path);
 		with_cstr(name.as_bytes(), &|name| {
+			// this internally grabs a mutex so its fine for this function to take &self
 			ortsys![unsafe RegisterExecutionProviderLibrary(self.ptr().cast_mut(), name.as_ptr(), path.as_ptr())?];
 			Ok(())
 		})?;
-		Ok(ExecutionProviderLibrary::new(name, self))
+		Ok(())
 	}
 
 	/// Returns an iterator over all automatically discovered [hardware device](crate::device::Device)s.
@@ -182,7 +181,8 @@ impl Environment {
 		// returns an error in minimal build because its unsupported. ignore & return empty iterator in that case
 		let _ = ortsys![@ort: unsafe GetEpDevices(self.ptr().cast_mut(), &mut ptrs, &mut len) as Result];
 		unsafe { core::slice::from_raw_parts(ptrs, len) }
-			.iter()
+			.to_vec() // `register_ep_library` (&self) could reallocate the underlying std::vector
+			.into_iter()
 			.filter_map(|c| NonNull::new(c.cast_mut()))
 			.map(crate::device::Device::new)
 	}

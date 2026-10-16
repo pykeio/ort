@@ -17,16 +17,12 @@
 //! ```
 
 use alloc::{ffi::CString, string::ToString, sync::Arc, vec::Vec};
-#[cfg(feature = "api-22")]
-use alloc::{string::String, sync::Weak};
 use core::{
 	ffi::c_char,
 	fmt::{self, Debug},
 	ptr
 };
 
-#[cfg(feature = "api-22")]
-use crate::environment::{Environment, EnvironmentInner};
 use crate::{
 	AsPointer,
 	error::Result,
@@ -379,33 +375,6 @@ fn is_ep_available(name: &str) -> Result<bool> {
 	}
 
 	Ok(false)
-}
-
-/// Handle to a loaded execution provider library, obtained from [`Environment::register_ep_library`].
-#[cfg(feature = "api-22")]
-#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
-pub struct ExecutionProviderLibrary {
-	name: String,
-	env: Weak<EnvironmentInner>
-}
-
-#[cfg(feature = "api-22")]
-impl ExecutionProviderLibrary {
-	pub(crate) fn new(name: impl Into<String>, env: &Environment) -> Self {
-		Self { name: name.into(), env: env.weak() }
-	}
-
-	/// Unregister the EP library from the environment.
-	#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
-	pub fn unregister(self) -> Result<()> {
-		if let Some(env) = self.env.upgrade() {
-			crate::util::with_cstr(self.name.as_bytes(), &|name| {
-				ortsys![unsafe UnregisterExecutionProviderLibrary(env.ptr.as_ptr(), name.as_ptr())?];
-				Ok(())
-			})?;
-		}
-		Ok(())
-	}
 }
 
 pub trait ExecutionProviderResource {

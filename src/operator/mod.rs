@@ -23,7 +23,7 @@ use crate::{
 	AsPointer, Error,
 	error::Result,
 	ortsys,
-	util::with_cstr,
+	util::{run_on_drop, with_cstr},
 	value::{ValueType, r#type::extract_data_type_from_tensor_info}
 };
 
@@ -128,8 +128,8 @@ impl ShapeInferenceContext {
 	pub fn set_output(&mut self, idx: usize, ty: &ValueType) -> Result<()> {
 		match ty.to_tensor_type_info() {
 			Some(ty_ptr) => {
+				let _guard = run_on_drop(|| ortsys![unsafe ReleaseTensorTypeAndShapeInfo(ty_ptr)]);
 				ortsys![unsafe ShapeInferContext_SetOutputTypeShape(self.ptr(), idx, ty_ptr)?];
-				ortsys![unsafe ReleaseTensorTypeAndShapeInfo(ty_ptr)];
 				Ok(())
 			}
 			None => Err(Error::new("only tensors are supported"))

@@ -1,7 +1,7 @@
 use alloc::{ffi::CString, sync::Arc};
 use core::{
 	ffi::c_char,
-	mem::{self, ManuallyDrop},
+	mem::{self, ManuallyDrop, forget},
 	ptr::{self, NonNull}
 };
 
@@ -12,7 +12,7 @@ use crate::{
 	operator::Attribute,
 	ortsys,
 	session::{Session, builder::SessionBuilder},
-	util::{with_cstr, with_cstr_ptr_array},
+	util::{run_on_drop, with_cstr, with_cstr_ptr_array},
 	value::{Outlet, TensorValueTypeMarker, Value, ValueFlags}
 };
 
@@ -161,15 +161,25 @@ impl Graph {
 
 	pub fn set_inputs(&mut self, inputs: impl IntoIterator<Item = Outlet>) -> Result<()> {
 		let inputs: SmallVec<[NonNull<ort_sys::OrtValueInfo>; 4]> = inputs.into_iter().filter_map(|input| input.into_value_info_ptr()).collect();
-		// this takes ownership of the OrtValueInfos so no need to free those
+		let _guard = run_on_drop(|| {
+			for ptr in &inputs {
+				ortsys![unsafe ReleaseValueInfo(ptr.as_ptr())];
+			}
+		});
 		ortsys![@editor: unsafe SetGraphInputs(self.0, inputs.as_ptr() as *mut _, inputs.len())?];
+		forget(_guard); // SetGraphInputs takes ownership of the OrtValueInfos so don't free if it succeeded
 		Ok(())
 	}
 
 	pub fn set_outputs(&mut self, outputs: impl IntoIterator<Item = Outlet>) -> Result<()> {
 		let outputs: SmallVec<[NonNull<ort_sys::OrtValueInfo>; 4]> = outputs.into_iter().filter_map(|input| input.into_value_info_ptr()).collect();
-		// this takes ownership of the OrtValueInfos so no need to free those
+		let _guard = run_on_drop(|| {
+			for ptr in &outputs {
+				ortsys![unsafe ReleaseValueInfo(ptr.as_ptr())];
+			}
+		});
 		ortsys![@editor: unsafe SetGraphOutputs(self.0, outputs.as_ptr() as *mut _, outputs.len())?];
+		forget(_guard); // SetGraphOutputs takes ownership of the OrtValueInfos so don't free if it succeeded
 		Ok(())
 	}
 

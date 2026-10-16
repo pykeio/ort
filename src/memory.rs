@@ -3,6 +3,7 @@
 use alloc::{borrow::Cow, ffi::CString, sync::Arc};
 use core::{
 	ffi::{CStr, c_char, c_int, c_void},
+	hash::{Hash, Hasher},
 	marker::PhantomData,
 	mem,
 	ptr::{self, NonNull},
@@ -291,7 +292,7 @@ impl PartialEq<str> for AllocationDevice<'_> {
 }
 
 /// Execution provider allocator type.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum AllocatorType {
 	/// Default device-specific allocator.
 	Device,
@@ -312,7 +313,7 @@ impl From<AllocatorType> for ort_sys::OrtAllocatorType {
 }
 
 /// Memory types for allocated memory.
-#[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum MemoryType {
 	/// Any CPU memory used by non-CPU execution provider.
 	CPUInput,
@@ -348,7 +349,7 @@ impl From<ort_sys::OrtMemType> for MemoryType {
 	}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum DeviceType {
 	CPU,
@@ -560,6 +561,16 @@ impl PartialEq<MemoryInfo<'_>> for MemoryInfo<'_> {
 		let mut out = 0;
 		ortsys![unsafe CompareMemoryInfo(self.ptr.as_ptr(), other.ptr.as_ptr(), &mut out).expect("infallible")]; // implementation always returns ok status
 		out == 0
+	}
+}
+
+impl Hash for MemoryInfo<'_> {
+	fn hash<H: Hasher>(&self, state: &mut H) {
+		self.device_type().hash(state);
+		self.memory_type().hash(state);
+		self.allocator_type().hash(state);
+		self.allocation_device().hash(state);
+		self.device_id().hash(state);
 	}
 }
 

@@ -12,6 +12,7 @@ use smallvec::SmallVec;
 use super::{Checkpoint, Optimizer, training_api};
 use crate::{
 	AsPointer, ErrorCode,
+	environment::Environment,
 	error::{Error, Result},
 	memory::Allocator,
 	ortsys,
@@ -28,6 +29,7 @@ pub struct Trainer {
 	eval_input_names: Vec<String>,
 	ckpt: Checkpoint,
 	_allocator: Allocator,
+	_environment: Environment,
 	// hold onto operators/logger/thread manager/etc
 	_extras: SmallVec<[Arc<dyn Any>; 4]>
 }
@@ -145,7 +147,8 @@ impl Trainer {
 			eval_input_names,
 			ckpt,
 			_allocator: allocator,
-			_extras: session_options.extras()
+			_extras: session_options.extras(),
+			_environment: session_options.environment
 		})
 	}
 

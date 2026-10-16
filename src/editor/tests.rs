@@ -31,7 +31,7 @@ fn test_identity_graph() -> Result<()> {
 	graph.add_node(Node::new("Identity", ONNX_DOMAIN, "identity", ["input"], ["output"], [])?)?;
 
 	let mut model = Model::new([Opset::new(ONNX_DOMAIN, 22)?])?;
-	model.add_graph(graph)?;
+	model.set_graph(graph)?;
 
 	let mut session = model.into_session(&SessionBuilder::new(test_env())?)?;
 	let output = session
@@ -75,7 +75,7 @@ fn test_mul_graph() -> Result<()> {
 	graph.add_initializer("weight", weight, false)?;
 
 	let mut model = Model::new([Opset::new(ONNX_DOMAIN, 22)?])?;
-	model.add_graph(graph)?;
+	model.set_graph(graph)?;
 
 	let mut session = model.into_session(&SessionBuilder::new(test_env())?)?;
 	let output = session

@@ -257,7 +257,7 @@ impl Model {
 		Ok(Self(ptr))
 	}
 
-	pub fn add_graph(&mut self, graph: Graph) -> Result<()> {
+	pub fn set_graph(&mut self, graph: Graph) -> Result<()> {
 		let graph = graph.consume();
 		ortsys![@editor: unsafe AddGraphToModel(self.0.as_ptr(), graph)?]; // infallible (errors on null pointer)
 		Ok(())

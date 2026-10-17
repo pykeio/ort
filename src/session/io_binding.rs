@@ -5,13 +5,13 @@ use core::{
 };
 
 use crate::{
-	AsPointer,
+	AsPointer, Error, ErrorCode,
 	error::Result,
 	memory::MemoryInfo,
 	ortsys,
 	session::{Session, SharedSessionInner},
 	util::{MiniMap, with_cstr},
-	value::{DynValue, Value, ValueInner, ValueTypeMarker}
+	value::{DynTensor, DynValue, Value, ValueInner, ValueTypeMarker}
 };
 
 /// Enables binding of session inputs and/or outputs to pre-allocated memory.
@@ -120,21 +120,51 @@ impl IoBinding {
 
 	/// Bind a [`Value`] to a session input.
 	///
-	/// Upon invocation, the value's data will be queued to be copied to the device the session is allocated on. The
-	/// copied data will be used as an input (specified by `name`) in all future invocations of [`Session::run_binding`]
-	/// until the input is overridden (by calling [`IoBinding::bind_input`] again) or until all inputs are cleared (via
-	/// [`IoBinding::clear_inputs`] or [`IoBinding::clear`]).
+	/// The value given here will be passed as the input specified by `name` in all future invocations of
+	/// [`Session::run_binding`] until this input is overridden (by calling [`IoBinding::bind_input`] again) or until
+	/// all inputs are cleared (via [`IoBinding::clear_inputs`] or [`IoBinding::clear`]).
 	///
-	/// The data is only copied upon invocation of this function. Any changes to the given value afterwards will not
-	/// affect the data seen by the session until the value is re-bound.
-	pub fn bind_input<T: ValueTypeMarker + ?Sized, S: Into<String>>(&mut self, name: S, ort_value: &Value<T>) -> Result<()> {
+	/// If the session wants the input to be placed on a different device than the one `value` is on (as is often the
+	/// case for CPU inputs to CUDA sessions), the data will be queued to be asynchronously copied to said device.
+	/// Otherwise, and if `value` was created from borrowed data (i.e. with
+	/// [`TensorRef::from_array_view`](crate::value::TensorRef::from_array_view)), a **second clone will be made
+	/// first**, so it is recommended to only use `IoBinding` when the inputs' devices differ from the session's
+	/// device(s) (or all inputs are owned).
+	///
+	/// The data is only copied upon invocation of this function. Any changes to the given value afterwards will
+	/// not affect the data seen by the session until the value is re-bound.
+	pub fn bind_input<T: ValueTypeMarker + ?Sized, S: Into<String>>(&mut self, name: S, value: &Value<T>) -> Result<()> {
 		let name: String = name.into();
+
+		#[allow(unused_mut)]
+		let mut may_alias = value.is_tensor() && !value.inner.flags.upgradable();
+		// if the input wasnt created from borrowed data, then we're keeping the owned data alive via held_inputs, so no
+		// need to worry about uaf from aliasing
+		#[cfg(feature = "api-23")]
+		if let Some(wanted_memory_info) = self._session.inputs_memory_info.get(&name)
+			&& let Some(input_memory_info) = value.inner.memory_info.as_ref()
+			&& (wanted_memory_info.allocation_device() != input_memory_info.allocation_device()
+				|| wanted_memory_info.device_id() != input_memory_info.device_id())
+		{
+			// ort will never alias if the devices do not match
+			may_alias = false;
+		}
+
+		let value_inner = if may_alias {
+			debug_assert!(value.is_tensor());
+
+			let cloned: DynTensor = unsafe { value.transmute_type_ref() }.clone();
+			cloned.inner
+		} else {
+			Arc::clone(&value.inner)
+		};
+
 		let ptr = self.ptr_mut();
 		with_cstr(name.as_bytes(), &|name| {
-			ortsys![unsafe BindInput(ptr, name.as_ptr(), ort_value.ptr())?];
+			ortsys![unsafe BindInput(ptr, name.as_ptr(), value_inner.ptr())?];
 			Ok(())
 		})?;
-		self.held_inputs.insert(name, Arc::clone(&ort_value.inner));
+		self.held_inputs.insert(name, value_inner);
 		Ok(())
 	}
 
@@ -148,17 +178,23 @@ impl IoBinding {
 	/// `name`.
 	///
 	/// [`Tensor::new`]: crate::value::Tensor::new
-	pub fn bind_output<T: ValueTypeMarker + ?Sized, S: Into<String>>(&mut self, name: S, mut ort_value: Value<T>) -> Result<()> {
+	pub fn bind_output<T: ValueTypeMarker + ?Sized, S: Into<String>>(&mut self, name: S, mut value: Value<T>) -> Result<()> {
+		if value.inner.is_backed() {
+			// this is purely because i am too lazy to modify `run_binding` to have preallocated outputs share the
+			// original value's backing
+			return Err(Error::new_with_code(ErrorCode::InvalidArgument, "only tensors created with Tensor::new can be bound to outputs"));
+		}
+
 		let name: String = name.into();
-		unsafe { self.bind_output_mut(name.as_bytes(), &mut ort_value) }?;
-		self.output_values.insert(name, Some(ort_value.into_dyn()));
+		unsafe { self.bind_output_mut(name.as_bytes(), &mut value) }?;
+		self.output_values.insert(name, Some(value.into_dyn()));
 		Ok(())
 	}
 
-	pub(crate) unsafe fn bind_output_mut<T: ValueTypeMarker + ?Sized, S: AsRef<[u8]>>(&mut self, name: S, ort_value: &mut Value<T>) -> Result<()> {
+	pub(crate) unsafe fn bind_output_mut<T: ValueTypeMarker + ?Sized, S: AsRef<[u8]>>(&mut self, name: S, value: &mut Value<T>) -> Result<()> {
 		let ptr = self.ptr_mut();
 		with_cstr(name.as_ref(), &|name| {
-			ortsys![unsafe BindOutput(ptr, name.as_ptr(), ort_value.ptr())?];
+			ortsys![unsafe BindOutput(ptr, name.as_ptr(), value.ptr())?];
 			Ok(())
 		})?;
 		Ok(())
@@ -242,13 +278,10 @@ impl Drop for IoBinding {
 #[cfg(test)]
 mod tests {
 	#[cfg(feature = "ndarray")]
-	use ndarray::Array2;
-
-	#[cfg(feature = "ndarray")]
 	use crate::test_util::{mnist, test_env};
 	use crate::{
 		Result,
-		memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
+		memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
 		session::Session,
 		value::Tensor
 	};
@@ -283,8 +316,7 @@ mod tests {
 		let mut binding = session.create_binding()?;
 		binding.bind_input(session.inputs()[0].name(), &Tensor::from_array(array)?)?;
 
-		let output = Array2::from_shape_simple_fn((1, 10), || 0.0_f32);
-		binding.bind_output(session.outputs()[0].name(), Tensor::from_array(output)?)?;
+		binding.bind_output(session.outputs()[0].name(), Tensor::<f32>::new(&Allocator::default(), [1i64, 10])?)?;
 
 		let outputs = session.run_binding(&binding)?;
 		let probabilities = mnist::extract_probabilities(&outputs[0])?;
@@ -301,8 +333,7 @@ mod tests {
 		let array = mnist::get_image();
 
 		let mut binding = session.create_binding()?;
-		let output = Array2::from_shape_simple_fn((1, 10), || 0.0_f32);
-		binding.bind_output(session.outputs()[0].name(), Tensor::from_array(output)?)?;
+		binding.bind_output(session.outputs()[0].name(), Tensor::<f32>::new(&Allocator::default(), [1i64, 10])?)?;
 
 		let probabilities = std::thread::spawn(move || {
 			binding.bind_input(session.inputs()[0].name(), &Tensor::from_array(array)?)?;
@@ -328,8 +359,7 @@ mod tests {
 		let mut binding = session.create_binding()?;
 		binding.bind_input(session.inputs()[0].name(), &Tensor::from_array(array)?)?;
 
-		let output = Array2::from_shape_simple_fn((1, 10), || 0.0_f32);
-		binding.bind_output(session.outputs()[0].name(), Tensor::from_array(output)?)?;
+		binding.bind_output(session.outputs()[0].name(), Tensor::<f32>::new(&Allocator::default(), [1i64, 10])?)?;
 
 		{
 			let outputs = session.run_binding(&binding)?;

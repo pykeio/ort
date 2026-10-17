@@ -195,6 +195,12 @@ impl SessionBuilder {
 			.map(|i| io::extract_output(ptr, &allocator, i))
 			.collect::<Result<Vec<Outlet>>>()?;
 
+		#[cfg(feature = "api-23")]
+		let (inputs_memory_info, outputs_memory_info) = (
+			io::extract_io_memory_info(ortsys![SessionGetMemoryInfoForInputs], ptr, &inputs)?,
+			io::extract_io_memory_info(ortsys![SessionGetMemoryInfoForOutputs], ptr, &outputs)?
+		);
+
 		let extras = self.extras();
 
 		mem::forget(session_guard);
@@ -204,6 +210,10 @@ impl SessionBuilder {
 			inner: Arc::new(SharedSessionInner {
 				session_ptr: ptr,
 				allocator,
+				#[cfg(feature = "api-23")]
+				inputs_memory_info,
+				#[cfg(feature = "api-23")]
+				outputs_memory_info,
 				_extras: extras,
 				_environment: self.environment.clone()
 			}),

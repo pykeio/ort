@@ -130,7 +130,9 @@ pub enum OrtOpAttrType {
 	ORT_OP_ATTR_FLOAT = 3,
 	ORT_OP_ATTR_FLOATS = 4,
 	ORT_OP_ATTR_STRING = 5,
-	ORT_OP_ATTR_STRINGS = 6
+	ORT_OP_ATTR_STRINGS = 6,
+	ORT_OP_ATTR_GRAPH = 7,
+	ORT_OP_ATTR_TENSOR = 8
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]

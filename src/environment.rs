@@ -137,9 +137,6 @@ impl Environment {
 	/// # Ok(())
 	/// # }
 	/// ```
-	///
-	/// Returns a handle that can be used to [unregister](ExecutionProviderLibrary::unregister) the library, should it
-	/// no longer be needed.
 	#[cfg(all(feature = "api-22", feature = "std"))]
 	#[cfg_attr(docsrs, doc(cfg(all(feature = "api-22", feature = "std"))))]
 	pub fn register_ep_library<P: AsRef<Path>>(&self, name: impl Into<String>, path: P) -> Result<()> {

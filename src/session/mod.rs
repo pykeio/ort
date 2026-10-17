@@ -178,6 +178,7 @@ impl Session {
 	}
 
 	/// Creates a new [`IoBinding`] for this session.
+	#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 	pub fn create_binding(&self) -> Result<IoBinding> {
 		IoBinding::new(self)
 	}
@@ -794,6 +795,8 @@ impl OverridableInitializer {
 }
 
 pub(crate) mod io {
+	use alloc::vec;
+
 	use super::*;
 
 	pub(super) fn extract_io_count(

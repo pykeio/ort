@@ -69,6 +69,7 @@ use crate::{AsPointer, error::Result, ortsys, session::Session};
 #[derive(Debug)]
 pub struct Allocator {
 	ptr: NonNull<ort_sys::OrtAllocator>,
+	info: MemoryInfo<'static>,
 	pub(crate) handle: Arc<AllocatorHandle>
 }
 
@@ -79,7 +80,6 @@ unsafe impl Send for Allocator {}
 /// Handle that tensors can hold onto so the underlying allocator stays alive until all tensors are freed.
 #[derive(Debug)]
 pub(crate) struct AllocatorHandle {
-	pub(crate) info: MemoryInfo<'static>,
 	/// `None` for the default CPU allocator provided by `GetAllocatorWithDefaultOptions`, which must never be released.
 	pub(crate) _drop_ptr: Option<NonNull<ort_sys::OrtAllocator>>
 }
@@ -104,8 +104,8 @@ impl Allocator {
 
 		Allocator {
 			ptr,
+			info: MemoryInfo::from_raw(memory_info_ptr, false),
 			handle: Arc::new(AllocatorHandle {
-				info: MemoryInfo::from_raw(memory_info_ptr, false),
 				_drop_ptr: (!is_default).then_some(ptr)
 			})
 		}
@@ -158,7 +158,7 @@ impl Allocator {
 
 	/// Returns the [`MemoryInfo`] describing this allocator.
 	pub fn memory_info<'a>(&'a self) -> &'a MemoryInfo<'a> {
-		&self.handle.info
+		&self.info
 	}
 
 	/// Creates a new [`Allocator`] for the given session, to allocate memory on the device described in the
@@ -169,10 +169,8 @@ impl Allocator {
 		crate::logging::create!(Allocator, ptr);
 		Ok(Self {
 			ptr,
-			handle: Arc::new(AllocatorHandle {
-				info: memory_info.to_owned(),
-				_drop_ptr: Some(ptr)
-			})
+			info: memory_info.to_owned(),
+			handle: Arc::new(AllocatorHandle { _drop_ptr: Some(ptr) })
 		})
 	}
 }
@@ -196,10 +194,8 @@ impl Default for Allocator {
 
 		Self {
 			ptr: allocator_ptr,
-			handle: Arc::new(AllocatorHandle {
-				info: MemoryInfo::from_raw(memory_info_ptr, false),
-				_drop_ptr: None
-			})
+			info: MemoryInfo::from_raw(memory_info_ptr, false),
+			handle: Arc::new(AllocatorHandle { _drop_ptr: None })
 		}
 	}
 }
@@ -434,17 +430,12 @@ impl MemoryInfo<'static> {
 }
 
 impl<'a> MemoryInfo<'a> {
-	pub(crate) unsafe fn from_value(value_ptr: NonNull<ort_sys::OrtValue>) -> Option<Self> {
-		let mut is_tensor = 0;
-		ortsys![unsafe IsTensor(value_ptr.as_ptr(), &mut is_tensor).expect("infallible")];
-		if is_tensor != 0 {
-			let mut memory_info_ptr: *const ort_sys::OrtMemoryInfo = ptr::null_mut();
-			// infallible, and `memory_info_ptr` will never be null
-			ortsys![unsafe GetTensorMemoryInfo(value_ptr.as_ptr(), &mut memory_info_ptr).expect("infallible"); nonNull(memory_info_ptr)];
-			Some(Self::from_raw(memory_info_ptr, false))
-		} else {
-			None
-		}
+	/// SAFETY: value must be a tensor
+	pub(crate) unsafe fn from_tensor_value(value_ptr: NonNull<ort_sys::OrtValue>) -> Self {
+		let mut memory_info_ptr: *const ort_sys::OrtMemoryInfo = ptr::null_mut();
+		// infallible, and `memory_info_ptr` will never be null
+		ortsys![unsafe GetTensorMemoryInfo(value_ptr.as_ptr(), &mut memory_info_ptr).expect("infallible"); nonNull(memory_info_ptr)];
+		Self::from_raw(memory_info_ptr, false)
 	}
 
 	pub(crate) fn from_raw(ptr: NonNull<ort_sys::OrtMemoryInfo>, should_release: bool) -> Self {

@@ -265,6 +265,7 @@ impl<K: IntoTensorElementType + Debug + Clone + Hash + Eq + 'static, V: IntoTens
 					value: V::into_tensor_element_type()
 				},
 				None,
+				None,
 				ValueFlags::DROP | ValueFlags::UPGRADABLE,
 				Some(Box::new(values))
 			),

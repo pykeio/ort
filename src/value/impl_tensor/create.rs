@@ -82,6 +82,7 @@ impl Tensor<String> {
 					shape,
 					dimension_symbols: SymbolicDimensions::empty(shape_len)
 				},
+				Some(allocator.memory_info().to_owned()),
 				Some(allocator.handle),
 				ValueFlags::DROP | ValueFlags::UPGRADABLE,
 				None
@@ -184,7 +185,7 @@ fn tensor_from_array(
 	}
 
 	Ok(DynTensor {
-		inner: ValueInner::new(value_ptr, dtype, None, flags, guard),
+		inner: ValueInner::new(value_ptr, dtype, Some(memory_info), None, flags, guard),
 		_markers: PhantomData
 	})
 }

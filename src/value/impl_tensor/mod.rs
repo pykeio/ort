@@ -128,7 +128,7 @@ impl DynTensor {
 
 		// `CreateTensorAsOrtValue` actually does not guarantee that the data allocated is zero'd out, so if we can, we
 		// should do it manually.
-		let memory_info = unsafe { MemoryInfo::from_value(value_ptr) }.expect("CreateTensorAsOrtValue returned non-tensor");
+		let memory_info = unsafe { MemoryInfo::from_tensor_value(value_ptr) };
 		#[cfg(not(all(target_family = "wasm", target_os = "unknown")))] // Data is not available at this point with `ort-web`, so this would just instantly fail
 		if memory_info.is_cpu_accessible() && data_type != TensorElementType::String {
 			let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
@@ -145,6 +145,7 @@ impl DynTensor {
 				shape,
 				dimension_symbols: SymbolicDimensions::empty(shape_len)
 			},
+			Some(memory_info),
 			Some(allocator.handle.clone()),
 			ValueFlags::DROP | ValueFlags::UPGRADABLE,
 			None
@@ -228,15 +229,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # }
 	/// ```
 	pub fn memory_info(&self) -> &MemoryInfo<'_> {
-		if let Some(allocator) = self.inner.allocator_handle.as_ref() {
-			&allocator.info
-		} else {
-			// There are two cases where a tensor may not store the allocator handle: when it's created from an array
-			// (so there is no `OrtAllocator` to keep track of), or when the allocator is the default one. In both
-			// cases, the tensor resides on CPU, the same as described by `MemoryInfo::default`.
-			static DEFAULT_MEMORY_INFO: OnceLock<MemoryInfo> = OnceLock::new();
-			DEFAULT_MEMORY_INFO.get_or_init(MemoryInfo::default)
-		}
+		unsafe { self.inner.memory_info.as_ref().unwrap_unchecked() }
 	}
 
 	/// Returns the size of the tensor's data in bytes, or `None` in the case of string tensors.

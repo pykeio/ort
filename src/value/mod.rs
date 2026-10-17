@@ -78,9 +78,10 @@ pub(crate) struct ValueInner {
 	pub(crate) ptr: NonNull<ort_sys::OrtValue>,
 	pub(crate) dtype: ValueType,
 	pub(crate) flags: ValueFlags,
+	pub(crate) memory_info: Option<MemoryInfo<'static>>,
 	/// the value needs the allocator to stay alive so it can drop its memory. maps/sequences don't use their own
 	/// allocators, though, hence this is optional
-	pub(crate) allocator_handle: Option<Arc<AllocatorHandle>>,
+	pub(crate) _allocator_handle: Option<Arc<AllocatorHandle>>,
 	// additional things like element `Value` handles for `Sequence`s
 	_backing: Option<Box<dyn Any>>
 }
@@ -89,6 +90,7 @@ impl ValueInner {
 	pub fn new(
 		ptr: NonNull<ort_sys::OrtValue>,
 		dtype: ValueType,
+		memory_info: Option<MemoryInfo<'static>>,
 		allocator_handle: Option<Arc<AllocatorHandle>>,
 		flags: ValueFlags,
 		backing: Option<Box<dyn Any>>
@@ -97,8 +99,9 @@ impl ValueInner {
 		Arc::new(Self {
 			ptr,
 			dtype,
+			memory_info,
 			flags,
-			allocator_handle,
+			_allocator_handle: allocator_handle,
 			_backing: backing
 		})
 	}
@@ -360,16 +363,16 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 			panic!("tensor values require the allocator it was created with to be passed to `Value::from_ptr`");
 		}
 
-		let dtype = if is_tensor != 0 {
-			unsafe { ValueType::from_tensor_value(ptr) }
+		let (memory_info, dtype) = if is_tensor != 0 {
+			unsafe { (Some(MemoryInfo::from_tensor_value(ptr)), ValueType::from_tensor_value(ptr)) }
 		} else {
 			let mut typeinfo_ptr = ptr::null_mut();
 			ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
-			unsafe { ValueType::from_type_info(typeinfo_ptr) }
+			(None, unsafe { ValueType::from_type_info(typeinfo_ptr) })
 		};
 
 		Value {
-			inner: ValueInner::new(ptr, dtype, allocator.map(|a| a.handle.clone()), ValueFlags::DROP | ValueFlags::UPGRADABLE, None),
+			inner: ValueInner::new(ptr, dtype, memory_info, allocator.map(|a| a.handle.clone()), ValueFlags::DROP | ValueFlags::UPGRADABLE, None),
 			_markers: PhantomData
 		}
 	}
@@ -381,7 +384,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 		ortsys![unsafe IsTensor(ptr.as_ptr(), &mut is_tensor).expect("infallible")];
 		if is_tensor != 0 {
 			let dtype = unsafe { ValueType::from_tensor_value(ptr) };
-			let memory_info = unsafe { MemoryInfo::from_value(ptr) }.expect("infallible");
+			let memory_info = unsafe { MemoryInfo::from_tensor_value(ptr) };
 
 			// keep in mind CreateAllocator doesn't actually create an allocator, just a smart pointer to an allocator
 			// the session already created when it was committed. also, this cannot fail because the value is coming
@@ -392,14 +395,11 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 				let mut ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
 				ortsys![unsafe CreateAllocator(session_inner.ptr(), memory_info.ptr(), &mut ptr).expect("infallible"); nonNull(ptr)];
 				crate::logging::create!(Allocator, ptr);
-				Arc::new(AllocatorHandle {
-					info: memory_info,
-					_drop_ptr: Some(ptr)
-				})
+				Arc::new(AllocatorHandle { _drop_ptr: Some(ptr) })
 			};
 
 			Value {
-				inner: ValueInner::new(ptr, dtype, Some(allocator_handle), ValueFlags::DROP | ValueFlags::UPGRADABLE, None),
+				inner: ValueInner::new(ptr, dtype, Some(memory_info), Some(allocator_handle), ValueFlags::DROP | ValueFlags::UPGRADABLE, None),
 				_markers: PhantomData
 			}
 		} else {
@@ -407,7 +407,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 			ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
 			let dtype = unsafe { ValueType::from_type_info(typeinfo_ptr) };
 			Value {
-				inner: ValueInner::new(ptr, dtype, Some(session_inner.allocator.handle.clone()), ValueFlags::DROP | ValueFlags::UPGRADABLE, None),
+				inner: ValueInner::new(ptr, dtype, None, Some(session_inner.allocator.handle.clone()), ValueFlags::DROP | ValueFlags::UPGRADABLE, None),
 				_markers: PhantomData
 			}
 		}
@@ -419,18 +419,19 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 	pub(crate) unsafe fn from_ptr_nodrop(ptr: NonNull<ort_sys::OrtValue>, allocator: Option<&Allocator>) -> Value<Type> {
 		let mut is_tensor = 0;
 		ortsys![unsafe IsTensor(ptr.as_ptr(), &mut is_tensor).expect("infallible")];
-		let dtype = if is_tensor != 0 {
-			unsafe { ValueType::from_tensor_value(ptr) }
+
+		let (memory_info, dtype) = if is_tensor != 0 {
+			unsafe { (Some(MemoryInfo::from_tensor_value(ptr)), ValueType::from_tensor_value(ptr)) }
 		} else {
 			let mut typeinfo_ptr = ptr::null_mut();
 			ortsys![unsafe GetTypeInfo(ptr.as_ptr(), &mut typeinfo_ptr).expect("infallible"); nonNull(typeinfo_ptr)];
-			unsafe { ValueType::from_type_info(typeinfo_ptr) }
+			(None, unsafe { ValueType::from_type_info(typeinfo_ptr) })
 		};
 
 		// allocator check for tensors not needed because, well, we don't drop!
 
 		Value {
-			inner: ValueInner::new(ptr, dtype, allocator.map(|a| a.handle.clone()), ValueFlags::default(), None),
+			inner: ValueInner::new(ptr, dtype, memory_info, allocator.map(|a| a.handle.clone()), ValueFlags::default(), None),
 			_markers: PhantomData
 		}
 	}

@@ -140,6 +140,7 @@ impl<T: ValueTypeMarker + DowncastableTarget + Debug + Sized + 'static> Value<Se
 				// 2. `CreateValue` internally uses the first value to determine the element type, so we do the same here
 				ValueType::Sequence(Box::new(values[0].inner.dtype.clone())),
 				None,
+				None,
 				ValueFlags::DROP | ValueFlags::UPGRADABLE,
 				Some(Box::new(values))
 			),

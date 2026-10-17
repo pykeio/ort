@@ -475,7 +475,8 @@ pub enum OrtMemType {
 pub enum OrtMemoryInfoDeviceType {
 	OrtMemoryInfoDeviceType_CPU = 0,
 	OrtMemoryInfoDeviceType_GPU = 1,
-	OrtMemoryInfoDeviceType_FPGA = 2
+	OrtMemoryInfoDeviceType_FPGA = 2,
+	OrtMemoryInfoDeviceType_NPU = 3
 }
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]

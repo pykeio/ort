@@ -385,7 +385,7 @@ impl Default for OrtStatusPtr {
 }
 #[doc = " \\brief Memory allocation interface\n\n Structure of function pointers that defines a memory allocator. This can be created and filled in by the user for custom allocators.\n\n When an allocator is passed to any function, be sure that the allocator object is not destroyed until the last allocated object using it is freed."]
 #[repr(C)]
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct OrtAllocator {
 	#[doc = "< Must be initialized to ORT_API_VERSION"]
 	pub version: u32,
@@ -403,6 +403,23 @@ pub struct OrtAllocator {
 	pub AllocOnStream: Option<unsafe extern "system" fn(this_: *mut OrtAllocator, size: usize, stream: *mut OrtSyncStream) -> *mut core::ffi::c_void>,
 	#[cfg(feature = "api-25")]
 	pub Shrink: Option<unsafe extern "system" fn(this_: *mut OrtAllocator) -> OrtStatusPtr>
+}
+impl OrtAllocator {
+	pub const unsafe fn default() -> Self {
+		Self {
+			version: ORT_API_VERSION,
+			Alloc: None,
+			Free: None,
+			Info: None,
+			Reserve: None,
+			#[cfg(feature = "api-23")]
+			GetStats: None,
+			#[cfg(feature = "api-23")]
+			AllocOnStream: None,
+			#[cfg(feature = "api-25")]
+			Shrink: None
+		}
+	}
 }
 pub type OrtLoggingFunction = unsafe extern "system" fn(
 	param: *mut core::ffi::c_void,

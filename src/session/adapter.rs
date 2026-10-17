@@ -3,11 +3,16 @@ use core::ptr::{self, NonNull};
 #[cfg(feature = "std")]
 use std::path::Path;
 
-use crate::{AsPointer, Result, memory::Allocator, ortsys};
+use crate::{
+	AsPointer, Result,
+	memory::{Allocator, AllocatorHandle},
+	ortsys
+};
 
 #[derive(Debug)]
 pub(crate) struct AdapterInner {
-	ptr: NonNull<ort_sys::OrtLoraAdapter>
+	ptr: NonNull<ort_sys::OrtLoraAdapter>,
+	_allocator: Option<Arc<AllocatorHandle>>
 }
 
 impl AsPointer for AdapterInner {
@@ -141,7 +146,10 @@ impl Adapter {
 		ortsys![unsafe CreateLoraAdapter(path.as_ptr(), allocator_ptr, &mut ptr)?; nonNull(ptr)];
 		crate::logging::create!(Adapter, ptr);
 		Ok(Adapter {
-			inner: Arc::new(AdapterInner { ptr })
+			inner: Arc::new(AdapterInner {
+				ptr,
+				_allocator: allocator.map(|a| a.handle.clone())
+			})
 		})
 	}
 
@@ -188,7 +196,10 @@ impl Adapter {
 		ortsys![unsafe CreateLoraAdapterFromArray(bytes.as_ptr().cast(), bytes.len(), allocator_ptr, &mut ptr)?; nonNull(ptr)];
 		crate::logging::create!(Adapter, ptr);
 		Ok(Adapter {
-			inner: Arc::new(AdapterInner { ptr })
+			inner: Arc::new(AdapterInner {
+				ptr,
+				_allocator: allocator.map(|a| a.handle.clone())
+			})
 		})
 	}
 }

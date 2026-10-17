@@ -251,7 +251,11 @@ pub enum ErrorCode {
 	ModelLoaded,
 	NotImplemented,
 	InvalidGraph,
-	ExecutionProviderFailure
+	ExecutionProviderFailure,
+	ModelLoadCanceled,
+	CompilationRequired,
+	NotFound,
+	DeviceReset
 }
 
 impl From<ort_sys::OrtErrorCode> for ErrorCode {
@@ -269,6 +273,10 @@ impl From<ort_sys::OrtErrorCode> for ErrorCode {
 			ort_sys::OrtErrorCode::ORT_NOT_IMPLEMENTED => Self::NotImplemented,
 			ort_sys::OrtErrorCode::ORT_INVALID_GRAPH => Self::InvalidGraph,
 			ort_sys::OrtErrorCode::ORT_EP_FAIL => Self::ExecutionProviderFailure,
+			ort_sys::OrtErrorCode::ORT_MODEL_LOAD_CANCELED => Self::ModelLoadCanceled,
+			ort_sys::OrtErrorCode::ORT_MODEL_REQUIRES_COMPILATION => Self::CompilationRequired,
+			ort_sys::OrtErrorCode::ORT_NOT_FOUND => Self::NotFound,
+			ort_sys::OrtErrorCode::ORT_DEVICE_RESET => Self::DeviceReset,
 			#[allow(unreachable_patterns)]
 			_ => Self::GenericFailure
 		}
@@ -289,7 +297,11 @@ impl From<ErrorCode> for ort_sys::OrtErrorCode {
 			ErrorCode::ModelLoaded => ort_sys::OrtErrorCode::ORT_MODEL_LOADED,
 			ErrorCode::NotImplemented => ort_sys::OrtErrorCode::ORT_NOT_IMPLEMENTED,
 			ErrorCode::InvalidGraph => ort_sys::OrtErrorCode::ORT_INVALID_GRAPH,
-			ErrorCode::ExecutionProviderFailure => ort_sys::OrtErrorCode::ORT_EP_FAIL
+			ErrorCode::ExecutionProviderFailure => ort_sys::OrtErrorCode::ORT_EP_FAIL,
+			ErrorCode::ModelLoadCanceled => ort_sys::OrtErrorCode::ORT_MODEL_LOAD_CANCELED,
+			ErrorCode::CompilationRequired => ort_sys::OrtErrorCode::ORT_MODEL_REQUIRES_COMPILATION,
+			ErrorCode::NotFound => ort_sys::OrtErrorCode::ORT_NOT_FOUND,
+			ErrorCode::DeviceReset => ort_sys::OrtErrorCode::ORT_DEVICE_RESET
 		}
 	}
 }

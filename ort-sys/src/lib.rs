@@ -115,7 +115,11 @@ pub enum OrtErrorCode {
 	ORT_MODEL_LOADED = 8,
 	ORT_NOT_IMPLEMENTED = 9,
 	ORT_INVALID_GRAPH = 10,
-	ORT_EP_FAIL = 11
+	ORT_EP_FAIL = 11,
+	ORT_MODEL_LOAD_CANCELED = 12,
+	ORT_MODEL_REQUIRES_COMPILATION = 13,
+	ORT_NOT_FOUND = 14,
+	ORT_DEVICE_RESET = 15
 }
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]

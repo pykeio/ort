@@ -383,7 +383,7 @@ impl Default for OrtStatusPtr {
 }
 #[doc = " \\brief Memory allocation interface\n\n Structure of function pointers that defines a memory allocator. This can be created and filled in by the user for custom allocators.\n\n When an allocator is passed to any function, be sure that the allocator object is not destroyed until the last allocated object using it is freed."]
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct OrtAllocator {
 	#[doc = "< Must be initialized to ORT_API_VERSION"]
 	pub version: u32,
@@ -393,7 +393,14 @@ pub struct OrtAllocator {
 	pub Free: Option<unsafe extern "system" fn(this_: *mut OrtAllocator, p: *mut core::ffi::c_void)>,
 	#[doc = "< Return a pointer to an ::OrtMemoryInfo that describes this allocator"]
 	pub Info: Option<unsafe extern "system" fn(this_: *const OrtAllocator) -> *const OrtMemoryInfo>,
-	pub Reserve: Option<unsafe extern "system" fn(this_: *const OrtAllocator, size: usize) -> *mut core::ffi::c_void>
+	pub Reserve: Option<unsafe extern "system" fn(this_: *const OrtAllocator, size: usize) -> *mut core::ffi::c_void>,
+	// these are truly optional (above aren't but kept option so we can derive default)
+	#[cfg(feature = "api-23")]
+	pub GetStats: Option<unsafe extern "system" fn(this_: *const OrtAllocator, out: *mut *mut OrtKeyValuePairs) -> OrtStatusPtr>,
+	#[cfg(feature = "api-23")]
+	pub AllocOnStream: Option<unsafe extern "system" fn(this_: *mut OrtAllocator, size: usize, stream: *mut OrtSyncStream) -> *mut core::ffi::c_void>,
+	#[cfg(feature = "api-25")]
+	pub Shrink: Option<unsafe extern "system" fn(this_: *mut OrtAllocator) -> OrtStatusPtr>
 }
 pub type OrtLoggingFunction = unsafe extern "system" fn(
 	param: *mut core::ffi::c_void,
@@ -922,7 +929,7 @@ unsafe extern "system" {
 	pub fn OrtGetApiBase() -> *const OrtApiBase;
 }
 #[doc = " \\brief Thread work loop function\n\n Onnxruntime will provide the working loop on custom thread creation\n Argument is an onnxruntime built-in type which will be provided when thread pool calls OrtCustomCreateThreadFn"]
-pub type OrtThreadWorkerFn = unsafe extern "system" fn(ort_worker_fn_param: *mut core::ffi::c_void);
+pub type OrtThreadWorkerFn = unsafe extern "C" fn(ort_worker_fn_param: *mut core::ffi::c_void);
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct OrtCustomHandleType {
@@ -931,18 +938,18 @@ pub struct OrtCustomHandleType {
 pub type OrtCustomThreadHandle = *const OrtCustomHandleType;
 #[doc = " \\brief Ort custom thread creation function\n\n The function should return a thread handle to be used in onnxruntime thread pools\n Onnxruntime will throw exception on return value of nullptr or 0, indicating that the function failed to create a thread"]
 pub type OrtCustomCreateThreadFn = Option<
-	unsafe extern "system" fn(
+	unsafe extern "C" fn(
 		ort_custom_thread_creation_options: *mut core::ffi::c_void,
 		ort_thread_worker_fn: OrtThreadWorkerFn,
 		ort_worker_fn_param: *mut core::ffi::c_void
 	) -> OrtCustomThreadHandle
 >;
 #[doc = " \\brief Custom thread join function\n\n Onnxruntime thread pool destructor will call the function to join a custom thread.\n Argument ort_custom_thread_handle is the value returned by OrtCustomCreateThreadFn"]
-pub type OrtCustomJoinThreadFn = Option<unsafe extern "system" fn(ort_custom_thread_handle: OrtCustomThreadHandle)>;
-pub type OrtThreadPoolWorkEnqueueFn = Option<unsafe extern "system" fn(user_context: *mut c_void) -> *mut c_void>;
-pub type OrtThreadPoolWorkStartFn = Option<unsafe extern "system" fn(user_context: *mut c_void, enqueue_data: *mut c_void)>;
-pub type OrtThreadPoolWorkStopFn = Option<unsafe extern "system" fn(user_context: *mut c_void, enqueue_data: *mut c_void)>;
-pub type OrtThreadPoolWorkAbandonFn = Option<unsafe extern "system" fn(user_context: *mut c_void, enqueue_data: *mut c_void)>;
+pub type OrtCustomJoinThreadFn = Option<unsafe extern "C" fn(ort_custom_thread_handle: OrtCustomThreadHandle)>;
+pub type OrtThreadPoolWorkEnqueueFn = Option<unsafe extern "C" fn(user_context: *mut c_void) -> *mut c_void>;
+pub type OrtThreadPoolWorkStartFn = Option<unsafe extern "C" fn(user_context: *mut c_void, enqueue_data: *mut c_void)>;
+pub type OrtThreadPoolWorkStopFn = Option<unsafe extern "C" fn(user_context: *mut c_void, enqueue_data: *mut c_void)>;
+pub type OrtThreadPoolWorkAbandonFn = Option<unsafe extern "C" fn(user_context: *mut c_void, enqueue_data: *mut c_void)>;
 #[repr(C)]
 #[derive(Default, Debug, Clone)]
 pub struct OrtThreadPoolCallbacksConfig {
@@ -955,7 +962,7 @@ pub struct OrtThreadPoolCallbacksConfig {
 }
 #[doc = " \\brief Callback function for RunAsync\n\n \\param[in] user_data User specific data that passed back to the callback\n \\param[out] outputs On succeed, outputs host inference results, on error, the value will be nullptr\n \\param[out] num_outputs Number of outputs, on error, the value will be zero\n \\param[out] status On error, status will provide details"]
 pub type RunAsyncCallbackFn =
-	Option<unsafe extern "system" fn(user_data: *mut core::ffi::c_void, outputs: *mut *mut OrtValue, num_outputs: usize, status: OrtStatusPtr)>;
+	Option<unsafe extern "C" fn(user_data: *mut core::ffi::c_void, outputs: *mut *mut OrtValue, num_outputs: usize, status: OrtStatusPtr)>;
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum OrtCompiledModelCompatibility {
@@ -1656,7 +1663,7 @@ pub struct OrtApi {
 	pub SetDeterministicCompute: unsafe extern "system" fn(options: *mut OrtSessionOptions, value: bool) -> OrtStatusPtr,
 	pub KernelContext_ParallelFor: unsafe extern "system" fn(
 		context: *const OrtKernelContext,
-		fn_: unsafe extern "system" fn(arg1: *mut core::ffi::c_void, arg2: usize),
+		fn_: unsafe extern "C" fn(arg1: *mut core::ffi::c_void, arg2: usize),
 		total: usize,
 		num_batch: usize,
 		usr_data: *mut core::ffi::c_void
@@ -1914,7 +1921,7 @@ pub struct OrtApi {
 	pub Node_GetSubgraphs: unsafe extern "system" fn(
 		node: *const OrtNode,
 		subgraphs: *mut *const OrtGraph,
-		num_subgraphs: *mut usize,
+		num_subgraphs: usize,
 		attribute_names: *mut *const c_char
 	) -> OrtStatusPtr,
 	#[cfg(feature = "api-23")]
@@ -2004,7 +2011,7 @@ pub struct OrtApi {
 	#[cfg(feature = "api-24")]
 	pub GetNumHardwareDevices: unsafe extern "system" fn(env: *const OrtEnv, num_devices: *mut usize) -> OrtStatusPtr,
 	#[cfg(feature = "api-24")]
-	pub GetHardwareDevices: unsafe extern "system" fn(env: *const OrtEnv, devices: *mut *const OrtHardwareDevice, num_devices: *mut usize) -> OrtStatusPtr,
+	pub GetHardwareDevices: unsafe extern "system" fn(env: *const OrtEnv, devices: *mut *const OrtHardwareDevice, num_devices: usize) -> OrtStatusPtr,
 	#[cfg(feature = "api-24")]
 	pub GetHardwareDeviceEpIncompatibilityDetails: unsafe extern "system" fn(
 		env: *const OrtEnv,
@@ -2178,7 +2185,7 @@ pub struct OrtModelPackageApi {
 		ctx: *const OrtModelPackageContext,
 		base_dir: *const c_char,
 		input: *const c_char,
-		must_exist: bool,
+		must_exist: c_int,
 		out_path: *mut *const c_char
 	) -> OrtStatusPtr,
 	pub SelectComponent: unsafe extern "system" fn(

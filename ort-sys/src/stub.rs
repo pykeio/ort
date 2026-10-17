@@ -1642,7 +1642,7 @@ unsafe extern "system" fn SetDeterministicCompute(options: *mut OrtSessionOption
 
 unsafe extern "system" fn KernelContext_ParallelFor(
 	context: *const OrtKernelContext,
-	fn_: unsafe extern "system" fn(arg1: *mut ::core::ffi::c_void, arg2: usize),
+	fn_: unsafe extern "C" fn(arg1: *mut ::core::ffi::c_void, arg2: usize),
 	total: usize,
 	num_batch: usize,
 	usr_data: *mut ::core::ffi::c_void
@@ -2185,7 +2185,7 @@ unsafe extern "system" fn Node_GetNumSubgraphs(node: *const OrtNode, num_subgrap
 unsafe extern "system" fn Node_GetSubgraphs(
 	node: *const OrtNode,
 	subgraphs: *mut *const OrtGraph,
-	num_subgraphs: *mut usize,
+	num_subgraphs: usize,
 	attribute_names: *mut *const c_char
 ) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
@@ -2386,7 +2386,7 @@ unsafe extern "system" fn GetNumHardwareDevices(env: *const OrtEnv, num_devices:
 }
 
 #[cfg(feature = "api-24")]
-unsafe extern "system" fn GetHardwareDevices(env: *const OrtEnv, devices: *mut *const OrtHardwareDevice, num_devices: *mut usize) -> OrtStatusPtr {
+unsafe extern "system" fn GetHardwareDevices(env: *const OrtEnv, devices: *mut *const OrtHardwareDevice, num_devices: usize) -> OrtStatusPtr {
 	Error::new_sys(OrtErrorCode::ORT_NOT_IMPLEMENTED, "Unimplemented")
 }
 

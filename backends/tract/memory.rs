@@ -13,7 +13,8 @@ impl Allocator {
 				Alloc: Some(sys_allocator_alloc),
 				Free: Some(sys_allocator_free),
 				Info: Some(sys_allocator_info),
-				Reserve: Some(sys_allocator_reserve)
+				Reserve: Some(sys_allocator_reserve),
+				..ort_sys::OrtAllocator::default()
 			}
 		}
 	}

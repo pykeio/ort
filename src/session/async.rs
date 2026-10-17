@@ -113,7 +113,7 @@ impl AsyncInferenceContext<'_> {
 	}
 }
 
-pub(crate) extern "system" fn async_callback(user_data: *mut c_void, _: *mut *mut ort_sys::OrtValue, _: usize, status: ort_sys::OrtStatusPtr) {
+pub(crate) extern "C" fn async_callback(user_data: *mut c_void, _: *mut *mut ort_sys::OrtValue, _: usize, status: ort_sys::OrtStatusPtr) {
 	let ctx = unsafe { Box::from_raw(user_data.cast::<AsyncInferenceContext<'_>>()) };
 
 	ctx.free_name_ptrs();

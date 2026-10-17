@@ -317,7 +317,7 @@ impl AsPointer for ComputeContext {
 	}
 }
 
-extern "system" fn parallel_for_cb(user_data: *mut c_void, iterator: usize) {
+extern "C" fn parallel_for_cb(user_data: *mut c_void, iterator: usize) {
 	let executor = unsafe { &*user_data.cast::<Box<dyn Fn(usize) + Sync + Send>>() };
 	executor(iterator)
 }

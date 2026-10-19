@@ -22,13 +22,15 @@ use core::{
 	fmt::{self, Debug},
 	marker::PhantomData,
 	mem::transmute,
-	ops::{BitOr, Deref, DerefMut},
+	ops::BitOr,
 	ptr::{self, NonNull}
 };
 
 mod impl_map;
 mod impl_sequence;
 mod impl_tensor;
+mod r#ref;
+mod ref_mut;
 pub(crate) mod r#type;
 
 pub use self::{
@@ -41,6 +43,8 @@ pub use self::{
 		PrimitiveTensorElementType, Shape, SymbolicDimensions, Tensor, TensorArrayData, TensorArrayDataMut, TensorArrayDataParts, TensorElementType, TensorRef,
 		TensorRefMut, TensorValueType, TensorValueTypeMarker, ToShape, Utf8Data
 	},
+	r#ref::{DynValueRef, ValueRef},
+	ref_mut::{AsValueMut, DynValueRefMut, ValueRefMut},
 	r#type::{Outlet, ValueType}
 };
 use crate::{
@@ -125,104 +129,6 @@ impl Drop for ValueInner {
 			ortsys![unsafe ReleaseValue(self.ptr_mut())];
 			crate::logging::drop!(Value, self.ptr());
 		}
-	}
-}
-
-/// A temporary version of a [`Value`] with a lifetime specifier.
-#[derive(Debug)]
-pub struct ValueRef<'v, Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
-	inner: Value<Type>,
-	lifetime: PhantomData<&'v ()>
-}
-
-impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
-	pub(crate) fn new(inner: Value<Type>) -> Self {
-		ValueRef { inner, lifetime: PhantomData }
-	}
-
-	/// Attempts to downcast a temporary dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed
-	/// variant, like [`TensorRef<T>`].
-	#[inline]
-	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + ?Sized>(self) -> Result<ValueRef<'v, OtherType>> {
-		let dt = self.dtype();
-		if OtherType::can_downcast(dt) {
-			Ok(unsafe { transmute::<ValueRef<'v, Type>, ValueRef<'v, OtherType>>(self) })
-		} else {
-			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &{dt} to &{}", format_value_type::<OtherType>())))
-		}
-	}
-
-	/// Attempts to upgrade this `ValueRef` to an owned [`Value`] holding the same data.
-	pub fn try_upgrade(self) -> Result<Value<Type>, Self> {
-		if Arc::strong_count(&self.inner.inner) != 1 || !self.inner.inner.flags.upgradable() {
-			return Err(self);
-		}
-
-		Ok(self.inner)
-	}
-
-	pub fn into_dyn(self) -> ValueRef<'v, DynValueTypeMarker> {
-		unsafe { transmute(self) }
-	}
-}
-
-impl<Type: ValueTypeMarker + ?Sized> Deref for ValueRef<'_, Type> {
-	type Target = Value<Type>;
-
-	fn deref(&self) -> &Self::Target {
-		&self.inner
-	}
-}
-
-/// A mutable temporary version of a [`Value`] with a lifetime specifier.
-#[derive(Debug)]
-pub struct ValueRefMut<'v, Type: ValueTypeMarker + ?Sized = DynValueTypeMarker> {
-	inner: Value<Type>,
-	lifetime: PhantomData<&'v ()>
-}
-
-impl<'v, Type: ValueTypeMarker + ?Sized> ValueRefMut<'v, Type> {
-	pub(crate) fn new(inner: Value<Type>) -> Self {
-		ValueRefMut { inner, lifetime: PhantomData }
-	}
-
-	/// Attempts to downcast a temporary mutable dynamic value (like [`DynValue`] or [`DynTensor`]) to a more
-	/// strongly typed variant, like [`TensorRefMut<T>`].
-	#[inline]
-	pub fn downcast<OtherType: ValueTypeMarker + DowncastableTarget + ?Sized>(self) -> Result<ValueRefMut<'v, OtherType>> {
-		let dt = self.dtype();
-		if OtherType::can_downcast(dt) {
-			Ok(unsafe { transmute::<ValueRefMut<'v, Type>, ValueRefMut<'v, OtherType>>(self) })
-		} else {
-			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &mut {dt} to &mut {}", format_value_type::<OtherType>())))
-		}
-	}
-
-	/// Attempts to upgrade this `ValueRefMut` to an owned [`Value`] holding the same data.
-	pub fn try_upgrade(self) -> Result<Value<Type>, Self> {
-		if Arc::strong_count(&self.inner.inner) != 1 || !self.inner.inner.flags.upgradable() {
-			return Err(self);
-		}
-
-		Ok(self.inner)
-	}
-
-	pub fn into_dyn(self) -> ValueRefMut<'v, DynValueTypeMarker> {
-		unsafe { transmute(self) }
-	}
-}
-
-impl<Type: ValueTypeMarker + ?Sized> Deref for ValueRefMut<'_, Type> {
-	type Target = Value<Type>;
-
-	fn deref(&self) -> &Self::Target {
-		&self.inner
-	}
-}
-
-impl<Type: ValueTypeMarker + ?Sized> DerefMut for ValueRefMut<'_, Type> {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.inner
 	}
 }
 
@@ -320,6 +226,9 @@ impl DowncastableTarget for DynValueTypeMarker {
 /// The dynamic type marker, used for values which can be of any type.
 #[derive(Debug)]
 pub struct DynValueTypeMarker;
+pub trait UnknownValueTypeMarker {
+	private_trait!();
+}
 impl ValueTypeMarker for DynValueTypeMarker {
 	fn fmt(f: &mut fmt::Formatter) -> fmt::Result {
 		f.write_str("DynValue")
@@ -334,6 +243,9 @@ impl SequenceValueTypeMarker for DynValueTypeMarker {
 	private_impl!();
 }
 impl TensorValueTypeMarker for DynValueTypeMarker {
+	private_impl!();
+}
+impl UnknownValueTypeMarker for DynValueTypeMarker {
 	private_impl!();
 }
 
@@ -498,30 +410,6 @@ impl Value<DynValueTypeMarker> {
 			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast {dt} to {}", format_value_type::<OtherType>())))
 		}
 	}
-
-	/// Attempts to downcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed reference
-	/// variant, like [`TensorRef<T>`].
-	#[inline]
-	pub fn downcast_ref<OtherType: ValueTypeMarker + DowncastableTarget + ?Sized>(&self) -> Result<ValueRef<'_, OtherType>> {
-		let dt = self.dtype();
-		if OtherType::can_downcast(dt) {
-			Ok(ValueRef::new(unsafe { transmute::<DynValue, Value<OtherType>>(Value::clone_of(self)) }))
-		} else {
-			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &{dt} to &{}", format_value_type::<OtherType>())))
-		}
-	}
-
-	/// Attempts to downcast a dynamic value (like [`DynValue`] or [`DynTensor`]) to a more strongly typed
-	/// mutable-reference variant, like [`TensorRefMut<T>`].
-	#[inline]
-	pub fn downcast_mut<OtherType: ValueTypeMarker + DowncastableTarget + ?Sized>(&mut self) -> Result<ValueRefMut<'_, OtherType>> {
-		let dt = self.dtype();
-		if OtherType::can_downcast(dt) {
-			Ok(ValueRefMut::new(unsafe { transmute::<DynValue, Value<OtherType>>(Value::clone_of(self)) }))
-		} else {
-			Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Cannot downcast &mut {dt} to &mut {}", format_value_type::<OtherType>())))
-		}
-	}
 }
 
 impl<Type: ValueTypeMarker + ?Sized> AsPointer for Value<Type> {
@@ -550,14 +438,14 @@ mod tests {
 		}
 		{
 			let dyn_tensor_ref = tensor.view().into_dyn();
-			let tensor_ref: TensorRef<i32> = dyn_tensor_ref.downcast_ref()?;
+			let tensor_ref: TensorRef<i32> = dyn_tensor_ref.downcast()?;
 			assert_eq!(tensor_ref.extract_tensor(), tensor.extract_tensor());
 		}
 
 		// Ensure mutating a TensorRefMut mutates the original tensor.
 		{
-			let mut dyn_tensor_ref = tensor.view_mut().into_dyn();
-			let mut tensor_ref: TensorRefMut<i32> = dyn_tensor_ref.downcast_mut()?;
+			let dyn_tensor_ref = tensor.view_mut().into_dyn();
+			let mut tensor_ref: TensorRefMut<i32> = dyn_tensor_ref.downcast()?;
 			let (_, data) = tensor_ref.extract_tensor_mut();
 			data[2] = 42;
 		}
@@ -576,7 +464,7 @@ mod tests {
 				.upcast()
 				.into_dyn();
 			let tensor = tensor.view();
-			let tensor = tensor.downcast_ref::<TensorValueType<i32>>()?;
+			let tensor = tensor.downcast::<TensorValueType<i32>>()?;
 			let (_, data) = tensor.extract_tensor();
 			assert_eq!(data, [1, 2, 42, 4, 5]);
 		}

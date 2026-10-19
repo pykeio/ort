@@ -434,7 +434,7 @@ fn test_preallocated_output() -> crate::Result<()> {
 	let options = RunOptions::new()?.with_outputs(OutputSelector::default().preallocate(output_name, preallocated));
 	let outputs = session.run_with_options(crate::inputs![&x, &y], &options)?;
 	assert_eq!(outputs[0].try_extract_tensor::<i32>()?.1, expected);
-	assert_eq!(outputs[0].downcast_ref::<crate::value::DynTensorValueType>()?.data_ptr(), preallocated_ptr);
+	assert_eq!(outputs[0].view().downcast::<crate::value::DynTensorValueType>()?.data_ptr(), preallocated_ptr);
 
 	assert_eq!(*seen.lock(), [None, Some(alloc::vec![3, 5])]);
 	Ok(())

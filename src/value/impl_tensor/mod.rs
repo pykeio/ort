@@ -24,7 +24,6 @@ use crate::{
 	error::Result,
 	memory::{Allocator, MemoryInfo},
 	ortsys,
-	util::OnceLock,
 	value::ValueFlags
 };
 

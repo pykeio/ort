@@ -14,7 +14,7 @@ use crate::{
 	memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
 	session::{IoBinding, NoSelectedOutputs, RunOptions, Session, builder::GraphOptimizationLevel},
 	util::{MiniMap, Mutex, MutexGuard},
-	value::{DefiniteTensorValueTypeMarker, DynTensorRef, TensorElementType, Value}
+	value::{AsValueMut, DefiniteTensorValueTypeMarker, DynTensorRef, TensorElementType, Value}
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -196,18 +196,18 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// # }
 	/// ```
 	#[cfg_attr(docsrs, doc(cfg(not(all(target_family = "wasm", target_os = "unknown")))))]
-	pub fn copy_into(&self, target: &mut Value<Type>) -> Result<()> {
-		if self.dtype() != target.dtype() {
-			return Err(Error::new("target data type does not match source data type"));
-		} else if self.shape() != target.shape() {
-			return Err(Error::new("target shape does not match source shape"));
+	pub fn copy_into(&self, mut target: impl AsValueMut<Type>) -> Result<()> {
+		let target_inner = target.value_inner();
+		if self.dtype() != &target_inner.dtype {
+			return Err(Error::new("target data type or shape does not match source data type or shape"));
 		}
 
-		let target_memory_info = target.memory_info();
+		// SAFETY: tensors always have memory info
+		let target_memory_info = unsafe { target_inner.memory_info.as_ref().unwrap_unchecked() };
 		let mut identity_session =
 			IdentitySessionHandle::new(self.upcast_ref(), &target_memory_info.allocation_device(), target_memory_info.device_id(), *self.data_type())?;
 
-		unsafe { identity_session.binding.bind_output_mut("output", target) }?;
+		unsafe { identity_session.binding.bind_output_inner("output", target_inner) }?;
 		{
 			let identity_session = &mut *identity_session;
 			identity_session.session.run_binding(&identity_session.binding)?;
@@ -242,13 +242,13 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	#[cfg_attr(docsrs, doc(cfg(not(all(target_family = "wasm", target_os = "unknown")))))]
 	pub fn copy_into_async(&self, target: &mut Value<Type>) -> Result<()> {
-		if self.dtype() != target.dtype() {
-			return Err(Error::new("target data type does not match source data type"));
-		} else if self.shape() != target.shape() {
-			return Err(Error::new("target shape does not match source shape"));
+		let target_inner = target.value_inner();
+		if self.dtype() != &target_inner.dtype {
+			return Err(Error::new("target data type or shape does not match source data type or shape"));
 		}
 
-		let target_memory_info = target.memory_info();
+		// SAFETY: tensors always have memory info
+		let target_memory_info = unsafe { target_inner.memory_info.as_ref().unwrap_unchecked() };
 		let mut identity_session =
 			IdentitySessionHandle::new(self.upcast_ref(), &target_memory_info.allocation_device(), target_memory_info.device_id(), *self.data_type())?;
 
@@ -257,7 +257,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 			options.disable_device_sync()?;
 			Ok(options)
 		})?;
-		unsafe { identity_session.binding.bind_output_mut("output", target) }?;
+		unsafe { identity_session.binding.bind_output_inner("output", target_inner) }?;
 		{
 			let identity_session = &mut *identity_session;
 			identity_session.session.run_binding_with_options(&identity_session.binding, options)?;

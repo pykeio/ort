@@ -191,10 +191,7 @@ Upcasting a value doesn't change its underlying type; it just removes the specia
 ### Dyn views
 Views also support down/upcasting via `.downcast()` & `.into_dyn()` (but not `.upcast()` at the moment).
 
-You can also directly downcast a value to a stronger-typed view using `.downcast_ref()` and `.downcast_mut()`:
 ```rs
-let tensor_view: ort::value::TensorRef<'_, f32> = dyn_value.downcast_ref()?;
-// is equivalent to
 let tensor_view: ort::value::TensorRef<'_, f32> = dyn_value.view().downcast()?;
 ```
 

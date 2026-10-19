@@ -11,7 +11,7 @@ use crate::{
 	ortsys,
 	session::{Session, SharedSessionInner},
 	util::{MiniMap, with_cstr},
-	value::{DynTensor, DynValue, Value, ValueInner, ValueTypeMarker}
+	value::{AsValueMut, DynTensor, Value, ValueInner, ValueTypeMarker}
 };
 
 /// Enables binding of session inputs and/or outputs to pre-allocated memory.
@@ -101,7 +101,7 @@ use crate::{
 pub struct IoBinding {
 	ptr: NonNull<ort_sys::OrtIoBinding>,
 	held_inputs: MiniMap<String, Arc<ValueInner>>,
-	pub(crate) output_values: MiniMap<String, Option<DynValue>>,
+	pub(crate) output_values: MiniMap<String, Option<Arc<ValueInner>>>,
 	_session: Arc<SharedSessionInner>
 }
 
@@ -178,20 +178,21 @@ impl IoBinding {
 	/// `name`.
 	///
 	/// [`Tensor::new`]: crate::value::Tensor::new
-	pub fn bind_output<T: ValueTypeMarker + ?Sized, S: Into<String>>(&mut self, name: S, mut value: Value<T>) -> Result<()> {
-		if value.inner.is_backed() {
+	pub fn bind_output<T: ValueTypeMarker + ?Sized, S: Into<String>>(&mut self, name: S, mut value: impl AsValueMut<T>) -> Result<()> {
+		let inner = value.value_inner();
+		if inner.is_backed() {
 			// this is purely because i am too lazy to modify `run_binding` to have preallocated outputs share the
 			// original value's backing
 			return Err(Error::new_with_code(ErrorCode::InvalidArgument, "only tensors created with Tensor::new can be bound to outputs"));
 		}
 
 		let name: String = name.into();
-		unsafe { self.bind_output_mut(name.as_bytes(), &mut value) }?;
-		self.output_values.insert(name, Some(value.into_dyn()));
+		unsafe { self.bind_output_inner(name.as_bytes(), inner) }?;
+		self.output_values.insert(name, Some(Arc::clone(inner)));
 		Ok(())
 	}
 
-	pub(crate) unsafe fn bind_output_mut<T: ValueTypeMarker + ?Sized, S: AsRef<[u8]>>(&mut self, name: S, value: &mut Value<T>) -> Result<()> {
+	pub(crate) unsafe fn bind_output_inner<S: AsRef<[u8]>>(&mut self, name: S, value: &ValueInner) -> Result<()> {
 		let ptr = self.ptr_mut();
 		with_cstr(name.as_ref(), &|name| {
 			ortsys![unsafe BindOutput(ptr, name.as_ptr(), value.ptr())?];

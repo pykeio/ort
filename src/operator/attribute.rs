@@ -33,6 +33,14 @@ impl Drop for Attribute {
 	}
 }
 
+impl AsPointer for Attribute {
+	type Sys = ort_sys::OrtOpAttr;
+
+	fn ptr(&self) -> *const Self::Sys {
+		self.0.as_ptr()
+	}
+}
+
 #[diagnostic::on_unimplemented(message = "`{Self}` is not a supported operator attribute")]
 pub trait FromKernelContext<'s> {
 	/// Reads the value of the attribute from an [`ort_sys::OrtKernelInfo`] given its C name.

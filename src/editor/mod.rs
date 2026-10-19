@@ -1,7 +1,7 @@
 use alloc::{ffi::CString, sync::Arc};
 use core::{
 	ffi::c_char,
-	mem::{self, ManuallyDrop, forget},
+	mem::{ManuallyDrop, forget},
 	ptr::{self, NonNull}
 };
 
@@ -9,10 +9,11 @@ use smallvec::SmallVec;
 
 use crate::{
 	AsPointer, Error, OnceLock, Result,
+	memory::AllocatorHandle,
 	operator::Attribute,
 	ortsys,
 	session::{Session, builder::SessionBuilder},
-	util::{run_on_drop, with_cstr, with_cstr_ptr_array},
+	util::{MiniMap, run_on_drop, with_cstr, with_cstr_ptr_array},
 	value::{Outlet, TensorValueTypeMarker, Value, ValueFlags}
 };
 
@@ -92,15 +93,17 @@ impl Node {
 		node_name: impl AsRef<str>,
 		inputs: impl AsRef<[I]>,
 		outputs: impl AsRef<[O]>,
-		attributes: impl AsRef<[Attribute]>
+		attributes: impl IntoIterator<Item = Attribute>
 	) -> Result<Self> {
+		// CreateNode takes ownership of attributes, releases our originals, and sets them to null
+		let attributes: SmallVec<[_; 3]> = attributes.into_iter().map(|c| ManuallyDrop::new(c).ptr_mut()).collect();
+
 		// This code is garbage and we should probably just be allocating.
 		with_cstr(operator_name.as_ref().as_bytes(), &|operator_name| {
 			with_cstr(domain_name.as_ref().as_bytes(), &|domain_name| {
 				with_cstr(node_name.as_ref().as_bytes(), &|node_name| {
 					with_cstr_ptr_array(inputs.as_ref(), &mut |inputs| {
 						with_cstr_ptr_array(outputs.as_ref(), &mut |outputs| {
-							let attributes = attributes.as_ref();
 							let mut out = ptr::null_mut();
 							ortsys![@editor:
 								unsafe CreateNode(
@@ -111,7 +114,7 @@ impl Node {
 									inputs.len(),
 									outputs.as_ptr(),
 									outputs.len(),
-									attributes.as_ptr() as *mut _,
+									attributes.as_ptr().cast_mut(),
 									attributes.len(),
 									&mut out
 								)?;
@@ -148,15 +151,20 @@ impl Drop for Node {
 /// A single graph in a [`Model`], comprised of [`Node`]s (and optional initializers, aka weights), and describing its
 /// inputs/outputs.
 #[derive(Debug)]
-#[repr(transparent)]
-pub struct Graph(*mut ort_sys::OrtGraph);
+pub struct Graph {
+	ptr: NonNull<ort_sys::OrtGraph>,
+	_initializer_allocators: MiniMap<usize, Arc<AllocatorHandle>>
+}
 
 impl Graph {
 	pub fn new() -> Result<Self> {
 		let mut out = ptr::null_mut();
-		ortsys![@editor: unsafe CreateGraph(&mut out)?];
+		ortsys![@editor: unsafe CreateGraph(&mut out)?; nonNull(out)];
 		crate::logging::create!(Graph, out);
-		Ok(Self(out))
+		Ok(Self {
+			ptr: out,
+			_initializer_allocators: MiniMap::new()
+		})
 	}
 
 	pub fn set_inputs(&mut self, inputs: impl IntoIterator<Item = Outlet>) -> Result<()> {
@@ -166,7 +174,7 @@ impl Graph {
 				ortsys![unsafe ReleaseValueInfo(ptr.as_ptr())];
 			}
 		});
-		ortsys![@editor: unsafe SetGraphInputs(self.0, inputs.as_ptr() as *mut _, inputs.len())?];
+		ortsys![@editor: unsafe SetGraphInputs(self.ptr.as_ptr(), inputs.as_ptr() as *mut _, inputs.len())?];
 		forget(_guard); // SetGraphInputs takes ownership of the OrtValueInfos so don't free if it succeeded
 		Ok(())
 	}
@@ -178,14 +186,14 @@ impl Graph {
 				ortsys![unsafe ReleaseValueInfo(ptr.as_ptr())];
 			}
 		});
-		ortsys![@editor: unsafe SetGraphOutputs(self.0, outputs.as_ptr() as *mut _, outputs.len())?];
+		ortsys![@editor: unsafe SetGraphOutputs(self.ptr.as_ptr(), outputs.as_ptr() as *mut _, outputs.len())?];
 		forget(_guard); // SetGraphOutputs takes ownership of the OrtValueInfos so don't free if it succeeded
 		Ok(())
 	}
 
 	pub fn add_node(&mut self, node: Node) -> Result<()> {
 		let node = node.consume();
-		ortsys![@editor: unsafe AddNodeToGraph(self.0, node)?]; // infallible
+		ortsys![@editor: unsafe AddNodeToGraph(self.ptr.as_ptr(), node)?]; // infallible
 		Ok(())
 	}
 
@@ -201,9 +209,14 @@ impl Graph {
 		}
 
 		with_cstr(name.as_ref().as_bytes(), &|name| {
-			ortsys![@editor: unsafe AddInitializerToGraph(self.0, name.as_ptr(), value_inner.ptr.as_ptr(), as_external)?];
+			ortsys![@editor: unsafe AddInitializerToGraph(self.ptr.as_ptr(), name.as_ptr(), value_inner.ptr.as_ptr(), as_external)?];
 			Ok(())
 		})?;
+
+		if let Some(allocator) = value_inner._allocator_handle.clone() {
+			self._initializer_allocators
+				.insert(allocator._drop_ptr.map_or(0, |p| p.as_ptr() as usize), allocator);
+		}
 
 		// Allow the `ValueInner` to be dropped so the `Arc` strong count is decremented, but don't allow it to actually
 		// *release* the underlying value, since it's now owned by ONNX Runtime.
@@ -213,23 +226,21 @@ impl Graph {
 	}
 
 	pub(crate) fn consume(self) -> *mut ort_sys::OrtGraph {
-		let ptr = self.0;
-		mem::forget(self);
-		ptr
+		ManuallyDrop::new(self).ptr.as_ptr()
 	}
 }
 
 impl AsPointer for Graph {
 	type Sys = ort_sys::OrtGraph;
 	fn ptr(&self) -> *const Self::Sys {
-		self.0
+		self.ptr.as_ptr()
 	}
 }
 
 impl Drop for Graph {
 	fn drop(&mut self) {
-		ortsys![unsafe ReleaseGraph(self.0)];
-		crate::logging::drop!(Graph, self.0);
+		ortsys![unsafe ReleaseGraph(self.ptr.as_ptr())];
+		crate::logging::drop!(Graph, self.ptr);
 	}
 }
 

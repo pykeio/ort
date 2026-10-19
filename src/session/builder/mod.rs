@@ -1,5 +1,4 @@
 use alloc::{
-	borrow::Cow,
 	sync::{Arc, Weak},
 	vec::Vec
 };
@@ -68,7 +67,7 @@ pub struct SessionBuilder {
 	memory_info: Option<Arc<MemoryInfo<'static>>>,
 	operator_domains: SmallVec<[Arc<OperatorDomain>; 1]>,
 	initializers: Vec<Arc<DynValue>>,
-	external_initializer_buffers: Vec<Cow<'static, [u8]>>,
+	external_initializer_buffers: Vec<Arc<[u8]>>,
 	prepacked_weights: Option<PrepackedWeights>,
 	thread_manager: Option<Arc<dyn Any>>,
 	logger: Option<Arc<LoggerFunction>>,

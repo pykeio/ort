@@ -218,7 +218,7 @@ impl SessionBuilder {
 
 	#[cfg(all(feature = "std", feature = "api-18"))]
 	#[cfg_attr(docsrs, doc(cfg(all(feature = "std", feature = "api-18"))))]
-	pub fn with_external_initializer_file_in_memory(mut self, file_name: impl AsRef<Path>, buffer: alloc::borrow::Cow<'static, [u8]>) -> BuilderResult {
+	pub fn with_external_initializer_file_in_memory(mut self, file_name: impl AsRef<Path>, buffer: alloc::sync::Arc<[u8]>) -> BuilderResult {
 		let file_name = path_to_os_char(file_name);
 		let sizes = [buffer.len()];
 		match ortsys![@ort:

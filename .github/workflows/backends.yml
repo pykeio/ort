@@ -86,6 +86,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2.9.1
         with:
           workspaces: backends/web
+      - name: Install wasm-pack
+        run:
+          cargo install wasm-pack
       - name: Run tests
         run: |
-          cargo check --manifest-path backends/web/Cargo.toml -p ort-web --target wasm32-unknown-unknown
+          wasm-pack test --headless --firefox backends/web

@@ -66,7 +66,7 @@ class Models:
 			initializer=[weight_x, lora_param_a, lora_param_b],
 			name='lora_test'
 		)
-	
+
 	@misc_factory
 	def lora_adapter():
 		param_a = ort.OrtValue.ortvalue_from_numpy(np.array([[3], [4], [5], [6]], dtype=np.float32))
@@ -78,6 +78,33 @@ class Models:
 			'lora_param_b': param_b
 		})
 		adapter.export_adapter('tests/data/adapter.orl')
+
+	@model_factory
+	def mul_add():
+		input_x = G.make_tensor_value_info('x', onnx.TensorProto.FLOAT, ['batch', 3])
+		output_y = onnx.helper.make_tensor_value_info('y', onnx.TensorProto.FLOAT, ['batch', 3])
+		output_z = onnx.helper.make_tensor_value_info('z', onnx.TensorProto.FLOAT, ['batch', 3])
+
+		add_bias = make_tensor_from_np('bias', np.array([1, 2, 3], dtype=np.float32))
+		mul_weight = make_tensor_from_np('weight', np.array([2], dtype=np.float32))
+
+		mul = G.make_node('Mul', ['x', 'weight'], ['y'])
+		add = G.make_node('Add', ['x', 'bias'], ['z'])
+
+		return G.ModelProto(
+			ir_version=13,
+			graph=G.make_graph(
+				nodes=[mul, add],
+				inputs=[input_x],
+				outputs=[output_y, output_z],
+				initializer=[add_bias, mul_weight],
+				name='mul_add'
+			),
+			opset_import=[onnx.OperatorSetIdProto(domain=None, version=13)],
+			domain='io.pyke.ort',
+			model_version=42,
+			producer_name='generate-models.py'
+		)
 
 if __name__ == '__main__':
 	for model_factory in factories:

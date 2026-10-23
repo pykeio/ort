@@ -106,6 +106,7 @@ pub const FEATURE_WEBNN: u8 = FEATURE_WEBGPU;
 /// 		// load the WebGPU build
 /// 		.with_script_name("ort.webgpu.min.js");
 /// 	ort::set_api(ort_web::api(dist).await?);
+/// 	# todo!()
 /// }
 /// ```
 pub async fn api<L: Loadable>(config: L) -> Result<ort_sys::OrtApi> {

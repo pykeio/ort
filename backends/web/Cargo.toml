@@ -4,7 +4,7 @@ resolver = "3"
 [package]
 name = "ort-web"
 description = "ONNX Runtime on the web 🌐 - An alternative backend for ort"
-version = "0.4.0+1.30"
+version = "0.5.0+1.30"
 edition = "2024"
 rust-version = "1.92"
 license = "MIT OR Apache-2.0"
@@ -15,7 +15,7 @@ categories = [ "algorithms", "mathematics", "science", "web-programming", "wasm"
 authors = [
 	"pyke.io <contact@pyke.io>"
 ]
-include = [ "*.rs", "/*.js" ]
+include = [ "*.rs", "/*.js", "!/tests/*.rs" ]
 
 [lib]
 name = "ort_web"

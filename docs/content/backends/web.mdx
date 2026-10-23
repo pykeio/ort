@@ -14,21 +14,27 @@ Rather than trying to link ONNX Runtime into your Rust application, `ort-web` in
 - 🔷 `ort::environment::EnvironmentBuilder`
     - `EnvironmentBuilder::with_telemetry` <sup>[*](#telemetry)</sup>
     - `EnvironmentBuilder::build`
-- 🔷 `ort::memory::Allocator`
-    - `Allocator::default`
-    - `Allocator::memory_info`
+- ✅ `ort::memory::Allocator`
+    - Only CPU allocations are supported.
 - ✅ `ort::memory::MemoryInfo`
 - 🔷 `ort::session::Session`
     - `Session::builder`
     - `Session::allocator`
     - `Session::run_async`
     - ⚠️ Synchronous run methods like `Session::run` and `Session::run_with_options` are not supported.
+- ✅ `ort::session::RunOptions`
 - 🔷 `ort::session::builder::SessionBuilder`
     - `SessionBuilder::new`
     - `SessionBuilder::commit_from_memory`
     - `SessionBuilder::commit_from_url` (does not require `fetch-models` feature)
+    - `SessionBuilder::with_execution_providers` (WASM, WebGL, WebGPU, and WebNN)
     - `SessionBuilder::with_optimization_level`
+    - `SessionBuilder::with_intra_threads`, `SessionBuilder::with_inter_threads`, `SessionBuilder::with_parallel_execution`
+    - `SessionBuilder::with_memory_pattern`
+    - `SessionBuilder::with_dimension_override`
+    - `SessionBuilder::with_log_id`, `SessionBuilder::with_log_level`, `SessionBuilder::with_log_verbosity`
 - ✅ `ort::value::DynValue`, `ort::value::DynValueRef`, `ort::value::DynValueRefMut`
+    - Only `Tensor` types are supported.
 - ✅ `ort::value::Tensor`, `TensorRef`, `TensorRefMut`, etc.
 - ✅ `ort::value::ValueType`
 
@@ -113,11 +119,11 @@ async fn init() -> Result<(), JsError> {
 ## Synchronization
 With `ort-web`, ONNX Runtime is loaded as a separate WASM module, and `ort-web` acts as an intermediary between it and <Ort/>. There is no mechanism in WASM for two modules to share memory, so tensors often need to be *'synchronized'* when one side needs to see data from the other.
 
-This means that [`Tensor::new`](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/value/type.Tensor.html#method.new) should never be used for creating inputs, as they start out allocated on the ONNX Runtime side, thus requiring a sync (of *empty data*) to Rust before it can be written to. Prefer instead [`Tensor::from_array`](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/value/type.Tensor.html#method.from_array)/[`TensorRef::from_array_view`](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/value/type.TensorRef.html#method.from_array_view), as tensors created this way never require synchronization.
+Tensors created from Rust data (with [`Tensor::new`](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/value/type.Tensor.html#method.new), [`Tensor::from_array`](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/value/type.Tensor.html#method.from_array), or [`TensorRef::from_array_view`](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/value/type.TensorRef.html#method.from_array_view)) live in Rust memory, so they never need to be synchronized; their data is passed to ONNX Runtime when the session is run.
 
-Outputs of a session are **not** synchronized automatically. If you wish to use their data in Rust, you must either sync all outputs at once with [`ort_web::sync_outputs`](https://docs.rs/ort-web/latest/ort_web/fn.sync_outputs.html), or sync each tensor at a time (if you only use a few outputs):
+Session outputs that are on the CPU are synchronized to Rust automatically the first time their data is accessed. Outputs on other devices (i.e. when using the WebGPU EP) must be synchronized explicitly. You can either sync all outputs at once with [`ort_web::sync_outputs`](https://docs.rs/ort-web/latest/ort_web/fn.sync_outputs.html), or sync each tensor at a time (if you only use a few outputs):
 ```rs filename="lib.rs"
-use ort_web::{TensorExt, SyncDirection};
+use ort_web::{ValueExt, SyncDirection};
 
 let mut outputs = session.run_async(ort::inputs![...]).await?;
 
@@ -128,7 +134,7 @@ bounding_boxes.sync(SyncDirection::Rust).await?;
 let data = bounding_boxes.try_extract_tensor::<f32>()?;
 ```
 
-Once a session output is `sync`ed, that tensor becomes backed by a Rust buffer. Updates to the tensor's data from the Rust side will not reflect in ONNX Runtime until the tensor is `sync`ed with [`SyncDirection::Runtime`](https://docs.rs/ort-web/latest/ort_web/enum.SyncDirection.html#variant.Runtime). Likewise, updates to the tensor's data from ONNX Runtime won't reflect in Rust until Rust syncs that tensor with [`SyncDirection::Rust`](https://docs.rs/ort-web/latest/ort_web/enum.SyncDirection.html#variant.Rust). You don't have to worry about this behavior if you only ever *read* from session outputs, though.
+Once a session output is synchronized, that tensor becomes backed by a Rust buffer. If the tensor is on the CPU, updates to its data from the Rust side will be passed to ONNX Runtime if it is used as an input. Otherwise, updates to the tensor's data from the Rust side will not reflect in ONNX Runtime until the tensor is `sync`ed with [`SyncDirection::Runtime`](https://docs.rs/ort-web/latest/ort_web/enum.SyncDirection.html#variant.Runtime). Likewise, updates to the tensor's data from ONNX Runtime won't reflect in Rust until Rust syncs that tensor with [`SyncDirection::Rust`](https://docs.rs/ort-web/latest/ort_web/enum.SyncDirection.html#variant.Rust). You don't have to worry about this behavior if you only ever *read* from session outputs, though.
 
 ## Serving assets
 `ort-web` dynamically fetches the required scripts & WASM binary at runtime. By default, it will fetch the build from the `cdn.pyke.io` domain, so make sure it's accessible through your [content security policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP) if you have that configured.

@@ -25,7 +25,7 @@ pub enum ImageTensorLayout {
 
 #[derive(Serialize, Debug, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
-pub enum ImageDataType {
+pub(crate) enum ImageDataType {
 	Float32,
 	Uint8
 }
@@ -77,13 +77,13 @@ impl ImageNorm {
 
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct TensorFromImageOptions {
-	pub data_type: Option<ImageDataType>,
-	pub norm: Option<ImageNorm>,
-	pub resized_height: Option<u32>,
-	pub resized_width: Option<u32>,
-	pub tensor_format: Option<ImageFormat>,
-	pub tensor_layout: Option<ImageTensorLayout>
+pub(crate) struct TensorFromImageOptions {
+	pub(crate) data_type: Option<ImageDataType>,
+	pub(crate) norm: Option<ImageNorm>,
+	pub(crate) resized_height: Option<u32>,
+	pub(crate) resized_width: Option<u32>,
+	pub(crate) tensor_format: Option<ImageFormat>,
+	pub(crate) tensor_layout: Option<ImageTensorLayout>
 }
 
 impl TensorFromImageOptions {
@@ -94,11 +94,11 @@ impl TensorFromImageOptions {
 
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct TensorFromUrlOptions {
+pub(crate) struct TensorFromUrlOptions {
 	#[serde(flatten)]
-	pub base: TensorFromImageOptions,
-	pub width: Option<u32>,
-	pub height: Option<u32>
+	pub(crate) base: TensorFromImageOptions,
+	pub(crate) width: Option<u32>,
+	pub(crate) height: Option<u32>
 }
 
 impl TensorFromUrlOptions {
@@ -109,7 +109,7 @@ impl TensorFromUrlOptions {
 
 #[derive(Serialize)]
 #[serde(transparent)]
-pub struct DisposeFunction(#[serde(with = "serde_wasm_bindgen::preserve")] JsValue);
+pub(crate) struct DisposeFunction(#[serde(with = "serde_wasm_bindgen::preserve")] JsValue);
 
 impl<T> From<T> for DisposeFunction
 where
@@ -122,7 +122,7 @@ where
 
 #[derive(Serialize)]
 #[serde(transparent)]
-pub struct DownloadFunction(#[serde(with = "serde_wasm_bindgen::preserve")] JsValue);
+pub(crate) struct DownloadFunction(#[serde(with = "serde_wasm_bindgen::preserve")] JsValue);
 
 impl<T, F, E> From<T> for DownloadFunction
 where
@@ -144,18 +144,18 @@ where
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TensorFromTextureOptions {
-	pub width: u32,
-	pub height: u32,
-	pub format: Option<ImageFormat>,
-	pub dispose: Option<DisposeFunction>,
-	pub download: Option<DownloadFunction>
+pub(crate) struct TensorFromTextureOptions {
+	pub(crate) width: u32,
+	pub(crate) height: u32,
+	pub(crate) format: Option<ImageFormat>,
+	pub(crate) dispose: Option<DisposeFunction>,
+	pub(crate) download: Option<DownloadFunction>
 }
 
 #[wasm_bindgen]
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
-pub enum DataLocation {
+pub(crate) enum DataLocation {
 	None = "none", // indicates tensor is disposed
 	Cpu = "cpu",
 	CpuPinned = "cpu-pinned", // what is *pinned* in WASM?
@@ -167,7 +167,7 @@ pub enum DataLocation {
 #[wasm_bindgen]
 extern "C" {
 	#[wasm_bindgen(js_namespace = ort)]
-	pub type Tensor;
+	pub(crate) type Tensor;
 
 	#[wasm_bindgen(catch, js_namespace = ort, static_method_of = Tensor, js_name = fromImage)]
 	async fn from_image_data_raw(image_data: &ImageData, options: JsValue) -> Result<Tensor, JsValue>;
@@ -189,44 +189,48 @@ extern "C" {
 	fn new_from_buffer_raw(dtype: DataType, buffer: JsValue, dims: JsValue) -> Result<Tensor, JsValue>;
 
 	#[wasm_bindgen(structural, catch, method, getter, js_name = data)]
-	pub fn data(this: &Tensor) -> Result<JsValue, JsValue>;
+	pub(crate) fn data(this: &Tensor) -> Result<JsValue, JsValue>;
 	#[wasm_bindgen(structural, method, getter, js_name = location)]
-	pub fn location(this: &Tensor) -> DataLocation;
+	pub(crate) fn location(this: &Tensor) -> DataLocation;
 	#[wasm_bindgen(structural, method, getter, js_name = type)]
-	pub fn dtype(this: &Tensor) -> DataType;
+	pub(crate) fn dtype(this: &Tensor) -> DataType;
 	#[wasm_bindgen(structural, method, getter, js_name = size)]
-	pub fn size(this: &Tensor) -> usize;
+	pub(crate) fn size(this: &Tensor) -> usize;
 	#[wasm_bindgen(structural, method, getter, js_name = dims)]
-	pub fn dims(this: &Tensor) -> Vec<i64>;
+	pub(crate) fn dims_raw(this: &Tensor) -> Vec<f64>;
 
 	#[wasm_bindgen(structural, catch, method, js_name = getData)]
-	pub async fn get_data(this: &Tensor) -> Result<JsValue, JsValue>;
+	pub(crate) async fn get_data(this: &Tensor) -> Result<JsValue, JsValue>;
 
 	#[wasm_bindgen(structural, catch, method, js_name = dispose)]
-	pub fn dispose(this: &Tensor) -> Result<(), JsValue>;
+	pub(crate) fn dispose(this: &Tensor) -> Result<(), JsValue>;
 	#[wasm_bindgen(structural, catch, method, js_name = reshape)]
 	fn reshape(this: &Tensor, dims: JsValue) -> Result<Tensor, JsValue>;
 }
 
 impl Tensor {
-	pub async fn from_image_data(image_data: &ImageData, options: &TensorFromImageOptions) -> Result<Tensor, JsValue> {
+	pub(crate) async fn from_image_data(image_data: &ImageData, options: &TensorFromImageOptions) -> Result<Tensor, JsValue> {
 		Self::from_image_data_raw(image_data, options.to_value()?).await
 	}
 
-	pub async fn from_image_element(element: &HtmlImageElement, options: &TensorFromImageOptions) -> Result<Tensor, JsValue> {
+	pub(crate) async fn from_image_element(element: &HtmlImageElement, options: &TensorFromImageOptions) -> Result<Tensor, JsValue> {
 		Self::from_image_element_raw(element, options.to_value()?).await
 	}
 
-	pub async fn from_image_bitmap(bitmap: &ImageBitmap, options: &TensorFromImageOptions) -> Result<Tensor, JsValue> {
+	pub(crate) async fn from_image_bitmap(bitmap: &ImageBitmap, options: &TensorFromImageOptions) -> Result<Tensor, JsValue> {
 		Self::from_image_bitmap_raw(bitmap, options.to_value()?).await
 	}
 
-	pub async fn from_image_url(url: &str, options: &TensorFromUrlOptions) -> Result<Tensor, JsValue> {
+	pub(crate) async fn from_image_url(url: &str, options: &TensorFromUrlOptions) -> Result<Tensor, JsValue> {
 		Self::from_image_url_raw(url, options.to_value()?).await
 	}
 
-	pub fn new_from_buffer(dtype: DataType, buffer: JsValue, dims: &[i32]) -> Result<Tensor, JsValue> {
+	pub(crate) fn new_from_buffer(dtype: DataType, buffer: JsValue, dims: &[i32]) -> Result<Tensor, JsValue> {
 		Self::new_from_buffer_raw(dtype, buffer, convert_dims(dims))
+	}
+
+	pub(crate) fn dims(&self) -> Vec<i64> {
+		self.dims_raw().into_iter().map(|d| d as i64).collect()
 	}
 }
 

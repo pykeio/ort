@@ -28,7 +28,9 @@ mod util;
 
 pub use self::{
 	session::sync_outputs,
-	tensor::{ImageFormat, ImageNorm, ImageTensorLayout, SyncDirection, TensorFromImage, TensorFromImageOptions, TensorFromUrlOptions, ValueExt}
+	tensor::{
+		ImageFormat, ImageNorm, ImageNormOption, ImageTensorLayout, SyncDirection, TensorFromImage, TensorFromImageOptions, TensorFromUrlOptions, ValueExt
+	}
 };
 
 pub type Result<T, E = Error> = core::result::Result<T, E>;

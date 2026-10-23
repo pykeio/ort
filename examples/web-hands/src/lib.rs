@@ -1,8 +1,9 @@
 use std::slice;
 
 use ort::{
+	memory::Allocator,
 	session::{RunOptions, Session},
-	value::{Shape, Tensor}
+	value::Tensor
 };
 use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
@@ -72,12 +73,7 @@ impl HandDetector {
 
 		self.candidates.clear();
 
-		// Typically, `resized_image` would be a `Tensor` we created via `Tensor::new` rather than a normal Rust `Vec`.
-		// However, use of `Tensor::new` is heavily discouraged with `ort-web`, since it creates the tensor in ONNX
-		// Runtime's WASM context, requiring a useless copy of empty data before it can be used in Rust.
-		let shape = Shape::new([1, INPUT_SIZE as i64, INPUT_SIZE as i64, 3]);
-		let buf = vec![0.0_f32; shape.num_elements()];
-		let mut resized_image = Tensor::from_array((shape, buf))?;
+		let mut resized_image = Tensor::<f32>::new(&Allocator::default(), [1, INPUT_SIZE as i64, INPUT_SIZE as i64, 3])?;
 
 		resizer.resize(unsafe { slice::from_raw_parts(image.as_ptr().cast(), image.len() / 4) }, unsafe {
 			let resized_buffer = resized_image.extract_tensor_mut().1;
@@ -88,21 +84,6 @@ impl HandDetector {
 		// `run_async` requires a `RunOptions`, but we don't use it. We keep a dummy one in the struct to avoid
 		// needlessly reallocating on every `predict` call.
 		let mut outputs = self.session.run_async(ort::inputs![resized_image], &self._run_options).await?;
-
-		// The outputs' data lies in ONNX Runtime's WASM context and is inaccessible to us. We need to synchronize them
-		// to get their data. For more information on synchronization, see https://ort.pyke.io/backends/web#synchronization.
-		//
-		// We do use all of the model's outputs, so we can use the handy `sync_outputs` helper to synchronize all
-		// outputs at once.
-		ort_web::sync_outputs(&mut outputs).await?;
-
-		// If the model outputs more tensors than you actually use, it's best to manually synchronize only the outputs
-		// you need with `ort_web::TensorExt::sync()`. That would look like:
-		// ```
-		// use ort_web::{SyncDirection, TensorExt};
-		// let classificators: Tensor<f32> = outputs.remove("Identity_1").unwrap().downcast().unwrap();
-		// classificators.sync(SyncDirection::Rust).await?;
-		// ```
 
 		let classificators: Tensor<f32> = outputs.remove("Identity_1").unwrap().downcast().unwrap();
 		let classificators = classificators.extract_tensor().1;

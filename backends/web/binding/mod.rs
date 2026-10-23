@@ -3,14 +3,15 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 mod session;
-pub use self::session::*;
+pub(crate) use self::session::*;
 mod tensor;
-pub use self::tensor::*;
+pub(crate) use self::tensor::*;
+pub use self::tensor::{ImageFormat, ImageNorm, ImageNormOption, ImageTensorLayout};
 
 #[wasm_bindgen]
-#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-pub enum DataType {
+pub(crate) enum DataType {
 	Bool = "bool",
 	Float16 = "float16",
 	Float32 = "float32",
@@ -31,11 +32,11 @@ pub enum DataType {
 #[wasm_bindgen(module = "/_loader.js")]
 extern "C" {
 	#[wasm_bindgen(catch, js_name = "initRuntime")]
-	pub async fn init_runtime(features: u8, dist: JsValue) -> Result<Boolean, JsValue>;
+	pub(crate) async fn init_runtime(features: u8, dist: JsValue) -> Result<Boolean, JsValue>;
 }
 
 #[wasm_bindgen(module = "/_telemetry.js")]
 extern "C" {
 	#[wasm_bindgen(catch, js_name = "trackSessionInit")]
-	pub fn track_session_init(crate_version: &str) -> Result<Boolean, JsValue>;
+	pub(crate) fn track_session_init(crate_version: &str) -> Result<Boolean, JsValue>;
 }

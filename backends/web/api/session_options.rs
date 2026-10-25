@@ -34,13 +34,14 @@ pub(super) unsafe extern "system" fn SessionOptionsAppendExecutionProvider(
 
 	let provider_name = unsafe { CStr::from_ptr(provider_name) };
 	match provider_name.to_string_lossy().as_ref() {
-		"WASM" => {
+		"CPUExecutionProvider" => {}
+		"WASM" | "WASMExecutionProvider" => {
 			execution_providers.push(binding::ExecutionProvider::WASM);
 		}
-		"WebGL" => {
+		"WebGL" | "WebGLExecutionProvider" => {
 			execution_providers.push(binding::ExecutionProvider::WebGL);
 		}
-		"WebGPU" => {
+		"WebGPU" | "WebGpuExecutionProvider" => {
 			execution_providers.push(binding::ExecutionProvider::WebGPU {
 				preferred_layout: match get("preferredLayout") {
 					Some("NHWC") => Some(binding::WebGPUPreferredLayout::NHWC),
@@ -49,7 +50,7 @@ pub(super) unsafe extern "system" fn SessionOptionsAppendExecutionProvider(
 				}
 			});
 		}
-		"WebNN" => {
+		"WebNN" | "WebNNExecutionProvider" => {
 			execution_providers.push(binding::ExecutionProvider::WebNN {
 				power_preference: match get("powerPreference") {
 					Some("default") => Some(binding::WebNNPowerPreference::Default),

@@ -314,13 +314,13 @@ pub(crate) use impl_ep;
 macro_rules! define_options {
 	($(
         $(#[$attr:meta])*
-		$vis:vis fn $fn_name:ident(mut self, $arg_name:ident: $type:ty) -> Self = $opt_name:expr;
+		$vis:vis fn $fn_name:ident(mut self, $arg_name:ident: $($type:tt)*) -> Self = $opt_name:expr;
 	)*) => {
 		$(
 			$(#[$attr])*
 			#[must_use]
-			$vis fn $fn_name(mut self, $arg_name: $type) -> Self {
-				self.0.set($opt_name, define_options!(@to_str($arg_name: $type)));
+			$vis fn $fn_name(mut self, $arg_name: $($type)*) -> Self {
+				self.0.set($opt_name, define_options!(@to_str($arg_name: $($type)*)));
 				self
 			}
 		)*

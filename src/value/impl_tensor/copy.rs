@@ -3,7 +3,8 @@
 
 use alloc::{
 	format,
-	string::{String, ToString}
+	string::{String, ToString},
+	sync::Arc
 };
 use core::ops::{Deref, DerefMut};
 
@@ -356,7 +357,9 @@ impl<'s> IdentitySessionHandle<'s> {
 			}
 		};
 
-		identity_session.binding.bind_input("input", &src)?;
+		// Bind without cloning; `bind_input` would clone borrowed tensors, re-entering this function while `SESSIONS`
+		// is locked.
+		identity_session.binding.bind_input_inner("input".to_string(), Arc::clone(&src.inner))?;
 
 		Ok(Self {
 			inner: unsafe { core::mem::transmute::<&mut IdentitySession, &'static mut IdentitySession>(identity_session) },
@@ -391,13 +394,23 @@ mod tests {
 	use crate::{
 		memory::{AllocationDevice, Allocator},
 		test_util::test_env,
-		value::Tensor
+		value::{Tensor, TensorRef}
 	};
 
 	#[test]
 	fn test_clone_tensor() -> crate::Result<()> {
 		let _env = test_env();
 		let tensor = Tensor::<f32>::from_array(([1, 5], vec![2.167892, 333., 1.0, -0.0, f32::EPSILON]))?;
+		let clone = tensor.clone();
+		assert_eq!(tensor.extract_tensor(), clone.extract_tensor());
+		Ok(())
+	}
+
+	#[test]
+	fn test_clone_borrowed_tensor() -> crate::Result<()> {
+		let _env = test_env();
+		let data = [2.167892_f32, 333., 1.0, -0.0, f32::EPSILON];
+		let tensor = TensorRef::<f32>::from_array_view(([1_usize, 5], &data[..]))?;
 		let clone = tensor.clone();
 		assert_eq!(tensor.extract_tensor(), clone.extract_tensor());
 		Ok(())

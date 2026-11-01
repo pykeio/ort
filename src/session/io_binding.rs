@@ -159,6 +159,11 @@ impl IoBinding {
 			Arc::clone(&value.inner)
 		};
 
+		self.bind_input_inner(name, value_inner)
+	}
+
+	/// Binds `value_inner` as is, without cloning borrowed data.
+	pub(crate) fn bind_input_inner(&mut self, name: String, value_inner: Arc<ValueInner>) -> Result<()> {
 		let ptr = self.ptr_mut();
 		with_cstr(name.as_bytes(), &|name| {
 			ortsys![unsafe BindInput(ptr, name.as_ptr(), value_inner.ptr())?];

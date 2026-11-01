@@ -14,7 +14,7 @@ In some cases, this I/O overhead is unavoidable--a causal language model, for ex
 For these cases, ONNX Runtime provides **I/O binding**, an interface that allows you to manually specify which inputs/outputs reside on which device, and control when they are synchronized.
 
 ## Creating
-I/O binding is used via the [`IoBinding`](https://docs.rs/ort/latest/ort/io_binding/struct.IoBinding.html) struct. `IoBinding` is created using the [`Session::create_binding`](https://docs.rs/ort/latest/ort/session/struct.Session.html#method.create_binding) method:
+I/O binding is used via the [`IoBinding`](https://docs.rs/ort/latest/ort/session/struct.IoBinding.html) struct. `IoBinding` is created using the [`Session::create_binding`](https://docs.rs/ort/latest/ort/session/struct.Session.html#method.create_binding) method:
 
 ```rs
 let mut binding = session.create_binding()?;
@@ -26,23 +26,44 @@ let mut binding = session.create_binding()?;
 
 ## Binding
 ### Binding inputs
-To bind an input, use `IoBinding::bind_input`. This will queue the input data to be copied to the device that `session` is allocated on.
+To bind an input, use `IoBinding::bind_input`. The binding takes ownership of the value, so it stays alive for as long as it is bound.
 ```rs
 let style_embedding: Tensor<f32> = Tensor::from_array(...)?;
 
-binding.bind_input("style_embd", &style_embedding)?;
+binding.bind_input("style_embd", style_embedding)?;
 ```
 
-The data is not guaranteed to be synchronized immediately. The data *will* be fully synchronized once the I/O binding is run. To force synchronization, use `IoBinding::synchronize_inputs`.
+If the value already lives on the device the session wants the input on, the session uses it directly without copying. Otherwise (e.g. a CPU tensor bound to a CUDA session), the data is queued to be copied to that device. In most cases, this copy happens asynchronously; to wait for all pending input copies to finish, use `IoBinding::synchronize_inputs`:
 ```rs
 binding.synchronize_inputs()?;
 // all inputs are now synchronized
 ```
 
-Binding an input represents a single copy at that moment in time. Any updates to `style_embedding` intentionally won't take effect until you either call `synchronize_inputs` (which synchronizes *all* inputs), or re-bind `style_embd` (which will only synchronize `style_embedding`).
+Only owned values (like `Tensor` or `DynValue`) and views with a `'static` lifetime can be bound as inputs. Views of borrowed data (like `TensorRef::from_array_view(&array)`) cannot be bound, because the binding could outlive the data they point to. If you need to bind borrowed data, make an owned copy first, e.g. with `Tensor::from_array(array.clone())`.
+
+#### Modifying bound inputs
+You can access or modify a bound input with `IoBinding::input`/`IoBinding::input_mut`:
+```rs
+let mut style_embedding = binding.input_mut("style_embd")?;
+let mut style_embedding = style_embedding.try_extract_array_mut::<f32>()?;
+style_embedding *= 0.5;
+```
+
+Changes made via `input_mut` will be seen by the next run. If the input had to be copied to another device, it is automatically bound (and thus copied) again before the next run, so you don't need to re-bind it yourself.
+
+#### Zero-copy device buffers
+If you manage a device buffer yourself (e.g. one that a CUDA kernel writes preprocessed data into), you can bind it without copying by using [`TensorRefMut::from_raw`](https://docs.rs/ort/latest/ort/value/type.TensorRefMut.html#method.from_raw) with a `'static` lifetime:
+```rs
+let cuda_memory = MemoryInfo::new(AllocationDevice::CUDA, 0, AllocatorType::Device, MemoryType::Default)?;
+// SAFETY: `device_ptr` must stay valid for as long as `binding` uses it
+let input: TensorRefMut<'static, f32> = unsafe { TensorRefMut::from_raw(cuda_memory, device_ptr, Shape::new([1, 3, 640, 640]))? };
+binding.bind_input("images", input)?;
+```
+
+Since the buffer is already on the session's device, ONNX Runtime reads it directly, so anything written into the buffer before a run is seen by that run.
 
 ### Binding outputs
-Binding an output is similar; use `IoBinding::bind_output`, providing a value which the output will be placed into.
+Binding an output is similar; use `IoBinding::bind_output`, providing a value which the output will be placed into. Like inputs, only owned values and `'static` mutable views (`TensorRefMut<'static, T>`) can be bound as outputs.
 ```rs
 binding.bind_output("action", Tensor::<f32>::new(&Allocator::default(), [1, 32])?)?;
 ```
@@ -88,7 +109,7 @@ let mut unet = Session::builder(&env)?
 
 let text_condition = {
     let mut binding = text_encoder.create_binding()?;
-    binding.bind_input("tokens", &Tensor::<i64>::from_array((
+    binding.bind_input("tokens", Tensor::<i64>::from_array((
         vec![1, 22],
         vec![49, 272, 503, 286, 1396, 353, 9653, 284, 1234, 287, 616, 2438, 11, 7926, 13, 3423, 338, 3362, 25, 12520, 238, 242]
     ))?)?;
@@ -96,14 +117,14 @@ let text_condition = {
     text_encoder.run_binding(&binding)?.remove("output0").unwrap()
 };
 
+let mut io_binding = unet.create_binding()?;
+io_binding.bind_input("condition", text_condition)?;
+
 let input_allocator = Allocator::new(
 	&unet,
 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
 )?;
-let mut latents = Tensor::<f32>::new(&input_allocator, [1, 4, 64, 64])?;
-
-let mut io_binding = unet.create_binding()?;
-io_binding.bind_input("condition", &text_condition)?;
+io_binding.bind_input("latents", Tensor::<f32>::new(&input_allocator, [1, 4, 64, 64])?)?;
 
 let output_allocator = Allocator::new(
 	&unet,
@@ -112,10 +133,11 @@ let output_allocator = Allocator::new(
 io_binding.bind_output("noise_pred", Tensor::<f32>::new(&output_allocator, [1, 4, 64, 64])?)?;
 
 for _ in 0..20 {
-	io_binding.bind_input("latents", &latents)?;
 	let noise_pred = unet.run_binding(&io_binding)?.remove("noise_pred").unwrap();
 
-	let mut latents = latents.extract_array_mut();
+	// changes made to the bound input will be seen by the next run
+	let mut latents = io_binding.input_mut("latents")?;
+	let mut latents = latents.try_extract_array_mut::<f32>()?;
 	latents += &noise_pred.try_extract_array::<f32>()?;
 }
 ```

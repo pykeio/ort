@@ -356,7 +356,7 @@ impl<'s> IdentitySessionHandle<'s> {
 			}
 		};
 
-		identity_session.binding.bind_input("input", &src)?;
+		unsafe { identity_session.binding.bind_input_inner("input", &src.inner)? };
 
 		Ok(Self {
 			inner: unsafe { core::mem::transmute::<&mut IdentitySession, &'static mut IdentitySession>(identity_session) },

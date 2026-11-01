@@ -35,8 +35,6 @@ use crate::{
 	util::{AllocatedString, with_cstr},
 	value::{Outlet, ValueType}
 };
-#[cfg(feature = "api-23")]
-use crate::{memory::MemoryInfo, util::MiniMap};
 
 #[cfg(feature = "api-20")]
 mod adapter;
@@ -56,7 +54,7 @@ pub use self::adapter::Adapter;
 #[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
 pub use self::r#async::InferenceFut;
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
-pub use self::io_binding::IoBinding;
+pub use self::io_binding::{BindableInput, BindableOutput, IoBinding};
 use self::{builder::SessionBuilder, run_options::UntypedRunOptions};
 pub use self::{
 	input::{SessionInputValue, SessionInputs},
@@ -73,10 +71,6 @@ pub use self::{
 pub struct SharedSessionInner {
 	session_ptr: NonNull<ort_sys::OrtSession>,
 	pub(crate) allocator: Allocator,
-	#[cfg(feature = "api-23")]
-	pub(crate) inputs_memory_info: MiniMap<String, MemoryInfo<'static>>,
-	#[cfg(feature = "api-23")]
-	pub(crate) outputs_memory_info: MiniMap<String, MemoryInfo<'static>>,
 	/// Additional things we may need to hold onto for the duration of this session, like `OperatorDomain`s and
 	/// DLL handles for operator libraries.
 	_extras: SmallVec<[Arc<dyn Any>; 4]>,
@@ -392,8 +386,6 @@ impl OverridableInitializer {
 }
 
 pub(crate) mod io {
-	use alloc::vec;
-
 	use super::*;
 
 	pub(super) fn extract_io_count(
@@ -450,25 +442,5 @@ pub(crate) mod io {
 		let name = extract_io_name(ortsys![SessionGetOutputName], session_ptr, allocator, i)?;
 		let dtype = extract_io(ortsys![SessionGetOutputTypeInfo], session_ptr, i)?;
 		Ok(Outlet::new(name, dtype))
-	}
-
-	#[cfg(feature = "api-23")]
-	pub(super) fn extract_io_memory_info(
-		f: unsafe extern "system" fn(*const ort_sys::OrtSession, *mut *const ort_sys::OrtMemoryInfo, usize) -> ort_sys::OrtStatusPtr,
-		session_ptr: NonNull<ort_sys::OrtSession>,
-		outlets: &[Outlet]
-	) -> Result<MiniMap<String, MemoryInfo<'static>>> {
-		let mut memory_info_ptrs = vec![ptr::null(); outlets.len()];
-		let status = unsafe { f(session_ptr.as_ptr(), memory_info_ptrs.as_mut_ptr(), memory_info_ptrs.len()) };
-		unsafe { Error::result_from_status(status) }?;
-		let mut memory_infos = MiniMap::new();
-		for (ptr, outlet) in memory_info_ptrs.iter().zip(outlets.iter()) {
-			let Some(ptr) = NonNull::new(*ptr as *mut ort_sys::OrtMemoryInfo) else {
-				crate::util::cold();
-				return Err(crate::Error::new("expected in/output memory info to not be null"));
-			};
-			memory_infos.insert(outlet.name().to_string(), MemoryInfo::from_raw(ptr, false));
-		}
-		Ok(memory_infos)
 	}
 }

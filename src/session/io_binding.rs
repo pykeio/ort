@@ -1,6 +1,9 @@
 use alloc::{string::String, sync::Arc};
 use core::{
+	cell::Cell,
 	fmt::Debug,
+	marker::PhantomData,
+	mem,
 	ptr::{self, NonNull}
 };
 
@@ -11,7 +14,7 @@ use crate::{
 	ortsys,
 	session::{Session, SharedSessionInner},
 	util::{MiniMap, with_cstr},
-	value::{AsValueMut, DynTensor, Value, ValueInner, ValueTypeMarker}
+	value::{DynValueRef, DynValueRefMut, Value, ValueInner, ValueRef, ValueRefMut, ValueTypeMarker}
 };
 
 /// Enables binding of session inputs and/or outputs to pre-allocated memory.
@@ -67,14 +70,14 @@ use crate::{
 /// 	.remove("output0")
 /// 	.unwrap();
 ///
+/// let mut io_binding = unet.create_binding()?;
+/// io_binding.bind_input("condition", text_condition)?;
+///
 /// let input_allocator = Allocator::new(
 /// 	&unet,
 /// 	MemoryInfo::new(AllocationDevice::CUDA_PINNED, 0, AllocatorType::Device, MemoryType::CPUInput)?
 /// )?;
-/// let mut latents = Tensor::<f32>::new(&input_allocator, [1_usize, 4, 64, 64])?;
-///
-/// let mut io_binding = unet.create_binding()?;
-/// io_binding.bind_input("condition", &text_condition)?;
+/// io_binding.bind_input("latents", Tensor::<f32>::new(&input_allocator, [1_usize, 4, 64, 64])?)?;
 ///
 /// let output_allocator = Allocator::new(
 /// 	&unet,
@@ -83,10 +86,11 @@ use crate::{
 /// io_binding.bind_output("noise_pred", Tensor::<f32>::new(&output_allocator, [1_usize, 4, 64, 64])?)?;
 ///
 /// for _ in 0..20 {
-/// 	io_binding.bind_input("latents", &latents)?;
 /// 	let noise_pred = unet.run_binding(&io_binding)?.remove("noise_pred").unwrap();
 ///
-/// 	let mut latents = latents.extract_array_mut();
+/// 	// changes made to the bound input will be seen by the next run
+/// 	let mut latents = io_binding.input_mut("latents")?;
+/// 	let mut latents = latents.try_extract_array_mut::<f32>()?;
 /// 	latents += &noise_pred.try_extract_array::<f32>()?;
 /// }
 /// # Ok(())
@@ -100,9 +104,88 @@ use crate::{
 #[derive(Debug)]
 pub struct IoBinding {
 	ptr: NonNull<ort_sys::OrtIoBinding>,
-	held_inputs: MiniMap<String, Arc<ValueInner>>,
+	held_inputs: MiniMap<String, BoundInput>,
 	pub(crate) output_values: MiniMap<String, Option<Arc<ValueInner>>>,
+	maybe_pending_copies: Cell<bool>,
 	_session: Arc<SharedSessionInner>
+}
+
+#[derive(Debug)]
+struct BoundInput {
+	inner: Arc<ValueInner>,
+	mutable: bool,
+	dirty: Cell<bool>
+}
+
+/// A value which can be bound to a session input via [`IoBinding::bind_input`].
+#[diagnostic::on_unimplemented(
+	message = "`{Self}` cannot be bound as an input",
+	note = "only owned values or (unsafe) 'static views can be bound"
+)]
+pub trait BindableInput {
+	#[doc(hidden)]
+	#[allow(private_interfaces)]
+	fn into_bound_input(self) -> (Arc<ValueInner>, bool);
+
+	private_trait!();
+}
+
+impl<Type: ValueTypeMarker + ?Sized> BindableInput for Value<Type> {
+	#[allow(private_interfaces)]
+	fn into_bound_input(self) -> (Arc<ValueInner>, bool) {
+		(self.inner, true)
+	}
+
+	private_impl!();
+}
+
+impl<Type: ValueTypeMarker + ?Sized> BindableInput for ValueRef<'static, Type> {
+	#[allow(private_interfaces)]
+	fn into_bound_input(self) -> (Arc<ValueInner>, bool) {
+		(self.into_inner().inner, false)
+	}
+
+	private_impl!();
+}
+
+impl<Type: ValueTypeMarker + ?Sized> BindableInput for ValueRefMut<'static, Type> {
+	#[allow(private_interfaces)]
+	fn into_bound_input(self) -> (Arc<ValueInner>, bool) {
+		(self.inner.inner, true)
+	}
+
+	private_impl!();
+}
+
+/// A value which can be bound to a session output via [`IoBinding::bind_output`].
+#[diagnostic::on_unimplemented(
+	message = "`{Self}` cannot be bound as an output",
+	note = "only owned values or (unsafe) 'static mutable views can be bound"
+)]
+pub trait BindableOutput {
+	#[doc(hidden)]
+	#[allow(private_interfaces)]
+	fn into_bound_output(self) -> Arc<ValueInner>;
+
+	private_trait!();
+}
+
+impl<Type: ValueTypeMarker + ?Sized> BindableOutput for Value<Type> {
+	#[allow(private_interfaces)]
+	fn into_bound_output(self) -> Arc<ValueInner> {
+		self.inner
+	}
+
+	private_impl!();
+}
+
+impl<Type: ValueTypeMarker + ?Sized> BindableOutput for ValueRefMut<'static, Type> {
+	#[allow(private_interfaces)]
+	fn into_bound_output(self) -> Arc<ValueInner> {
+		self.inner.inner
+	}
+
+	private_impl!();
 }
 
 impl IoBinding {
@@ -114,6 +197,7 @@ impl IoBinding {
 			ptr,
 			held_inputs: MiniMap::new(),
 			output_values: MiniMap::new(),
+			maybe_pending_copies: Cell::new(false),
 			_session: session.inner()
 		})
 	}
@@ -122,50 +206,99 @@ impl IoBinding {
 	///
 	/// The value given here will be passed as the input specified by `name` in all future invocations of
 	/// [`Session::run_binding`] until this input is overridden (by calling [`IoBinding::bind_input`] again) or until
-	/// all inputs are cleared (via [`IoBinding::clear_inputs`] or [`IoBinding::clear`]).
+	/// all inputs are cleared (via [`IoBinding::clear_inputs`] or [`IoBinding::clear`]). The binding takes ownership
+	/// of the value; it can be accessed later with [`IoBinding::input`] or [`IoBinding::input_mut`].
 	///
-	/// If the session wants the input to be placed on a different device than the one `value` is on (as is often the
-	/// case for CPU inputs to CUDA sessions), the data will be queued to be asynchronously copied to said device.
-	/// Otherwise, and if `value` was created from borrowed data (i.e. with
-	/// [`TensorRef::from_array_view`](crate::value::TensorRef::from_array_view)), a **second clone will be made
-	/// first**, so it is recommended to only use `IoBinding` when the inputs' devices differ from the session's
-	/// device(s) (or all inputs are owned).
+	/// Only owned values and `'static` views can be bound. To bind a raw device buffer that you manage yourself without
+	/// copying it, create a [`TensorRefMut`](crate::value::TensorRefMut) with
+	/// [`TensorRefMut::from_raw`](crate::value::TensorRefMut::from_raw) and a `'static` lifetime; you must then ensure
+	/// the buffer stays valid for as long as the binding uses it.
 	///
-	/// The data is only copied upon invocation of this function. Any changes to the given value afterwards will
-	/// not affect the data seen by the session until the value is re-bound.
-	pub fn bind_input<T: ValueTypeMarker + ?Sized, S: Into<String>>(&mut self, name: S, value: &Value<T>) -> Result<()> {
+	/// If the value already resides on the device the session wants the input on, it is used directly without a copy.
+	/// Otherwise (as is often the case for CPU inputs to CUDA sessions), the data will be queued to be asynchronously
+	/// copied to that device. That copy is only made when the input is bound, so changes made to the value through
+	/// [`IoBinding::input_mut`] cause it to be bound (and thus copied) again before the next run.
+	pub fn bind_input<S: Into<String>>(&mut self, name: S, value: impl BindableInput) -> Result<()> {
 		let name: String = name.into();
+		let (inner, mutable) = value.into_bound_input();
+		unsafe { self.bind_input_inner(name.as_bytes(), &inner) }?;
+		self.maybe_pending_copies.set(true);
 
-		#[allow(unused_mut)]
-		let mut may_alias = value.is_tensor() && !value.inner.flags.upgradable();
-		// if the input wasnt created from borrowed data, then we're keeping the owned data alive via held_inputs, so no
-		// need to worry about uaf from aliasing
-		#[cfg(feature = "api-23")]
-		if let Some(wanted_memory_info) = self._session.inputs_memory_info.get(&name)
-			&& let Some(input_memory_info) = value.inner.memory_info.as_ref()
-			&& (wanted_memory_info.allocation_device() != input_memory_info.allocation_device()
-				|| wanted_memory_info.device_id() != input_memory_info.device_id())
+		if let Some(prev) = self.held_inputs.insert(
+			name,
+			BoundInput {
+				inner,
+				mutable,
+				dirty: Cell::new(false)
+			}
+		) && !self.ensure_inputs_synchronized()
 		{
-			// ort will never alias if the devices do not match
-			may_alias = false;
+			crate::warn!("bound input failed to synchronize; its previous value will be leaked!");
+			mem::forget(prev);
 		}
+		Ok(())
+	}
 
-		let value_inner = if may_alias {
-			debug_assert!(value.is_tensor());
-
-			let cloned: DynTensor = unsafe { value.transmute_type_ref() }.clone();
-			cloned.inner
-		} else {
-			Arc::clone(&value.inner)
-		};
-
-		let ptr = self.ptr_mut();
-		with_cstr(name.as_bytes(), &|name| {
-			ortsys![unsafe BindInput(ptr, name.as_ptr(), value_inner.ptr())?];
+	pub(crate) unsafe fn bind_input_inner<S: AsRef<[u8]>>(&self, name: S, value: &ValueInner) -> Result<()> {
+		let ptr = self.ptr.as_ptr();
+		with_cstr(name.as_ref(), &|name| {
+			ortsys![unsafe BindInput(ptr, name.as_ptr(), value.ptr())?];
 			Ok(())
 		})?;
-		self.held_inputs.insert(name, value_inner);
 		Ok(())
+	}
+
+	/// Returns a view of the value bound to the input `name`, if any.
+	pub fn input(&self, name: &str) -> Option<DynValueRef<'_>> {
+		self.held_inputs.get(name).map(|input| {
+			ValueRef::new(Value {
+				inner: Arc::clone(&input.inner),
+				_markers: PhantomData
+			})
+		})
+	}
+
+	/// Returns a mutable view of the value bound to the input `name`.
+	///
+	/// Changes made to the value through this view will be seen by the next call to [`Session::run_binding`]. If ONNX
+	/// Runtime had to copy the input to another device, it will be bound (and thus copied) again before the next
+	/// run.
+	pub fn input_mut(&mut self, name: &str) -> Result<DynValueRefMut<'_>> {
+		let Some(input) = self.held_inputs.get(name) else {
+			return Err(Error::new_with_code(ErrorCode::InvalidArgument, alloc::format!("no value is bound to input '{name}'")));
+		};
+		if !input.mutable {
+			return Err(Error::new_with_code(ErrorCode::InvalidArgument, alloc::format!("input '{name}' was bound from an immutable view")));
+		}
+
+		// make sure we're not in the middle of a copy
+		if self.maybe_pending_copies.get() {
+			self.synchronize_inputs()?;
+		}
+
+		input.dirty.set(true);
+		Ok(ValueRefMut::new(Value {
+			inner: Arc::clone(&input.inner),
+			_markers: PhantomData
+		}))
+	}
+
+	pub(crate) fn rebind_dirty_inputs(&self) -> Result<()> {
+		for (name, input) in self.held_inputs.iter() {
+			if input.dirty.get() {
+				unsafe { self.bind_input_inner(name.as_bytes(), &input.inner) }?;
+				self.maybe_pending_copies.set(true);
+				input.dirty.set(false);
+			}
+		}
+		Ok(())
+	}
+
+	fn ensure_inputs_synchronized(&self) -> bool {
+		if !self.maybe_pending_copies.get() {
+			return true;
+		}
+		self.synchronize_inputs().is_ok()
 	}
 
 	/// Bind a session output to a pre-allocated [`Value`].
@@ -178,8 +311,8 @@ impl IoBinding {
 	/// `name`.
 	///
 	/// [`Tensor::new`]: crate::value::Tensor::new
-	pub fn bind_output<T: ValueTypeMarker + ?Sized, S: Into<String>>(&mut self, name: S, mut value: impl AsValueMut<T>) -> Result<()> {
-		let inner = value.value_inner();
+	pub fn bind_output<S: Into<String>>(&mut self, name: S, value: impl BindableOutput) -> Result<()> {
+		let inner = value.into_bound_output();
 		if inner.is_backed() {
 			// this is purely because i am too lazy to modify `run_binding` to have preallocated outputs share the
 			// original value's backing
@@ -187,8 +320,8 @@ impl IoBinding {
 		}
 
 		let name: String = name.into();
-		unsafe { self.bind_output_inner(name.as_bytes(), inner) }?;
-		self.output_values.insert(name, Some(Arc::clone(inner)));
+		unsafe { self.bind_output_inner(name.as_bytes(), &inner) }?;
+		self.output_values.insert(name, Some(inner));
 		Ok(())
 	}
 
@@ -221,8 +354,14 @@ impl IoBinding {
 
 	/// Clears all bound inputs specified by [`IoBinding::bind_input`].
 	pub fn clear_inputs(&mut self) {
+		let synchronized = self.ensure_inputs_synchronized();
 		ortsys![unsafe ClearBoundInputs(self.ptr_mut())];
-		drop(self.held_inputs.drain());
+		for (name, input) in self.held_inputs.drain() {
+			if !synchronized {
+				crate::warn!("failed to synchronize inputs before clear; input '{name}'s previous value will be leaked!");
+				mem::forget(input);
+			}
+		}
 	}
 	/// Clears all bound outputs specified by [`IoBinding::bind_output`] or [`IoBinding::bind_output_to_device`].
 	pub fn clear_outputs(&mut self) {
@@ -243,6 +382,7 @@ impl IoBinding {
 	/// Synchronize all bound inputs, ensuring any pending asynchronous transfers are completed.
 	pub fn synchronize_inputs(&self) -> Result<()> {
 		ortsys![unsafe SynchronizeBoundInputs(self.ptr().cast_mut())?];
+		self.maybe_pending_copies.set(false);
 		Ok(())
 	}
 	/// Synchronize all bound outputs, ensuring any pending asynchronous transfers are completed.
@@ -296,7 +436,7 @@ mod tests {
 		let array = mnist::get_image();
 
 		let mut binding = session.create_binding()?;
-		binding.bind_input(session.inputs()[0].name(), &Tensor::from_array(array)?)?;
+		binding.bind_input(session.inputs()[0].name(), Tensor::from_array(array)?)?;
 		binding
 			.bind_output_to_device(session.outputs()[0].name(), &MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::CPUOutput)?)?;
 
@@ -315,7 +455,7 @@ mod tests {
 		let array = mnist::get_image();
 
 		let mut binding = session.create_binding()?;
-		binding.bind_input(session.inputs()[0].name(), &Tensor::from_array(array)?)?;
+		binding.bind_input(session.inputs()[0].name(), Tensor::from_array(array)?)?;
 
 		binding.bind_output(session.outputs()[0].name(), Tensor::<f32>::new(&Allocator::default(), [1i64, 10])?)?;
 
@@ -337,7 +477,7 @@ mod tests {
 		binding.bind_output(session.outputs()[0].name(), Tensor::<f32>::new(&Allocator::default(), [1i64, 10])?)?;
 
 		let probabilities = std::thread::spawn(move || {
-			binding.bind_input(session.inputs()[0].name(), &Tensor::from_array(array)?)?;
+			binding.bind_input(session.inputs()[0].name(), Tensor::from_array(array)?)?;
 			let outputs = session.run_binding(&binding)?;
 			let probabilities = mnist::extract_probabilities(&outputs[0])?;
 			Ok::<Vec<(usize, f32)>, crate::Error>(probabilities)
@@ -358,7 +498,7 @@ mod tests {
 		let array = mnist::get_image();
 
 		let mut binding = session.create_binding()?;
-		binding.bind_input(session.inputs()[0].name(), &Tensor::from_array(array)?)?;
+		binding.bind_input(session.inputs()[0].name(), Tensor::from_array(array)?)?;
 
 		binding.bind_output(session.outputs()[0].name(), Tensor::<f32>::new(&Allocator::default(), [1i64, 10])?)?;
 
@@ -380,6 +520,42 @@ mod tests {
 
 		binding.clear_inputs();
 		assert!(session.run_binding(&binding).is_err());
+
+		Ok(())
+	}
+
+	#[test]
+	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
+	fn test_mnist_input_mut() -> Result<()> {
+		use crate::value::TensorRef;
+
+		let mut session = Session::builder(test_env())?.commit_from_url(mnist::MODEL_URL)?;
+		let input_name = session.inputs()[0].name().to_string();
+
+		let mut binding = session.create_binding()?;
+		binding.bind_input(&input_name, Tensor::from_array(ndarray::Array4::<f32>::zeros((1, 1, 28, 28)))?)?;
+		binding
+			.bind_output_to_device(session.outputs()[0].name(), &MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::CPUOutput)?)?;
+
+		binding
+			.input_mut(&input_name)?
+			.try_extract_array_mut::<f32>()?
+			.assign(&mnist::get_image());
+		{
+			let outputs = session.run_binding(&binding)?;
+			let probabilities = mnist::extract_probabilities(&outputs[0])?;
+			assert_eq!(probabilities[0].0, 5);
+		}
+		assert_eq!(binding.input(&input_name).expect("").try_extract_array::<f32>()?, mnist::get_image().into_dyn());
+
+		let data: &'static [f32] = Box::leak(mnist::get_image().into_raw_vec_and_offset().0.into_boxed_slice());
+		binding.bind_input(&input_name, TensorRef::from_array_view(([1_usize, 1, 28, 28], data))?)?;
+		assert!(binding.input_mut(&input_name).is_err());
+		{
+			let outputs = session.run_binding(&binding)?;
+			let probabilities = mnist::extract_probabilities(&outputs[0])?;
+			assert_eq!(probabilities[0].0, 5);
+		}
 
 		Ok(())
 	}

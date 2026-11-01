@@ -42,6 +42,10 @@ impl<'v, Type: ValueTypeMarker + ?Sized> ValueRef<'v, Type> {
 	pub fn into_dyn(self) -> DynValueRef<'v> {
 		unsafe { transmute(self) }
 	}
+
+	pub(crate) fn into_inner(self) -> Value<Type> {
+		self.inner
+	}
 }
 
 impl<Type: ValueTypeMarker + ?Sized> Deref for ValueRef<'_, Type> {

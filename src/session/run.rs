@@ -292,6 +292,8 @@ impl Session {
 	) -> Result<SessionOutputs<'b>> {
 		use crate::util::run_on_drop;
 
+		binding.rebind_dirty_inputs()?;
+
 		let run_options_ptr = if let Some(run_options) = run_options { run_options.ptr() } else { ptr::null() };
 		ortsys![unsafe RunWithBinding(self.inner.ptr().cast_mut(), run_options_ptr, binding.ptr())?];
 

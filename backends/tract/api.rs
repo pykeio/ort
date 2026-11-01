@@ -539,6 +539,24 @@ unsafe extern "system" fn GetTensorMemoryInfo(_value: *const OrtValue, mem_info:
 	OrtStatusPtr::default()
 }
 
+unsafe extern "system" fn SessionGetMemoryInfoForInputs(session: *const OrtSession, out: *mut *const OrtMemoryInfo, num_inputs: usize) -> OrtStatusPtr {
+	let session = unsafe { &*session.cast::<Session>() };
+	if num_inputs != session.inputs.len() {
+		return Error::new_sys(OrtErrorCode::ORT_INVALID_ARGUMENT, "input count mismatch");
+	}
+	std::slice::from_raw_parts_mut(out, num_inputs).fill(ptr::dangling());
+	OrtStatusPtr::default()
+}
+
+unsafe extern "system" fn SessionGetMemoryInfoForOutputs(session: *const OrtSession, out: *mut *const OrtMemoryInfo, num_outputs: usize) -> OrtStatusPtr {
+	let session = unsafe { &*session.cast::<Session>() };
+	if num_outputs != session.outputs.len() {
+		return Error::new_sys(OrtErrorCode::ORT_INVALID_ARGUMENT, "output count mismatch");
+	}
+	std::slice::from_raw_parts_mut(out, num_outputs).fill(ptr::dangling());
+	OrtStatusPtr::default()
+}
+
 unsafe extern "system" fn GetBuildInfoString() -> *const ::std::os::raw::c_char {
 	concat!("ORT Build Info: backend=ort-tract, version=", env!("CARGO_PKG_VERSION"), "\0")
 		.as_ptr()
@@ -605,6 +623,8 @@ pub const fn api() -> OrtApi {
 		CreateAllocator,
 		ReleaseAllocator,
 		GetTensorMemoryInfo,
+		SessionGetMemoryInfoForInputs,
+		SessionGetMemoryInfoForOutputs,
 		GetBuildInfoString,
 		GetTensorElementTypeAndShapeDataReference,
 		..ort_sys::stub::api()

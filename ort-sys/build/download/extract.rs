@@ -1,5 +1,5 @@
 //! Note that this tar reader is only functional enough to read tar files produced by Deno's @std/tar, version 0.1.8.
-//! Zero unsafe allowed here. Since we verify the file on-the-fly, the file should be considered untrusted.
+//! Zero unsafe allowed here.
 
 #![forbid(unsafe_code)]
 

@@ -1,3 +1,5 @@
+#[cfg(feature = "download-binaries")]
+use std::io::Read;
 use std::{env, path::PathBuf};
 
 #[cfg(feature = "download-binaries")]
@@ -131,6 +133,23 @@ note: rerun the build with `cargo build -vv | grep ort-sys` to see debug message
 				}
 			};
 
+			let mut bin = Vec::new();
+			if let Err(e) = verified_reader.read_to_end(&mut bin) {
+				log::error!("ort-sys failed to download prebuilt binaries from `{}`: {e}", dist.url);
+				return;
+			};
+			let (calculated_hash, _) = verified_reader.finalize().expect("Failed to finalize read");
+			if calculated_hash[..] != download::hex_str_to_bytes(dist.hash) {
+				log::error!(
+					r"⚠️ The hash of the file downloaded from `{}` does not match the expected hash. ⚠️ -- Got {}, expected {}
+note: if you're using a proxy, make sure it's not doing something weird. Otherwise, report this incident to https://github.com/pykeio/ort/issues & email contact@pyke.io.",
+					dist.url,
+					download::bytes_to_hex_str(&calculated_hash),
+					dist.hash
+				);
+				return;
+			}
+
 			let mut temp_extract_dir = bin_extract_dir
 				.parent()
 				.unwrap()
@@ -141,22 +160,8 @@ note: rerun the build with `cargo build -vv | grep ort-sys` to see debug message
 				bin_extract_dir = temp_extract_dir.clone();
 				should_rename = false;
 			}
-			if let Err(e) = self::download::extract_tgz(&mut verified_reader, &temp_extract_dir) {
+			if let Err(e) = self::download::extract_tgz(&mut bin.as_slice(), &temp_extract_dir) {
 				log::error!("extraction of prebuilt binaries downloaded from `{}` failed: {e}", dist.url);
-				return;
-			}
-
-			let (calculated_hash, _) = verified_reader.finalize().expect("Failed to finalize read");
-			if calculated_hash[..] != download::hex_str_to_bytes(dist.hash) {
-				log::error!(
-					r"⚠️ The hash of the file downloaded from `{}` does not match the expected hash. ⚠️ -- Got {}, expected {}
-note: if you're using a proxy, make sure it's not doing something weird. Otherwise, report this incident to https://github.com/pykeio/ort/issues & email contact@pyke.io.
-note: the downloaded files are available to inspect at: {}",
-					dist.url,
-					download::bytes_to_hex_str(&calculated_hash),
-					dist.hash,
-					temp_extract_dir.display()
-				);
 				return;
 			}
 

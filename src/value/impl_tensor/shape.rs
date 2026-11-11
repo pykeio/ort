@@ -23,15 +23,15 @@ impl Shape {
 	}
 
 	#[doc(alias = "numel")]
-	pub fn num_elements(&self) -> usize {
+	pub fn num_elements(&self) -> Option<usize> {
 		let mut size = 1usize;
-		for dim in &self.inner {
-			if *dim < 0 {
-				return 0;
+		for &dim in &self.inner {
+			if dim < 0 {
+				return None;
 			}
-			size *= *dim as usize;
+			size = size.checked_mul(dim.try_into().ok()?)?;
 		}
-		size
+		Some(size)
 	}
 
 	#[cfg(feature = "ndarray")]

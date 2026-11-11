@@ -160,11 +160,15 @@ fn tensor_from_array(
 ) -> Result<DynTensor> {
 	let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 
+	let Some(byte_len) = shape.num_elements().and_then(|c| c.checked_mul(element_size)) else {
+		return Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Shape {shape:?} is too large")));
+	};
+
 	ortsys![
 		unsafe CreateTensorWithDataAsOrtValue(
 			memory_info.ptr(),
 			data,
-			shape.num_elements() * element_size,
+			byte_len,
 			shape.as_ptr(),
 			shape.len(),
 			element_type.into(),
@@ -345,13 +349,14 @@ macro_rules! impl_to_shape {
 				})
 				.collect::<Result<Shape>>()?;
 			if let Some(expected_size) = expected_size {
-				if v.num_elements() != expected_size {
+				let size = v.num_elements().ok_or_else(|| Error::new_with_code(ErrorCode::InvalidArgument, format!("Shape {v:?} is too large")))?;
+				if size != expected_size {
 					Err(Error::new_with_code(
 						ErrorCode::InvalidArgument,
 						format!(
 							"Cannot create a tensor from raw data; shape {:?} ({} elements) is different from the length of the data provided ({} elements)",
 							v,
-							v.num_elements(),
+							size,
 							expected_size
 						)
 					))
@@ -453,7 +458,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> OwnedTensorArrayData<T> for Arr
 			let shape: Shape = this.shape().iter().map(|d| *d as i64).collect();
 			// SAFETY: ndarrays internally store their pointer as NonNull
 			let ptr = unsafe { NonNull::new_unchecked(this.as_mut_ptr()) };
-			assert_eq!(this.len(), shape.num_elements());
+			assert_eq!(Some(this.len()), shape.num_elements());
 			Ok(TensorArrayDataParts { shape, ptr, guard: Some(this) })
 		} else {
 			// Need to do a copy here to get data in to standard layout
@@ -461,7 +466,7 @@ impl<T: Clone + 'static, D: Dimension + 'static> OwnedTensorArrayData<T> for Arr
 			let shape: Shape = contiguous_array.shape().iter().map(|d| *d as i64).collect();
 			// SAFETY: ndarrays internally store their pointer as NonNull
 			let ptr = unsafe { NonNull::new_unchecked(contiguous_array.as_mut_ptr()) };
-			assert_eq!(contiguous_array.len(), shape.num_elements());
+			assert_eq!(Some(contiguous_array.len()), shape.num_elements());
 			Ok(TensorArrayDataParts {
 				shape,
 				ptr,
@@ -561,7 +566,7 @@ impl<T: Clone + 'static, D: ToShape> OwnedTensorArrayData<T> for (D, Vec<T>) {
 		let shape = self.0.to_shape(Some(self.1.len()))?;
 		// SAFETY: A `Vec` always has a non-null pointer.
 		let ptr = unsafe { NonNull::new_unchecked(self.1.as_mut_ptr()) };
-		assert_eq!(shape.num_elements(), self.1.len());
+		assert_eq!(shape.num_elements(), Some(self.1.len()));
 		Ok(TensorArrayDataParts {
 			shape,
 			ptr,
@@ -577,7 +582,7 @@ impl<T: Clone + 'static, D: ToShape> OwnedTensorArrayData<T> for (D, Box<[T]>) {
 		let shape = self.0.to_shape(Some(self.1.len()))?;
 		// SAFETY: A `Box` always has a non-null pointer.
 		let ptr = unsafe { NonNull::new_unchecked(self.1.as_mut_ptr()) };
-		assert_eq!(shape.num_elements(), self.1.len());
+		assert_eq!(shape.num_elements(), Some(self.1.len()));
 		Ok(TensorArrayDataParts {
 			shape,
 			ptr,

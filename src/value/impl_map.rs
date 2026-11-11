@@ -123,7 +123,11 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 									output_array_ptr = NonNull::dangling().as_ptr();
 								}
 
-								(shape, unsafe { slice::from_raw_parts(output_array_ptr, shape.num_elements()) })
+								let Some(numel) = shape.num_elements() else {
+									return Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Shape {shape:?} is too large")));
+								};
+
+								(shape, unsafe { slice::from_raw_parts(output_array_ptr, numel) })
 							} else {
 								return Err(Error::new_with_code(
 									ErrorCode::InvalidArgument,

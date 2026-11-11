@@ -79,10 +79,10 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_scalar<T: PrimitiveTensorElementType + Copy>(&self) -> Result<T> {
 		extract_tensor(self, T::into_tensor_element_type()).and_then(|(ptr, shape)| {
-			if shape.num_elements() != 1 {
+			if shape.num_elements() != Some(1) {
 				return Err(Error::new_with_code(
 					ErrorCode::InvalidArgument,
-					format!("Cannot extract scalar {} from a tensor with {} elements", T::into_tensor_element_type(), shape.num_elements())
+					format!("Cannot extract scalar {} from a tensor with shape {shape:?}", T::into_tensor_element_type())
 				));
 			}
 
@@ -119,8 +119,12 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	///
 	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_tensor<T: PrimitiveTensorElementType>(&self) -> Result<(&Shape, &[T])> {
-		extract_tensor(self, T::into_tensor_element_type())
-			.and_then(|(ptr, shape)| Ok((shape, unsafe { slice::from_raw_parts(data_ptr(ptr)?, shape.num_elements()) })))
+		extract_tensor(self, T::into_tensor_element_type()).and_then(|(ptr, shape)| {
+			let Some(numel) = shape.num_elements() else {
+				return Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Shape {shape:?} is too large")));
+			};
+			Ok((shape, unsafe { slice::from_raw_parts(data_ptr(ptr)?, numel) }))
+		})
 	}
 
 	/// Attempt to extract the underlying data into a Rust `ndarray`.
@@ -257,7 +261,12 @@ mut_methods! {
 		/// [`DynValue`]: crate::value::DynValue
 		pub fn try_extract_tensor_mut[T: PrimitiveTensorElementType](&mut self) -> Result<(&Shape, &mut [T])> {
 			extract_tensor(self, T::into_tensor_element_type())
-				.and_then(|(ptr, shape)| Ok((shape, unsafe { slice::from_raw_parts_mut(data_ptr(ptr)?, shape.num_elements()) })))
+				.and_then(|(ptr, shape)| {
+					let Some(numel) = shape.num_elements() else {
+						return Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Shape {shape:?} is too large")));
+					};
+					Ok((shape, unsafe { slice::from_raw_parts_mut(data_ptr(ptr)?, numel) }))
+				})
 		}
 	}
 }
@@ -309,7 +318,9 @@ unsafe fn data_ptr<T>(ptr: *mut ort_sys::OrtValue) -> Result<*mut T> {
 }
 
 fn extract_strings(ptr: *mut ort_sys::OrtValue, shape: &Shape) -> Result<Vec<String>> {
-	let len = shape.num_elements();
+	let Some(len) = shape.num_elements() else {
+		return Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Shape {shape:?} is too large")));
+	};
 	// Total length of string data, not including \0 suffix
 	let mut total_length = 0;
 	ortsys![unsafe GetStringTensorDataLength(ptr, &mut total_length)?];

@@ -133,7 +133,10 @@ impl DynTensor {
 			let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
 			ortsys![unsafe GetTensorMutableData(value_ptr.as_ptr(), &mut buffer_ptr)?];
 			if !buffer_ptr.is_null() {
-				unsafe { buffer_ptr.write_bytes(0, data_type.byte_size(shape.num_elements()).expect("infallible")) };
+				let Some(numel) = shape.num_elements() else {
+					return Err(crate::Error::new_with_code(crate::ErrorCode::InvalidArgument, format!("Shape {shape:?} is too large")));
+				};
+				unsafe { buffer_ptr.write_bytes(0, data_type.byte_size(numel).expect("infallible")) };
 			}
 		}
 

@@ -10,7 +10,7 @@ use core::{
 	str::{self, FromStr}
 };
 
-use crate::{AsPointer, error::Result, ortsys, session::Session};
+use crate::{AsPointer, Error, ErrorCode, error::Result, ortsys, session::Session};
 
 /// A device allocator used to manage the allocation of [`Value`]s.
 ///
@@ -128,7 +128,13 @@ impl Allocator {
 	/// ```
 	pub fn alloc<T>(&self, len: usize) -> Result<AllocatedBlock<'_>> {
 		let mut ptr = ptr::null_mut();
-		ortsys![unsafe AllocatorAlloc(self.ptr.as_ptr(), (len * mem::size_of::<T>()) as _, &mut ptr)?; nonNull(ptr)];
+		let Some(bytes) = len.checked_mul(mem::size_of::<T>()) else {
+			return Err(Error::new_with_code(
+				ErrorCode::InvalidArgument,
+				format!("a buffer of {len} elements of type {} would overflow memory", core::any::type_name::<T>())
+			));
+		};
+		ortsys![unsafe AllocatorAlloc(self.ptr.as_ptr(), bytes as _, &mut ptr)?; nonNull(ptr)];
 		crate::logging::create!(AllocatedBlock, ptr);
 		Ok(AllocatedBlock { ptr, allocator: self })
 	}

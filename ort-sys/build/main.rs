@@ -121,8 +121,6 @@ note: rerun the build with `cargo build -vv | grep ort-sys` to see debug message
 
 		let mut bin_extract_dir = internal::dirs::cache_dir()
 			.expect("could not determine cache directory")
-			.canonicalize()
-			.expect("failed to canonicalize cache directory")
 			.join("dfbin")
 			.join(target)
 			.join(dist.hash);
@@ -162,7 +160,8 @@ note: if you're using a proxy, make sure it's not doing something weird. Otherwi
 				bin_extract_dir = temp_extract_dir.clone();
 				should_rename = false;
 			}
-			if let Err(e) = self::download::extract_tgz(&mut bin.as_slice(), &temp_extract_dir) {
+			if let Err(e) = self::download::extract_tgz(&mut bin.as_slice(), &temp_extract_dir.canonicalize().expect("failed to canonicalize cache directory"))
+			{
 				log::error!("extraction of prebuilt binaries downloaded from `{}` failed: {e}", dist.url);
 				return;
 			}

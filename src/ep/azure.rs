@@ -36,7 +36,7 @@ use super::{ExecutionProviderOptions, SimpleExecutionProvider};
 /// ```no_run
 /// # use ort::{ep, session::Session, value::Tensor};
 /// # fn main() -> ort::Result<()> {
-/// # let env = ort::test_util::test_env().clone();
+/// # let env = ort_test_util::test_env().clone();
 /// let mut session = Session::builder(&env)?
 /// 	// note: session must be initialized with `onnxruntime-extensions`
 /// 	.with_extensions()?

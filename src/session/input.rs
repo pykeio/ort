@@ -89,7 +89,7 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 /// # use ndarray::Array1;
 /// # use ort::{value::Tensor, session::{builder::GraphOptimizationLevel, Session}};
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// # 	let env = ort::test_util::test_env().clone();
+/// # 	let env = ort_test_util::test_env().clone();
 /// # 	let mut session = Session::builder(&env)?.commit_from_file("model.onnx")?;
 /// let _ = session.run(ort::inputs![Tensor::from_array(([5], vec![1, 2, 3, 4, 5]))?])?;
 /// # 	Ok(())
@@ -103,7 +103,7 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 /// # use ndarray::Array1;
 /// # use ort::{value::Tensor, session::{builder::GraphOptimizationLevel, Session}};
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// # 	let env = ort::test_util::test_env().clone();
+/// # 	let env = ort_test_util::test_env().clone();
 /// # 	let mut session = Session::builder(&env)?.commit_from_file("model.onnx")?;
 /// let _ = session.run(ort::inputs! {
 /// 	"tokens" => Tensor::from_array(([5], vec![1, 2, 3, 4, 5]))?
@@ -119,7 +119,7 @@ impl<'v, const N: usize> From<[SessionInputValue<'v>; N]> for SessionInputs<'_, 
 /// # use ndarray::Array1;
 /// # use ort::{value::Tensor, session::{builder::GraphOptimizationLevel, Session}};
 /// # fn main() -> Result<(), Box<dyn Error>> {
-/// # 	let env = ort::test_util::test_env().clone();
+/// # 	let env = ort_test_util::test_env().clone();
 /// # 	let mut session = Session::builder(&env)?.commit_from_file("model.onnx")?;
 /// # 	let model_layers = 12;
 /// let mut my_inputs = ort::inputs![

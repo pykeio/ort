@@ -3,7 +3,7 @@
 //! ```
 //! # use ort::{session::Session, value::TensorRef};
 //! # fn main() -> ort::Result<()> {
-//! # let env = ort::test_util::test_env().clone();
+//! # let env = ort_test_util::test_env().clone();
 //! let mut session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 //! let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 //! let outputs = session.run(ort::inputs![TensorRef::from_array_view(&input)?])?;
@@ -102,7 +102,7 @@ impl Drop for SharedSessionInner {
 /// ```
 /// # use ort::{session::Session, value::TensorRef};
 /// # fn main() -> ort::Result<()> {
-/// # let env = ort::test_util::test_env().clone();
+/// # let env = ort_test_util::test_env().clone();
 /// let mut session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 /// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 /// let outputs = session.run(ort::inputs![TensorRef::from_array_view(&input)?])?;
@@ -178,7 +178,7 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{RunOptions, Session}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let session = Session::builder(&env)?.commit_from_file("tests/data/overridable_initializer.onnx")?;
 	///
 	/// let mut overridable_initializers = session.overridable_initializers();
@@ -239,7 +239,7 @@ impl Session {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{RunOptions, Session}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let session = Session::builder(&env)?.commit_from_file("tests/data/lora_model.onnx")?;
 	/// assert_eq!(session.opset_for_domain(ort::editor::ONNX_DOMAIN), Some(21));
 	/// # 	Ok(())
@@ -325,7 +325,7 @@ mut_methods! {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{RunOptions, Session, WorkloadType}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let mut session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// session.set_workload_type(WorkloadType::Efficient)?;
 	///

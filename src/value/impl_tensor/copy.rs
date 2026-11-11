@@ -98,7 +98,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	/// # use ort::{memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType}, session::Session, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// # if false {
 	/// # let session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let cuda_allocator = Allocator::new(
@@ -142,7 +142,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	/// # use ort::{memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType}, session::Session, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// # let tensor = Tensor::<f32>::new(&Allocator::default(), [1_usize, 3, 224, 224])?;
 	/// # if false {
 	/// let cuda_tensor = tensor.to_async(AllocationDevice::CUDA, 0)?;
@@ -179,7 +179,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	/// # use ort::{memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType}, session::Session, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// # if false {
 	/// # let session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let cuda_allocator = Allocator::new(
@@ -224,7 +224,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 	/// ```
 	/// # use ort::{memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType}, session::Session, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let cpu_tensor = Tensor::<f32>::new(&Allocator::default(), [1_usize, 3, 224, 224])?;;
 	/// # if false {
 	/// # let session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
@@ -274,7 +274,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Clone for Value<Type> {
 	/// ```
 	/// # use ort::{value::Tensor, AsPointer};
 	/// # fn main() -> ort::Result<()> {
-	/// # let _env = ort::test_util::test_env().clone();
+	/// # let _env = ort_test_util::test_env().clone();
 	/// let array = vec![1_i64, 2, 3, 4, 5];
 	/// let tensor = Tensor::from_array(([array.len()], array.into_boxed_slice()))?;
 	///

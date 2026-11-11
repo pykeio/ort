@@ -103,7 +103,7 @@ impl SessionBuilder {
 	/// ```
 	/// # use ort::session::Session;
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let session = Session::builder(&env)?
 	/// 	.with_disabled_optimizers("ConstantFolding;GeluFusionL2")?
 	/// 	.commit_from_file("tests/data/upsample.onnx")?;
@@ -175,7 +175,7 @@ impl SessionBuilder {
 	/// ```
 	/// # use ort::session::Session;
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let session = Session::builder(&env)?
 	/// 	.with_max_shape_override([("string_input", [16])])?
 	/// 	.commit_from_file("tests/data/vectorizer.onnx")?;
@@ -208,7 +208,7 @@ impl SessionBuilder {
 	/// ```
 	/// # use ort::session::{Session, builder::GqaValueLayout};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let session = Session::builder(&env)?
 	/// 	.with_gqa_value_layout(GqaValueLayout::BNHS)?
 	/// 	.commit_from_file("tests/data/upsample.onnx")?;

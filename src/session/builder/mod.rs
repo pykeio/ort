@@ -32,7 +32,7 @@ pub use self::{impl_config_keys::GqaValueLayout, impl_options::*};
 /// ```
 /// # use ort::session::{builder::GraphOptimizationLevel, Session};
 /// # fn main() -> ort::Result<()> {
-/// # let env = ort::test_util::test_env().clone();
+/// # let env = ort_test_util::test_env().clone();
 /// let session = Session::builder(&env)?
 /// 	.with_optimization_level(GraphOptimizationLevel::All)
 /// 	// Optimization isn't enabled in minimal builds of ONNX Runtime, so it throws an error. We can just ignore it.
@@ -52,7 +52,7 @@ pub type BuilderResult = Result<SessionBuilder, Error<SessionBuilder>>;
 /// ```
 /// # use ort::session::{builder::GraphOptimizationLevel, Session};
 /// # fn main() -> ort::Result<()> {
-/// # let env = ort::test_util::test_env().clone();
+/// # let env = ort_test_util::test_env().clone();
 /// let session = Session::builder(&env)?
 /// 	.with_optimization_level(GraphOptimizationLevel::Level1)?
 /// 	.with_intra_threads(1)?
@@ -106,7 +106,7 @@ impl SessionBuilder {
 	/// ```
 	/// # use ort::session::{builder::GraphOptimizationLevel, Session};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let session = Session::builder(&env)?
 	/// 	.with_optimization_level(GraphOptimizationLevel::Level1)?
 	/// 	.with_intra_threads(1)?
@@ -154,7 +154,7 @@ impl SessionBuilder {
 	/// # use ort::session::{builder::GraphOptimizationLevel, Session};
 	/// # use std::{thread, time::Duration};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let mut builder = Session::builder(&env)?
 	/// 	.with_optimization_level(GraphOptimizationLevel::Level1)?
 	/// 	.with_intra_threads(1)?;
@@ -214,7 +214,7 @@ impl LoadCanceler {
 	/// # use ort::session::{builder::GraphOptimizationLevel, Session};
 	/// # use std::{thread, time::Duration};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let mut builder = Session::builder(&env)?
 	/// 	.with_optimization_level(GraphOptimizationLevel::Level1)?
 	/// 	.with_intra_threads(1)?;

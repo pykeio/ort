@@ -57,7 +57,7 @@ impl Drop for AdapterInner {
 /// ```
 /// # use ort::{session::{Adapter, RunOptions, Session}, value::Tensor};
 /// # fn main() -> ort::Result<()> {
-/// # let env = ort::test_util::test_env().clone();
+/// # let env = ort_test_util::test_env().clone();
 /// let mut model = Session::builder(&env)?.commit_from_file("tests/data/lora_model.onnx")?;
 /// let lora = Adapter::from_file("tests/data/adapter.orl", None)?;
 ///
@@ -74,7 +74,7 @@ impl Drop for AdapterInner {
 /// ```
 /// # use ort::{session::{Adapter, RunOptions, Session}, value::Tensor};
 /// # fn main() -> ort::Result<()> {
-/// # let env = ort::test_util::test_env().clone();
+/// # let env = ort_test_util::test_env().clone();
 /// let mut model = Session::builder(&env)?.commit_from_file("tests/data/lora_model.onnx")?;
 ///
 /// // Load our parameters from disk somehow
@@ -115,7 +115,7 @@ impl Adapter {
 	/// # 	value::Tensor
 	/// # };
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let mut model = Session::builder(&env)?
 	/// 	.with_execution_providers([
 	/// 		#[cfg(feature = "cuda")]
@@ -167,7 +167,7 @@ impl Adapter {
 	/// # 	value::Tensor
 	/// # };
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let mut model = Session::builder(&env)?
 	/// 	.with_execution_providers([
 	/// 		#[cfg(feature = "cuda")]

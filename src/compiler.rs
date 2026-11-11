@@ -22,7 +22,7 @@
 //! # use std::path::PathBuf;
 //! # use ort::{compiler::ModelCompiler, session::Session, ep};
 //! # fn main() -> ort::Result<()> {
-//! # let env = ort::test_util::test_env().clone();
+//! # let env = ort_test_util::test_env().clone();
 //! let mut session_options = Session::builder(&env)?.with_execution_providers([
 //! 	# #[cfg(feature = "coreml")]
 //! 	ep::CoreML::default().with_model_format(ep::coreml::ModelFormat::MLProgram).build()

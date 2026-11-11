@@ -20,7 +20,7 @@ use crate::{AsPointer, Error, ErrorCode, error::Result, ortsys, session::Session
 /// ```no_run
 /// # use ort::{memory::{Allocator, MemoryInfo, MemoryType, AllocationDevice, AllocatorType}, session::Session, value::Tensor};
 /// # fn main() -> ort::Result<()> {
-/// # let env = ort::test_util::test_env().clone();
+/// # let env = ort_test_util::test_env().clone();
 /// # let session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 /// let allocator = Allocator::new(
 /// 	&session,
@@ -50,7 +50,7 @@ use crate::{AsPointer, Error, ErrorCode, error::Result, ortsys, session::Session
 /// ```no_run
 /// # use ort::{memory::{Allocator, MemoryInfo, MemoryType, AllocationDevice, AllocatorType}, session::Session, value::Tensor};
 /// # fn main() -> ort::Result<()> {
-/// # let env = ort::test_util::test_env().clone();
+/// # let env = ort_test_util::test_env().clone();
 /// # let session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 /// let allocator = Allocator::new(
 /// 	&session,
@@ -409,7 +409,7 @@ impl MemoryInfo<'static> {
 	/// ```no_run
 	/// # use ort::{memory::{Allocator, MemoryInfo, MemoryType, AllocationDevice, AllocatorType}, session::Session, value::Tensor};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// # let session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let allocator = Allocator::new(
 	/// 	&session,

@@ -25,7 +25,7 @@ impl<'e> Device<'e> {
 	/// ```
 	/// # use ort::environment::Environment;
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let cpu = env.devices().next().unwrap();
 	/// assert!(matches!(cpu.ep(), Ok("CPUExecutionProvider")));
 	/// # Ok(())
@@ -43,7 +43,7 @@ impl<'e> Device<'e> {
 	/// ```
 	/// # use ort::environment::Environment;
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let cpu = env.devices().next().unwrap();
 	/// assert!(matches!(cpu.ep_vendor(), Ok("Microsoft")));
 	/// # Ok(())
@@ -113,7 +113,7 @@ impl<'e> HardwareDevice<'e> {
 	/// ```
 	/// # use ort::{environment::Environment, memory::DeviceType};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let cpu = env.devices().next().unwrap().hardware_device();
 	/// assert_eq!(cpu.ty(), DeviceType::CPU);
 	/// # Ok(())
@@ -139,7 +139,7 @@ impl<'e> HardwareDevice<'e> {
 	/// ```no_run
 	/// # use ort::{environment::Environment, memory::DeviceType};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let cpu = env.devices().next().unwrap().hardware_device();
 	/// assert_eq!(cpu.vendor().unwrap(), "Intel");
 	/// # Ok(())

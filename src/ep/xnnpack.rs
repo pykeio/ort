@@ -13,7 +13,7 @@ use super::{ExecutionProviderOptions, SimpleExecutionProvider};
 /// # use core::num::NonZeroUsize;
 /// # use ort::{ep, session::Session};
 /// # fn main() -> ort::Result<()> {
-/// # let env = ort::test_util::test_env().clone();
+/// # let env = ort_test_util::test_env().clone();
 /// let session = Session::builder(&env)?
 /// 	.with_intra_op_spinning(false)?
 /// 	.with_intra_threads(1)?

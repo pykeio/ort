@@ -303,7 +303,7 @@ impl SessionBuilder {
 	/// ```
 	/// # use ort::{session::Session};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// use std::sync::Arc;
 	///
 	/// let mut session = Session::builder(&env)?
@@ -363,7 +363,7 @@ impl SessionBuilder {
 	/// ```no_run
 	/// # use ort::session::{Session, builder::AutoDevicePolicy};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let mut session = Session::builder(&env)?
 	/// 	// moar power!!1!
 	/// 	.with_auto_device(AutoDevicePolicy::MaxPerformance)?
@@ -389,7 +389,7 @@ impl SessionBuilder {
 	/// ```
 	/// # use ort::{environment::Environment, session::Session, memory::DeviceType};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let options = vec![
 	/// 	("CPUExecutionProvider.use_arena".to_string(), "1".to_string()),
 	/// 	("XnnpackExecutionProvider.num_threads".to_string(), "4".to_string()),

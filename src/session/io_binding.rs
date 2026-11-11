@@ -45,7 +45,7 @@ use crate::{
 /// # 	value::Tensor
 /// # };
 /// # fn main() -> ort::Result<()> {
-/// # let env = ort::test_util::test_env().clone();
+/// # let env = ort_test_util::test_env().clone();
 /// let mut text_encoder = Session::builder(&env)?
 /// 	.with_execution_providers([
 /// 		#[cfg(feature = "cuda")]

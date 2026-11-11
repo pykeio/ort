@@ -102,7 +102,7 @@ impl Environment {
 	/// ```
 	/// # use ort::logging::LogLevel;
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// env.set_log_level(LogLevel::Warning);
 	/// # Ok(())
 	/// # }
@@ -127,7 +127,7 @@ impl Environment {
 	/// ```no_run
 	/// # use ort::{session::Session, memory::DeviceType};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// env.register_ep_library("CUDA", "/path/to/onnxruntime_providers_cuda.dll")?;
 	///
 	/// let mut session = Session::builder(&env)?
@@ -155,7 +155,7 @@ impl Environment {
 	/// ```
 	/// # use ort::environment::Environment;
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// for device in env.devices() {
 	/// 	let hardware_device = device.hardware_device();
 	/// 	println!(

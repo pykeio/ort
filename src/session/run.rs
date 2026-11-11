@@ -37,7 +37,7 @@ super::mut_methods! {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{RunOptions, Session}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let mut session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 	/// let outputs = session.run(ort::inputs![TensorRef::from_array_view(&input)?])?;
@@ -67,7 +67,7 @@ super::mut_methods! {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, RunOptions}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> {
-	/// # 	let env = ort::test_util::test_env().clone();
+	/// # 	let env = ort_test_util::test_env().clone();
 	/// # 	let mut session = Session::builder(&env)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// # 	let input = Value::from_array(ndarray::Array4::<f32>::zeros((1, 64, 64, 3)))?;
 	/// let run_options = Arc::new(RunOptions::new()?);
@@ -132,7 +132,7 @@ super::mut_methods! {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, RunOptions}, value::{Value, ValueType, Tensor, TensorElementType}};
 	/// # fn main() -> ort::Result<()> { tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let mut session = Session::builder(&env)?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 	/// let options = RunOptions::new()?;
@@ -176,7 +176,7 @@ super::mut_methods! {
 	/// # use std::sync::Arc;
 	/// # use ort::{session::{Session, RunOptions}, value::{Value, ValueType, TensorRef, TensorElementType}};
 	/// # fn main() -> ort::Result<()> { tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-	/// # let env = ort::test_util::test_env().clone();
+	/// # let env = ort_test_util::test_env().clone();
 	/// let mut session = Session::builder(&env)?.with_intra_threads(2)?.commit_from_file("tests/data/upsample.onnx")?;
 	/// let input = ndarray::Array4::<f32>::zeros((1, 64, 64, 3));
 	/// let options = RunOptions::new()?;

@@ -2,7 +2,10 @@ use core::fmt::Write;
 use std::{path::PathBuf, sync::OnceLock};
 
 use ort::{Error, environment::Environment};
-use ureq::config::Config;
+use ureq::{
+	config::Config,
+	tls::{RootCerts, TlsConfig, TlsProvider}
+};
 
 pub fn test_env() -> &'static Environment {
 	static TEST_ENV: OnceLock<Environment> = OnceLock::new();
@@ -25,7 +28,15 @@ pub fn download_model(url: &str) -> ort::Result<PathBuf> {
 	if model_filepath.exists() {
 		Ok(model_filepath)
 	} else {
-		let agent = Config::builder().build().new_agent();
+		let agent = Config::builder()
+			.tls_config(
+				TlsConfig::builder()
+					.provider(TlsProvider::NativeTls)
+					.root_certs(RootCerts::PlatformVerifier)
+					.build()
+			)
+			.build()
+			.new_agent();
 
 		let resp = agent.get(url).call().map_err(|e| Error::new(format!("Error downloading to file: {e}")))?;
 

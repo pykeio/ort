@@ -121,6 +121,8 @@ note: rerun the build with `cargo build -vv | grep ort-sys` to see debug message
 
 		let mut bin_extract_dir = internal::dirs::cache_dir()
 			.expect("could not determine cache directory")
+			.canonicalize()
+			.expect("failed to canonicalize cache directory")
 			.join("dfbin")
 			.join(target)
 			.join(dist.hash);

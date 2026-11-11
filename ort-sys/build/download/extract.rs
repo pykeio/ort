@@ -87,26 +87,17 @@ pub fn extract_tgz<R: Read>(reader: &mut R, output: &Path) -> Result<(), Error> 
 			continue;
 		}
 
-		// only allow entries below the root
-		let mut subpath = PathBuf::new();
-		for comp in PathBuf::from(header.path()).components() {
-			match comp {
-				Component::Prefix(_) | Component::RootDir => {
-					return Err(Error::new("invalid entry path"));
-				}
-				Component::CurDir => {
-					continue;
-				}
-				Component::ParentDir => {
-					subpath.pop();
-				}
-				Component::Normal(x) => {
-					subpath.push(x);
-				}
-			}
-		}
+		// only allow simple entries
+		let file_path = PathBuf::from(header.path());
+		let mut components = file_path.components();
+		let Some(Component::Normal(file_name)) = components.next() else {
+			return Err(Error::new("invalid tar entry path"));
+		};
+		assert_eq!(components.next(), None);
 
-		let path = output.join(subpath);
+		let path = output.join(file_name);
+		assert!(path.starts_with(output));
+
 		if let Some(parent) = path.parent() {
 			let _ = std::fs::create_dir_all(parent);
 		}

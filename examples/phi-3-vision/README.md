@@ -40,7 +40,7 @@ The performance of ONNX-based LLM inference can be relatively slow, especially o
 
 ## Run this Example
 
-Before running the example, you'll need to download the ONNX model files to the `data` directory. At present, the `SessionBuilder.commit_from_url` method doesn't support initialization for models split into `.onnx` and `.onnx.data` files, which is the case for Phi-3 Vision models.
+Before running the example, you'll need to download the ONNX model files to the `data` directory.
 
 To get started, run the `download.sh` script from the `data` directory to download the following three model files:
 

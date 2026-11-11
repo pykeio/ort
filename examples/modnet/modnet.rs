@@ -24,8 +24,8 @@ fn main() -> ort::Result<()> {
 	// Create our environment, registering EPs based on feature flags; you can also simply do `ort::init().build()?`
 	let env = common::get_env()?;
 
-	let mut session =
-		Session::builder(&env)?.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/modnet_photographic_portrait_matting.onnx")?;
+	let mut session = Session::builder(&env)?
+		.commit_from_file(ort_test_util::download_model("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/modnet_photographic_portrait_matting.onnx")?)?;
 
 	let original_img = image::open(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("photo.jpg")).unwrap();
 	let (img_width, img_height) = (original_img.width(), original_img.height());

@@ -41,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
 		.map_err(|e| anyhow::Error::msg(e.to_string()))?
 		.with_intra_threads(4)
 		.map_err(|e| anyhow::Error::msg(e.to_string()))?
-		.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/gpt2.onnx")?;
+		.commit_from_file(ort_test_util::download_model("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/gpt2.onnx")?)?;
 
 	// Load the tokenizer and encode the prompt into a sequence of tokens.
 	let tokenizer = Tokenizer::from_file(

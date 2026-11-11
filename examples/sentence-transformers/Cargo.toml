@@ -5,7 +5,8 @@ version = "0.0.0"
 edition = "2024"
 
 [dependencies]
-ort = { path = "../../", features = [ "fetch-models" ] }
+ort = { path = "../../" }
+ort-test-util = { path = "../../tests/util" }
 ndarray = "0.17"
 tokenizers = { version = "0.19", default-features = false, features = [ "onig" ] }
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }

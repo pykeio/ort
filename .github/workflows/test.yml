@@ -45,4 +45,4 @@ jobs:
       - uses: Swatinem/rust-cache@v2.9.1
       - name: Run tests
         run: |
-          cargo test -p ort --verbose --features fetch-models,tls-rustls -- --test-threads 1
+          cargo test -p ort --verbose --features tls-rustls -- --test-threads 1

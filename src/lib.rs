@@ -17,6 +17,7 @@
 
 extern crate alloc;
 extern crate core;
+extern crate self as ort;
 
 #[doc(hidden)]
 pub mod __private {
@@ -64,9 +65,9 @@ pub use ort_sys as sys;
 #[cfg(all(feature = "load-dynamic", not(all(target_family = "wasm", target_os = "unknown"))))]
 pub use self::environment::init_from;
 pub(crate) use self::logging::{debug, error, info, trace, warning as warn};
-#[doc(hidden)]
-pub mod test_util;
 use self::util::OnceLock;
+#[cfg(test)]
+pub(crate) mod test_util;
 pub use self::{
 	environment::init,
 	error::{Error, ErrorCode, Result}

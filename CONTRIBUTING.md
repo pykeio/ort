@@ -99,16 +99,14 @@ Any warnings about "`fn_call_width`" can be safely ignored. I don't know how to 
 </li>
 <li>
 
-**Test the code**. Ideally use stable Rust for this step. When testing code, the `fetch-models` feature flag is required, since many tests depend on externally hosted models.
-
-In the root of the repository, run:
+**Test the code**. Ideally use stable Rust for this step. In the root of the repository, run:
 ```shell
-$ cargo test --features fetch-models
+$ cargo test --features
 ```
 
-Generally, you don't need to enable any other features, unless you changed something related to a non-default feature like `load-dynamic`. Don't enable `--all-features`, as this will error; testing with only the default features (+ `fetch-models`) is fine.
+Generally, you don't need to enable any other features, unless you changed something related to a non-default feature like `load-dynamic`. Don't enable `--all-features`, as this will error; testing with only the default features is fine.
 
-Alternative backends aren't part of the main workspace, so if you change code in one of them, you'll have to `cd` into that backend and run `cargo test` there (`fetch-models` is not required).
+Alternative backends aren't part of the main workspace, so if you change code in one of them, you'll have to `cd` into that backend and run `cargo test` there.
 
 </li>
 </ol>

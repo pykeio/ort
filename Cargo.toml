@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = [ 'ort-sys' ]
+members = [ 'ort-sys', 'tests/util' ]
 default-members = [ '.' ]
 exclude = [
 	'backends/candle',
@@ -45,7 +45,7 @@ status = "actively-developed"
 
 [package.metadata.docs.rs]
 features = [
-	"std", "ndarray", "half", "num-complex", "training", "fetch-models", "load-dynamic", "copy-dylibs",
+	"std", "ndarray", "half", "num-complex", "training", "load-dynamic", "copy-dylibs",
 	"cuda", "tensorrt", "openvino", "onednn", "directml", "nnapi", "coreml", "xnnpack", "rocm", "acl",
 	"armnn", "tvm", "migraphx", "rknpu", "vitis", "cann", "qnn", "webgpu", "azure", "nvrtx", "vsinpu"
 ]
@@ -64,7 +64,6 @@ nightly = []
 num-complex = [ "dep:num-complex" ]
 tracing = [ "dep:tracing" ]
 
-fetch-models = [ "std", "dep:ureq", "dep:sha2" ]
 download-binaries = [ "ort-sys/download-binaries" ]
 lax-feature-matching = [ "ort-sys/lax-feature-matching" ]
 preload-dylibs = [ "dep:libloading" ]
@@ -88,10 +87,10 @@ api-29 = [ "ort-sys/api-29", "api-28" ]
 api-30 = [ "ort-sys/api-30", "api-29" ]
 api-31 = [ "ort-sys/api-31", "api-30" ]
 
-tls-rustls = [ "ort-sys/tls-rustls", "ureq?/rustls", "tls-rustls-no-provider" ]
-tls-rustls-no-provider = [ "ort-sys/tls-rustls-no-provider", "ureq?/rustls-no-provider" ]
-tls-native = [ "ort-sys/tls-native", "ureq?/native-tls" ]
-tls-native-vendored = [ "ort-sys/tls-native-vendored", "ureq?/native-tls", "ureq?/vendored" ]
+tls-rustls = [ "ort-sys/tls-rustls", "tls-rustls-no-provider" ]
+tls-rustls-no-provider = [ "ort-sys/tls-rustls-no-provider" ]
+tls-native = [ "ort-sys/tls-native" ]
+tls-native-vendored = [ "ort-sys/tls-native-vendored" ]
 
 alternative-backend = [ "ort-sys/disable-linking" ]
 
@@ -127,13 +126,13 @@ half = { version = "2.1", default-features = false, optional = true }
 num-complex = { version = "0.4", default-features = false, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-ureq = { version = "3.1", optional = true, default-features = false }
-sha2 = { version = "0.10", optional = true }
 libloading = { version = "0.9", optional = true }
 
 [dev-dependencies]
+ort-test-util = { path = "tests/util" }
 anyhow = "1.0"
 ureq = { version = "3", default-features = false, features = [ "native-tls" ] }
+sha2 = "0.11"
 image = { version = "0.25", default-features = false, features = [ "png", "jpeg" ] }
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "env-filter", "fmt" ] }
 tokio = { version = "1.36", features = [ "test-util" ] }

@@ -40,7 +40,7 @@ fn main() -> ort::Result<()> {
 	let mut session = Session::builder(&env)?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
-		.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/gpt2.onnx")?;
+		.commit_from_file(ort_test_util::download_model("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/gpt2.onnx")?)?;
 
 	// Load the tokenizer and encode the prompt into a sequence of tokens.
 	let tokenizer = Tokenizer::from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("data").join("tokenizer.json")).unwrap();

@@ -419,7 +419,7 @@ impl Drop for IoBinding {
 #[cfg(test)]
 mod tests {
 	#[cfg(feature = "ndarray")]
-	use crate::test_util::{mnist, test_env};
+	use crate::test_util::{download_model, mnist, test_env};
 	use crate::{
 		Result,
 		memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
@@ -429,9 +429,9 @@ mod tests {
 
 	// not terribly useful since CI is CPU-only, but it at least ensures the API won't segfault or something silly
 	#[test]
-	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
+	#[cfg(feature = "ndarray")]
 	fn test_mnist_input_bound() -> Result<()> {
-		let mut session = Session::builder(test_env())?.commit_from_url(mnist::MODEL_URL)?;
+		let mut session = Session::builder(test_env())?.commit_from_file(download_model(mnist::MODEL_URL)?)?;
 
 		let array = mnist::get_image();
 
@@ -448,9 +448,9 @@ mod tests {
 	}
 
 	#[test]
-	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
+	#[cfg(feature = "ndarray")]
 	fn test_mnist_input_output_bound() -> Result<()> {
-		let mut session = Session::builder(test_env())?.commit_from_url(mnist::MODEL_URL)?;
+		let mut session = Session::builder(test_env())?.commit_from_file(download_model(mnist::MODEL_URL)?)?;
 
 		let array = mnist::get_image();
 
@@ -467,9 +467,9 @@ mod tests {
 	}
 
 	#[test]
-	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
+	#[cfg(feature = "ndarray")]
 	fn test_send_iobinding() -> Result<()> {
-		let mut session = Session::builder(test_env())?.commit_from_url(mnist::MODEL_URL)?;
+		let mut session = Session::builder(test_env())?.commit_from_file(download_model(mnist::MODEL_URL)?)?;
 
 		let array = mnist::get_image();
 
@@ -491,9 +491,9 @@ mod tests {
 	}
 
 	#[test]
-	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
+	#[cfg(feature = "ndarray")]
 	fn test_mnist_clear_binds() -> Result<()> {
-		let mut session = Session::builder(test_env())?.commit_from_url(mnist::MODEL_URL)?;
+		let mut session = Session::builder(test_env())?.commit_from_file(download_model(mnist::MODEL_URL)?)?;
 
 		let array = mnist::get_image();
 
@@ -525,11 +525,11 @@ mod tests {
 	}
 
 	#[test]
-	#[cfg(all(feature = "ndarray", feature = "fetch-models"))]
+	#[cfg(feature = "ndarray")]
 	fn test_mnist_input_mut() -> Result<()> {
 		use crate::value::TensorRef;
 
-		let mut session = Session::builder(test_env())?.commit_from_url(mnist::MODEL_URL)?;
+		let mut session = Session::builder(test_env())?.commit_from_file(download_model(mnist::MODEL_URL)?)?;
 		let input_name = session.inputs()[0].name().to_string();
 
 		let mut binding = session.create_binding()?;

@@ -7,7 +7,7 @@ use ort::{
 
 #[test]
 fn run_async_rejects_extra_inputs() -> ort::Result<()> {
-	let env = ort::test_util::test_env();
+	let env = ort_test_util::test_env();
 	let mut session = Session::builder(env)?.commit_from_file("tests/data/upsample.onnx")?;
 	let input = Tensor::<f32>::new(&Allocator::default(), [1i64, 64, 64, 3])?;
 	let options = RunOptions::new()?;
@@ -20,7 +20,7 @@ fn run_async_rejects_extra_inputs() -> ort::Result<()> {
 
 #[test]
 fn run_async_error_and_success() -> ort::Result<()> {
-	let env = ort::test_util::test_env();
+	let env = ort_test_util::test_env();
 	let input = Tensor::<f32>::new(&Allocator::default(), [1i64, 64, 64, 3])?;
 	let options = RunOptions::new()?;
 
@@ -43,7 +43,7 @@ fn run_async_error_and_success() -> ort::Result<()> {
 
 #[test]
 fn run_async_preallocated_output() -> ort::Result<()> {
-	let env = ort::test_util::test_env();
+	let env = ort_test_util::test_env();
 	let mut session = Session::builder(env)?
 		.with_intra_threads(2)?
 		.commit_from_file("tests/data/upsample.onnx")?;

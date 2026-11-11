@@ -26,7 +26,7 @@ Rather than trying to link ONNX Runtime into your Rust application, `ort-web` in
 - 🔷 `ort::session::builder::SessionBuilder`
     - `SessionBuilder::new`
     - `SessionBuilder::commit_from_memory`
-    - `SessionBuilder::commit_from_url` (does not require `fetch-models` feature)
+    - [`SessionBuilder::commit_from_url`](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/session/builder/struct.SessionBuilder.html#method.commit_from_url)
     - `SessionBuilder::with_execution_providers` (WASM, WebGL, WebGPU, and WebNN)
     - `SessionBuilder::with_optimization_level`
     - `SessionBuilder::with_intra_threads`, `SessionBuilder::with_inter_threads`, `SessionBuilder::with_parallel_execution`
@@ -96,7 +96,7 @@ You'll still need to configure the EPs on a per-session basis later like you wou
 ## Session creation
 Sessions can only be [created from a URL](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/session/builder/struct.SessionBuilder.html#method.commit_from_url), or [indirectly from memory](https://docs.rs/ort/latest/wasm32-unknown-unknown/ort/session/builder/struct.SessionBuilder.html#method.commit_from_memory)--that means no `SessionBuilder::commit_from_memory_directly` for `.ort` format models, and no `SessionBuilder::commit_from_file`.
 
-Unlike vanilla <Ort/>, `commit_from_url` and `commit_from_memory` are marked `async` on the Web and thus need to be `await`ed. Also, `commit_from_url` is always available, regardless of whether the `fetch-models` feature is enabled.
+Unlike vanilla <Ort/>, `commit_from_url` and `commit_from_memory` are marked `async` on the Web and thus need to be `await`ed.
 
 ```rs filename="lib.rs"
 use ort::{ep, session::Session};

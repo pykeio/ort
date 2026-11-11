@@ -1,0 +1,16 @@
+[package]
+name = "ort-test-util"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "ort_test_util"
+path = "../../src/test_util.rs"
+
+[dependencies]
+ndarray = "0.17"
+ort = { path = "../../", default-features = false, features = [ "ndarray" ] }
+ureq = { version = "3", default-features = false, features = [ "native-tls" ] }
+sha2 = "0.11"
+image = { version = "0.25", default-features = false, features = [ "png", "jpeg" ] }

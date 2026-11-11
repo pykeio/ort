@@ -5,7 +5,8 @@ version = "0.0.0"
 edition = "2024"
 
 [dependencies]
-ort = { path = "../../", features = [ "fetch-models" ] }
+ort = { path = "../../" }
+ort-test-util = { path = "../../tests/util" }
 tokenizers = { version = "0.21", default-features = false, features = [ "onig" ] }
 rand = "0.9"
 

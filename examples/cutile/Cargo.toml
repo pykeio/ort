@@ -5,7 +5,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ort = { path = "../../", features = [ "cuda", "fetch-models" ] }
+ort = { path = "../../", features = [ "cuda" ] }
+ort-test-util = { path = "../../tests/util" }
 cutile = "0.4"
 anyhow = "1.0"
 image = { version = "0.25", default-features = false, features = [ "jpeg" ] }

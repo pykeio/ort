@@ -7,6 +7,7 @@ use ort::{
 	util::ArrayExt,
 	value::TensorRef
 };
+use ort_test_util::download_model;
 
 #[test]
 fn mnist_5() -> ort::Result<()> {
@@ -17,7 +18,7 @@ fn mnist_5() -> ort::Result<()> {
 	let mut session = Session::builder(&env)?
 		.with_optimization_level(GraphOptimizationLevel::Level1)?
 		.with_intra_threads(1)?
-		.commit_from_url("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/mnist.onnx")
+		.commit_from_file(download_model("https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/mnist.onnx")?)
 		.expect("Could not download model from file");
 
 	let input0_shape = {

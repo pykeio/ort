@@ -44,7 +44,7 @@ jobs:
       - name: Check fmt
         run: cargo fmt --all -- --check
       - name: Run clippy
-        run: cargo clippy -p ort --all-targets --features fetch-models
+        run: cargo clippy -p ort --all-targets
   coverage:
     name: Code coverage
     runs-on: ubuntu-24.04
@@ -71,7 +71,7 @@ jobs:
         run: cargo install cargo-tarpaulin --version 0.37.4
       - name: Generate code coverage
         run: |
-          cargo tarpaulin -p ort --features fetch-models,tls-rustls --verbose --timeout 120 --out xml --engine llvm --doc --lib --tests -- --test-threads 1
+          cargo tarpaulin -p ort --features tls-rustls --verbose --timeout 120 --out xml --engine llvm --doc --lib --tests -- --test-threads 1
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v6
         with:

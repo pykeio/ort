@@ -134,7 +134,7 @@ impl DynTensor {
 			ortsys![unsafe GetTensorMutableData(value_ptr.as_ptr(), &mut buffer_ptr)?];
 			if !buffer_ptr.is_null() {
 				let Some(numel) = shape.num_elements() else {
-					return Err(crate::Error::new_with_code(crate::ErrorCode::InvalidArgument, format!("Shape {shape:?} is too large")));
+					return Err(crate::Error::new_with_code(crate::ErrorCode::InvalidArgument, alloc::format!("Shape {shape:?} is too large")));
 				};
 				unsafe { buffer_ptr.write_bytes(0, data_type.byte_size(numel).expect("infallible")) };
 			}
@@ -234,7 +234,8 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 		unsafe { self.inner.memory_info.as_ref().unwrap_unchecked() }
 	}
 
-	/// Returns the size of the tensor's data in bytes, or `None` in the case of string tensors.
+	/// Returns the size of the tensor's data in bytes, or `None` if the shape is invalid or the tensor is a string
+	/// tensor.
 	///
 	/// ```
 	/// # use ort::{memory::{Allocator, AllocatorType, AllocationDevice, MemoryInfo, MemoryType}, session::Session, value::Tensor};
@@ -251,7 +252,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 			Some(size)
 		}
 		#[cfg(not(feature = "api-23"))]
-		self.data_type().byte_size(self.shape().num_elements())
+		self.data_type().byte_size(self.shape().num_elements()?)
 	}
 }
 

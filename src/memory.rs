@@ -1,6 +1,6 @@
 //! Types for managing memory & device allocations.
 
-use alloc::{borrow::Cow, ffi::CString, sync::Arc};
+use alloc::{borrow::Cow, ffi::CString, format, sync::Arc};
 use core::{
 	ffi::{CStr, c_char, c_int, c_void},
 	hash::{Hash, Hasher},

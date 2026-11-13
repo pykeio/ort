@@ -37,17 +37,20 @@ pub fn copy_dylibs(lib_dir: &Path) {
 			}
 
 			// recent rust versions no longer use the deps folder
-			if out_dir.exists() && !out_path.exists() {
-				#[cfg(windows)]
-				if std::os::windows::fs::symlink_file(&lib_path, &out_path).is_err() {
-					copy_fallback = true;
-					fs::copy(&lib_path, &out_path).unwrap();
+			if out_dir.exists() {
+				if !out_path.exists() {
+					#[cfg(windows)]
+					if std::os::windows::fs::symlink_file(&lib_path, &out_path).is_err() {
+						copy_fallback = true;
+						fs::copy(&lib_path, &out_path).unwrap();
+					}
+					#[cfg(unix)]
+					std::os::unix::fs::symlink(&lib_path, &out_path).unwrap();
 				}
-				#[cfg(unix)]
-				std::os::unix::fs::symlink(&lib_path, &out_path).unwrap();
-			}
-			if !copy_fallback {
-				println!("cargo:rerun-if-changed={}", out_path.to_str().unwrap());
+
+				if !copy_fallback {
+					println!("cargo:rerun-if-changed={}", out_path.to_str().unwrap());
+				}
 			}
 		}
 

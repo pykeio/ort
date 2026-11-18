@@ -328,6 +328,8 @@ pub struct TensorArrayDataParts<I> {
 )]
 pub trait ToShape {
 	fn to_shape(&self, expected_size: Option<usize>) -> Result<Shape>;
+
+	private_trait!();
 }
 
 macro_rules! impl_to_shape {
@@ -371,11 +373,13 @@ macro_rules! impl_to_shape {
 	($(for $t:ty),+) => {
 		$(impl ToShape for $t {
 			impl_to_shape!(@inner);
+			private_impl!();
 		})+
 	};
 	(<N> $(for $t:ty),+) => {
 		$(impl<const N: usize> ToShape for $t {
 			impl_to_shape!(@inner);
+			private_impl!();
 		})+
 	};
 }
@@ -387,6 +391,8 @@ impl ToShape for () {
 			Some(_) => Err(Error::new_with_code(ErrorCode::InvalidArgument, "Expected data to have a length of exactly 1 for scalar shape"))
 		}
 	}
+
+	private_impl!();
 }
 
 impl_to_shape!(for Shape, for &[usize], for &[i32], for &[i64], for Vec<usize>, for Vec<i32>, for Vec<i64>);

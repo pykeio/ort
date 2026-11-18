@@ -1,7 +1,9 @@
 use alloc::{borrow::Cow, sync::Arc};
 use core::{
 	any::Any,
-	fmt, mem,
+	fmt,
+	marker::PhantomData,
+	mem,
 	ptr::{self, NonNull}
 };
 use std::path::Path;
@@ -14,19 +16,24 @@ use crate::{
 	AsPointer, ErrorCode,
 	environment::Environment,
 	error::{Error, Result},
-	memory::Allocator,
+	memory::{Allocator, MemoryInfo},
 	ortsys,
 	session::{SessionInputValue, SessionInputs, SessionOutputs, builder::SessionBuilder},
 	util::{char_p_to_string, run_on_drop, with_cstr_ptr_array},
-	value::{IntoTensorElementType, Tensor, Value}
+	value::{IntoTensorElementType, Tensor, Value, ValueFlags, ValueInner, ValueType}
 };
 
+#[derive(Debug)]
 pub struct Trainer {
-	ptr: NonNull<ort_sys::OrtTrainingSession>,
+	inner: Arc<TrainingSessionInner>,
 	train_output_names: Vec<String>,
 	eval_output_names: Vec<String>,
 	train_input_names: Vec<String>,
-	eval_input_names: Vec<String>,
+	eval_input_names: Vec<String>
+}
+
+pub(crate) struct TrainingSessionInner {
+	ptr: NonNull<ort_sys::OrtTrainingSession>,
 	ckpt: Checkpoint,
 	_allocator: Allocator,
 	_environment: Environment,
@@ -34,16 +41,19 @@ pub struct Trainer {
 	_extras: SmallVec<[Arc<dyn Any>; 4]>
 }
 
-impl fmt::Debug for Trainer {
+unsafe impl Send for TrainingSessionInner {}
+unsafe impl Sync for TrainingSessionInner {}
+
+impl fmt::Debug for TrainingSessionInner {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		f.debug_struct("Trainer")
-			.field("ptr", &self.ptr)
-			.field("train_output_names", &self.train_output_names)
-			.field("eval_output_names", &self.eval_output_names)
-			.field("train_input_names", &self.train_input_names)
-			.field("eval_input_names", &self.eval_input_names)
-			.field("ckpt", &self.ckpt)
-			.finish_non_exhaustive()
+		f.debug_struct("TrainingSessionInner").field("ptr", &self.ptr).finish_non_exhaustive()
+	}
+}
+
+impl Drop for TrainingSessionInner {
+	fn drop(&mut self) {
+		crate::logging::drop!(Trainer, self.ptr);
+		ortsys![@training: unsafe ReleaseTrainingSession(self.ptr.as_ptr())];
 	}
 }
 
@@ -140,15 +150,17 @@ impl Trainer {
 		crate::logging::create!(Trainer, ptr);
 
 		Ok(Self {
-			ptr,
+			inner: Arc::new(TrainingSessionInner {
+				ptr,
+				ckpt,
+				_allocator: allocator,
+				_extras: session_options.extras(),
+				_environment: session_options.environment
+			}),
 			train_output_names,
 			train_input_names,
 			eval_output_names,
-			eval_input_names,
-			ckpt,
-			_allocator: allocator,
-			_extras: session_options.extras(),
-			_environment: session_options.environment
+			eval_input_names
 		})
 	}
 
@@ -192,7 +204,7 @@ impl Trainer {
 		};
 		unsafe {
 			Error::result_from_status(run(
-				self.ptr.as_ptr(),
+				self.inner.ptr.as_ptr(),
 				ptr::null(),
 				input_ort_values.len(),
 				input_ort_values.as_ptr(),
@@ -203,11 +215,21 @@ impl Trainer {
 
 		let outputs = output_tensor_ptrs
 			.into_iter()
-			.map(|tensor_ptr| unsafe {
-				// TODO: `Value` should absolutely be refactored to accept a different backing pointer than
-				// `SharedSessionInner`. but for now, nobody should be using the loss tensor past the
-				// lifetime of the trainer... right...? 😣
-				Value::from_ptr(NonNull::new(tensor_ptr).expect("OrtValue ptr returned from session Run should not be null"), None)
+			.map(|tensor_ptr| {
+				let Some(ptr) = NonNull::new(tensor_ptr) else {
+					panic!("OrtValue ptr returned from session Run should not be null");
+				};
+
+				let mut is_tensor = 0;
+				ortsys![unsafe IsTensor(ptr.as_ptr(), &mut is_tensor).expect("infallible")];
+				assert!(is_tensor != 0);
+
+				let (memory_info, dtype) = unsafe { (Some(MemoryInfo::from_tensor_value(ptr)), ValueType::from_tensor_value(ptr)) };
+
+				Value {
+					inner: ValueInner::new(ptr, dtype, memory_info, Some(self.inner.clone() as Arc<_>), ValueFlags::DROP | ValueFlags::UPGRADABLE, None),
+					_markers: PhantomData
+				}
 			})
 			.collect();
 
@@ -217,7 +239,7 @@ impl Trainer {
 	pub fn export<O: AsRef<str>>(&self, out_path: impl AsRef<Path>, output_names: impl AsRef<[O]>) -> Result<()> {
 		let out_path = crate::util::path_to_os_char(out_path);
 		with_cstr_ptr_array(output_names.as_ref(), &mut |output_name_ptrs| {
-			ortsys![@training: unsafe ExportModelForInferencing(self.ptr.as_ptr(), out_path.as_ptr(), output_name_ptrs.len(), output_name_ptrs.as_ptr())?];
+			ortsys![@training: unsafe ExportModelForInferencing(self.inner.ptr.as_ptr(), out_path.as_ptr(), output_name_ptrs.len(), output_name_ptrs.as_ptr())?];
 			Ok(())
 		})?;
 		Ok(())
@@ -225,26 +247,26 @@ impl Trainer {
 
 	pub fn num_params(&self, trainable_only: bool) -> Result<usize> {
 		let mut out = 0;
-		ortsys![@training: unsafe GetParametersSize(self.ptr.as_ptr(), &mut out, trainable_only)?];
+		ortsys![@training: unsafe GetParametersSize(self.inner.ptr.as_ptr(), &mut out, trainable_only)?];
 		Ok(out)
 	}
 
 	pub fn copy_parameters_to<T: IntoTensorElementType + fmt::Debug>(&self, value: &mut Tensor<T>, trainable_only: bool) -> Result<()> {
-		ortsys![@training: unsafe CopyParametersToBuffer(self.ptr.as_ptr(), value.ptr_mut(), trainable_only)?];
+		ortsys![@training: unsafe CopyParametersToBuffer(self.inner.ptr.as_ptr(), value.ptr_mut(), trainable_only)?];
 		Ok(())
 	}
 
 	pub fn copy_parameters_from<T: IntoTensorElementType + fmt::Debug>(&mut self, value: &Tensor<T>, trainable_only: bool) -> Result<()> {
-		ortsys![@training: unsafe CopyBufferToParameters(self.ptr.as_ptr(), value.ptr().cast_mut(), trainable_only)?];
+		ortsys![@training: unsafe CopyBufferToParameters(self.inner.ptr.as_ptr(), value.ptr().cast_mut(), trainable_only)?];
 		Ok(())
 	}
 
 	pub fn optimizer(&self) -> Optimizer<'_> {
-		Optimizer::new(self.ptr)
+		Optimizer::new(self.inner.ptr)
 	}
 
 	pub fn checkpoint(&self) -> &Checkpoint {
-		&self.ckpt
+		&self.inner.ckpt
 	}
 }
 
@@ -252,14 +274,7 @@ impl AsPointer for Trainer {
 	type Sys = ort_sys::OrtTrainingSession;
 
 	fn ptr(&self) -> *const Self::Sys {
-		self.ptr.as_ptr()
-	}
-}
-
-impl Drop for Trainer {
-	fn drop(&mut self) {
-		crate::logging::drop!(Trainer, self.ptr);
-		ortsys![@training: unsafe ReleaseTrainingSession(self.ptr.as_ptr())];
+		self.inner.ptr.as_ptr()
 	}
 }
 

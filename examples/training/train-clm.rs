@@ -38,7 +38,7 @@ fn main() -> ort::Result<()> {
 	let _ = kdam::term::hide_cursor();
 
 	let trainer = Trainer::new(
-		SessionBuilder::new(&env)?.with_execution_providers([ep::CUDA::default().build()])?,
+		SessionBuilder::new(&env)?,
 		Allocator::default(),
 		Checkpoint::load("tools/train-data/mini-clm/checkpoint")?,
 		"tools/train-data/mini-clm/training_model.onnx",

@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 
 use crate::{
 	AsPointer, Error, OnceLock, Result,
-	memory::AllocatorHandle,
+	memory::{Allocator, AllocatorHandle},
 	operator::Attribute,
 	ortsys,
 	session::{Session, builder::SessionBuilder},
@@ -213,7 +213,9 @@ impl Graph {
 			Ok(())
 		})?;
 
-		if let Some(allocator) = value_inner._allocator_handle.clone() {
+		if let Some(allocator) = value_inner._allocator_handle.clone()
+			&& let Ok(allocator) = Arc::downcast::<AllocatorHandle>(allocator)
+		{
 			self._initializer_allocators
 				.insert(allocator._drop_ptr.map_or(0, |p| p.as_ptr() as usize), allocator);
 		}

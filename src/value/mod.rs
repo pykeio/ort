@@ -77,17 +77,27 @@ impl BitOr for ValueFlags {
 	}
 }
 
-#[derive(Debug)]
 pub(crate) struct ValueInner {
 	pub(crate) ptr: NonNull<ort_sys::OrtValue>,
 	pub(crate) dtype: ValueType,
 	pub(crate) flags: ValueFlags,
 	pub(crate) memory_info: Option<MemoryInfo<'static>>,
-	/// the value needs the allocator to stay alive so it can drop its memory. maps/sequences don't use their own
-	/// allocators, though, hence this is optional
-	pub(crate) _allocator_handle: Option<Arc<AllocatorHandle>>,
+	/// the value needs whatever allocated it to stay alive so it can drop its memory. maps/sequences don't use their
+	/// own allocators, though, hence this is optional
+	pub(crate) _allocator_handle: Option<Arc<dyn Any + Send + Sync>>,
 	// additional things like element `Value` handles for `Sequence`s
 	_backing: Option<Box<dyn Any>>
+}
+
+impl fmt::Debug for ValueInner {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.debug_struct("ValueInner")
+			.field("ptr", &self.ptr)
+			.field("dtype", &self.dtype)
+			.field("flags", &self.flags)
+			.field("memory_info", &self.memory_info)
+			.finish_non_exhaustive()
+	}
 }
 
 impl ValueInner {
@@ -95,7 +105,7 @@ impl ValueInner {
 		ptr: NonNull<ort_sys::OrtValue>,
 		dtype: ValueType,
 		memory_info: Option<MemoryInfo<'static>>,
-		allocator_handle: Option<Arc<AllocatorHandle>>,
+		allocator_handle: Option<Arc<dyn Any + Send + Sync>>,
 		flags: ValueFlags,
 		backing: Option<Box<dyn Any>>
 	) -> Arc<Self> {
@@ -284,7 +294,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 		};
 
 		Value {
-			inner: ValueInner::new(ptr, dtype, memory_info, allocator.map(|a| a.handle.clone()), ValueFlags::DROP | ValueFlags::UPGRADABLE, None),
+			inner: ValueInner::new(ptr, dtype, memory_info, allocator.map(|a| a.handle.clone() as Arc<_>), ValueFlags::DROP | ValueFlags::UPGRADABLE, None),
 			_markers: PhantomData
 		}
 	}
@@ -343,7 +353,7 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 		// allocator check for tensors not needed because, well, we don't drop!
 
 		Value {
-			inner: ValueInner::new(ptr, dtype, memory_info, allocator.map(|a| a.handle.clone()), ValueFlags::default(), None),
+			inner: ValueInner::new(ptr, dtype, memory_info, allocator.map(|a| a.handle.clone() as Arc<_>), ValueFlags::default(), None),
 			_markers: PhantomData
 		}
 	}

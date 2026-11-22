@@ -1,7 +1,7 @@
 [package]
 name = "ort-candle"
 description = "ort + candle = 🦀 - An alternative backend for ort, powered by candle."
-version = "0.5.0+0.11.0"
+version = "0.6.0+0.11.1"
 edition = "2024"
 rust-version = "1.92"
 license = "MIT OR Apache-2.0"
@@ -35,12 +35,13 @@ ort-sys = { version = "=2.0.0-rc.15", path = "../../ort-sys", default-features =
 
 [dependencies]
 ort-sys = { workspace = true }
-candle-core = { version = "=0.11.0", default-features = false }
-candle-onnx = { version = "=0.11.0" }
+candle-core = { version = "=0.11.1", default-features = false }
+candle-onnx = { version = "=0.11.1" }
 prost = { version = "0.14.1", default-features = false }
 
 [dev-dependencies]
-ort = { version = "=2.0.0-rc.15", path = "../../", default-features = false, features = [ "alternative-backend", "fetch-models", "tls-rustls", "api-24" ] }
+ort = { version = "=2.0.0-rc.15", path = "../../", default-features = false, features = [ "std", "alternative-backend", "tls-rustls", "ndarray", "api-24" ] }
+ndarray = "0.17"
 
 [[test]]
 name = "memory"
@@ -48,3 +49,6 @@ path = "tests/memory.rs"
 [[test]]
 name = "tensor"
 path = "tests/tensor.rs"
+[[test]]
+name = "session"
+path = "tests/session.rs"

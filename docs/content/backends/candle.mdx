@@ -8,23 +8,31 @@ import Ort from '../../components/Ort';
 - ✅ `ort::init`
 - 🔷 `ort::environment::EnvironmentBuilder`
     - `EnvironmentBuilder::build`
-- 🔷 `ort::memory::Allocator`
-    - `Allocator::default`
-    - `Allocator::memory_info`
+    - `EnvironmentBuilder::with_global_thread_pool` (accepted, but has no effect)
+- ✅ `ort::memory::Allocator`
+    - Only CPU allocations are supported.
 - ✅ `ort::memory::MemoryInfo`
 - 🔷 `ort::session::Session`
     - `Session::builder`
+    - `Session::inputs`, `Session::outputs`
     - `Session::allocator`
+    - `Session::metadata`
     - `Session::run`
     - `Session::run_with_options`
+    - `Session::create_binding`, `Session::run_binding`
+- ✅ `ort::session::RunOptions`, `ort::session::OutputSelector`
+    - `RunOptions::terminate` only takes effect if called before the run.
 - 🔷 `ort::session::builder::SessionBuilder`
     - `SessionBuilder::new`
     - `SessionBuilder::commit_from_file`
     - `SessionBuilder::commit_from_memory`
     - `SessionBuilder::commit_from_memory_directly`
+    - `SessionBuilder::with_initializer`, `SessionBuilder::with_external_initializer`
+    - `SessionBuilder::with_dimension_override`, ``SessionBuilder::with_dimension_override_by_denotation`
 - ✅ `ort::value::DynValue`, `ort::value::DynValueRef`, `ort::value::DynValueRefMut`
     - Only `Tensor` types are supported.
 - ✅ `ort::value::Tensor`, `TensorRef`, `TensorRefMut`, etc.
+    - String tensors are not supported.
 - ✅ `ort::value::ValueType`
 
 ## Usage
@@ -34,7 +42,7 @@ import Ort from '../../components/Ort';
 ### Install `ort-candle`
 ```toml filename="Cargo.toml"
 [dependencies]
-ort-candle = "0.5.0+0.11.0"
+ort-candle = "0.6.0+0.11.1"
 ...
 ```
 

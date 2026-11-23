@@ -203,6 +203,7 @@ note: rerun the build with `cargo build -vv | grep ort-sys` to see debug message
 		#[cfg(feature = "copy-dylibs")]
 		dynamic_link::copy_dylibs(&bin_extract_dir);
 
+		println!("cargo:rerun-if-changed={}", bin_extract_dir.display());
 		println!("cargo:rustc-link-search=native={}", bin_extract_dir.display());
 		println!("cargo:rustc-link-lib=static=onnxruntime");
 	}

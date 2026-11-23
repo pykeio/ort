@@ -14,6 +14,7 @@ pub const CXX_STDLIB: &[&str] = &[
 	"CXXSTDLIB" // Used by the `cc` crate - we should mirror if this is set for other C++ crates
 ];
 pub const CUDA_VERSION: &str = "ORT_CUDA_VERSION";
+pub const MIRROR: &str = "ORT_MIRROR";
 
 pub fn get(var: &str) -> Option<String> {
 	println!("cargo:rerun-if-env-changed={var}");

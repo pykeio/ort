@@ -125,10 +125,24 @@ note: rerun the build with `cargo build -vv | grep ort-sys` to see debug message
 			.join(target)
 			.join(dist.hash);
 		if !bin_extract_dir.exists() {
-			let mut verified_reader = match download::fetch_file(dist.url) {
+			let mut url = dist.url.to_string();
+			let mut is_mirror = false;
+			if let Some(mut mirror_base) = vars::get(vars::MIRROR)
+				&& let Some(name) = url.split('/').next_back()
+			{
+				assert!(url.starts_with("http://") || url.starts_with("https://"));
+
+				if mirror_base.ends_with('/') {
+					mirror_base.pop();
+				}
+				url = format!("{mirror_base}/{name}");
+				is_mirror = true;
+			}
+
+			let mut verified_reader = match download::fetch_file(&url, is_mirror) {
 				Ok(reader) => download::VerifyReader::new(reader),
 				Err(e) => {
-					log::error!("ort-sys failed to download prebuilt binaries from `{}`: {e}", dist.url);
+					log::error!("ort-sys failed to download prebuilt binaries from `{}`: {e}", &url);
 					return;
 				}
 			};
@@ -141,11 +155,15 @@ note: rerun the build with `cargo build -vv | grep ort-sys` to see debug message
 			let (calculated_hash, _) = verified_reader.finalize().expect("Failed to finalize read");
 			if calculated_hash[..] != download::hex_str_to_bytes(dist.hash) {
 				log::error!(
-					r"⚠️ The hash of the file downloaded from `{}` does not match the expected hash. ⚠️ -- Got {}, expected {}
-note: if you're using a proxy, make sure it's not doing something weird. Otherwise, report this incident to https://github.com/pykeio/ort/issues & email contact@pyke.io.",
+					r"⚠️ The hash of the file downloaded from `{}` does not match the expected hash. ⚠️ -- Got {}, expected {}{}",
 					dist.url,
 					download::bytes_to_hex_str(&calculated_hash),
-					dist.hash
+					dist.hash,
+					if !is_mirror {
+						"\nnote: if you're using a proxy, make sure it's not doing something weird. Otherwise, report this incident to https://github.com/pykeio/ort/issues & email contact@pyke.io."
+					} else {
+						""
+					}
 				);
 				return;
 			}

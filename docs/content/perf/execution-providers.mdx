@@ -216,4 +216,4 @@ On x86_64, [compute capabilities](https://developer.nvidia.com/cuda/gpus) 7.5 (`
 ### WebGPU
 The WebGPU EP is **experimental** and may produce incorrect results/crashes; these issues should be reported upstream as there's unfortunately nothing we can do about them.
 
-WebGPU binaries are provided for Windows, macOS, and Linux. On Windows, DirectX 12 and 11 are supported. On Linux, Vulkan and OpenGL/GLES are supported.
+WebGPU binaries are provided for Windows (x86_64), macOS (aarch64), and Linux (x86_64 only — there are no prebuilt WebGPU binaries for `aarch64-unknown-linux-gnu` yet; requesting the `webgpu` feature there will fail the build with a message listing the available feature sets unless `lax-feature-matching` is enabled, in which case the WebGPU EP will not be present at runtime). On Windows, DirectX 12 and 11 are supported. On Linux (x86_64), Vulkan and OpenGL/GLES are supported. If you need WebGPU on a target without prebuilt binaries, compile ONNX Runtime from source (see [linking](/setup/linking)).

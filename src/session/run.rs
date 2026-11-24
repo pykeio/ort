@@ -275,6 +275,8 @@ impl Session {
 		input_values: SmallVec<[&'i SessionInputValue<'v>; STACK_SESSION_INPUTS]>,
 		run_options: Option<&'r UntypedRunOptions>
 	) -> Result<SessionOutputs<'r>> {
+		self.inner.wait_for_async_run();
+
 		if input_values.len() > input_names.len() {
 			// If we provide more inputs than the model expects with `ort::inputs![a, b, c]`, then we get an
 			// `input_names` shorter than `inputs`. ONNX Runtime will attempt to look up the name of all
@@ -363,6 +365,7 @@ impl Session {
 	) -> Result<SessionOutputs<'b>> {
 		use crate::util::run_on_drop;
 
+		self.inner.wait_for_async_run();
 		binding.rebind_dirty_inputs()?;
 
 		let run_options_ptr = if let Some(run_options) = run_options { run_options.ptr() } else { ptr::null() };
@@ -483,6 +486,8 @@ impl Session {
 		let ctx = Box::leak(unsafe { ctx.assume_init() });
 		crate::logging::create!(AsyncInferenceContext, ctx);
 
+		self.inner.async_gate.begin();
+
 		let res = ortsys![@ort:
 			unsafe RunAsync(
 				self.inner.session_ptr.as_ptr(),
@@ -499,6 +504,8 @@ impl Session {
 		];
 		if let Err(e) = res {
 			// The callback is never called if `RunAsync` fails, so we have to free the context ourselves.
+			self.inner.async_gate.end();
+
 			let ctx = unsafe { Box::from_raw(ctx as *mut AsyncInferenceContext<'_>) };
 			crate::logging::drop!(AsyncInferenceContext, &*ctx);
 			ctx.free_name_ptrs();

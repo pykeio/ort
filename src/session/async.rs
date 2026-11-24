@@ -6,6 +6,7 @@ use core::{
 	ptr::NonNull,
 	task::{Context, Poll, Waker}
 };
+use std::sync::Condvar;
 
 use smallvec::SmallVec;
 
@@ -13,9 +14,38 @@ use crate::{
 	Error,
 	error::Result,
 	session::{SessionOutputs, SharedSessionInner, UntypedRunOptions, run::OutputAliasGuard},
-	util::{Mutex, STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS},
+	util::{Mutex, STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS, run_on_drop},
 	value::{DynValue, ValueInner}
 };
+
+#[derive(Debug, Default)]
+pub(crate) struct AsyncRunGate {
+	running: std::sync::Mutex<bool>,
+	finished: Condvar
+}
+
+impl AsyncRunGate {
+	fn wait_idle(&self) -> std::sync::MutexGuard<'_, bool> {
+		let mut running = self.running.lock().unwrap_or_else(|e| e.into_inner());
+		while *running {
+			running = self.finished.wait(running).unwrap_or_else(|e| e.into_inner());
+		}
+		running
+	}
+
+	pub(crate) fn wait(&self) {
+		drop(self.wait_idle());
+	}
+
+	pub(crate) fn begin(&self) {
+		*self.wait_idle() = true;
+	}
+
+	pub(crate) fn end(&self) {
+		*self.running.lock().unwrap_or_else(|e| e.into_inner()) = false;
+		self.finished.notify_all();
+	}
+}
 
 struct InferenceFutState<'r> {
 	value: Option<Result<SessionOutputs<'r>>>,
@@ -116,6 +146,9 @@ impl AsyncInferenceContext<'_> {
 pub(crate) extern "C" fn async_callback(user_data: *mut c_void, _: *mut *mut ort_sys::OrtValue, _: usize, status: ort_sys::OrtStatusPtr) {
 	let ctx = unsafe { Box::from_raw(user_data.cast::<AsyncInferenceContext<'_>>()) };
 
+	let session_inner = Arc::clone(&ctx.session_inner);
+	let _gate = run_on_drop(move || session_inner.async_gate.end());
+
 	ctx.free_name_ptrs();
 
 	crate::logging::drop!(AsyncInferenceContext, user_data);
@@ -160,4 +193,104 @@ pub(crate) extern "C" fn async_callback(user_data: *mut c_void, _: *mut *mut ort
 
 	let output_names = ctx.output_names;
 	ctx.inner.complete(outputs.map(|outputs| SessionOutputs::new(output_names, outputs)));
+}
+
+#[cfg(test)]
+mod tests {
+	use alloc::sync::Arc;
+	use core::{
+		mem,
+		sync::atomic::{AtomicUsize, Ordering},
+		time::Duration
+	};
+	use std::thread;
+
+	use crate::{
+		Error, Result,
+		memory::Allocator,
+		operator::{BoxedKernel, ComputeContext, KernelContext, Operator, OperatorDomain, OperatorInput, OperatorOutput},
+		session::{RunOptions, Session},
+		test_util::test_env,
+		value::{Tensor, TensorElementType}
+	};
+
+	#[derive(Default)]
+	struct Activity {
+		active: AtomicUsize,
+		max_active: AtomicUsize
+	}
+
+	struct SlowOp {
+		name: &'static str,
+		inputs: usize,
+		output_type: TensorElementType,
+		activity: Arc<Activity>
+	}
+
+	impl Operator for SlowOp {
+		type Kernel<'attr> = BoxedKernel<'attr>;
+
+		fn name(&self) -> &str {
+			self.name
+		}
+
+		fn inputs(&self) -> impl IntoIterator<Item = OperatorInput> {
+			(0..self.inputs).map(|_| OperatorInput::required(TensorElementType::Float32))
+		}
+
+		fn outputs(&self) -> impl IntoIterator<Item = OperatorOutput> {
+			[OperatorOutput::required(self.output_type)]
+		}
+
+		fn create_kernel<'attr>(&self, _: &KernelContext<'attr>) -> Result<Self::Kernel<'attr>> {
+			let activity = Arc::clone(&self.activity);
+			Ok(Box::new(move |ctx: &ComputeContext| {
+				let active = activity.active.fetch_add(1, Ordering::SeqCst) + 1;
+				activity.max_active.fetch_max(active, Ordering::SeqCst);
+				thread::sleep(Duration::from_millis(100));
+
+				let shape = ctx.input(0)?.ok_or_else(|| Error::new("missing input"))?.shape().to_vec();
+				ctx.output(0, shape)?.ok_or_else(|| Error::new("missing output"))?;
+
+				activity.active.fetch_sub(1, Ordering::SeqCst);
+				Ok(())
+			}))
+		}
+	}
+
+	#[test]
+	fn test_abandoned_async_run_does_not_overlap() -> Result<()> {
+		let activity = Arc::new(Activity::default());
+		let slow_op = |name, inputs, output_type| SlowOp {
+			name,
+			inputs,
+			output_type,
+			activity: Arc::clone(&activity)
+		};
+		let mut session = Session::builder(test_env())?
+			.with_intra_threads(2)?
+			.with_operators(
+				OperatorDomain::new("test.customop")?
+					.add(slow_op("CustomOpOne", 2, TensorElementType::Float32))?
+					.add(slow_op("CustomOpTwo", 1, TensorElementType::Int32))?
+			)?
+			.commit_from_file("tests/data/custom_op_test.onnx")?;
+		let input = || Tensor::<f32>::new(&Allocator::default(), [3_usize, 5]);
+
+		for forget in [false, true] {
+			let options = RunOptions::new()?;
+			let fut = session.run_async(crate::inputs![input()?, input()?], &options)?;
+			thread::sleep(Duration::from_millis(20));
+			if forget {
+				mem::forget(fut);
+			} else {
+				drop(fut);
+			}
+
+			session.run(crate::inputs![input()?, input()?])?;
+			assert_eq!(activity.max_active.load(Ordering::SeqCst), 1);
+		}
+
+		Ok(())
+	}
 }

@@ -71,6 +71,8 @@ pub use self::{
 pub struct SharedSessionInner {
 	session_ptr: NonNull<ort_sys::OrtSession>,
 	pub(crate) allocator: Allocator,
+	#[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
+	pub(crate) async_gate: r#async::AsyncRunGate,
 	/// Additional things we may need to hold onto for the duration of this session, like `OperatorDomain`s and
 	/// DLL handles for operator libraries.
 	_extras: SmallVec<[Arc<dyn Any>; 4]>,
@@ -79,6 +81,17 @@ pub struct SharedSessionInner {
 
 unsafe impl Send for SharedSessionInner {}
 unsafe impl Sync for SharedSessionInner {}
+
+impl SharedSessionInner {
+	/// Blocks until ONNX Runtime has finished a [`Session::run_async`] call whose future was dropped or forgotten.
+	///
+	/// This must be called before using the session in a way that requires exclusive access to it.
+	#[inline]
+	pub(crate) fn wait_for_async_run(&self) {
+		#[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
+		self.async_gate.wait();
+	}
+}
 
 impl AsPointer for SharedSessionInner {
 	type Sys = ort_sys::OrtSession;
@@ -227,6 +240,8 @@ impl Session {
 
 	#[cfg(feature = "api-20")]
 	pub(crate) fn set_dynamic_option(&mut self, key: *const c_char, value: *const c_char) -> Result<()> {
+		self.inner.wait_for_async_run();
+
 		ortsys![unsafe SetEpDynamicOptions(self.inner.session_ptr.as_ptr(), &key, &value, 1)?];
 		Ok(())
 	}
@@ -313,6 +328,8 @@ mut_methods! {
 	///
 	/// Note that this must be explicitly called at the end of profiling, otherwise the profiling file will be empty.
 	pub fn end_profiling(&mut self) -> Result<String> {
+		self.inner.wait_for_async_run();
+
 		let mut profiling_name: *mut c_char = ptr::null_mut();
 		ortsys![unsafe SessionEndProfiling(self.inner.session_ptr.as_ptr(), self.inner.allocator.ptr().cast_mut(), &mut profiling_name)?; nonNull(profiling_name)];
 		unsafe { AllocatedString::from_ptr(profiling_name.as_ptr(), &self.inner.allocator) }.map(|x| x.to_string())

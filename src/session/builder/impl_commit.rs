@@ -192,6 +192,8 @@ impl SessionBuilder {
 			inner: Arc::new(SharedSessionInner {
 				session_ptr: ptr,
 				allocator,
+				#[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
+				async_gate: Default::default(),
 				_extras: extras,
 				_environment: self.environment.clone()
 			}),

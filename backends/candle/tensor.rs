@@ -36,7 +36,9 @@ impl Tensor {
 		let candle_dtype = convert_sys_to_dtype(dtype)?;
 		let num_elements = num_elements(&shape)?;
 		if memory_info.is_cpu() {
-			let byte_len = num_elements * element_size(dtype);
+			let byte_len = num_elements
+				.checked_mul(element_size(dtype))
+				.ok_or_else(|| Error::new(OrtErrorCode::ORT_INVALID_ARGUMENT, format!("tensor shape {shape:?} is too large")))?;
 			let ptr = alloc_host(byte_len, true);
 			if ptr.is_null() {
 				return Err(Error::new(OrtErrorCode::ORT_RUNTIME_EXCEPTION, "allocation failed"));

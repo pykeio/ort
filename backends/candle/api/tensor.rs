@@ -118,7 +118,11 @@ pub(super) unsafe extern "system" fn GetTensorData(value: *const OrtValue, out: 
 
 pub(super) unsafe extern "system" fn GetTensorSizeInBytes(value: *const OrtValue, size: *mut usize) -> OrtStatusPtr {
 	let tensor = unsafe { &*value.cast::<Tensor>() };
-	unsafe { size.write(trys!(num_elements(&tensor.shape).map(|x| x * element_size(tensor.dtype)))) };
+	let byte_len = trys!(num_elements(&tensor.shape).and_then(|x| {
+		x.checked_mul(element_size(tensor.dtype))
+			.ok_or_else(|| Error::new(OrtErrorCode::ORT_INVALID_ARGUMENT, "tensor is too large"))
+	}));
+	unsafe { size.write(byte_len) };
 	OrtStatusPtr::default()
 }
 

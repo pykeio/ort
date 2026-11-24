@@ -72,3 +72,11 @@ fn test_unsupported_types() -> ort::Result<()> {
 
 	Ok(())
 }
+
+#[test]
+fn test_comically_large_tensor() {
+	unsafe { ort::set_api(ort_candle::api()) };
+
+	assert!(Tensor::<f32>::new(&Allocator::default(), [1_i64 << 62]).is_err());
+	assert!(Tensor::<i64>::new(&Allocator::default(), [1_i64 << 31, 1_i64 << 30]).is_err());
+}

@@ -1,4 +1,4 @@
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use core::{ffi::c_void, fmt};
 
 use super::{ExecutionProviderOptions, SimpleExecutionProvider};

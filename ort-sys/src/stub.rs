@@ -553,7 +553,9 @@ unsafe extern "system" fn KernelContext_GetOutput(
 unsafe extern "system" fn ReleaseEnv(input: *mut OrtEnv) {}
 
 unsafe extern "system" fn ReleaseStatus(input: *mut OrtStatus) {
-	drop(unsafe { Error::consume_sys(input) });
+	if !input.is_null() {
+		drop(unsafe { Error::consume_sys(input) });
+	}
 }
 
 unsafe extern "system" fn ReleaseMemoryInfo(input: *mut OrtMemoryInfo) {}

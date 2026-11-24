@@ -93,10 +93,6 @@ impl Environment {
 		CURRENT_ENV.get().and_then(Weak::upgrade).map(Environment)
 	}
 
-	pub(crate) fn weak(&self) -> Weak<EnvironmentInner> {
-		Arc::downgrade(&self.0)
-	}
-
 	/// Sets the global log level.
 	///
 	/// ```

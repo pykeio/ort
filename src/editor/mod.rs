@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 
 use crate::{
 	AsPointer, Error, OnceLock, Result,
-	memory::{Allocator, AllocatorHandle},
+	memory::AllocatorHandle,
 	operator::Attribute,
 	ortsys,
 	session::{Session, builder::SessionBuilder},

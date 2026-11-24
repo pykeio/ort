@@ -563,4 +563,27 @@ mod tests {
 
 		Ok(())
 	}
+
+	#[test]
+	fn test_bound_output_outlives_allocator() -> Result<()> {
+		let mut session = Session::builder(crate::test_util::test_env())?.commit_from_file("tests/data/upsample.onnx")?;
+		let (input_name, output_name) = (session.inputs()[0].name().to_string(), session.outputs()[0].name().to_string());
+
+		// need an allocator that drops, so no Allocator::default()
+		let allocator = Allocator::new(&session, MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Arena, MemoryType::Default)?)?;
+
+		let mut binding = session.create_binding()?;
+		binding.bind_input(&input_name, Tensor::<f32>::new(&Allocator::default(), [1_usize, 8, 8, 3])?)?;
+		binding.bind_output(&output_name, Tensor::<f32>::new(&allocator, [1_usize, 16, 16, 3])?)?;
+
+		let output = session.run_binding(&binding)?.remove(&output_name).expect("output should be bound");
+		drop(binding);
+		drop(allocator);
+		let junk: Vec<Vec<u8>> = (0..10_000).map(|i| vec![0xAA; 16 + (i % 128)]).collect();
+		assert_eq!(output.try_extract_tensor::<f32>()?.1.len(), 16 * 16 * 3);
+		drop(output);
+		drop(junk);
+
+		Ok(())
+	}
 }

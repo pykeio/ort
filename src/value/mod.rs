@@ -358,6 +358,17 @@ impl<Type: ValueTypeMarker + ?Sized> Value<Type> {
 		}
 	}
 
+	pub(crate) fn share_allocator_of(&mut self, other: &ValueInner) {
+		let Some(other_handle) = other._allocator_handle.clone() else {
+			return;
+		};
+		let inner = Arc::get_mut(&mut self.inner).expect("value should not be shared yet");
+		inner._allocator_handle = Some(match inner._allocator_handle.take() {
+			Some(own_handle) => Arc::new((own_handle, other_handle)),
+			None => other_handle
+		});
+	}
+
 	/// Create a view of this value's data.
 	pub fn view(&self) -> ValueRef<'_, Type> {
 		ValueRef::new(Value::clone_of(self))

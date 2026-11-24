@@ -378,11 +378,18 @@ impl Session {
 			});
 			let output_values: SmallVec<[DynValue; STACK_SESSION_OUTPUTS]> = unsafe { slice::from_raw_parts(output_values_ptr.as_ptr(), count) }
 				.iter()
-				.map(|ptr| unsafe {
-					DynValue::from_session_output_ptr(
-						NonNull::new(*ptr).expect("OrtValue ptrs returned by GetBoundOutputValues should not be null"),
-						&self.inner
-					)
+				.zip(binding.output_values.iter())
+				.map(|(ptr, (_, bound_value))| {
+					let mut value = unsafe {
+						DynValue::from_session_output_ptr(
+							NonNull::new(*ptr).expect("OrtValue ptrs returned by GetBoundOutputValues should not be null"),
+							&self.inner
+						)
+					};
+					if let Some(bound_value) = bound_value {
+						value.share_allocator_of(bound_value);
+					}
+					value
 				})
 				.collect();
 			let output_values = if unalias_outputs {

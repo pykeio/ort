@@ -99,6 +99,7 @@ impl<E: SimpleExecutionProvider> ExecutionProvider for E {
 struct ExecutionProviderVTable {
 	name: &'static str,
 	register: fn(*const (), session_builder: &mut SessionBuilder) -> Result<()>,
+	clone: fn(*const ()),
 	drop: fn(*mut ())
 }
 
@@ -115,7 +116,7 @@ pub struct ExecutionProviderDispatch {
 
 impl Clone for ExecutionProviderDispatch {
 	fn clone(&self) -> Self {
-		unsafe { Arc::increment_strong_count(self.ep) };
+		(self.vtable.clone)(self.ep);
 
 		ExecutionProviderDispatch {
 			ep: self.ep,
@@ -136,7 +137,9 @@ impl ExecutionProviderDispatch {
 			let ep = unsafe { &*ep.cast::<E>() };
 			ep.register(session_builder)
 		}
-
+		fn clone<E: ExecutionProvider>(ep: *const ()) {
+			unsafe { Arc::increment_strong_count(ep.cast::<E>()) };
+		}
 		fn ep_drop<E: ExecutionProvider>(ep: *mut ()) {
 			let _ = unsafe { Arc::from_raw(ep.cast::<E>()) };
 		}
@@ -146,6 +149,7 @@ impl ExecutionProviderDispatch {
 			vtable: &ExecutionProviderVTable {
 				name: E::NAME,
 				register: register::<E>,
+				clone: clone::<E>,
 				drop: ep_drop::<E>
 			},
 			error_on_failure: false

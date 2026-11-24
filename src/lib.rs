@@ -136,7 +136,7 @@ pub(crate) mod load_dynamic {
 	}
 
 	pub(crate) fn version_string(lib: &libloading::Library, path: &std::path::Path) -> Result<&'static str, LoadError> {
-		let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const ort_sys::OrtApiBase> =
+		let base_getter: libloading::Symbol<unsafe extern "system" fn() -> *const ort_sys::OrtApiBase> =
 			unsafe { lib.get(b"OrtGetApiBase") }.map_err(|_| LoadError::MissingApi { path: path.to_path_buf() })?;
 		let base: *const ort_sys::OrtApiBase = unsafe { base_getter() };
 		assert!(!base.is_null());
@@ -237,7 +237,7 @@ fn setup_api() -> ApiPointer {
 			load_dynamic::init(&path).unwrap_or_else(|e| panic!("Failed to load ONNX Runtime dylib: {e}"));
 			G_ORT_LIB.get_unchecked()
 		};
-		let base_getter: libloading::Symbol<unsafe extern "C" fn() -> *const ort_sys::OrtApiBase> = dylib
+		let base_getter: libloading::Symbol<unsafe extern "system" fn() -> *const ort_sys::OrtApiBase> = dylib
 			.get(b"OrtGetApiBase")
 			.expect("`OrtGetApiBase` must be present in ONNX Runtime dylib");
 		base_getter()

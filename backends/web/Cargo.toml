@@ -12,9 +12,6 @@ repository = "https://github.com/pykeio/ort"
 homepage = "https://ort.pyke.io/backends/web"
 keywords = [ "machine-learning", "ai", "ml", "web", "wasm" ]
 categories = [ "algorithms", "mathematics", "science", "web-programming", "wasm" ]
-authors = [
-	"pyke.io <contact@pyke.io>"
-]
 include = [ "*.rs", "/*.js", "!/tests/*.rs" ]
 
 [lib]

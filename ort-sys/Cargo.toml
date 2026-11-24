@@ -10,9 +10,6 @@ repository = "https://github.com/pykeio/ort"
 homepage = "https://ort.pyke.io/"
 keywords = [ "machine-learning", "ai", "ml", "onnxruntime", "sys"]
 categories = [ "algorithms", "mathematics", "science" ]
-authors = [
-	"pyke.io <contact@pyke.io>"
-]
 include = [ "src/", "build/", "LICENSE-APACHE", "LICENSE-MIT" ]
 build = "build/main.rs"
 

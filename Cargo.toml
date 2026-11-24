@@ -34,10 +34,6 @@ homepage = "https://ort.pyke.io/"
 readme = "README.md"
 keywords = [ "machine-learning", "ai", "ml", "onnxruntime" ]
 categories = [ "algorithms", "mathematics", "science" ]
-authors = [
-	"pyke.io <contact@pyke.io>",
-	"Nicolas Bigaouette <nbigaouette@gmail.com>"
-]
 include = [ "/src/", "/LICENSE-APACHE", "/LICENSE-MIT" ]
 
 [badges.maintenance]

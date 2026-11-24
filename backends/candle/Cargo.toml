@@ -9,9 +9,6 @@ repository = "https://github.com/pykeio/ort"
 homepage = "https://ort.pyke.io/backends/candle"
 keywords = [ "machine-learning", "ai", "ml" , "sys"]
 categories = [ "algorithms", "mathematics", "science" ]
-authors = [
-	"pyke.io <contact@pyke.io>"
-]
 
 [workspace]
 resolver = "3"

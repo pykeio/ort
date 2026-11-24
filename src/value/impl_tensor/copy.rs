@@ -126,7 +126,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 			let identity_session = &mut *identity_session;
 			identity_session
 				.session
-				.run_binding(&identity_session.binding)?
+				.run_binding_inner(&identity_session.binding, None, false)?
 				.remove("output")
 				.expect("identity model should have single output")
 		};
@@ -166,7 +166,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 			let identity_session = &mut *identity_session;
 			identity_session
 				.session
-				.run_binding_with_options(&identity_session.binding, options)?
+				.run_binding_inner(&identity_session.binding, Some(options), false)?
 				.remove("output")
 				.expect("identity model should have single output")
 		};
@@ -210,7 +210,7 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 		unsafe { identity_session.binding.bind_output_inner("output", target_inner) }?;
 		{
 			let identity_session = &mut *identity_session;
-			identity_session.session.run_binding(&identity_session.binding)?;
+			identity_session.session.run_binding_inner(&identity_session.binding, None, false)?;
 		}
 
 		Ok(())
@@ -260,7 +260,9 @@ impl<Type: DefiniteTensorValueTypeMarker + ?Sized> Value<Type> {
 		unsafe { identity_session.binding.bind_output_inner("output", target_inner) }?;
 		{
 			let identity_session = &mut *identity_session;
-			identity_session.session.run_binding_with_options(&identity_session.binding, options)?;
+			identity_session
+				.session
+				.run_binding_inner(&identity_session.binding, Some(options), false)?;
 		}
 
 		Ok(())

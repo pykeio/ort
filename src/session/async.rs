@@ -12,7 +12,7 @@ use smallvec::SmallVec;
 use crate::{
 	Error,
 	error::Result,
-	session::{SessionOutputs, SharedSessionInner, UntypedRunOptions},
+	session::{SessionOutputs, SharedSessionInner, UntypedRunOptions, run::OutputAliasGuard},
 	util::{Mutex, STACK_SESSION_INPUTS, STACK_SESSION_OUTPUTS},
 	value::{DynValue, ValueInner}
 };
@@ -125,20 +125,39 @@ pub(crate) extern "C" fn async_callback(user_data: *mut c_void, _: *mut *mut ort
 		return;
 	}
 
-	let outputs = ctx
+	let mut alias_guard = OutputAliasGuard::new();
+	for value in ctx
+		._input_inner_holders
+		.iter()
+		.map(|input| &**input)
+		.chain(ctx.output_values.iter().flatten().map(|output| &*output.inner))
+	{
+		alias_guard.add(value);
+	}
+
+	let outputs: SmallVec<[(DynValue, bool); STACK_SESSION_OUTPUTS]> = ctx
 		.output_value_ptrs
 		.into_iter()
 		.zip(ctx.output_values)
-		.map(|(tensor_ptr, value)| match value {
-			Some(value) => value,
-			None => unsafe {
-				DynValue::from_session_output_ptr(
-					NonNull::new(tensor_ptr).expect("OrtValue ptr returned from session Run should not be null"),
-					&ctx.session_inner
-				)
-			}
+		.map(|(tensor_ptr, v)| match v {
+			Some(value) => (value, true),
+			None => (
+				unsafe {
+					DynValue::from_session_output_ptr(
+						NonNull::new(tensor_ptr).expect("OrtValue ptr returned from session Run should not be null"),
+						&ctx.session_inner
+					)
+				},
+				false
+			)
 		})
 		.collect();
+	// split so we take ownership before doing anything fallible
+	let outputs = outputs
+		.into_iter()
+		.map(|(value, preallocated)| if preallocated { Ok(value) } else { alias_guard.unalias(value) })
+		.collect::<Result<_>>();
 
-	ctx.inner.complete(Ok(SessionOutputs::new(ctx.output_names, outputs)));
+	let output_names = ctx.output_names;
+	ctx.inner.complete(outputs.map(|outputs| SessionOutputs::new(output_names, outputs)));
 }

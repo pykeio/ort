@@ -22,7 +22,7 @@ def model_factory(func):
 			print(f'Failed to create `{model_name}`: {e}')
 			return
 		if isinstance(model, onnx.GraphProto):
-			model = G.make_model(model, opset_imports=[onnx.OperatorSetIdProto(domain=None, version=21)])
+			model = G.make_model(model, ir_version=13, opset_imports=[onnx.OperatorSetIdProto(domain=None, version=21)])
 		try:
 			onnx.checker.check_model(model)
 		except Exception as e:
@@ -103,6 +103,23 @@ class Models:
 			opset_import=[onnx.OperatorSetIdProto(domain=None, version=13)],
 			domain='io.pyke.ort',
 			model_version=42,
+			producer_name='generate-models.py'
+		)
+
+	@model_factory
+	def passthrough():
+		input_x = G.make_tensor_value_info('x', onnx.TensorProto.FLOAT, ['n'])
+		output_y = G.make_tensor_value_info('y', onnx.TensorProto.FLOAT, ['n'])
+
+		return G.ModelProto(
+			ir_version=13,
+			graph=G.make_graph(
+				nodes=[G.make_node('Neg', ['x'], ['y'])],
+				inputs=[input_x],
+				outputs=[input_x, output_y],
+				name='passthrough'
+			),
+			opset_import=[onnx.OperatorSetIdProto(domain=None, version=13)],
 			producer_name='generate-models.py'
 		)
 

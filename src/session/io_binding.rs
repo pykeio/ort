@@ -283,6 +283,10 @@ impl IoBinding {
 		}))
 	}
 
+	pub(crate) fn bound_inputs(&self) -> impl Iterator<Item = &ValueInner> {
+		self.held_inputs.iter().map(|(_, input)| &*input.inner)
+	}
+
 	pub(crate) fn rebind_dirty_inputs(&self) -> Result<()> {
 		for (name, input) in self.held_inputs.iter() {
 			if input.dirty.get() {

@@ -227,10 +227,11 @@ impl Index<usize> for SessionOutputs<'_> {
 
 impl IndexMut<usize> for SessionOutputs<'_> {
 	fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+		let num_outputs = self.values.len();
 		match self.values.get_mut(index) {
 			Some(Some(value)) => value,
 			Some(None) => panic!("output #{index} was removed"),
-			None => panic!("attempted to index output #{index} when there are only {} outputs", self.values.len())
+			None => panic!("attempted to index output #{index} when there are only {num_outputs} outputs")
 		}
 	}
 }

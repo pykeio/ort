@@ -68,19 +68,19 @@ impl TensorElementType {
 			TensorElementType::Uint2 | TensorElementType::Int2 => container_capacity.div_ceil(4),
 			TensorElementType::Uint4 | TensorElementType::Int4 | TensorElementType::Float4E2M1 => container_capacity.div_ceil(2),
 			TensorElementType::Bool | TensorElementType::Int8 | TensorElementType::Uint8 => container_capacity,
-			TensorElementType::Int16 | TensorElementType::Uint16 => container_capacity * 2,
-			TensorElementType::Int32 | TensorElementType::Uint32 => container_capacity * 4,
-			TensorElementType::Int64 | TensorElementType::Uint64 => container_capacity * 8,
+			TensorElementType::Int16 | TensorElementType::Uint16 => container_capacity.checked_mul(2)?,
+			TensorElementType::Int32 | TensorElementType::Uint32 => container_capacity.checked_mul(4)?,
+			TensorElementType::Int64 | TensorElementType::Uint64 => container_capacity.checked_mul(8)?,
 			TensorElementType::Float8E4M3FN
 			| TensorElementType::Float8E4M3FNUZ
 			| TensorElementType::Float8E5M2
 			| TensorElementType::Float8E5M2FNUZ
 			| TensorElementType::Float8E8M0 => container_capacity,
-			TensorElementType::Float16 | TensorElementType::Bfloat16 => container_capacity * 2,
-			TensorElementType::Float32 => container_capacity * 4,
-			TensorElementType::Float64 => container_capacity * 8,
-			TensorElementType::Complex64 => container_capacity * 8,
-			TensorElementType::Complex128 => container_capacity * 16,
+			TensorElementType::Float16 | TensorElementType::Bfloat16 => container_capacity.checked_mul(2)?,
+			TensorElementType::Float32 => container_capacity.checked_mul(4)?,
+			TensorElementType::Float64 => container_capacity.checked_mul(8)?,
+			TensorElementType::Complex64 => container_capacity.checked_mul(8)?,
+			TensorElementType::Complex128 => container_capacity.checked_mul(16)?,
 			TensorElementType::String | TensorElementType::Undefined => {
 				// ONNX Runtime doesn't support `GetTensorSizeInBytes` for string tensors either
 				return None;

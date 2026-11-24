@@ -252,7 +252,7 @@ macro_rules! define_ep_register {
 		let $symbol = unsafe {
 			let dylib = $crate::load_dynamic::G_ORT_LIB.get().expect("dylib not yet initialized");
 			let symbol: ::core::result::Result<
-				::libloading::Symbol<unsafe extern "C" fn($($id: $type),*) -> $rt>,
+				::libloading::Symbol<unsafe extern "system" fn($($id: $type),*) -> $rt>,
 				::libloading::Error
 			> = dylib.get(stringify!($symbol).as_bytes());
 			match symbol {
@@ -263,7 +263,7 @@ macro_rules! define_ep_register {
 			}
 		};
 		#[cfg(not(all(feature = "load-dynamic", not(all(target_family = "wasm", target_os = "unknown")))))]
-		unsafe extern "C" {
+		unsafe extern "system" {
 			fn $symbol($($id: $type),*) -> $rt;
 		}
 	};

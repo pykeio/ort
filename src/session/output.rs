@@ -37,7 +37,7 @@ use crate::{
 #[derive(Debug)]
 pub struct SessionOutputs<'r> {
 	keys: SmallVec<[&'r str; STACK_SESSION_OUTPUTS]>,
-	values: SmallVec<[DynValue; STACK_SESSION_OUTPUTS]>,
+	values: SmallVec<[Option<DynValue>; STACK_SESSION_OUTPUTS]>,
 	effective_len: usize
 }
 
@@ -49,7 +49,7 @@ impl<'r> SessionOutputs<'r> {
 		Self {
 			effective_len: output_names.len(),
 			keys: output_names,
-			values: output_values
+			values: output_values.into_iter().map(Some).collect()
 		}
 	}
 
@@ -77,7 +77,7 @@ impl<'r> SessionOutputs<'r> {
 		assert!(!key.is_empty(), "output name cannot be empty");
 		for (i, k) in self.keys.iter().enumerate() {
 			if &key == k {
-				return Some(&self.values[i]);
+				return self.values[i].as_ref();
 			}
 		}
 		None
@@ -88,7 +88,7 @@ impl<'r> SessionOutputs<'r> {
 		assert!(!key.is_empty(), "output name cannot be empty");
 		for (i, k) in self.keys.iter().enumerate() {
 			if &key == k {
-				return Some(&mut self.values[i]);
+				return self.values[i].as_mut();
 			}
 		}
 		None
@@ -99,9 +99,10 @@ impl<'r> SessionOutputs<'r> {
 		assert!(!key.is_empty(), "output name cannot be empty");
 		for (i, k) in self.keys.iter_mut().enumerate() {
 			if &key == k {
+				let value = self.values[i].take()?;
 				*k = "";
 				self.effective_len -= 1;
-				return Some(DynValue::clone_of(&self.values[i]));
+				return Some(value);
 			}
 		}
 		None
@@ -216,19 +217,21 @@ impl IndexMut<String> for SessionOutputs<'_> {
 impl Index<usize> for SessionOutputs<'_> {
 	type Output = DynValue;
 	fn index(&self, index: usize) -> &Self::Output {
-		if index >= self.values.len() {
-			panic!("attempted to index output #{index} when there are only {} outputs", self.values.len());
+		match self.values.get(index) {
+			Some(Some(value)) => value,
+			Some(None) => panic!("output #{index} was removed"),
+			None => panic!("attempted to index output #{index} when there are only {} outputs", self.values.len())
 		}
-		&self.values[index]
 	}
 }
 
 impl IndexMut<usize> for SessionOutputs<'_> {
 	fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-		if index >= self.values.len() {
-			panic!("attempted to index output #{index} when there are only {} outputs", self.values.len());
+		match self.values.get_mut(index) {
+			Some(Some(value)) => value,
+			Some(None) => panic!("output #{index} was removed"),
+			None => panic!("attempted to index output #{index} when there are only {} outputs", self.values.len())
 		}
-		&mut self.values[index]
 	}
 }
 
@@ -262,7 +265,7 @@ impl ExactSizeIterator for Keys<'_, '_> {}
 impl FusedIterator for Keys<'_, '_> {}
 
 pub struct Values<'x, 'k> {
-	value_iter: core::slice::Iter<'x, DynValue>,
+	value_iter: core::slice::Iter<'x, Option<DynValue>>,
 	key_iter: core::slice::Iter<'x, &'k str>,
 	effective_len: usize
 }
@@ -272,15 +275,10 @@ impl<'x> Iterator for Values<'x, '_> {
 
 	fn next(&mut self) -> Option<Self::Item> {
 		loop {
-			match self.key_iter.next() {
-				None => return None,
-				Some(&"") => {
-					self.value_iter.next();
-				}
-				Some(_) => {
-					self.effective_len -= 1;
-					return self.value_iter.next().map(DynValue::view);
-				}
+			self.key_iter.next()?;
+			if let Some(value) = self.value_iter.next()? {
+				self.effective_len -= 1;
+				return Some(value.view());
 			}
 		}
 	}
@@ -294,7 +292,7 @@ impl ExactSizeIterator for Values<'_, '_> {}
 impl FusedIterator for Values<'_, '_> {}
 
 pub struct ValuesMut<'x, 'k> {
-	value_iter: core::slice::IterMut<'x, DynValue>,
+	value_iter: core::slice::IterMut<'x, Option<DynValue>>,
 	key_iter: core::slice::Iter<'x, &'k str>,
 	effective_len: usize
 }
@@ -304,15 +302,10 @@ impl<'x> Iterator for ValuesMut<'x, '_> {
 
 	fn next(&mut self) -> Option<Self::Item> {
 		loop {
-			match self.key_iter.next() {
-				None => return None,
-				Some(&"") => {
-					self.value_iter.next();
-				}
-				Some(_) => {
-					self.effective_len -= 1;
-					return self.value_iter.next().map(DynValue::view_mut);
-				}
+			self.key_iter.next()?;
+			if let Some(value) = self.value_iter.next()? {
+				self.effective_len -= 1;
+				return Some(value.view_mut());
 			}
 		}
 	}
@@ -326,7 +319,7 @@ impl ExactSizeIterator for ValuesMut<'_, '_> {}
 impl FusedIterator for ValuesMut<'_, '_> {}
 
 pub struct Iter<'x, 'k> {
-	value_iter: core::slice::Iter<'x, DynValue>,
+	value_iter: core::slice::Iter<'x, Option<DynValue>>,
 	key_iter: core::slice::Iter<'x, &'k str>,
 	effective_len: usize
 }
@@ -336,15 +329,10 @@ impl<'x, 'k> Iterator for Iter<'x, 'k> {
 
 	fn next(&mut self) -> Option<Self::Item> {
 		loop {
-			match self.key_iter.next() {
-				None => return None,
-				Some(&"") => {
-					self.value_iter.next();
-				}
-				Some(key) => {
-					self.effective_len -= 1;
-					return self.value_iter.next().map(|v| (*key, v.view()));
-				}
+			let key = self.key_iter.next()?;
+			if let Some(value) = self.value_iter.next()? {
+				self.effective_len -= 1;
+				return Some((*key, value.view()));
 			}
 		}
 	}
@@ -358,7 +346,7 @@ impl ExactSizeIterator for Iter<'_, '_> {}
 impl FusedIterator for Iter<'_, '_> {}
 
 pub struct IterMut<'x, 'k> {
-	value_iter: core::slice::IterMut<'x, DynValue>,
+	value_iter: core::slice::IterMut<'x, Option<DynValue>>,
 	key_iter: core::slice::Iter<'x, &'k str>,
 	effective_len: usize
 }
@@ -368,15 +356,10 @@ impl<'x, 'k> Iterator for IterMut<'x, 'k> {
 
 	fn next(&mut self) -> Option<Self::Item> {
 		loop {
-			match self.key_iter.next() {
-				None => return None,
-				Some(&"") => {
-					self.value_iter.next();
-				}
-				Some(key) => {
-					self.effective_len -= 1;
-					return self.value_iter.next().map(|v| (*key, v.view_mut()));
-				}
+			let key = self.key_iter.next()?;
+			if let Some(value) = self.value_iter.next()? {
+				self.effective_len -= 1;
+				return Some((*key, value.view_mut()));
 			}
 		}
 	}
@@ -391,7 +374,7 @@ impl FusedIterator for IterMut<'_, '_> {}
 
 pub struct IntoIter<'r> {
 	keys: smallvec::IntoIter<[&'r str; STACK_SESSION_OUTPUTS]>,
-	values: smallvec::IntoIter<[DynValue; STACK_SESSION_OUTPUTS]>,
+	values: smallvec::IntoIter<[Option<DynValue>; STACK_SESSION_OUTPUTS]>,
 	effective_len: usize
 }
 
@@ -400,15 +383,10 @@ impl<'r> Iterator for IntoIter<'r> {
 
 	fn next(&mut self) -> Option<Self::Item> {
 		loop {
-			match self.keys.next() {
-				None => return None,
-				Some("") => {
-					self.values.next();
-				}
-				Some(key) => {
-					self.effective_len -= 1;
-					return self.values.next().map(|v| (key, v));
-				}
+			let key = self.keys.next()?;
+			if let Some(value) = self.values.next()? {
+				self.effective_len -= 1;
+				return Some((key, value));
 			}
 		}
 	}
@@ -423,6 +401,10 @@ impl FusedIterator for IntoIter<'_> {}
 
 #[cfg(test)]
 mod tests {
+	use alloc::sync::Arc;
+	use core::panic::AssertUnwindSafe;
+	use std::panic::catch_unwind;
+
 	use smallvec::smallvec;
 
 	use super::SessionOutputs;
@@ -441,6 +423,28 @@ mod tests {
 		assert_eq!(outputs.iter_mut().last().map(|(k, v)| (k, v.ptr())), Some(("c", c)));
 		assert_eq!(outputs.values_mut().last().map(|v| v.ptr()), Some(c));
 		assert_eq!(outputs.into_iter().last().map(|(k, v)| (k, v.ptr())), Some(("c", c)));
+		Ok(())
+	}
+
+	#[test]
+	fn test_remove_actually_removes() -> crate::Result<()> {
+		let tensor = || Tensor::from_array(([1_usize], vec![0.0_f32])).map(|t| t.into_dyn());
+		let mut outputs = SessionOutputs::new(smallvec!["a", "b"], smallvec![tensor()?, tensor()?]);
+		let mut b = outputs.remove("b").expect("");
+		assert_eq!(outputs.len(), 1);
+
+		assert_eq!(Arc::strong_count(&b.inner), 1);
+		b.try_extract_tensor_mut::<f32>()?.1[0] = 1.0;
+
+		assert!(outputs.remove("b").is_none());
+		assert!(outputs.get("b").is_none());
+		assert!(outputs.get_mut("b").is_none());
+		assert!(!outputs.contains_key("b"));
+		assert!(catch_unwind(AssertUnwindSafe(|| outputs[1].ptr())).is_err());
+		assert!(catch_unwind(AssertUnwindSafe(|| outputs["b"].ptr())).is_err());
+
+		let _ = &mut outputs[0];
+		assert_eq!(outputs.iter().count(), 1);
 		Ok(())
 	}
 }

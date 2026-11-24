@@ -259,7 +259,7 @@ impl ComputeContext {
 	pub fn resource<T: ExecutionProviderResource>(&self, resource: T) -> Result<T::Type> {
 		let mut resource_ptr: *mut ort_sys::c_void = ptr::null_mut();
 		ortsys![unsafe KernelContext_GetResource(self.ptr.as_ptr(), T::VERSION as _, resource.id() as _, &mut resource_ptr)?];
-		Ok(T::convert(resource_ptr))
+		Ok(unsafe { T::convert(resource_ptr) })
 	}
 
 	pub fn par_for<F>(&self, total: usize, max_num_batches: usize, f: F) -> Result<()>

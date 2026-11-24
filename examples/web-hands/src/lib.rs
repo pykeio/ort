@@ -128,7 +128,7 @@ impl HandDetector {
 pub async fn setup_ort() -> Result<(), JsError> {
 	// Initialize `ort-web` without any hardware-accelerated EPs.
 	// WebGPU seems to not like this model, at least on Firefox.
-	ort::set_api(ort_web::api(ort_web::FEATURE_NONE).await?);
+	unsafe { ort::set_api(ort_web::api(ort_web::FEATURE_NONE).await?) };
 
 	// Set up a panic hook so panics are logged to the browser console.
 	std::panic::set_hook(Box::new(console_error_panic_hook::hook));

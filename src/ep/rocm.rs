@@ -32,8 +32,10 @@ impl ROCm {
 		pub fn with_max_tuning_duration(mut self, ms: i32) -> Self = "tunable_op_max_tuning_duration_ms";
 	}
 
+	/// # Safety
+	/// The provided `ptr` must outlive the environment/session configured to use this execution provider.
 	#[must_use]
-	pub fn with_compute_stream(mut self, ptr: *mut c_void) -> Self {
+	pub unsafe fn with_compute_stream(mut self, ptr: *mut c_void) -> Self {
 		self.0.set("has_user_compute_stream", "1");
 		self.0.set("user_compute_stream", (ptr as usize).to_string());
 		self

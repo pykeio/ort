@@ -4,9 +4,13 @@ use ort::ep::*;
 
 pub fn get_env() -> ort::Result<Environment> {
 	#[cfg(feature = "backend-candle")]
-	ort::set_api(ort_candle::api());
+	unsafe {
+		ort::set_api(ort_candle::api())
+	};
 	#[cfg(feature = "backend-tract")]
-	ort::set_api(ort_tract::api());
+	unsafe {
+		ort::set_api(ort_tract::api())
+	};
 
 	#[cfg(all(not(feature = "backend-candle"), not(feature = "backend-tract")))]
 	ort::init()

@@ -59,8 +59,8 @@ Use [`ort::set_api`](https://docs.rs/ort/latest/ort/fn.set_api.html) to use the 
 
 ```rs filename="main.rs"
 fn main() {
-    // This should run as early in your application as possible - before you ever use `ort`!
-    ort::set_api(ort_tract::api());
+    // This must run as early in your application as possible - before you ever use `ort`!
+    unsafe { ort::set_api(ort_tract::api()) };
 }
 ```
 

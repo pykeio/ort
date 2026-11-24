@@ -23,7 +23,7 @@ fn test_data(name: &str) -> PathBuf {
 
 fn test_env() -> ort::Result<Environment> {
 	static ENV: OnceLock<Environment> = OnceLock::new();
-	ort::set_api(ort_candle::api());
+	unsafe { ort::set_api(ort_candle::api()) };
 	Ok(ENV.get_or_init(|| ort::init().build().unwrap()).clone())
 }
 

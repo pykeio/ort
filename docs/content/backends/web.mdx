@@ -72,8 +72,8 @@ use ort_web::FEATURE_WEBGPU;
 use wasm_bindgen::JsError;
 
 async fn init() -> Result<(), JsError> {
-    // This should always be run before you use any other `ort` API.
-    ort::set_api(ort_web::api(FEATURE_WEBGPU).await?);
+    // This must always be run before you use any other `ort` API!
+    unsafe { ort::set_api(ort_web::api(FEATURE_WEBGPU).await?) };
 
     ...
 }
@@ -88,7 +88,7 @@ You can choose which build of ONNX Runtime to fetch by choosing any combination 
 
 ```rs
 use ort_web::{FEATURE_WEBGL, FEATURE_WEBGPU};
-ort::set_api(ort_web::api(FEATURE_WEBGL | FEATURE_WEBGPU).await?);
+unsafe { ort::set_api(ort_web::api(FEATURE_WEBGL | FEATURE_WEBGPU).await?) };
 ```
 
 You'll still need to configure the EPs on a per-session basis later like you would normally, but this allows you to e.g. only fetch the CPU build (`FEATURE_NONE`) if the user doesn't have hardware acceleration.
@@ -104,7 +104,7 @@ use ort_web::FEATURE_WEBGPU;
 use wasm_bindgen::JsError;
 
 async fn init() -> Result<(), JsError> {
-    ort::set_api(ort_web::api(FEATURE_WEBGPU).await?);
+    unsafe { ort::set_api(ort_web::api(FEATURE_WEBGPU).await?) };
 
     let mut session = Session::builder()?
         .with_execution_providers([
@@ -148,7 +148,7 @@ async fn init_model() -> anyhow::Result<Session> {
 	let dist = Dist::new("https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/")
 		// we want to load the WebGPU build
 		.with_script_name("ort.webgpu.min.js");
-	ort::set_api(ort_web::api(dist).await?);
+	unsafe { ort::set_api(ort_web::api(dist).await?) };
 }
 ```
 
@@ -163,7 +163,7 @@ You can always disable this telemetry via [`EnvironmentBuilder::with_telemetry`]
 ```rs filename="lib.rs"
 use wasm_bindgen::JsError;
 async fn init() -> Result<(), JsError> {
-    ort::set_api(ort_web::api().await?);
+    unsafe { ort::set_api(ort_web::api().await?) };
 
     let env = ort::init()
         .with_telemetry(false)

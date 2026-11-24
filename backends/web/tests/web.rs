@@ -22,7 +22,7 @@ thread_local! {
 }
 
 async fn env() -> ort::Result<Environment> {
-	ort::set_api(ort_web::api(ort_web::FEATURE_NONE).await.expect("failed to load runtime"));
+	unsafe { ort::set_api(ort_web::api(ort_web::FEATURE_NONE).await.expect("failed to load runtime")) };
 	ENV.with_borrow_mut(|env| match env {
 		Some(env) => Ok(env.clone()),
 		None => {

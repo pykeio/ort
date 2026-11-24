@@ -2,7 +2,7 @@ use ort::memory::{AllocationDevice, Allocator, DeviceType};
 
 #[test]
 fn test_memory_info_apis() {
-	ort::set_api(ort_tract::api());
+	unsafe { ort::set_api(ort_tract::api()) };
 
 	let allocator = Allocator::default();
 

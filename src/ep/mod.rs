@@ -65,7 +65,13 @@ pub trait ExecutionProvider: Send + Sync {
 pub trait ArbitrarilyConfigurableExecutionProvider: Sized {
 	fn options_mut(&mut self) -> &mut ExecutionProviderOptions;
 
-	fn with_arbitrary_config(mut self, key: impl ToString, value: impl ToString) -> Self {
+	/// Sets the option `key` to `value`.
+	///
+	/// # Safety
+	/// Usage of this function is usually safe, but some EPs have options whose value is the address of something to be
+	/// used by ONNX Runtime (e.g. a compute stream or device context). In those cases, you must ensure the object being
+	/// pointed to outlives the environment/session configured to use this execution provider.
+	unsafe fn with_arbitrary_config(mut self, key: impl ToString, value: impl ToString) -> Self {
 		self.options_mut().set(key.to_string(), value.to_string());
 		self
 	}
@@ -211,7 +217,7 @@ impl fmt::Display for ArenaExtendStrategy {
 pub struct ExecutionProviderOptions(MiniMap<CString, CString>);
 
 impl ExecutionProviderOptions {
-	pub fn set(&mut self, key: impl Into<Vec<u8>>, value: impl Into<Vec<u8>>) {
+	pub(crate) fn set(&mut self, key: impl Into<Vec<u8>>, value: impl Into<Vec<u8>>) {
 		self.0
 			.insert(CString::new(key).expect("unexpected nul in key string"), CString::new(value).expect("unexpected nul in value string"));
 	}
@@ -389,7 +395,7 @@ pub trait ExecutionProviderResource {
 	fn id(&self) -> u32;
 
 	#[doc(hidden)]
-	fn convert(value: *const core::ffi::c_void) -> Self::Type;
+	unsafe fn convert(value: *const core::ffi::c_void) -> Self::Type;
 }
 
 pub mod cpu;

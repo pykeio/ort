@@ -412,7 +412,7 @@ pub mod resource {
 				fn id(&self) -> u32 {
 					$id
 				}
-				fn convert(v: *const c_void) -> Self::Type {
+				unsafe fn convert(v: *const c_void) -> Self::Type {
 					($conv)(v)
 				}
 			}

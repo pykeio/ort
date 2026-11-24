@@ -88,7 +88,7 @@ pub const FEATURE_WEBNN: u8 = FEATURE_WEBGPU;
 ///
 /// async fn init_model() -> anyhow::Result<Session> {
 /// 	// This must be called at least once before using any `ort` API.
-/// 	ort::set_api(ort_web::api(FEATURE_WEBGL | FEATURE_WEBGPU).await?);
+/// 	unsafe { ort::set_api(ort_web::api(FEATURE_WEBGL | FEATURE_WEBGPU).await?) };
 ///
 /// 	let env = ort::init().build()?;
 /// 	let session = Session::builder(&env)?.commit_from_url("https://...").await?;
@@ -105,7 +105,7 @@ pub const FEATURE_WEBNN: u8 = FEATURE_WEBGPU;
 /// 	let dist = Dist::new("https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/")
 /// 		// load the WebGPU build
 /// 		.with_script_name("ort.webgpu.min.js");
-/// 	ort::set_api(ort_web::api(dist).await?);
+/// 	unsafe { ort::set_api(ort_web::api(dist).await?) };
 /// 	# todo!()
 /// }
 /// ```

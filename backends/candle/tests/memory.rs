@@ -2,7 +2,7 @@ use ort::memory::{AllocationDevice, Allocator, AllocatorType, DeviceType, Memory
 
 #[test]
 fn test_memory_info_apis() {
-	ort::set_api(ort_candle::api());
+	unsafe { ort::set_api(ort_candle::api()) };
 
 	let allocator = Allocator::default();
 
@@ -25,7 +25,7 @@ fn test_memory_info_apis() {
 
 #[test]
 fn test_allocator() -> ort::Result<()> {
-	ort::set_api(ort_candle::api());
+	unsafe { ort::set_api(ort_candle::api()) };
 
 	let allocator = Allocator::default();
 	let mut block = allocator.alloc::<u64>(16)?;

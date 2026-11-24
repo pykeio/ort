@@ -12,7 +12,7 @@ use ort::{
 fn mnist_5() -> ort::Result<()> {
 	const IMAGE_TO_LOAD: &str = "mnist_5.jpg";
 
-	ort::set_api(ort_tract::api());
+	unsafe { ort::set_api(ort_tract::api()) };
 
 	let env = ort::init().build()?;
 	let mut session = Session::builder(&env)?

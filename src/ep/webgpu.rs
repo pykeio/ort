@@ -1,5 +1,5 @@
 use alloc::string::String;
-use core::fmt;
+use core::{ffi::c_void, fmt};
 
 use super::{ExecutionProviderOptions, SimpleExecutionProvider};
 
@@ -82,8 +82,6 @@ impl WebGPU {
 
 		pub fn with_enable_graph_capture(mut self, enable: bool) -> Self = "enableGraphCapture";
 
-		pub fn with_dawn_proc_table(mut self, table: String) -> Self = "dawnProcTable";
-
 		pub fn with_dawn_backend_type(mut self, backend_type: DawnBackendType) -> Self = "dawnBackendType";
 
 		pub fn with_device_id(mut self, id: i32) -> Self = "deviceId";
@@ -101,6 +99,16 @@ impl WebGPU {
 		pub fn with_force_cpu_node_names(mut self, names: String) -> Self = "forceCpuNodeNames";
 
 		pub fn with_enable_pix_capture(mut self, enable: bool) -> Self = "enablePIXCapture";
+	}
+
+	/// Sets the Dawn proc table to use.
+	///
+	/// # Safety
+	/// The proc table must outlive the environment/session configured to use this execution provider.
+	#[must_use]
+	pub unsafe fn with_dawn_proc_table(mut self, table: *mut c_void) -> Self {
+		self.0.set("dawnProcTable", (table as usize).to_string());
+		self
 	}
 }
 

@@ -63,8 +63,8 @@ impl<'e> Device<'e> {
 
 	#[cfg(feature = "api-23")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "api-23")))]
-	pub fn memory_info(&self, host_accessible: bool) -> MemoryInfo<'_> {
-		MemoryInfo::from_raw(
+	pub fn memory_info(&self, host_accessible: bool) -> Option<MemoryInfo<'_>> {
+		Some(MemoryInfo::from_raw(
 			NonNull::new(
 				ortsys![unsafe EpDevice_MemoryInfo(self.ptr.as_ptr(), if host_accessible {
 					ort_sys::OrtDeviceMemoryType::OrtDeviceMemoryType_HOST_ACCESSIBLE
@@ -72,10 +72,9 @@ impl<'e> Device<'e> {
 					ort_sys::OrtDeviceMemoryType::OrtDeviceMemoryType_DEFAULT
 				})]
 				.cast_mut()
-			)
-			.expect("infallible"),
+			)?,
 			false
-		)
+		))
 	}
 
 	#[cfg(feature = "api-24")]

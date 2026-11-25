@@ -298,7 +298,7 @@ fn extract_tensor<Type: TensorValueTypeMarker + ?Sized>(value: &Value<Type>, exp
 	}
 }
 
-unsafe fn data_ptr<T>(ptr: *mut ort_sys::OrtValue) -> Result<*mut T> {
+pub(crate) unsafe fn data_ptr<T>(ptr: *mut ort_sys::OrtValue) -> Result<*mut T> {
 	let mut output_array_ptr: *mut c_void = ptr::null_mut();
 	ortsys![unsafe GetTensorMutableData(ptr, &mut output_array_ptr)?];
 

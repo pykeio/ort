@@ -1,12 +1,9 @@
 use alloc::{boxed::Box, format, string::String, sync::Arc, vec, vec::Vec};
 use core::{
-	ffi::c_void,
 	fmt::{self, Debug},
 	hash::Hash,
 	marker::PhantomData,
-	mem,
-	ptr::{self, NonNull},
-	slice
+	mem, ptr, slice
 };
 #[cfg(feature = "std")]
 use std::collections::HashMap;
@@ -20,7 +17,7 @@ use crate::{
 	error::{Error, Result},
 	memory::Allocator,
 	ortsys,
-	value::ValueFlags
+	value::{ValueFlags, impl_tensor}
 };
 
 pub trait MapValueTypeMarker: ValueTypeMarker {
@@ -115,14 +112,7 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 							}
 
 							if *ty == K::into_tensor_element_type() {
-								let mut output_array_ptr: *mut K = ptr::null_mut();
-								let output_array_ptr_ptr: *mut *mut K = &mut output_array_ptr;
-								let output_array_ptr_ptr_void: *mut *mut c_void = output_array_ptr_ptr.cast();
-								ortsys![unsafe GetTensorMutableData(key_tensor_ptr.as_ptr(), output_array_ptr_ptr_void)?];
-								if output_array_ptr.is_null() {
-									output_array_ptr = NonNull::dangling().as_ptr();
-								}
-
+								let output_array_ptr = unsafe { impl_tensor::data_ptr::<K>(key_tensor_ptr.as_ptr()) }?;
 								let Some(numel) = shape.num_elements() else {
 									return Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Shape {shape:?} is too large")));
 								};

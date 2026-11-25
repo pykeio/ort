@@ -248,10 +248,15 @@ pub(super) fn erase<O: Operator + 'static>(operator: O) -> Result<ErasedOperator
 				return 0;
 			}
 
-			*input_index = alloc::alloc::alloc(index_pairs_layout(pairs.len())).cast();
-			*output_index = alloc::alloc::alloc(index_pairs_layout(pairs.len())).cast();
+			let layout = index_pairs_layout(pairs.len());
+			*input_index = alloc::alloc::alloc(layout).cast();
+			*output_index = alloc::alloc::alloc(layout).cast();
 
 			let (input_index, output_index) = (*input_index, *output_index);
+			if input_index.is_null() || output_index.is_null() {
+				alloc::alloc::handle_alloc_error(layout);
+			}
+
 			for (i, &(input, output)) in pairs.iter().enumerate() {
 				*input_index.add(i) = input as _;
 				*output_index.add(i) = output as _;

@@ -190,7 +190,7 @@ impl<'i> ModelCompiler<'i> {
 				&mut size
 			)?
 		];
-		ortsys![@compile: unsafe CompileModel(self.session_options.environment.ptr(), self.ptr.as_ptr())?];
+		ortsys![@compile: unsafe CompileModel(self.session_options.environment.ptr(), self.ptr.as_ptr())?; nonNull(ptr)];
 		crate::logging::create!(CompiledModel, ptr);
 		Ok(CompiledModel { ptr, size, allocator })
 	}
@@ -211,14 +211,14 @@ impl Drop for ModelCompiler<'_> {
 }
 
 pub struct CompiledModel {
-	ptr: *mut c_void,
+	ptr: NonNull<c_void>,
 	size: usize,
 	allocator: Allocator
 }
 
 impl CompiledModel {
 	pub fn as_slice(&self) -> &[u8] {
-		unsafe { core::slice::from_raw_parts(self.ptr.cast(), self.size) }
+		unsafe { core::slice::from_raw_parts(self.ptr.as_ptr().cast(), self.size) }
 	}
 }
 
@@ -231,7 +231,7 @@ impl Deref for CompiledModel {
 
 impl Drop for CompiledModel {
 	fn drop(&mut self) {
-		unsafe { self.allocator.free(self.ptr) };
+		unsafe { self.allocator.free(self.ptr.as_ptr()) };
 		crate::logging::drop!(CompiledModel, self.ptr);
 	}
 }

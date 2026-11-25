@@ -86,3 +86,12 @@ fn test_mul_graph() -> Result<()> {
 
 	Ok(())
 }
+
+#[test]
+fn test_model_without_graph() -> Result<()> {
+	let model = Model::new([Opset::new(ONNX_DOMAIN, 22)?])?;
+	let mut builder = SessionBuilder::new(test_env())?;
+	assert!(builder.edit_from_file("tests/data/upsample.onnx")?.apply_model(&model).is_err());
+	assert!(model.into_session(&builder).is_err());
+	Ok(())
+}

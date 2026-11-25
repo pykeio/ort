@@ -278,8 +278,10 @@ impl Opset {
 }
 
 #[derive(Debug)]
-#[repr(transparent)]
-pub struct Model(NonNull<ort_sys::OrtModel>);
+pub struct Model {
+	ptr: NonNull<ort_sys::OrtModel>,
+	has_graph: bool
+}
 
 impl Model {
 	pub fn new(opsets: impl AsRef<[Opset]>) -> Result<Self> {
@@ -290,21 +292,34 @@ impl Model {
 		let mut ptr = ptr::null_mut();
 		ortsys![@editor: unsafe CreateModel(domain_names.as_ptr(), opset_versions.as_ptr(), opsets.len(), &mut ptr)?; nonNull(ptr)];
 		crate::logging::create!(Model, ptr);
-		Ok(Self(ptr))
+		Ok(Self { ptr, has_graph: false })
 	}
 
 	pub fn set_graph(&mut self, graph: Graph) -> Result<()> {
 		let graph = graph.consume();
-		ortsys![@editor: unsafe AddGraphToModel(self.0.as_ptr(), graph)?]; // infallible (errors on null pointer)
+		ortsys![@editor: unsafe AddGraphToModel(self.ptr.as_ptr(), graph)?]; // infallible (errors on null pointer)
+		self.has_graph = true;
 		Ok(())
 	}
 
+	/// ONNX Runtime just assumes that a model has a graph wherever it uses one so we have to protect it to avoid a
+	/// nullptr deref
+	pub(crate) fn ensure_has_graph(&self) -> Result<()> {
+		if self.has_graph {
+			Ok(())
+		} else {
+			Err(Error::new("Model has no graph; add one with `Model::set_graph` first"))
+		}
+	}
+
 	pub fn into_session(self, options: &SessionBuilder) -> Result<Session> {
+		self.ensure_has_graph()?;
+
 		let mut session_ptr = ptr::null_mut();
 		ortsys![@editor:
 			unsafe CreateSessionFromModel(
 				options.environment.ptr(),
-				self.0.as_ptr(),
+				self.ptr.as_ptr(),
 				options.ptr(),
 				&mut session_ptr
 			)?;
@@ -317,13 +332,13 @@ impl Model {
 impl AsPointer for Model {
 	type Sys = ort_sys::OrtModel;
 	fn ptr(&self) -> *const Self::Sys {
-		self.0.as_ptr()
+		self.ptr.as_ptr()
 	}
 }
 
 impl Drop for Model {
 	fn drop(&mut self) {
-		ortsys![unsafe ReleaseModel(self.0.as_ptr())];
-		crate::logging::drop!(Model, self.0);
+		ortsys![unsafe ReleaseModel(self.ptr.as_ptr())];
+		crate::logging::drop!(Model, self.ptr);
 	}
 }

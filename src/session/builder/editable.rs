@@ -26,6 +26,8 @@ impl<'b> EditableSession<'b> {
 	}
 
 	pub fn apply_model(&mut self, model: &Model) -> Result<()> {
+		model.ensure_has_graph()?;
+
 		ortsys![@editor:
 			unsafe ApplyModelToModelEditorSession(
 				self.session.ptr_mut(),

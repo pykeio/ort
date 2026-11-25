@@ -112,10 +112,10 @@ impl<Type: MapValueTypeMarker + ?Sized> Value<Type> {
 							}
 
 							if *ty == K::into_tensor_element_type() {
-								let output_array_ptr = unsafe { impl_tensor::data_ptr::<K>(key_tensor_ptr.as_ptr()) }?;
 								let Some(numel) = shape.num_elements() else {
 									return Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Shape {shape:?} is too large")));
 								};
+								let output_array_ptr = unsafe { impl_tensor::data_ptr::<K>(key_tensor_ptr.as_ptr()) }?;
 
 								(shape, unsafe { slice::from_raw_parts(output_array_ptr, numel) })
 							} else {

@@ -115,6 +115,16 @@ impl DynTensor {
 		let shape_ptr: *const i64 = shape.as_ptr();
 		let shape_len = shape.len();
 
+		let data_len = match data_type {
+			TensorElementType::String => None,
+			_ => Some(
+				shape
+					.num_elements()
+					.and_then(|numel| data_type.byte_size(numel))
+					.ok_or_else(|| crate::Error::new_with_code(crate::ErrorCode::InvalidArgument, alloc::format!("Shape {shape:?} is invalid or too large")))?
+			)
+		};
+
 		ortsys![
 			unsafe CreateTensorAsOrtValue(
 				allocator.ptr().cast_mut(),
@@ -130,14 +140,13 @@ impl DynTensor {
 		// should do it manually.
 		let memory_info = unsafe { MemoryInfo::from_tensor_value(value_ptr) };
 		#[cfg(not(all(target_family = "wasm", target_os = "unknown")))] // Data is not available at this point with `ort-web`, so this would just instantly fail
-		if memory_info.is_cpu_accessible() && data_type != TensorElementType::String {
+		if memory_info.is_cpu_accessible()
+			&& let Some(data_len) = data_len
+		{
 			let mut buffer_ptr: *mut ort_sys::c_void = ptr::null_mut();
 			ortsys![unsafe GetTensorMutableData(value_ptr.as_ptr(), &mut buffer_ptr)?];
 			if !buffer_ptr.is_null() {
-				let Some(numel) = shape.num_elements() else {
-					return Err(crate::Error::new_with_code(crate::ErrorCode::InvalidArgument, alloc::format!("Shape {shape:?} is too large")));
-				};
-				unsafe { buffer_ptr.write_bytes(0, data_type.byte_size(numel).expect("infallible")) };
+				unsafe { buffer_ptr.write_bytes(0, data_len) };
 			}
 		}
 

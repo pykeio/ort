@@ -168,26 +168,39 @@ impl Graph {
 	}
 
 	pub fn set_inputs(&mut self, inputs: impl IntoIterator<Item = Outlet>) -> Result<()> {
-		let inputs: SmallVec<[NonNull<ort_sys::OrtValueInfo>; 4]> = inputs.into_iter().filter_map(|input| input.into_value_info_ptr()).collect();
+		// similar to CreateNode, these get set to null after SetGraphInputs since it takes ownership
+		let mut inputs: SmallVec<[*mut ort_sys::OrtValueInfo; 4]> = inputs
+			.into_iter()
+			.filter_map(|input| input.into_value_info_ptr())
+			.map(NonNull::as_ptr)
+			.collect();
+		let (inputs_ptr, inputs_len) = (inputs.as_mut_ptr(), inputs.len());
 		let _guard = run_on_drop(|| {
 			for ptr in &inputs {
-				ortsys![unsafe ReleaseValueInfo(ptr.as_ptr())];
+				if !ptr.is_null() {
+					ortsys![unsafe ReleaseValueInfo(*ptr)];
+				}
 			}
 		});
-		ortsys![@editor: unsafe SetGraphInputs(self.ptr.as_ptr(), inputs.as_ptr() as *mut _, inputs.len())?];
-		forget(_guard); // SetGraphInputs takes ownership of the OrtValueInfos so don't free if it succeeded
+		ortsys![@editor: unsafe SetGraphInputs(self.ptr.as_ptr(), inputs_ptr as *mut _, inputs_len)?];
+		forget(_guard);
 		Ok(())
 	}
 
 	pub fn set_outputs(&mut self, outputs: impl IntoIterator<Item = Outlet>) -> Result<()> {
-		let outputs: SmallVec<[NonNull<ort_sys::OrtValueInfo>; 4]> = outputs.into_iter().filter_map(|input| input.into_value_info_ptr()).collect();
+		let mut outputs: SmallVec<[*mut ort_sys::OrtValueInfo; 4]> = outputs
+			.into_iter()
+			.filter_map(|output| output.into_value_info_ptr())
+			.map(NonNull::as_ptr)
+			.collect();
+		let (outputs_ptr, outputs_len) = (outputs.as_mut_ptr(), outputs.len());
 		let _guard = run_on_drop(|| {
 			for ptr in &outputs {
-				ortsys![unsafe ReleaseValueInfo(ptr.as_ptr())];
+				ortsys![unsafe ReleaseValueInfo(*ptr)];
 			}
 		});
-		ortsys![@editor: unsafe SetGraphOutputs(self.ptr.as_ptr(), outputs.as_ptr() as *mut _, outputs.len())?];
-		forget(_guard); // SetGraphOutputs takes ownership of the OrtValueInfos so don't free if it succeeded
+		ortsys![@editor: unsafe SetGraphOutputs(self.ptr.as_ptr(), outputs_ptr as *mut _, outputs_len)?];
+		forget(_guard);
 		Ok(())
 	}
 

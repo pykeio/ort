@@ -136,7 +136,7 @@ impl Error<()> {
 				code,
 				message,
 				cause,
-				status_ptr: unsafe { NonNull::new_unchecked(ptr.0) }
+				status_ptr: NonNull::new(ptr.0).expect("failed to allocate error status")
 			})
 		}
 	}

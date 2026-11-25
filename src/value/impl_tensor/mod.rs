@@ -116,7 +116,7 @@ impl DynTensor {
 		let shape_len = shape.len();
 
 		let data_len = match data_type {
-			TensorElementType::String => None,
+			TensorElementType::String | TensorElementType::Undefined => None,
 			_ => Some(
 				shape
 					.num_elements()

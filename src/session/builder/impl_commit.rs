@@ -59,7 +59,7 @@ impl SessionBuilder {
 			session_ptr
 		};
 
-		self.commit_finalize(session_ptr)
+		self.commit_finalize(session_ptr, true)
 	}
 
 	/// Load an ONNX graph directly from memory and commit the session.
@@ -112,7 +112,7 @@ impl SessionBuilder {
 			session_ptr
 		};
 
-		self.commit_finalize(session_ptr)
+		self.commit_finalize(session_ptr, true)
 	}
 
 	/// Downloads a pre-trained ONNX model from the given URL and builds the session.
@@ -128,7 +128,7 @@ impl SessionBuilder {
 			return Err(Error::new(alloc::format!("Session creation failed with unknown error")));
 		};
 
-		self.commit_finalize(session_ptr)
+		self.commit_finalize(session_ptr, true)
 	}
 
 	/// Load an ONNX graph from memory and commit the session.
@@ -144,7 +144,7 @@ impl SessionBuilder {
 			return Err(Error::new(alloc::format!("Session creation failed with unknown error")));
 		};
 
-		self.commit_finalize(session_ptr)
+		self.commit_finalize(session_ptr, true)
 	}
 
 	pub(crate) fn pre_commit(&mut self) -> Result<()> {
@@ -160,20 +160,18 @@ impl SessionBuilder {
 		Ok(())
 	}
 
-	pub(crate) fn commit_finalize(&self, ptr: NonNull<ort_sys::OrtSession>) -> Result<Session> {
-		// Release the session if anything below fails; `SharedSessionInner` takes over once it's built.
-		let session_guard = run_on_drop(|| ortsys![unsafe ReleaseSession(ptr.as_ptr())]);
-
-		let allocator = match &self.memory_info {
+	pub(crate) fn session_allocator(&self, ptr: NonNull<ort_sys::OrtSession>) -> Result<Allocator> {
+		Ok(match &self.memory_info {
 			Some(info) => {
 				let mut allocator_ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
 				ortsys![unsafe CreateAllocator(ptr.as_ptr(), info.ptr(), &mut allocator_ptr)?; nonNull(allocator_ptr)];
 				unsafe { Allocator::from_raw(allocator_ptr, false) }
 			}
 			None => Allocator::default()
-		};
-
-		// Extract input and output properties
+		})
+	}
+	pub(crate) fn session_outlets(ptr: NonNull<ort_sys::OrtSession>) -> Result<(Vec<Outlet>, Vec<Outlet>)> {
+		let allocator = Allocator::default();
 		let num_inputs = io::extract_io_count(ortsys![SessionGetInputCount], ptr)?;
 		let num_outputs = io::extract_io_count(ortsys![SessionGetOutputCount], ptr)?;
 		let inputs = (0..num_inputs)
@@ -182,7 +180,15 @@ impl SessionBuilder {
 		let outputs = (0..num_outputs)
 			.map(|i| io::extract_output(ptr, &allocator, i))
 			.collect::<Result<Vec<Outlet>>>()?;
+		Ok((inputs, outputs))
+	}
 
+	pub(crate) fn commit_finalize(&self, ptr: NonNull<ort_sys::OrtSession>, initialized: bool) -> Result<Session> {
+		// Release the session if anything below fails; `SharedSessionInner` takes over once it's built.
+		let session_guard = run_on_drop(|| ortsys![unsafe ReleaseSession(ptr.as_ptr())]);
+
+		let allocator = if initialized { self.session_allocator(ptr)? } else { Allocator::default() };
+		let (inputs, outputs) = Self::session_outlets(ptr)?;
 		let extras = self.extras();
 
 		mem::forget(session_guard);
@@ -192,6 +198,7 @@ impl SessionBuilder {
 			inner: Arc::new(SharedSessionInner {
 				session_ptr: ptr,
 				allocator,
+				initialized,
 				#[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
 				async_gate: Default::default(),
 				_extras: extras,

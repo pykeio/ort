@@ -170,6 +170,10 @@ impl Allocator {
 	/// Creates a new [`Allocator`] for the given session, to allocate memory on the device described in the
 	/// [`MemoryInfo`].
 	pub fn new(session: &Session, memory_info: MemoryInfo<'_>) -> Result<Self> {
+		if !session.inner.initialized {
+			return Err(Error::new("Cannot create an allocator for a session that is still being edited"));
+		}
+
 		let mut ptr: *mut ort_sys::OrtAllocator = ptr::null_mut();
 		ortsys![unsafe CreateAllocator(session.ptr(), memory_info.ptr.as_ptr(), &mut ptr)?; nonNull(ptr)];
 		crate::logging::create!(Allocator, ptr);

@@ -3,7 +3,7 @@ use crate::{
 	Result,
 	editor::ONNX_DOMAIN,
 	inputs,
-	memory::Allocator,
+	memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
 	session::builder::SessionBuilder,
 	test_util::test_env,
 	value::{Shape, SymbolicDimensions, Tensor, TensorElementType, ValueType}
@@ -93,5 +93,22 @@ fn test_model_without_graph() -> Result<()> {
 	let mut builder = SessionBuilder::new(test_env())?;
 	assert!(builder.edit_from_file("tests/data/upsample.onnx")?.apply_model(&model).is_err());
 	assert!(model.into_session(&builder).is_err());
+	Ok(())
+}
+
+#[test]
+fn test_editable_session_allocator() -> Result<()> {
+	let memory_info = || MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Arena, MemoryType::Default);
+
+	let mut builder = SessionBuilder::new(test_env())?.with_allocator(memory_info()?)?;
+	let editable = builder.edit_from_file("tests/data/upsample.onnx")?;
+	assert!(Allocator::new(&editable, memory_info()?).is_err());
+
+	let mut session = editable.into_session()?;
+	assert_eq!(session.allocator().memory_info().allocator_type(), AllocatorType::Arena);
+	let allocator = Allocator::new(&session, memory_info()?)?;
+	let outputs = session.run(inputs![Tensor::<f32>::new(&allocator, [1_usize, 8, 8, 3])?])?;
+	assert_eq!(**outputs[0].shape(), [1, 16, 16, 3]);
+
 	Ok(())
 }

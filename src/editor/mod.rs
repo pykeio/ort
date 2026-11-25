@@ -325,7 +325,7 @@ impl Model {
 			)?;
 			nonNull(session_ptr)
 		];
-		options.commit_finalize(session_ptr)
+		options.commit_finalize(session_ptr, true)
 	}
 }
 

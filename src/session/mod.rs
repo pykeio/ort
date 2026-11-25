@@ -71,6 +71,7 @@ pub use self::{
 pub struct SharedSessionInner {
 	session_ptr: NonNull<ort_sys::OrtSession>,
 	pub(crate) allocator: Allocator,
+	pub(crate) initialized: bool,
 	#[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
 	pub(crate) async_gate: r#async::AsyncRunGate,
 	/// Additional things we may need to hold onto for the duration of this session, like `OperatorDomain`s and

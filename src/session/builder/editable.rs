@@ -19,7 +19,7 @@ impl<'b> EditableSession<'b> {
 		// later.
 		let prepacked_weights = builder.prepacked_weights.clone();
 		Ok(Self {
-			session: builder.commit_finalize(session)?,
+			session: builder.commit_finalize(session, false)?,
 			builder,
 			prepacked_weights
 		})
@@ -46,14 +46,18 @@ impl<'b> EditableSession<'b> {
 			)?
 		];
 
-		if let Some(prepacked_weights) = self.prepacked_weights {
-			let Some(inner) = Arc::get_mut(&mut self.session.inner) else {
-				return Err(Error::new("Expected to have exclusive access to session inner"));
-			};
+		let session_ptr = self.session.inner.session_ptr;
+		let Some(inner) = Arc::get_mut(&mut self.session.inner) else {
+			return Err(Error::new("Expected to have exclusive access to session inner"));
+		};
 
+		inner.initialized = true;
+		inner.allocator = self.builder.session_allocator(session_ptr)?;
+		if let Some(prepacked_weights) = self.prepacked_weights {
 			// add to extras so it outlives the session
 			inner._extras.push(prepacked_weights.inner);
 		}
+		(self.session.inputs, self.session.outputs) = SessionBuilder::session_outlets(session_ptr)?;
 
 		Ok(self.session)
 	}

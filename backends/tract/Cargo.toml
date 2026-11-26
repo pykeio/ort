@@ -33,10 +33,11 @@ ort-sys = { version = "=2.0.0-rc.15", path = "../../ort-sys", default-features =
 [dependencies]
 ort-sys = { workspace = true }
 tract-onnx = "0.23"
-parking_lot = "0.12"
+parking_lot = "0.13"
 
 [dev-dependencies]
-ort = { version = "=2.0.0-rc.15", path = "../../", default-features = false, features = [ "alternative-backend", "fetch-models", "tls-rustls", "ndarray", "api-24" ] }
+ort = { version = "=2.0.0-rc.15", path = "../../", default-features = false, features = [ "std", "alternative-backend", "tls-rustls", "ndarray", "api-24" ] }
+ort-test-util = { path = "../../tests/util" }
 image = "0.25"
 ndarray = "0.17"
 

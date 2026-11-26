@@ -28,6 +28,8 @@ use crate::{
 	util::run_on_drop
 };
 
+const MODEL_BYTES_BORROWING_KEYS: [&str; 2] = ["session.use_ort_model_bytes_directly", "session.use_ort_model_bytes_for_initializers"];
+
 impl SessionBuilder {
 	/// Loads an ONNX model from a file and builds the session.
 	#[cfg(all(feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
@@ -71,15 +73,13 @@ impl SessionBuilder {
 	/// facilitate creating self-referential structs, such as [`ouroboros`](https://github.com/joshua-maros/ouroboros).
 	#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 	pub fn commit_from_memory_directly<'m>(&mut self, model_bytes: &'m [u8]) -> Result<InMemorySession<'m>> {
-		const KEYS: [&str; 2] = ["session.use_ort_model_bytes_directly", "session.use_ort_model_bytes_for_initializers"];
-
 		// Enable zero-copy deserialization for models in `.ort` format, only for this commit; if left on, later
 		// `commit_from_memory` calls would borrow the model bytes without a lifetime tying the session to them.
-		for key in KEYS {
+		for key in MODEL_BYTES_BORROWING_KEYS {
 			let _ = self.add_config_entry(key, "1");
 		}
 		let session = self.commit_from_memory(model_bytes);
-		for key in KEYS {
+		for key in MODEL_BYTES_BORROWING_KEYS {
 			let _ = self.add_config_entry(key, "0");
 		}
 
@@ -92,6 +92,8 @@ impl SessionBuilder {
 	/// Load an ONNX graph from memory and commit the session.
 	#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 	pub fn commit_from_memory(&mut self, model_bytes: &[u8]) -> Result<Session> {
+		self.copy_model_bytes()?;
+
 		self.pre_commit()?;
 
 		let model_data = model_bytes.as_ptr().cast::<c_void>();
@@ -145,6 +147,15 @@ impl SessionBuilder {
 		};
 
 		self.commit_finalize(session_ptr, true)
+	}
+
+	/// Ensures that ONNX Runtime copies a model loaded from memory, overriding `use_ort_model_bytes_directly`
+	/// or similar keys the user might have set.
+	pub(crate) fn copy_model_bytes(&mut self) -> Result<()> {
+		for key in MODEL_BYTES_BORROWING_KEYS {
+			self.add_config_entry(key, "0")?;
+		}
+		Ok(())
 	}
 
 	pub(crate) fn pre_commit(&mut self) -> Result<()> {
@@ -258,6 +269,8 @@ impl SessionBuilder {
 	#[cfg(feature = "api-22")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
 	pub fn edit_from_memory(&mut self, model_bytes: &[u8]) -> Result<EditableSession<'_>> {
+		self.copy_model_bytes()?;
+
 		let mut session_ptr: *mut ort_sys::OrtSession = ptr::null_mut();
 
 		ortsys![@editor:
@@ -272,5 +285,29 @@ impl SessionBuilder {
 		];
 
 		EditableSession::new(session_ptr, self)
+	}
+}
+
+#[cfg(all(test, feature = "std", not(all(target_family = "wasm", target_os = "unknown"))))]
+mod tests {
+	use crate::{Result, session::Session, test_util::test_env, value::Tensor};
+
+	#[test]
+	fn test_commit_from_memory_copies() -> Result<()> {
+		let mut model_bytes = std::fs::read("tests/data/add_constant.ort").expect("failed to read model");
+		let input = Tensor::<f32>::from_array(([64_usize], vec![1.0; 64]))?;
+
+		let mut session = Session::builder(test_env())?
+			.with_config_entry("session.use_ort_model_bytes_directly", "1")?
+			.with_config_entry("session.use_ort_model_bytes_for_initializers", "1")?
+			.commit_from_memory(&model_bytes)?;
+		model_bytes.fill(0);
+		drop(model_bytes);
+
+		let outputs = session.run(crate::inputs![&input])?;
+		let expected = (1..=64).map(|x| x as f32).collect::<Vec<_>>();
+		assert_eq!(outputs["y"].try_extract_tensor::<f32>()?.1, expected);
+
+		Ok(())
 	}
 }

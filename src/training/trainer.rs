@@ -112,13 +112,15 @@ impl Trainer {
 	}
 
 	pub fn new_from_memory(
-		session_options: SessionBuilder,
+		mut session_options: SessionBuilder,
 		allocator: Allocator,
 		ckpt: Checkpoint,
 		training_model: &[u8],
 		eval_model: &[u8],
 		optimizer_model: &[u8]
 	) -> Result<Self> {
+		session_options.copy_model_bytes()?;
+
 		let mut ptr: *mut ort_sys::OrtTrainingSession = ptr::null_mut();
 		ortsys![@training:
 			unsafe CreateTrainingSessionFromBuffer(

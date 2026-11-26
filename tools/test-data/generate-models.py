@@ -123,6 +123,37 @@ class Models:
 			producer_name='generate-models.py'
 		)
 
+	@misc_factory
+	def add_constant_ort():
+		import os, tempfile
+
+		input_x = G.make_tensor_value_info('x', onnx.TensorProto.FLOAT, [64])
+		output_y = G.make_tensor_value_info('y', onnx.TensorProto.FLOAT, [64])
+		bias = make_tensor_from_np('bias', np.arange(64, dtype=np.float32))
+		model = G.ModelProto(
+			ir_version=13,
+			graph=G.make_graph(
+				nodes=[G.make_node('Add', ['x', 'bias'], ['y'])],
+				inputs=[input_x],
+				outputs=[output_y],
+				initializer=[bias],
+				name='add_constant'
+			),
+			opset_import=[onnx.OperatorSetIdProto(domain=None, version=13)],
+			producer_name='generate-models.py'
+		)
+		onnx.checker.check_model(model)
+
+		with tempfile.TemporaryDirectory() as temp_dir:
+			onnx_path = os.path.join(temp_dir, 'add_constant.onnx')
+			onnx.save_model(model, onnx_path)
+
+			options = ort.SessionOptions()
+			options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
+			options.optimized_model_filepath = 'tests/data/add_constant.ort'
+			options.add_session_config_entry('session.save_model_format', 'ORT')
+			_ = ort.InferenceSession(onnx_path, options, providers=['CPUExecutionProvider'])
+
 if __name__ == '__main__':
 	for model_factory in factories:
 		model_factory()

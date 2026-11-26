@@ -226,6 +226,10 @@ impl SessionBuilder {
 		if let Some(logger) = self.logger.clone() {
 			extras.push(logger as Arc<dyn Any>);
 		}
+		if !self.external_initializer_buffers.is_empty() {
+			// needed in case the user sets `session.use_external_initializer_file_buffers_directly`
+			extras.push(Arc::new(self.external_initializer_buffers.clone()) as Arc<dyn Any>);
+		}
 		extras
 	}
 

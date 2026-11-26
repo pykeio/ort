@@ -525,7 +525,7 @@ impl Session {
 			));
 		}
 
-		let (output_names, mut output_tensors) = run_options.outputs.resolve_outputs(&self.outputs);
+		let (output_names, mut output_tensors) = run_options.outputs.resolve_outputs(&self.outputs)?;
 		let mut output_value_ptrs: SmallVec<[*mut ort_sys::OrtValue; STACK_SESSION_OUTPUTS]> = output_tensors
 			.iter_mut()
 			.map(|c| match c {

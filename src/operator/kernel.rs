@@ -1,10 +1,21 @@
-use alloc::{boxed::Box, ffi::CString, string::String, vec, vec::Vec};
+use alloc::{
+	boxed::Box,
+	ffi::CString,
+	format,
+	string::String,
+	sync::{Arc, Weak},
+	vec,
+	vec::Vec
+};
 use core::{
+	cell::{RefCell, RefMut},
 	ffi::{c_char, c_void},
 	marker::PhantomData,
 	ptr::{self, NonNull},
 	slice
 };
+
+use smallvec::SmallVec;
 
 use super::attribute::FromKernelContext;
 use crate::{
@@ -15,7 +26,7 @@ use crate::{
 	memory::{Allocator, MemoryInfo, MemoryType},
 	ortsys,
 	util::with_cstr,
-	value::{DowncastableTarget, DynValue, IntoShape, Outlet, Value, ValueRef, ValueRefMut, ValueType}
+	value::{DowncastableTarget, DynValue, IntoShape, Outlet, Value, ValueInner, ValueRef, ValueRefMut, ValueType}
 };
 
 pub trait Kernel: Send {
@@ -195,27 +206,86 @@ impl<T> Drop for ScratchBuffer<T> {
 }
 
 pub struct ComputeContext {
-	ptr: NonNull<ort_sys::OrtKernelContext>
+	ptr: NonNull<ort_sys::OrtKernelContext>,
+	in_use: RefCell<SmallVec<[InUseValue; 4]>>
+}
+
+struct InUseValue {
+	value: Weak<ValueInner>,
+	data_ptr: Option<*const c_void>,
+	output: Option<usize>
 }
 
 impl ComputeContext {
 	pub(crate) fn new(ctx: *mut ort_sys::OrtKernelContext) -> Self {
 		Self {
-			ptr: NonNull::from(unsafe { &mut *ctx })
+			ptr: NonNull::from(unsafe { &mut *ctx }),
+			in_use: RefCell::new(SmallVec::new())
 		}
+	}
+
+	fn values_in_use(&self) -> RefMut<'_, SmallVec<[InUseValue; 4]>> {
+		let mut in_use = self.in_use.borrow_mut();
+		in_use.retain(|c| c.value.strong_count() > 0);
+		in_use
+	}
+
+	fn ensure_output_unused(&self, idx: usize) -> Result<()> {
+		if self.values_in_use().iter().any(|c| c.output == Some(idx)) {
+			return Err(Error::new(format!("Output #{idx} is already in use; the previous handle to it must be dropped before retrieving it again")));
+		}
+		Ok(())
+	}
+
+	fn track_input(&self, idx: usize, value: DynValue) -> Result<ValueRef<'_>> {
+		let data_ptr = value.inner.data_ptr();
+		let mut in_use = self.values_in_use();
+		if data_ptr.is_some() && in_use.iter().any(|c| c.output.is_some() && c.data_ptr == data_ptr) {
+			return Err(Error::new(format!(
+				"Input #{idx} shares its data with an output that is still in use (operator is inplace); the output must be dropped before retrieving the input"
+			)));
+		}
+		in_use.push(InUseValue {
+			value: Arc::downgrade(&value.inner),
+			data_ptr,
+			output: None
+		});
+		Ok(ValueRef::new(value))
+	}
+
+	fn track_output(&self, idx: usize, value: DynValue) -> Result<ValueRefMut<'_>> {
+		let data_ptr = value.inner.data_ptr();
+		let mut in_use = self.values_in_use();
+		if data_ptr.is_some() && in_use.iter().any(|c| c.data_ptr == data_ptr) {
+			return Err(Error::new(format!(
+				"Output #{idx} shares its data with an input or output that is still in use (operator may run inplace); other handles must be dropped before retrieving the output"
+			)));
+		}
+		in_use.push(InUseValue {
+			value: Arc::downgrade(&value.inner),
+			data_ptr,
+			output: Some(idx)
+		});
+		Ok(ValueRefMut::new(value))
 	}
 
 	pub fn input(&self, idx: usize) -> Result<Option<ValueRef<'_>>> {
 		let mut value_ptr: *const ort_sys::OrtValue = ptr::null();
 		ortsys![unsafe KernelContext_GetInput(self.ptr.as_ptr(), idx, &mut value_ptr)?];
-		Ok(NonNull::new(value_ptr.cast_mut()).map(|c| ValueRef::new(unsafe { Value::from_ptr_nodrop(c, None) })))
+		NonNull::new(value_ptr.cast_mut())
+			.map(|c| self.track_input(idx, unsafe { Value::from_ptr_nodrop(c, None) }))
+			.transpose()
 	}
 
 	pub fn output(&self, idx: usize, shape: impl IntoShape) -> Result<Option<ValueRefMut<'_>>> {
+		self.ensure_output_unused(idx)?;
+
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 		let shape = shape.into();
 		ortsys![unsafe KernelContext_GetOutput(self.ptr.as_ptr(), idx, shape.as_ptr(), shape.len(), &mut value_ptr)?];
-		Ok(NonNull::new(value_ptr).map(|c| ValueRefMut::new(unsafe { Value::from_ptr_nodrop(c, None) })))
+		NonNull::new(value_ptr)
+			.map(|c| self.track_output(idx, unsafe { Value::from_ptr_nodrop(c, None) }))
+			.transpose()
 	}
 
 	/// Returns the value already allocated for output `idx`, or `None` if the output has not been allocated.
@@ -233,9 +303,13 @@ impl ComputeContext {
 	#[cfg(feature = "api-30")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "api-30")))]
 	pub fn preallocated_output(&self, idx: usize) -> Result<Option<ValueRefMut<'_>>> {
+		self.ensure_output_unused(idx)?;
+
 		let mut value_ptr: *mut ort_sys::OrtValue = ptr::null_mut();
 		ortsys![unsafe KernelContext_GetPreallocatedOutput(self.ptr.as_ptr(), idx, &mut value_ptr)?];
-		Ok(NonNull::new(value_ptr).map(|c| ValueRefMut::new(unsafe { Value::from_ptr_nodrop(c, None) })))
+		NonNull::new(value_ptr)
+			.map(|c| self.track_output(idx, unsafe { Value::from_ptr_nodrop(c, None) }))
+			.transpose()
 	}
 
 	pub fn num_inputs(&self) -> Result<usize> {

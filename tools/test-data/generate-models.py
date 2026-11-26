@@ -154,6 +154,30 @@ class Models:
 			options.add_session_config_entry('session.save_model_format', 'ORT')
 			_ = ort.InferenceSession(onnx_path, options, providers=['CPUExecutionProvider'])
 
+	@model_factory
+	def custom_op_inplace():
+		input_x = G.make_tensor_value_info('x', onnx.TensorProto.FLOAT, [4])
+		output_y = G.make_tensor_value_info('y', onnx.TensorProto.FLOAT, [4])
+
+		return G.ModelProto(
+			ir_version=10,
+			graph=G.make_graph(
+				nodes=[
+					G.make_node('Neg', ['x'], ['neg_x']),
+					G.make_node('AddOne', ['neg_x'], ['added'], name='add_one', domain='test.customop'),
+					G.make_node('Neg', ['added'], ['y'])
+				],
+				inputs=[input_x],
+				outputs=[output_y],
+				name='custom_op_inplace'
+			),
+			opset_import=[
+				onnx.OperatorSetIdProto(domain='', version=19),
+				onnx.OperatorSetIdProto(domain='test.customop', version=1)
+			],
+			producer_name='generate-models.py'
+		)
+
 if __name__ == '__main__':
 	for model_factory in factories:
 		model_factory()

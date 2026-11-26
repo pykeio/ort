@@ -2,9 +2,9 @@ use alloc::sync::Arc;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{
-	Result,
+	Error, Result,
 	logging::LogLevel,
-	operator::{BoxedKernel, ComputeContext, Kernel, KernelContext, Operator, OperatorDomain, OperatorInput, OperatorOutput},
+	operator::{BoxedKernel, ComputeContext, Kernel, KernelContext, Operator, OperatorDomain, OperatorInput, OperatorOutput, ShapeInferenceContext},
 	session::Session,
 	test_util::test_env,
 	value::{Tensor, TensorElementType}
@@ -437,5 +437,90 @@ fn test_preallocated_output() -> crate::Result<()> {
 	assert_eq!(outputs[0].view().downcast::<crate::value::DynTensorValueType>()?.data_ptr(), preallocated_ptr);
 
 	assert_eq!(*seen.lock(), [None, Some(alloc::vec![3, 5])]);
+	Ok(())
+}
+
+struct AddOne {
+	in_place: Arc<AtomicBool>,
+	checks_passed: Arc<AtomicBool>
+}
+
+impl Operator for AddOne {
+	type Kernel<'attr> = BoxedKernel<'attr>;
+
+	const INPLACES: &[(u32, u32)] = &[(0, 0)];
+
+	fn name(&self) -> &str {
+		"AddOne"
+	}
+
+	fn inputs(&self) -> impl IntoIterator<Item = OperatorInput> {
+		[OperatorInput::required(TensorElementType::Float32)]
+	}
+
+	fn outputs(&self) -> impl IntoIterator<Item = OperatorOutput> {
+		[OperatorOutput::required(TensorElementType::Float32)]
+	}
+
+	fn infer_shape(&self, ctx: &mut ShapeInferenceContext) -> Result<()> {
+		let input = ctx.inputs().remove(0);
+		ctx.set_output(0, &input)
+	}
+
+	fn create_kernel<'attr>(&self, _: &KernelContext<'attr>) -> Result<Self::Kernel<'attr>> {
+		let (in_place, checks_passed) = (Arc::clone(&self.in_place), Arc::clone(&self.checks_passed));
+		Ok(Box::new(move |ctx: &ComputeContext| {
+			let missing = || Error::new("missing input/output");
+
+			let shape = ctx.input(0)?.ok_or_else(missing)?.shape().to_vec();
+			let mut output = ctx.output(0, shape.clone())?.ok_or_else(missing)?;
+			let mut ok = ctx.output(0, shape.clone()).is_err();
+
+			match ctx.input(0) {
+				Ok(input) => {
+					let input = input.ok_or_else(missing)?;
+					let (_, x) = input.try_extract_tensor::<f32>()?;
+					let (_, y) = output.try_extract_tensor_mut::<f32>()?;
+					ok &= x.as_ptr() != y.as_ptr();
+					for (y, x) in y.iter_mut().zip(x) {
+						*y = *x + 1.0;
+					}
+				}
+				Err(_) => {
+					in_place.store(true, Ordering::Release);
+					for y in output.try_extract_tensor_mut::<f32>()?.1 {
+						*y += 1.0;
+					}
+				}
+			}
+
+			drop(output);
+			let input = ctx.input(0)?.ok_or_else(missing)?;
+			ok &= ctx.output(0, shape.clone()).is_err() == in_place.load(Ordering::Acquire);
+			drop(input);
+			ok &= ctx.output(0, shape).is_ok();
+
+			checks_passed.store(ok, Ordering::Release);
+			Ok(())
+		}))
+	}
+}
+
+#[test]
+fn test_inplace_operator_does_not_alias() -> Result<()> {
+	let (in_place, checks_passed) = (Arc::new(AtomicBool::new(false)), Arc::new(AtomicBool::new(false)));
+	let mut session = Session::builder(test_env())?
+		.with_operators(OperatorDomain::new("test.customop")?.add(AddOne {
+			in_place: Arc::clone(&in_place),
+			checks_passed: Arc::clone(&checks_passed)
+		})?)?
+		.commit_from_file("tests/data/custom_op_inplace.onnx")?;
+
+	let outputs = session.run(crate::inputs![Tensor::<f32>::from_array(([4_usize], vec![1.0, 2.0, 3.0, 4.0]))?])?;
+	assert_eq!(outputs[0].try_extract_tensor::<f32>()?.1, [0.0, 1.0, 2.0, 3.0]);
+
+	assert!(checks_passed.load(Ordering::Acquire));
+	assert!(in_place.load(Ordering::Acquire));
+
 	Ok(())
 }

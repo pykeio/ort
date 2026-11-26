@@ -13,7 +13,7 @@ categories = [ "algorithms", "mathematics", "science" ]
 [workspace]
 resolver = "3"
 members = [ "standalone" ]
-default-members = []
+default-members = [ "." ]
 
 [profile.release]
 opt-level = 3

@@ -51,7 +51,8 @@ use core::{
 	ffi::c_void,
 	fmt,
 	mem::forget,
-	ptr::{self, NonNull}
+	ptr::{self, NonNull},
+	sync::atomic::{AtomicBool, Ordering}
 };
 #[cfg(all(feature = "api-22", feature = "std"))]
 use std::path::Path;
@@ -362,6 +363,19 @@ pub trait ThreadManager: Send + Sync {
 	fn join(thread: Self::Thread) -> crate::Result<()>;
 }
 
+struct ManagedThread<Thread> {
+	thread: Thread,
+	finished: Arc<AtomicBool>
+}
+
+struct FinishOnDrop(Arc<AtomicBool>);
+
+impl Drop for FinishOnDrop {
+	fn drop(&mut self) {
+		self.0.store(true, Ordering::Release);
+	}
+}
+
 pub(crate) unsafe extern "C" fn thread_create<T: ThreadManager + Any>(
 	ort_custom_thread_creation_options: *mut c_void,
 	ort_thread_worker_fn: ort_sys::OrtThreadWorkerFn,
@@ -372,9 +386,13 @@ pub(crate) unsafe extern "C" fn thread_create<T: ThreadManager + Any>(
 
 	let ort_worker_fn_param = SendablePtr(ort_worker_fn_param);
 
+	let finished = Arc::new(AtomicBool::new(false));
+	let finish_guard = FinishOnDrop(Arc::clone(&finished));
+
 	let runner = || {
 		let manager = unsafe { &mut *ort_custom_thread_creation_options.cast::<T>() };
 		<T as ThreadManager>::create(manager, move || {
+			let _finish_guard = finish_guard;
 			let p = ort_worker_fn_param;
 			unsafe { (ort_thread_worker_fn)(p.0) }
 		})
@@ -382,9 +400,9 @@ pub(crate) unsafe extern "C" fn thread_create<T: ThreadManager + Any>(
 	#[cfg(not(feature = "std"))]
 	let res = Result::<_, crate::Error>::Ok(runner()); // dumb hack
 	#[cfg(feature = "std")]
-	let res = std::panic::catch_unwind(runner);
+	let res = std::panic::catch_unwind(core::panic::AssertUnwindSafe(runner));
 	match res {
-		Ok(Ok(thread)) => (Box::leak(Box::new(thread)) as *mut <T as ThreadManager>::Thread)
+		Ok(Ok(thread)) => (Box::leak(Box::new(ManagedThread { thread, finished })) as *mut ManagedThread<<T as ThreadManager>::Thread>)
 			.cast_const()
 			.cast::<ort_sys::OrtCustomHandleType>(),
 		Ok(Err(e)) => {
@@ -401,10 +419,20 @@ pub(crate) unsafe extern "C" fn thread_create<T: ThreadManager + Any>(
 }
 
 pub(crate) unsafe extern "C" fn thread_join<T: ThreadManager + Any>(ort_custom_thread_handle: ort_sys::OrtCustomThreadHandle) {
-	let handle = unsafe { Box::from_raw(ort_custom_thread_handle.cast_mut().cast::<<T as ThreadManager>::Thread>()) };
-	if let Err(e) = <T as ThreadManager>::join(*handle) {
+	let handle = unsafe { Box::from_raw(ort_custom_thread_handle.cast_mut().cast::<ManagedThread<<T as ThreadManager>::Thread>>()) };
+	let ManagedThread { thread, finished } = *handle;
+	if let Err(e) = <T as ThreadManager>::join(thread) {
 		crate::error!("Failed to join thread using manager: {e}");
 		let _ = e;
+	}
+
+	// dont trust `ThreadManager::join` to have actually waited for the thread to finish since it may have failed or the
+	// thread may be detached; ONNX Runtime *needs* the thread to actually be finished by the time we return
+	while !finished.load(Ordering::Acquire) {
+		#[cfg(feature = "std")]
+		std::thread::sleep(core::time::Duration::from_millis(1));
+		#[cfg(not(feature = "std"))]
+		core::hint::spin_loop();
 	}
 }
 

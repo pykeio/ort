@@ -37,7 +37,7 @@ fn main() -> ort::Result<()> {
 	kdam::term::init(true);
 	let _ = kdam::term::hide_cursor();
 
-	let trainer = Trainer::new(
+	let mut trainer = Trainer::new(
 		SessionBuilder::new(&env)?,
 		Allocator::default(),
 		Checkpoint::load("tools/train-data/mini-clm/checkpoint")?,
@@ -56,8 +56,7 @@ fn main() -> ort::Result<()> {
 	)
 	.unwrap();
 
-	let mut optimizer = trainer.optimizer();
-	optimizer.set_lr(7e-5)?;
+	trainer.optimizer().set_lr(7e-5)?;
 
 	let mut dataset = File::open("train-clm-dataset.bin").unwrap();
 	let file_size = dataset.metadata().unwrap().len();
@@ -99,6 +98,7 @@ fn main() -> ort::Result<()> {
 
 		let outputs = trainer.step(ort::inputs![inputs], ort::inputs![labels])?;
 		let loss = outputs[0].try_extract_scalar::<f32>()?;
+		drop(outputs);
 		pb.set_postfix(format!("loss={loss:.3}"));
 		pb.update(1).unwrap();
 		if loss.is_nan() {

@@ -1,6 +1,7 @@
 use alloc::{borrow::Cow, sync::Arc};
 use core::{
 	any::Any,
+	cell::Cell,
 	fmt,
 	marker::PhantomData,
 	mem,
@@ -29,7 +30,9 @@ pub struct Trainer {
 	train_output_names: Vec<String>,
 	eval_output_names: Vec<String>,
 	train_input_names: Vec<String>,
-	eval_input_names: Vec<String>
+	eval_input_names: Vec<String>,
+	// force !Sync because TrainingSession has zero internal synchronization
+	_p: PhantomData<Cell<()>>
 }
 
 pub(crate) struct TrainingSessionInner {
@@ -160,12 +163,13 @@ impl Trainer {
 			train_output_names,
 			train_input_names,
 			eval_output_names,
-			eval_input_names
+			eval_input_names,
+			_p: PhantomData
 		})
 	}
 
 	pub fn step<'s, 'i1, 'v1: 'i1, 'i2: 'i1, 'v2: 'i2 + 'i1, const N1: usize, const N2: usize>(
-		&'s self,
+		&'s mut self,
 		inputs: impl Into<SessionInputs<'i1, 'v1, N1>>,
 		labels: impl Into<SessionInputs<'i2, 'v2, N2>>
 	) -> Result<SessionOutputs<'s>> {
@@ -173,7 +177,7 @@ impl Trainer {
 	}
 
 	pub fn eval_step<'s, 'i1, 'v1: 'i1, 'i2: 'i1, 'v2: 'i2 + 'i1, const N1: usize, const N2: usize>(
-		&'s self,
+		&'s mut self,
 		inputs: impl Into<SessionInputs<'i1, 'v1, N1>>,
 		labels: impl Into<SessionInputs<'i2, 'v2, N2>>
 	) -> Result<SessionOutputs<'s>> {
@@ -181,7 +185,7 @@ impl Trainer {
 	}
 
 	fn run_step<'s, 'i1, 'v1: 'i1, 'i2: 'i1, 'v2: 'i2 + 'i1, const N1: usize, const N2: usize>(
-		&'s self,
+		&'s mut self,
 		step: Step,
 		inputs: &SessionInputs<'i1, 'v1, N1>,
 		labels: &SessionInputs<'i2, 'v2, N2>

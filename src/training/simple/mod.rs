@@ -11,28 +11,28 @@ mod callbacks;
 pub use self::callbacks::{TrainerCallbacks, TrainerControl, TrainerState};
 
 macro_rules! callback {
-	($which:ident($self:expr, $optimizer:expr, $args:expr, $state:expr)) => {
+	($which:ident($self:expr, $args:expr, $state:expr)) => {
 		let mut halt = false;
 		for cb in &mut $args.callbacks {
 			let mut control = TrainerControl::new($self);
 			cb.$which(&$state, &mut control)?;
 			halt = halt || control.halt;
 			if let Some(lr) = control.lr {
-				$optimizer.set_lr(lr)?;
+				($self).optimizer().set_lr(lr)?;
 			}
 		}
 		if halt {
 			return $self.handle_halt(&mut $args.callbacks, &$state);
 		}
 	};
-	($which:ident($self:expr, $optimizer:expr, $args:expr, $state:expr), $($addt:expr),*) => {
+	($which:ident($self:expr, $args:expr, $state:expr), $($addt:expr),*) => {
 		let mut halt = false;
 		for cb in &mut $args.callbacks {
 			let mut control = TrainerControl::new($self);
 			cb.$which($($addt,)* &$state, &mut control)?;
 			halt = halt || control.halt;
 			if let Some(lr) = control.lr {
-				$optimizer.set_lr(lr)?;
+				($self).optimizer().set_lr(lr)?;
 			}
 		}
 		if halt {
@@ -43,11 +43,10 @@ macro_rules! callback {
 
 impl Trainer {
 	pub fn train<I: Into<SessionInputs<'static, 'static, NI>>, L: Into<SessionInputs<'static, 'static, NL>>, const NI: usize, const NL: usize>(
-		&self,
+		&mut self,
 		mut args: TrainingArguments<I, L, NI, NL>
 	) -> Result<()> {
-		let mut optimizer = self.optimizer();
-		optimizer.set_lr(args.lr)?;
+		self.optimizer().set_lr(args.lr)?;
 
 		let mut saved_ckpts = VecDeque::new();
 		let mut state = TrainerState::new(&args);
@@ -58,7 +57,7 @@ impl Trainer {
 
 			if let Some(epoch) = state.epoch {
 				if epoch.trunc() != last_epoch {
-					callback!(epoch(self, optimizer, args, state));
+					callback!(epoch(self, args, state));
 				}
 
 				last_epoch = epoch.trunc();
@@ -69,13 +68,16 @@ impl Trainer {
 
 			let outputs = self.step(inputs, labels)?;
 			let loss = outputs[0].try_extract_scalar::<f32>()?;
-			callback!(train_step(self, optimizer, args, state), loss);
+			drop(outputs);
+			callback!(train_step(self, args, state), loss);
 
 			if iter_step % args.gradient_accumulation_steps == 0 {
+				let mut optimizer = self.optimizer();
 				optimizer.step()?;
 				optimizer.reset_grad()?;
 				state.global_step += 1;
-				callback!(optimizer_step(self, optimizer, args, state), loss);
+
+				callback!(optimizer_step(self, args, state), loss);
 			}
 
 			if args.ckpt_strategy.should_fire(state.global_step, iter_step, args.loader.len()) {
@@ -101,9 +103,9 @@ impl Trainer {
 				.eval_strategy
 				.should_fire(state.global_step, iter_step, args.eval_loader.as_ref().and_then(|d| d.len()))
 			{
-				callback!(eval_begin(self, optimizer, args, state));
+				callback!(eval_begin(self, args, state));
 				let eval_loss = self.eval_inner(&mut args)?;
-				callback!(eval_end(self, optimizer, args, state), eval_loss);
+				callback!(eval_end(self, args, state), eval_loss);
 			}
 		}
 		Ok(())
@@ -118,7 +120,7 @@ impl Trainer {
 	}
 
 	pub(crate) fn eval_inner<I: Into<SessionInputs<'static, 'static, NI>>, L: Into<SessionInputs<'static, 'static, NL>>, const NI: usize, const NL: usize>(
-		&self,
+		&mut self,
 		args: &mut TrainingArguments<I, L, NI, NL>
 	) -> crate::Result<f32> {
 		let Some(eval_loader) = &mut args.eval_loader else {

@@ -55,7 +55,7 @@ fn main() -> ort::Result<()> {
 	// Create our environment, registering EPs based on feature flags; you can also simply do `ort::init().build()?`
 	let env = common::get_env()?;
 
-	let trainer = Trainer::new_from_artifacts(
+	let mut trainer = Trainer::new_from_artifacts(
 		SessionBuilder::new(&env)?.with_execution_providers([ep::CUDA::default().build()])?,
 		Allocator::default(),
 		"tools/train-data/mini-clm",

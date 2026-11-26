@@ -19,6 +19,7 @@
 use alloc::{boxed::Box, format, sync::Arc};
 use core::{
 	any::Any,
+	ffi::c_void,
 	fmt::{self, Debug},
 	marker::PhantomData,
 	mem::transmute,
@@ -122,6 +123,19 @@ impl ValueInner {
 
 	pub(crate) fn is_backed(&self) -> bool {
 		self._backing.is_some()
+	}
+
+	pub(crate) fn data_ptr(&self) -> Option<*const c_void> {
+		let ValueType::Tensor { shape, .. } = &self.dtype else {
+			return None;
+		};
+		if self.memory_info.is_none() || shape.num_elements() == Some(0) {
+			return None;
+		}
+
+		let mut data_ptr: *mut c_void = ptr::null_mut();
+		ortsys![@ort: unsafe GetTensorMutableData(self.ptr().cast_mut(), &mut data_ptr) as Result].ok()?;
+		if !data_ptr.is_null() { Some(data_ptr.cast_const()) } else { None }
 	}
 }
 

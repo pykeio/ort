@@ -1,6 +1,6 @@
 #[cfg(feature = "api-23")]
 use alloc::string::ToString;
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::{format, string::String, sync::Arc, vec::Vec};
 use core::{
 	ffi::{CStr, c_char, c_int},
 	marker::PhantomData,
@@ -13,7 +13,7 @@ use smallvec::SmallVec;
 #[cfg(feature = "api-20")]
 use crate::session::adapter::{Adapter, AdapterInner};
 use crate::{
-	AsPointer,
+	AsPointer, Error, ErrorCode,
 	error::Result,
 	logging::LogLevel,
 	ortsys,
@@ -101,6 +101,10 @@ impl OutputSelector {
 	/// if you use the same `RunOptions` across multiple runs with a preallocated value, the preallocated value will be
 	/// overwritten upon each run.
 	///
+	/// Since the value is overwritten, the output returned for it by one run has to be dropped before the next run can
+	/// start; a run returns an error if the output of a previous run hasn't dropped. To hold onto the contents of an
+	/// output for longer, [clone](crate::value::Tensor::clone) it.
+	///
 	/// This can improve performance if the size and type of the output is known, and does not change between runs, i.e.
 	/// for an ODE or embeddings model.
 	///
@@ -127,16 +131,42 @@ impl OutputSelector {
 		self
 	}
 
+	#[allow(clippy::type_complexity)]
 	pub(crate) fn resolve_outputs<'a, 's: 'a>(
 		&'a self,
 		outputs: &'s [Outlet]
-	) -> (SmallVec<[&'a str; STACK_SESSION_OUTPUTS]>, SmallVec<[Option<DynValue>; STACK_SESSION_OUTPUTS]>) {
-		if self.use_defaults { outputs.iter() } else { [].iter() }
+	) -> Result<(SmallVec<[&'a str; STACK_SESSION_OUTPUTS]>, SmallVec<[Option<DynValue>; STACK_SESSION_OUTPUTS]>)> {
+		let mut names: SmallVec<[&'a str; STACK_SESSION_OUTPUTS]> = SmallVec::new();
+		let mut values: SmallVec<[Option<DynValue>; STACK_SESSION_OUTPUTS]> = SmallVec::new();
+		for name in if self.use_defaults { outputs.iter() } else { [].iter() }
 			.map(|o| o.name())
 			.filter(|n| !self.default_blocklist.iter().any(|e| e == n))
 			.chain(self.allowlist.iter().map(|x| x.as_str()))
-			.map(|n| (n, self.preallocated_outputs.get(n).map(DynValue::clone_of)))
-			.unzip()
+		{
+			if names.contains(&name) {
+				continue;
+			}
+
+			let value = match self.preallocated_outputs.get(name) {
+				Some(value) => {
+					// We hold one handle; any other belongs to the outputs of a previous run (or something they were
+					// given to)
+					if Arc::strong_count(&value.inner) != 1 {
+						return Err(Error::new_with_code(
+							ErrorCode::InvalidArgument,
+							format!(
+								"The value preallocated for output '{name}' is still in use; every value returned for this output by a previous run must be dropped before it can be overwritten by another run (`.clone()` the value to keep its contents)"
+							)
+						));
+					}
+					Some(DynValue::clone_of(value))
+				}
+				None => None
+			};
+			names.push(name);
+			values.push(value);
+		}
+		Ok((names, values))
 	}
 }
 

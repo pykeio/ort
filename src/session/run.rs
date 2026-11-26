@@ -19,9 +19,12 @@ use super::{
 	run_options::{RunOptions, SelectedOutputMarker, UntypedRunOptions}
 };
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
-use super::{io_binding::IoBinding, run_options::NoSelectedOutputs};
+use super::{
+	io_binding::{BoundOutput, IoBinding},
+	run_options::NoSelectedOutputs
+};
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
-use crate::value::{DynTensor, ValueInner, ValueType};
+use crate::value::{DynTensor, ValueInner};
 use crate::{
 	AsPointer,
 	error::{Error, ErrorCode, Result},
@@ -42,27 +45,14 @@ impl OutputAliasGuard {
 		Self { seen: SmallVec::new() }
 	}
 
-	fn data_ptr(value: &ValueInner) -> Option<*const c_void> {
-		let ValueType::Tensor { shape, .. } = &value.dtype else {
-			return None;
-		};
-		if value.memory_info.is_none() || shape.num_elements() == Some(0) {
-			return None;
-		}
-
-		let mut data_ptr: *mut c_void = ptr::null_mut();
-		ortsys![@ort: unsafe GetTensorMutableData(value.ptr().cast_mut(), &mut data_ptr) as Result].ok()?;
-		if !data_ptr.is_null() { Some(data_ptr.cast_const()) } else { None }
-	}
-
 	pub(crate) fn add(&mut self, value: &ValueInner) {
-		if let Some(data_ptr) = Self::data_ptr(value) {
+		if let Some(data_ptr) = value.data_ptr() {
 			self.seen.push(data_ptr);
 		}
 	}
 
 	pub(crate) fn unalias(&mut self, output: DynValue) -> Result<DynValue> {
-		let Some(data_ptr) = Self::data_ptr(&output.inner) else {
+		let Some(data_ptr) = output.inner.data_ptr() else {
 			return Ok(output);
 		};
 
@@ -290,7 +280,7 @@ impl Session {
 		}
 
 		let (output_names, mut output_tensors) = match run_options {
-			Some(r) => r.outputs.resolve_outputs(&self.outputs),
+			Some(r) => r.outputs.resolve_outputs(&self.outputs)?,
 			None => (self.outputs.iter().map(|o| o.name()).collect(), iter::repeat_with(|| None).take(self.outputs.len()).collect())
 		};
 		let mut output_value_ptrs: SmallVec<[*mut ort_sys::OrtValue; STACK_SESSION_OUTPUTS]> = output_tensors
@@ -367,6 +357,7 @@ impl Session {
 
 		self.inner.wait_for_async_run();
 		binding.rebind_dirty_inputs()?;
+		binding.prepare_outputs()?;
 
 		let run_options_ptr = if let Some(run_options) = run_options { run_options.ptr() } else { ptr::null() };
 		ortsys![unsafe RunWithBinding(self.inner.ptr().cast_mut(), run_options_ptr, binding.ptr())?];
@@ -389,7 +380,7 @@ impl Session {
 							&self.inner
 						)
 					};
-					if let Some(bound_value) = bound_value {
+					if let BoundOutput::Value(bound_value) = bound_value {
 						value.share_allocator_of(bound_value);
 					}
 					value
@@ -405,6 +396,8 @@ impl Session {
 				output_values
 			};
 
+			binding.track_outputs(output_values.iter().map(|value| &value.inner));
+
 			Ok(SessionOutputs::new(binding.output_values.iter().map(|(k, _)| k.as_str()).collect(), output_values))
 		} else {
 			Ok(SessionOutputs::new_empty())
@@ -418,7 +411,8 @@ impl Session {
 		input_values: SmallVec<[&SessionInputValue<'static>; STACK_SESSION_INPUTS]>,
 		run_options: &'r Arc<UntypedRunOptions>
 	) -> Result<InferenceFut<'r>> {
-		// See the comment in `run_inner`; ONNX Runtime would read past the end of `input_name_ptrs`.
+		// An abandoned run still holds onto its preallocated outputs until it finishes.
+		self.inner.wait_for_async_run();
 
 		if input_values.len() > input_names.len() {
 			return Err(Error::new_with_code(
@@ -426,6 +420,9 @@ impl Session {
 				format!("{} inputs were provided, but the model only accepts {}.", input_values.len(), input_names.len())
 			));
 		}
+
+		// This can fail, so do it before leaking anything.
+		let (output_names, mut output_tensors) = run_options.outputs.resolve_outputs(&self.outputs)?;
 
 		// Convert every name before leaking any of them, so an invalid name doesn't leak the ones before it.
 		let input_name_ptrs = input_names
@@ -447,7 +444,6 @@ impl Session {
 			}));
 		}
 
-		let (output_names, mut output_tensors) = run_options.outputs.resolve_outputs(&self.outputs);
 		let output_name_ptrs = output_names
 			.iter()
 			.map(|n| CString::new(*n).unwrap_or_else(|_| unreachable!()))
@@ -574,10 +570,10 @@ impl Session {
 mod tests {
 	use crate::{
 		Result,
-		memory::{AllocationDevice, AllocatorType, MemoryInfo, MemoryType},
+		memory::{AllocationDevice, Allocator, AllocatorType, MemoryInfo, MemoryType},
 		session::{OutputSelector, RunOptions, Session},
 		test_util::test_env,
-		value::{Tensor, TensorRef}
+		value::{DynTensorValueType, Tensor, TensorRef}
 	};
 
 	const PASSTHROUGH_MODEL: &str = "tests/data/passthrough.onnx";
@@ -606,20 +602,63 @@ mod tests {
 	}
 
 	#[test]
-	fn test_duplicate_output_noalias() -> Result<()> {
+	fn test_duplicate_output_requested_once() -> Result<()> {
 		let mut session = Session::builder(test_env())?.commit_from_file(PASSTHROUGH_MODEL)?;
 
+		// y is already selected by default
 		let options = RunOptions::new()?.with_outputs(OutputSelector::default().without("x").with("y"));
-		let mut outputs = session.run_with_options(crate::inputs![Tensor::<f32>::from_array(([2_usize], vec![1.0, 2.0]))?], &options)?;
-		assert_eq!(outputs.len(), 2);
+		let outputs = session.run_with_options(crate::inputs![Tensor::<f32>::from_array(([2_usize], vec![1.0, 2.0]))?], &options)?;
+		assert_eq!(outputs.len(), 1);
+		assert_eq!(outputs["y"].try_extract_tensor::<f32>()?.1, [-1.0, -2.0]);
 
-		let data_ptrs = outputs
-			.values_mut()
-			.map(|mut value| value.try_extract_tensor_mut::<f32>().map(|(_, data)| data.as_ptr()))
-			.collect::<Result<Vec<_>>>()?;
-		assert_ne!(data_ptrs[0], data_ptrs[1]);
-		for value in outputs.values() {
-			assert_eq!(value.try_extract_tensor::<f32>()?.1, [-1.0, -2.0]);
+		Ok(())
+	}
+
+	#[test]
+	fn test_preallocated_output_in_use() -> Result<()> {
+		let mut session = Session::builder(test_env())?.commit_from_file(PASSTHROUGH_MODEL)?;
+		let input = |value: f32| Tensor::<f32>::from_array(([2_usize], vec![value; 2]));
+
+		let options = RunOptions::new()?.with_outputs(OutputSelector::default().preallocate("y", Tensor::<f32>::new(&Allocator::default(), [2_usize])?));
+		let first = session.run_with_options(crate::inputs![input(1.0)?], &options)?.remove("y").expect("");
+		let (_, first_data) = first.try_extract_tensor::<f32>()?;
+		assert_eq!(first_data, [-1.0, -1.0]);
+
+		let err = session
+			.run_with_options(crate::inputs![input(2.0)?], &options)
+			.expect_err("should fail while the preallocated output is still in use");
+		assert!(err.message().contains("still in use"), "{err}");
+		assert_eq!(first_data, [-1.0, -1.0]);
+
+		let copy = first.downcast::<DynTensorValueType>()?.clone();
+		let second = session.run_with_options(crate::inputs![input(2.0)?], &options)?.remove("y").expect("");
+		assert_eq!(second.try_extract_tensor::<f32>()?.1, [-2.0, -2.0]);
+		assert_eq!(copy.try_extract_tensor::<f32>()?.1, [-1.0, -1.0]);
+
+		assert!(session.run_with_options(crate::inputs![input(3.0)?], &options).is_err());
+		drop(second);
+		assert!(
+			session
+				.run_with_options(crate::inputs![Tensor::<i64>::from_array(([2_usize], vec![0; 2]))?], &options)
+				.is_err()
+		);
+		session.run_with_options(crate::inputs![input(3.0)?], &options)?;
+
+		Ok(())
+	}
+
+	#[test]
+	#[cfg(feature = "std")]
+	fn test_preallocated_output_after_abandoned_async_run() -> Result<()> {
+		let mut session = Session::builder(test_env())?.with_intra_threads(2)?.commit_from_file(PASSTHROUGH_MODEL)?;
+		let input = |value: f32| Tensor::<f32>::from_array(([2_usize], vec![value; 2]));
+
+		let options = RunOptions::new()?.with_outputs(OutputSelector::default().preallocate("y", Tensor::<f32>::new(&Allocator::default(), [2_usize])?));
+		for _ in 0..16 {
+			drop(session.run_async(crate::inputs![input(1.0)?], &options)?);
+			options.unterminate()?;
+			let outputs = session.run_with_options(crate::inputs![input(2.0)?], &options)?;
+			assert_eq!(outputs["y"].try_extract_tensor::<f32>()?.1, [-2.0, -2.0]);
 		}
 
 		Ok(())

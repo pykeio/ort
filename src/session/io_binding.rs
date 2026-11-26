@@ -1,11 +1,16 @@
-use alloc::{string::String, sync::Arc};
+use alloc::{
+	string::String,
+	sync::{Arc, Weak}
+};
 use core::{
-	cell::Cell,
+	cell::{Cell, RefCell},
 	fmt::Debug,
 	marker::PhantomData,
 	mem,
 	ptr::{self, NonNull}
 };
+
+use smallvec::SmallVec;
 
 use crate::{
 	AsPointer, Error, ErrorCode,
@@ -13,7 +18,7 @@ use crate::{
 	memory::MemoryInfo,
 	ortsys,
 	session::{Session, SharedSessionInner},
-	util::{MiniMap, with_cstr},
+	util::{MiniMap, STACK_SESSION_OUTPUTS, with_cstr},
 	value::{DynValueRef, DynValueRefMut, Value, ValueInner, ValueRef, ValueRefMut, ValueTypeMarker}
 };
 
@@ -105,9 +110,16 @@ use crate::{
 pub struct IoBinding {
 	ptr: NonNull<ort_sys::OrtIoBinding>,
 	held_inputs: MiniMap<String, BoundInput>,
-	pub(crate) output_values: MiniMap<String, Option<Arc<ValueInner>>>,
+	pub(crate) output_values: MiniMap<String, BoundOutput>,
+	last_outputs: RefCell<SmallVec<[Weak<ValueInner>; STACK_SESSION_OUTPUTS]>>,
 	maybe_pending_copies: Cell<bool>,
 	_session: Arc<SharedSessionInner>
+}
+
+#[derive(Debug)]
+pub(crate) enum BoundOutput {
+	Value(Arc<ValueInner>),
+	Device(MemoryInfo<'static>)
 }
 
 #[derive(Debug)]
@@ -197,6 +209,7 @@ impl IoBinding {
 			ptr,
 			held_inputs: MiniMap::new(),
 			output_values: MiniMap::new(),
+			last_outputs: RefCell::new(SmallVec::new()),
 			maybe_pending_copies: Cell::new(false),
 			_session: session.inner()
 		})
@@ -283,6 +296,53 @@ impl IoBinding {
 		}))
 	}
 
+	/// Makes sure an upcoming run won't overwrite data that can still be accessed through an output of the last run.
+	pub(crate) fn prepare_outputs(&self) -> Result<()> {
+		let mut last_outputs = self.last_outputs.borrow_mut();
+		for (i, (name, bound)) in self.output_values.iter().enumerate() {
+			let Some(last_output) = last_outputs.get_mut(i) else {
+				break;
+			};
+			if last_output.strong_count() == 0 {
+				continue;
+			}
+
+			match bound {
+				BoundOutput::Value(_) => {
+					return Err(Error::new_with_code(
+						ErrorCode::InvalidArgument,
+						alloc::format!(
+							"The value bound to output '{name}' is still in use; the value returned for this output by the previous run must be dropped before it can be overwritten by another run (`.clone()` the value to keep its contents)"
+						)
+					));
+				}
+				BoundOutput::Device(memory_info) => {
+					let ptr = self.ptr.as_ptr();
+					with_cstr(name.as_bytes(), &|name| {
+						ortsys![unsafe BindOutputToDevice(ptr, name.as_ptr(), memory_info.ptr())?];
+						Ok(())
+					})?;
+					*last_output = Weak::new();
+				}
+			}
+		}
+		Ok(())
+	}
+
+	pub(crate) fn track_outputs<'a>(&self, outputs: impl Iterator<Item = &'a Arc<ValueInner>>) {
+		let mut last_outputs = self.last_outputs.borrow_mut();
+		last_outputs.clear();
+		last_outputs.extend(outputs.map(Arc::downgrade));
+	}
+
+	fn untrack_output(&self, name: &str) {
+		if let Some(i) = self.output_values.iter().position(|(bound_name, _)| bound_name == name)
+			&& let Some(last_output) = self.last_outputs.borrow_mut().get_mut(i)
+		{
+			*last_output = Weak::new();
+		}
+	}
+
 	pub(crate) fn bound_inputs(&self) -> impl Iterator<Item = &ValueInner> {
 		self.held_inputs.iter().map(|(_, input)| &*input.inner)
 	}
@@ -314,6 +374,10 @@ impl IoBinding {
 	/// The output will be accessible in the value returned by [`Session::run_binding`], under the name specified by
 	/// `name`.
 	///
+	/// Since the value is overwritten by each run, the output returned for it by one run has to be dropped before the
+	/// next run can start; [`Session::run_binding`] returns an error if it hasn't dropped. To hold onto the contents
+	/// of an output for longer, [clone](crate::value::Tensor::clone) it.
+	///
 	/// [`Tensor::new`]: crate::value::Tensor::new
 	pub fn bind_output<S: Into<String>>(&mut self, name: S, value: impl BindableOutput) -> Result<()> {
 		let inner = value.into_bound_output();
@@ -325,7 +389,8 @@ impl IoBinding {
 
 		let name: String = name.into();
 		unsafe { self.bind_output_inner(name.as_bytes(), &inner) }?;
-		self.output_values.insert(name, Some(inner));
+		self.untrack_output(&name);
+		self.output_values.insert(name, BoundOutput::Value(inner));
 		Ok(())
 	}
 
@@ -341,8 +406,9 @@ impl IoBinding {
 	/// Bind a session output to a device which is specified by `mem_info`. Used when the shape of the output is
 	/// unknown.
 	///
-	/// Note that the same output buffer will be reused across runs, so the output must be
-	/// [`.clone()`](crate::value::Tensor::clone)d to avoid race conditions.
+	/// The same output buffer is reused across runs, as long as the output returned by the previous run has been
+	/// dropped by the time the next one starts. If it hasn't, the next run allocates a new buffer for the output
+	/// instead of overwriting the one that is still in use.
 	///
 	/// If the shape of the output is known, prefer [`IoBinding::bind_output`] instead.
 	pub fn bind_output_to_device<S: Into<String>>(&mut self, name: S, mem_info: &MemoryInfo) -> Result<()> {
@@ -352,7 +418,8 @@ impl IoBinding {
 			ortsys![unsafe BindOutputToDevice(ptr, name.as_ptr(), mem_info.ptr())?];
 			Ok(())
 		})?;
-		self.output_values.insert(name, None);
+		self.untrack_output(&name);
+		self.output_values.insert(name, BoundOutput::Device(mem_info.to_owned()));
 		Ok(())
 	}
 
@@ -371,6 +438,7 @@ impl IoBinding {
 	pub fn clear_outputs(&mut self) {
 		ortsys![unsafe ClearBoundOutputs(self.ptr_mut())];
 		drop(self.output_values.drain());
+		self.last_outputs.borrow_mut().clear();
 	}
 	/// Clears both the bound inputs & outputs; equivalent to [`IoBinding::clear_inputs`] followed by
 	/// [`IoBinding::clear_outputs`].
@@ -583,6 +651,66 @@ mod tests {
 		assert_eq!(output.try_extract_tensor::<f32>()?.1.len(), 16 * 16 * 3);
 		drop(output);
 		drop(junk);
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_bound_output_in_use() -> Result<()> {
+		let mut session = Session::builder(crate::test_util::test_env())?.commit_from_file("tests/data/passthrough.onnx")?;
+
+		let mut binding = session.create_binding()?;
+		binding.bind_input("x", Tensor::<f32>::from_array(([2_usize], vec![1.0, 1.0]))?)?;
+		binding.bind_output("y", Tensor::<f32>::new(&Allocator::default(), [2_usize])?)?;
+
+		let first = session.run_binding(&binding)?.remove("y").expect("");
+		let (_, first_data) = first.try_extract_tensor::<f32>()?;
+		assert_eq!(first_data, [-1.0, -1.0]);
+
+		binding.input_mut("x")?.try_extract_tensor_mut::<f32>()?.1.fill(2.0);
+		let err = session
+			.run_binding(&binding)
+			.expect_err("should fail while the old output is still in use");
+		assert!(err.message().contains("still in use"), "{err}");
+		assert_eq!(first_data, [-1.0, -1.0]);
+
+		drop(first);
+		let second = session.run_binding(&binding)?.remove("y").expect("");
+		assert_eq!(second.try_extract_tensor::<f32>()?.1, [-2.0, -2.0]);
+
+		binding.bind_output("y", Tensor::<f32>::new(&Allocator::default(), [2_usize])?)?;
+		binding.input_mut("x")?.try_extract_tensor_mut::<f32>()?.1.fill(3.0);
+		let third = session.run_binding(&binding)?.remove("y").expect("");
+		assert_eq!(second.try_extract_tensor::<f32>()?.1, [-2.0, -2.0]);
+		assert_eq!(third.try_extract_tensor::<f32>()?.1, [-3.0, -3.0]);
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_device_bound_output_in_use() -> Result<()> {
+		let mut session = Session::builder(crate::test_util::test_env())?.commit_from_file("tests/data/passthrough.onnx")?;
+
+		let mut binding = session.create_binding()?;
+		binding.bind_input("x", Tensor::<f32>::from_array(([2_usize], vec![1.0, 1.0]))?)?;
+		binding.bind_output_to_device("y", &MemoryInfo::new(AllocationDevice::CPU, 0, AllocatorType::Device, MemoryType::Default)?)?;
+
+		let first = session.run_binding(&binding)?.remove("y").expect("");
+		let (_, first_data) = first.try_extract_tensor::<f32>()?;
+		assert_eq!(first_data, [-1.0, -1.0]);
+
+		binding.input_mut("x")?.try_extract_tensor_mut::<f32>()?.1.fill(2.0);
+		let second = session.run_binding(&binding)?.remove("y").expect("");
+		let (_, second_data) = second.try_extract_tensor::<f32>()?;
+		assert_ne!(first_data.as_ptr(), second_data.as_ptr());
+		assert_eq!(first_data, [-1.0, -1.0]);
+		assert_eq!(second_data, [-2.0, -2.0]);
+
+		binding.input_mut("x")?.try_extract_tensor_mut::<f32>()?.1.fill(3.0);
+		let third = session.run_binding(&binding)?.remove("y").expect("");
+		assert_eq!(first_data, [-1.0, -1.0]);
+		assert_eq!(second_data, [-2.0, -2.0]);
+		assert_eq!(third.try_extract_tensor::<f32>()?.1, [-3.0, -3.0]);
 
 		Ok(())
 	}

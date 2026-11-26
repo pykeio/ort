@@ -64,10 +64,11 @@ use crate::{
 	error::{Error, Result},
 	logging::{LogLevel, LoggerFunction},
 	ortsys,
-	util::{OnceLock, STACK_EXECUTION_PROVIDERS, run_on_drop, with_cstr}
+	util::{Mutex, OnceLock, STACK_EXECUTION_PROVIDERS, run_on_drop, with_cstr}
 };
 
 static CURRENT_ENV: OnceLock<Weak<EnvironmentInner>> = OnceLock::new();
+static BUILD_LOCK: Mutex<()> = Mutex::new(());
 
 pub(crate) struct EnvironmentInner {
 	pub(crate) ptr: NonNull<ort_sys::OrtEnv>,
@@ -508,6 +509,8 @@ impl EnvironmentBuilder {
 
 	/// Builds the environment.
 	pub fn build(self) -> Result<Environment> {
+		let _build_guard = BUILD_LOCK.lock();
+
 		if CURRENT_ENV.get().is_some() {
 			return Err(Error::new("only one environment is allowed per process"));
 		}

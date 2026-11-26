@@ -215,6 +215,8 @@ impl AsPointer for Adapter {
 #[cfg(test)]
 mod tests {
 	use super::Adapter;
+	#[cfg(feature = "std")]
+	use crate::memory::Allocator;
 	use crate::{
 		session::{RunOptions, Session},
 		test_util::test_env,
@@ -268,6 +270,19 @@ mod tests {
 		assert_eq!(output[2], 198.0);
 		assert_eq!(output[3], 220.0);
 
+		Ok(())
+	}
+
+	#[test]
+	#[cfg(feature = "std")]
+	fn test_lora_bad_inputs() -> crate::Result<()> {
+		let _env = test_env();
+		assert!(Adapter::from_file("tests/data/adapter.orl", Some(&Allocator::default())).is_err());
+		let lora_bytes = std::fs::read("tests/data/adapter.orl").expect("");
+		assert!(Adapter::from_memory(&lora_bytes, Some(&Allocator::default())).is_err());
+
+		assert!(Adapter::from_file("tests/data/does_not_exist.orl", None).is_err());
+		assert!(Adapter::from_memory(b"qwertyuiop", None).is_err());
 		Ok(())
 	}
 }

@@ -5,7 +5,7 @@ use core::{
 };
 
 use crate::{
-	AsPointer, Error, Result,
+	AsPointer, Error, ErrorCode, Result,
 	memory::Allocator,
 	ortsys,
 	util::{with_cstr, with_cstr_ptr_array},
@@ -479,6 +479,27 @@ impl FromKernelContext<'_> for Vec<String> {
 	private_impl!();
 }
 
+impl FromOpAttr for Vec<String> {
+	fn attr_type() -> ort_sys::OrtOpAttrType {
+		ort_sys::OrtOpAttrType::ORT_OP_ATTR_STRINGS
+	}
+
+	unsafe fn from_op_attr(attr: *const ort_sys::OrtOpAttr, mut len: usize) -> Result<Self>
+	where
+		Self: Sized
+	{
+		let mut buf = vec![0_u8; len];
+		ortsys![unsafe ReadOpAttr(attr, ort_sys::OrtOpAttrType::ORT_OP_ATTR_STRINGS, buf.as_mut_ptr().cast(), len, &mut len)?];
+		debug_assert_eq!(buf.len(), len, "string array attribute is smaller/larger than expected");
+		buf.split(|b| *b == 0)
+			.filter(|s| !s.is_empty())
+			.map(|s| String::from_utf8(s.to_vec()).map_err(|_| Error::new_with_code(ErrorCode::RuntimeException, "invalid UTF-8")))
+			.collect::<Result<_>>()
+	}
+
+	private_impl!();
+}
+
 impl<'s, T: DowncastableTarget> FromKernelContext<'s> for ValueRef<'s, T> {
 	unsafe fn from_info(info: *mut ort_sys::OrtKernelInfo, name: *const ort_sys::c_char) -> Result<Self>
 	where
@@ -503,7 +524,7 @@ mod tests {
 	use core::ptr;
 
 	use super::{Attribute, FromOpAttr};
-	use crate::{Result, ortsys};
+	use crate::{Result, ortsys, test_util::test_env};
 
 	fn read<T: FromOpAttr>(attr: &Attribute) -> Result<T> {
 		let mut len = 0;
@@ -512,10 +533,48 @@ mod tests {
 	}
 
 	#[test]
-	fn test_string_attribute() -> Result<()> {
-		let _env = crate::test_util::test_env();
-		let attr = Attribute::new("mode", "linear".to_string())?;
-		assert_eq!(read::<String>(&attr)?, "linear");
+	fn test_scalar_attributes() -> Result<()> {
+		let _env = test_env();
+		assert_eq!(read::<f32>(&Attribute::new("alpha", 0.25_f32)?)?, 0.25);
+		assert_eq!(read::<i64>(&Attribute::new("axis", -3_i64)?)?, -3);
+		assert_eq!(read::<String>(&Attribute::new("mode", "linear".to_string())?)?, "linear");
+		assert_eq!(read::<String>(&Attribute::new("empty", String::new())?)?, "");
 		Ok(())
+	}
+
+	#[test]
+	fn test_array_attributes() -> Result<()> {
+		let _env = test_env();
+		assert_eq!(read::<Vec<f32>>(&Attribute::new("scales", vec![1.0_f32, 2.0, 0.5])?)?, [1.0, 2.0, 0.5]);
+		assert_eq!(read::<Vec<f32>>(&Attribute::new("scales", [4.0_f32].as_slice())?)?, [4.0]);
+		assert_eq!(read::<Vec<i64>>(&Attribute::new("pads", vec![0_i64, 1, 2, 3])?)?, [0, 1, 2, 3]);
+		assert_eq!(read::<Vec<i64>>(&Attribute::new("pads", [-1_i64, i64::MAX].as_slice())?)?, [-1, i64::MAX]);
+		Ok(())
+	}
+
+	#[test]
+	fn test_string_array_attributes() -> Result<()> {
+		let _env = test_env();
+		let expected = ["a", "bc", "def"];
+		let owned: Vec<String> = expected.iter().map(|s| s.to_string()).collect();
+		assert_eq!(read::<Vec<String>>(&Attribute::new("strings", owned.clone())?)?, expected);
+		assert_eq!(read::<Vec<String>>(&Attribute::new("strings", owned.as_slice())?)?, expected);
+		assert_eq!(read::<Vec<String>>(&Attribute::new("strings", expected.to_vec())?)?, expected);
+		assert_eq!(read::<Vec<String>>(&Attribute::new("strings", expected.as_slice())?)?, expected);
+		Ok(())
+	}
+
+	#[test]
+	fn test_wrong_attribute_type() -> Result<()> {
+		let _env = test_env();
+		let attr = Attribute::new("axis", 1_i64)?;
+		assert!(unsafe { f32::from_op_attr(attr.0.as_ptr(), size_of::<f32>()) }.is_err());
+		Ok(())
+	}
+
+	#[test]
+	fn test_attribute_name_with_nul() {
+		let _env = test_env();
+		assert!(Attribute::new("a\0b", 1_i64).is_err());
 	}
 }

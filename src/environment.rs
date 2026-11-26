@@ -74,6 +74,8 @@ pub(crate) struct EnvironmentInner {
 	pub(crate) ptr: NonNull<ort_sys::OrtEnv>,
 	execution_providers: SmallVec<[ExecutionProviderDispatch; STACK_EXECUTION_PROVIDERS]>,
 	has_global_threadpool: bool,
+	#[cfg(feature = "api-22")]
+	devices_lock: Mutex<()>,
 	_thread_manager: Option<Arc<dyn Any>>,
 	_logger: Option<Box<LoggerFunction>>
 }
@@ -139,8 +141,10 @@ impl Environment {
 	pub fn register_ep_library<P: AsRef<Path>>(&self, name: impl Into<String>, path: P) -> Result<()> {
 		let name = name.into();
 		let path = crate::util::path_to_os_char(path);
+		let _devices_guard = self.0.devices_lock.lock();
 		with_cstr(name.as_bytes(), &|name| {
-			// this internally grabs a mutex so its fine for this function to take &self
+			// this internally grabs a mutex so its fine for this function to take &self (but we still need
+			// `_devices_guard` because *reading* devices doesn't lock)
 			ortsys![unsafe RegisterExecutionProviderLibrary(self.ptr().cast_mut(), name.as_ptr(), path.as_ptr())?];
 			Ok(())
 		})?;
@@ -170,12 +174,17 @@ impl Environment {
 	#[cfg(feature = "api-22")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "api-22")))]
 	pub fn devices(&self) -> impl DoubleEndedIterator<Item = crate::device::Device<'_>> + '_ {
-		let mut ptrs = ptr::dangling();
+		let mut ptrs = ptr::null();
 		let mut len = 0;
-		// returns an error in minimal build because its unsupported. ignore & return empty iterator in that case
-		let _ = ortsys![@ort: unsafe GetEpDevices(self.ptr().cast_mut(), &mut ptrs, &mut len) as Result];
-		unsafe { core::slice::from_raw_parts(ptrs, len) }
-			.to_vec() // `register_ep_library` (&self) could reallocate the underlying std::vector
+		let devices = {
+			let _devices_guard = self.0.devices_lock.lock();
+			// returns an error in minimal build because its unsupported. ignore & return empty iterator in that case
+			match ortsys![@ort: unsafe GetEpDevices(self.ptr().cast_mut(), &mut ptrs, &mut len) as Result] {
+				Ok(()) if !ptrs.is_null() && len != 0 => unsafe { core::slice::from_raw_parts(ptrs, len) }.to_vec(),
+				_ => alloc::vec::Vec::new()
+			}
+		};
+		devices
 			.into_iter()
 			.filter_map(|c| NonNull::new(c.cast_mut()))
 			.map(crate::device::Device::new)
@@ -596,6 +605,8 @@ impl EnvironmentBuilder {
 			execution_providers: self.execution_providers.clone(),
 			ptr: env_ptr,
 			has_global_threadpool: self.global_thread_pool_options.is_some(),
+			#[cfg(feature = "api-22")]
+			devices_lock: Mutex::new(()),
 			_thread_manager: self
 				.global_thread_pool_options
 				.as_ref()

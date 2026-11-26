@@ -52,7 +52,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 	pub fn try_extract_array<T: PrimitiveTensorElementType>(&self) -> Result<ndarray::ArrayViewD<'_, T>> {
 		extract_tensor(self, T::into_tensor_element_type())
-			.and_then(|(ptr, shape)| Ok(unsafe { ndarray::ArrayView::from_shape_ptr(shape.to_ixdyn(), data_ptr(ptr)?) }))
+			.and_then(|(ptr, shape)| Ok(unsafe { ndarray::ArrayView::from_shape_ptr(array_dim::<T>(shape)?, data_ptr(ptr, num_elements(shape)?)?) }))
 	}
 
 	/// Attempt to extract the singular value from a scalar tensor of type `T`.
@@ -86,7 +86,7 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 				));
 			}
 
-			Ok(unsafe { *data_ptr(ptr)? })
+			Ok(unsafe { *data_ptr(ptr, 1)? })
 		})
 	}
 
@@ -120,10 +120,8 @@ impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
 	/// [`DynValue`]: crate::value::DynValue
 	pub fn try_extract_tensor<T: PrimitiveTensorElementType>(&self) -> Result<(&Shape, &[T])> {
 		extract_tensor(self, T::into_tensor_element_type()).and_then(|(ptr, shape)| {
-			let Some(numel) = shape.num_elements() else {
-				return Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Shape {shape:?} is too large")));
-			};
-			Ok((shape, unsafe { slice::from_raw_parts(data_ptr(ptr)?, numel) }))
+			let numel = num_elements(shape)?;
+			Ok((shape, unsafe { slice::from_raw_parts(data_ptr(ptr, numel)?, numel) }))
 		})
 	}
 
@@ -231,7 +229,7 @@ mut_methods! {
 		#[cfg_attr(docsrs, doc(cfg(feature = "ndarray")))]
 		pub fn try_extract_array_mut[T: PrimitiveTensorElementType](&mut self) -> Result<ndarray::ArrayViewMutD<'_, T>> {
 			extract_tensor::<Type>(self, T::into_tensor_element_type())
-				.and_then(|(ptr, shape)| Ok(unsafe { ndarray::ArrayViewMut::from_shape_ptr(shape.to_ixdyn(), data_ptr(ptr)?) }))
+				.and_then(|(ptr, shape)| Ok(unsafe { ndarray::ArrayViewMut::from_shape_ptr(array_dim::<T>(shape)?, data_ptr(ptr, num_elements(shape)?)?) }))
 		}
 
 		/// Attempt to extract the underlying data into a view tuple, consisting of the tensor's shape and a
@@ -262,10 +260,8 @@ mut_methods! {
 		pub fn try_extract_tensor_mut[T: PrimitiveTensorElementType](&mut self) -> Result<(&Shape, &mut [T])> {
 			extract_tensor(self, T::into_tensor_element_type())
 				.and_then(|(ptr, shape)| {
-					let Some(numel) = shape.num_elements() else {
-						return Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Shape {shape:?} is too large")));
-					};
-					Ok((shape, unsafe { slice::from_raw_parts_mut(data_ptr(ptr)?, numel) }))
+					let numel = num_elements(shape)?;
+					Ok((shape, unsafe { slice::from_raw_parts_mut(data_ptr(ptr, numel)?, numel) }))
 				})
 		}
 	}
@@ -298,21 +294,42 @@ fn extract_tensor<Type: TensorValueTypeMarker + ?Sized>(value: &Value<Type>, exp
 	}
 }
 
-pub(crate) unsafe fn data_ptr<T>(ptr: *mut ort_sys::OrtValue) -> Result<*mut T> {
+pub(crate) fn num_elements(shape: &Shape) -> Result<usize> {
+	shape
+		.num_elements()
+		.ok_or_else(|| Error::new_with_code(ErrorCode::InvalidArgument, format!("Shape {shape:?} is too large")))
+}
+
+#[cfg(feature = "ndarray")]
+fn array_dim<T>(shape: &Shape) -> Result<ndarray::IxDyn> {
+	// ndarray requires that the size of the array fits in an `isize`, *ignoring axes of length zero*, i.e. a shape
+	// like `[0, isize::MAX, isize::MAX]` isn't allowed even though it's technically empty
+	let size = shape
+		.iter()
+		.filter(|dim| **dim != 0)
+		.try_fold(size_of::<T>().max(1), |size, dim| size.checked_mul(usize::try_from(*dim).ok()?));
+	match size {
+		Some(size) if isize::try_from(size).is_ok() => Ok(shape.to_ixdyn()),
+		_ => Err(Error::new_with_code(ErrorCode::InvalidArgument, format!("Shape {shape:?} is too large")))
+	}
+}
+
+pub(crate) unsafe fn data_ptr<T>(ptr: *mut ort_sys::OrtValue, numel: usize) -> Result<*mut T> {
 	let mut output_array_ptr: *mut c_void = ptr::null_mut();
 	ortsys![unsafe GetTensorMutableData(ptr, &mut output_array_ptr)?];
 
-	// Cast the pointer to the expected data type now.
-	// We do this here because the very next step is to replace the pointer with a dangling one in the case of
-	// zero-sized tensors. If we do this to a `c_void` pointer, the dangling pointer will be aligned to 1 byte,
-	// meaning casting to T afterwards is UB if T has alignment >= 2.
-	let mut output_array_ptr = output_array_ptr.cast::<T>();
+	// An empty tensor doesn't necessarily have a usable data pointer; it might be null or a dangling pointer that
+	// isn't aligned for `T`.
+	if numel == 0 {
+		return Ok(NonNull::dangling().as_ptr());
+	}
 
-	// Zero-sized tensors can have a null data pointer. An empty slice with a null data pointer is invalid, but it is
-	// valid to have an empty slice with a *dangling* pointer. Note that this function is only called when the data
-	// resides on the CPU, so this won't change semantics for non-CPU data.
+	let output_array_ptr = output_array_ptr.cast::<T>();
 	if output_array_ptr.is_null() {
-		output_array_ptr = NonNull::dangling().as_ptr();
+		return Err(Error::new("Tensor has no data"));
+	}
+	if !output_array_ptr.is_aligned() {
+		return Err(Error::new(format!("Tensor data is not sufficiently aligned to be accessed as `{}`", core::any::type_name::<T>())));
 	}
 	Ok(output_array_ptr)
 }
@@ -465,6 +482,18 @@ mod tests {
 	fn test_bad_extract() -> crate::Result<()> {
 		let tensor = Tensor::<f32>::new(&Allocator::default(), Shape::new([5i64]))?;
 		assert!(tensor.try_extract_scalar::<f64>().is_err());
+		Ok(())
+	}
+
+	#[test]
+	#[cfg(feature = "ndarray")]
+	fn test_extract_oversized_empty_array() -> crate::Result<()> {
+		let Ok(mut tensor) = Tensor::<f32>::new(&Allocator::default(), Shape::new([0, i64::MAX / 2, i64::MAX / 2])) else {
+			return Ok(());
+		};
+		assert!(tensor.try_extract_array::<f32>().is_err());
+		assert!(tensor.try_extract_array_mut::<f32>().is_err());
+		assert_eq!(tensor.try_extract_tensor::<f32>()?.1.len(), 0);
 		Ok(())
 	}
 }

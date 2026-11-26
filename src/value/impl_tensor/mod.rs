@@ -13,7 +13,7 @@ use core::{
 	ptr::{self}
 };
 
-pub(crate) use self::extract::data_ptr;
+pub(crate) use self::extract::{data_ptr, num_elements};
 pub use self::{
 	create::{OwnedTensorArrayData, TensorArrayData, TensorArrayDataMut, TensorArrayDataParts, ToShape},
 	element::{IntoTensorElementType, PrimitiveTensorElementType, TensorElementType, Utf8Data},

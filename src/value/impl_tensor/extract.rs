@@ -16,7 +16,7 @@ use crate::{
 	AsPointer,
 	error::{Error, ErrorCode, Result},
 	ortsys,
-	value::{TensorValueType, Value, ValueType, ref_mut::mut_methods}
+	value::{IntoTensorElementType, TensorValueType, Value, ValueType, ref_mut::mut_methods}
 };
 
 impl<Type: TensorValueTypeMarker + ?Sized> Value<Type> {
@@ -314,9 +314,9 @@ fn array_dim<T>(shape: &Shape) -> Result<ndarray::IxDyn> {
 	}
 }
 
-pub(crate) unsafe fn data_ptr<T>(ptr: *mut ort_sys::OrtValue, numel: usize) -> Result<*mut T> {
-	let mut output_array_ptr: *mut c_void = ptr::null_mut();
-	ortsys![unsafe GetTensorMutableData(ptr, &mut output_array_ptr)?];
+pub(crate) unsafe fn data_ptr<T: IntoTensorElementType>(ptr: *mut ort_sys::OrtValue, numel: usize) -> Result<*mut T> {
+	let mut data_ptr: *mut c_void = ptr::null_mut();
+	ortsys![unsafe GetTensorMutableData(ptr, &mut data_ptr)?];
 
 	// An empty tensor doesn't necessarily have a usable data pointer; it might be null or a dangling pointer that
 	// isn't aligned for `T`.
@@ -324,14 +324,24 @@ pub(crate) unsafe fn data_ptr<T>(ptr: *mut ort_sys::OrtValue, numel: usize) -> R
 		return Ok(NonNull::dangling().as_ptr());
 	}
 
-	let output_array_ptr = output_array_ptr.cast::<T>();
-	if output_array_ptr.is_null() {
+	let data_ptr = data_ptr.cast::<T>();
+	if data_ptr.is_null() {
 		return Err(Error::new("Tensor has no data"));
 	}
-	if !output_array_ptr.is_aligned() {
+	if !data_ptr.is_aligned() {
 		return Err(Error::new(format!("Tensor data is not sufficiently aligned to be accessed as `{}`", core::any::type_name::<T>())));
 	}
-	Ok(output_array_ptr)
+
+	// ONNX Runtime copies the bytes from a bool initializer as-is, without verifying if they're all 0 or 1, so we have
+	// to do that ourselves. Yay.
+	if T::into_tensor_element_type() == TensorElementType::Bool {
+		let bytes = unsafe { slice::from_raw_parts(data_ptr.cast::<u8>(), numel) };
+		if bytes.iter().any(|byte| *byte > 1) {
+			return Err(Error::new("Boolean tensor contains values other than 0 or 1"));
+		}
+	}
+
+	Ok(data_ptr)
 }
 
 fn extract_strings(ptr: *mut ort_sys::OrtValue, shape: &Shape) -> Result<Vec<String>> {
@@ -460,6 +470,9 @@ mut_methods! {
 
 #[cfg(test)]
 mod tests {
+	use core::panic::AssertUnwindSafe;
+	use std::panic::catch_unwind;
+
 	use crate::{
 		memory::Allocator,
 		value::{Shape, Tensor}
@@ -494,6 +507,27 @@ mod tests {
 		assert!(tensor.try_extract_array::<f32>().is_err());
 		assert!(tensor.try_extract_array_mut::<f32>().is_err());
 		assert_eq!(tensor.try_extract_tensor::<f32>()?.1.len(), 0);
+		Ok(())
+	}
+
+	#[test]
+	fn test_extract_invalid_bool() -> crate::Result<()> {
+		let mut tensor = Tensor::<bool>::new(&Allocator::default(), Shape::new([4i64]))?;
+		assert_eq!(tensor.try_extract_tensor::<bool>()?.1, [false; 4]);
+		tensor[[1]] = true;
+		assert_eq!(tensor.try_extract_tensor::<bool>()?.1, [false, true, false, false]);
+
+		unsafe { tensor.data_ptr_mut().cast::<u8>().add(2).write(2) };
+		assert!(tensor.try_extract_tensor::<bool>().is_err());
+		assert!(tensor.try_extract_tensor_mut::<bool>().is_err());
+		#[cfg(feature = "ndarray")]
+		assert!(tensor.try_extract_array::<bool>().is_err());
+		assert!(!tensor[[0]]);
+		assert!(catch_unwind(AssertUnwindSafe(|| tensor[[2]])).is_err());
+
+		let scalar = Tensor::<bool>::new(&Allocator::default(), Shape::default())?;
+		assert!(!scalar.try_extract_scalar::<bool>()?);
+
 		Ok(())
 	}
 }

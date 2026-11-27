@@ -364,6 +364,9 @@ impl<T: IntoTensorElementType + Clone + Debug, const N: usize> Index<[i64; N]> f
 
 		let mut out: *mut ort_sys::c_void = ptr::null_mut();
 		ortsys![unsafe TensorAt(self.ptr().cast_mut(), index.as_ptr(), N, &mut out).expect("Failed to index tensor"); nonNull(out)];
+		if T::into_tensor_element_type() == TensorElementType::Bool {
+			assert!(unsafe { *out.cast::<u8>().as_ptr() } < 2, "Boolean tensor contains values other than 0 or 1");
+		}
 		unsafe { out.cast::<T>().as_ref() }
 	}
 }
@@ -375,6 +378,9 @@ impl<T: IntoTensorElementType + Clone + Debug, const N: usize> IndexMut<[i64; N]
 
 		let mut out: *mut ort_sys::c_void = ptr::null_mut();
 		ortsys![unsafe TensorAt(self.ptr_mut(), index.as_ptr(), N, &mut out).expect("Failed to index tensor"); nonNull(out)];
+		if T::into_tensor_element_type() == TensorElementType::Bool {
+			assert!(unsafe { *out.cast::<u8>().as_ptr() } < 2, "Boolean tensor contains values other than 0 or 1");
+		}
 		unsafe { out.cast::<T>().as_mut() }
 	}
 }

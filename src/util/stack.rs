@@ -54,44 +54,31 @@ pub(crate) fn with_cstr_ptr_array<T, R>(strings: &[T], f: &mut dyn FnMut(&mut [*
 where
 	T: AsRef<str>
 {
-	fn run_with_heap_cstr_array<T: AsRef<str>, R>(strings: &[T], f: &mut dyn FnMut(&mut [*const c_char]) -> Result<R>) -> Result<R> {
-		let mut strings: SmallVec<[*const c_char; STACK_CSTR_ARRAY_MAX_ELEMENTS]> = strings
-			.iter()
-			.map(|s| CString::new(s.as_ref()).map(|s| s.into_raw().cast_const()))
-			.collect::<Result<SmallVec<[*const c_char; STACK_CSTR_ARRAY_MAX_ELEMENTS]>, NulError>>()?;
-		let res = f(&mut strings);
-		for string in strings {
-			drop(unsafe { CString::from_raw(string.cast_mut()) });
+	let mut buf = MaybeUninit::<[c_char; STACK_CSTR_ARRAY_MAX_TOTAL]>::uninit();
+	let buf_ptr = buf.as_mut_ptr() as *mut c_char;
+	let mut offset = 0;
+
+	let mut out_strings: SmallVec<[*const c_char; STACK_CSTR_ARRAY_MAX_ELEMENTS]> = SmallVec::with_capacity(strings.len());
+	for s in strings {
+		let s = s.as_ref();
+		if s.len() < STACK_CSTR_ARRAY_MAX_TOTAL - offset {
+			let start = unsafe { buf_ptr.add(offset) };
+			unsafe {
+				ptr::copy_nonoverlapping(s.as_ptr().cast::<c_char>(), start, s.len());
+				*start.add(s.len()) = 0;
+			};
+			offset += s.len() + 1;
+			out_strings.push(start);
+		} else {
+			let cstrings: SmallVec<[CString; STACK_CSTR_ARRAY_MAX_ELEMENTS]> =
+				strings.iter().map(|s| CString::new(s.as_ref())).collect::<Result<_, NulError>>()?;
+			let mut string_ptrs: SmallVec<[*const c_char; STACK_CSTR_ARRAY_MAX_ELEMENTS]> = cstrings.into_iter().map(|s| s.into_raw().cast_const()).collect();
+			let res = f(&mut string_ptrs);
+			for string in string_ptrs {
+				drop(unsafe { CString::from_raw(string.cast_mut()) });
+			}
+			return res;
 		}
-		res
 	}
-
-	fn run_with_stack_cstr_array<T: AsRef<str>, R>(strings: &[T], f: &mut dyn FnMut(&mut [*const c_char]) -> Result<R>) -> Result<R> {
-		let mut buf = MaybeUninit::<[c_char; STACK_CSTR_ARRAY_MAX_TOTAL]>::uninit();
-		let mut buf_ptr = buf.as_mut_ptr() as *mut c_char;
-
-		let mut strings: SmallVec<[*const c_char; STACK_CSTR_ARRAY_MAX_ELEMENTS]> = strings
-			.iter()
-			.map(|s| {
-				let s = s.as_ref();
-				let ptr = buf_ptr;
-				unsafe {
-					ptr::copy_nonoverlapping(s.as_ptr().cast::<c_char>(), buf_ptr, s.len());
-					buf_ptr = buf_ptr.add(s.len());
-					*buf_ptr = 0;
-					buf_ptr = buf_ptr.add(1);
-				};
-				ptr.cast_const()
-			})
-			.collect();
-
-		f(&mut strings)
-	}
-
-	let total_bytes = strings.iter().fold(0, |acc, s| acc + s.as_ref().len() + 1);
-	if total_bytes < STACK_CSTR_ARRAY_MAX_TOTAL {
-		run_with_stack_cstr_array(strings, f)
-	} else {
-		run_with_heap_cstr_array(strings, f)
-	}
+	f(&mut out_strings)
 }

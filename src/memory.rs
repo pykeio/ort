@@ -10,7 +10,7 @@ use core::{
 	str::{self, FromStr}
 };
 
-use crate::{AsPointer, Error, ErrorCode, error::Result, ortsys, session::Session};
+use crate::{AsPointer, Error, ErrorCode, error::Result, ortsys, session::Session, util::c_enum};
 
 /// A device allocator used to manage the allocation of [`Value`]s.
 ///
@@ -466,9 +466,9 @@ impl<'a> MemoryInfo<'a> {
 	/// # }
 	/// ```
 	pub fn memory_type(&self) -> MemoryType {
-		let mut raw_type: ort_sys::OrtMemType = ort_sys::OrtMemType::OrtMemTypeDefault;
-		ortsys![unsafe MemoryInfoGetMemType(self.ptr.as_ptr(), &mut raw_type).expect("infallible")];
-		MemoryType::from(raw_type)
+		let mut raw_type = c_enum::Out::new(ort_sys::OrtMemType::OrtMemTypeDefault);
+		ortsys![unsafe MemoryInfoGetMemType(self.ptr.as_ptr(), raw_type.as_mut_ptr()).expect("infallible")];
+		raw_type.get().map_or(MemoryType::Default, MemoryType::from)
 	}
 
 	/// Returns the [`AllocatorType`] described by this struct.
@@ -481,13 +481,13 @@ impl<'a> MemoryInfo<'a> {
 	/// # }
 	/// ```
 	pub fn allocator_type(&self) -> AllocatorType {
-		let mut raw_type: ort_sys::OrtAllocatorType = ort_sys::OrtAllocatorType::OrtInvalidAllocator;
-		ortsys![unsafe MemoryInfoGetType(self.ptr.as_ptr(), &mut raw_type).expect("infallible")];
-		match raw_type {
-			ort_sys::OrtAllocatorType::OrtArenaAllocator => AllocatorType::Arena,
-			ort_sys::OrtAllocatorType::OrtDeviceAllocator => AllocatorType::Device,
-			ort_sys::OrtAllocatorType::OrtReadOnlyAllocator => AllocatorType::ReadOnly,
-			ort_sys::OrtAllocatorType::OrtInvalidAllocator => unreachable!("memory info has invalid allocator type")
+		let mut raw_type = c_enum::Out::new(ort_sys::OrtAllocatorType::OrtInvalidAllocator);
+		ortsys![unsafe MemoryInfoGetType(self.ptr.as_ptr(), raw_type.as_mut_ptr()).expect("infallible")];
+		match raw_type.get() {
+			Some(ort_sys::OrtAllocatorType::OrtArenaAllocator) => AllocatorType::Arena,
+			Some(ort_sys::OrtAllocatorType::OrtDeviceAllocator) => AllocatorType::Device,
+			Some(ort_sys::OrtAllocatorType::OrtReadOnlyAllocator) => AllocatorType::ReadOnly,
+			Some(ort_sys::OrtAllocatorType::OrtInvalidAllocator) | None => unreachable!("memory info has invalid allocator type")
 		}
 	}
 
@@ -525,9 +525,10 @@ impl<'a> MemoryInfo<'a> {
 
 	/// Returns the type of device (CPU/GPU) this memory is allocated on.
 	pub fn device_type(&self) -> DeviceType {
-		let mut raw: ort_sys::OrtMemoryInfoDeviceType = ort_sys::OrtMemoryInfoDeviceType::OrtMemoryInfoDeviceType_CPU;
-		ortsys![unsafe MemoryInfoGetDeviceType(self.ptr.as_ptr(), &mut raw)];
-		raw.into()
+		let mut raw = c_enum::Out::new(ort_sys::OrtMemoryInfoDeviceType::OrtMemoryInfoDeviceType_CPU);
+		ortsys![unsafe MemoryInfoGetDeviceType(self.ptr.as_ptr(), raw.as_mut_ptr())];
+		// default to GPU if we don't know the type cause it would probably be a bad idea to assume it's CPU-accessible!
+		raw.get().map_or(DeviceType::GPU, DeviceType::from)
 	}
 
 	/// Returns `true` if this memory is accessible by the CPU; meaning that, if a value were allocated on this device,
@@ -538,7 +539,8 @@ impl<'a> MemoryInfo<'a> {
 		// device, so we still need the old check too. I hate this library.
 		#[cfg(feature = "api-23")]
 		return self.device_type() == DeviceType::CPU
-			|| ortsys![unsafe MemoryInfoGetDeviceMemType(self.ptr.as_ptr())] == ort_sys::OrtDeviceMemoryType::OrtDeviceMemoryType_HOST_ACCESSIBLE;
+			|| unsafe { c_enum::call(ortsys![MemoryInfoGetDeviceMemType], self.ptr.as_ptr()) }
+				== Some(ort_sys::OrtDeviceMemoryType::OrtDeviceMemoryType_HOST_ACCESSIBLE);
 		#[cfg(not(feature = "api-23"))]
 		return self.device_type() == DeviceType::CPU;
 	}

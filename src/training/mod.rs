@@ -13,7 +13,7 @@ use crate::{
 	memory::Allocator,
 	ortsys,
 	session::{NoSelectedOutputs, RunOptions},
-	util::with_cstr,
+	util::{c_enum, with_cstr},
 	value::{DynTensor, Value, ValueType, ValueTypeMarker, r#type::extract_data_type_from_tensor_info}
 };
 
@@ -110,20 +110,20 @@ impl Checkpoint {
 		let allocator = Allocator::default();
 
 		let (property_type, property_value) = with_cstr(name.as_ref().as_bytes(), &|name| {
-			let mut property_type: ort_sys::OrtPropertyType = ort_sys::OrtPropertyType::OrtIntProperty;
+			let mut property_type = c_enum::Out::new(ort_sys::OrtPropertyType::OrtIntProperty);
 			let mut property_value: *const () = ptr::null();
 			ortsys![@training: unsafe GetProperty(
 				self.ptr.as_ptr(),
 				name.as_ptr(),
 				allocator.ptr().cast_mut(),
-				&mut property_type,
+				property_type.as_mut_ptr(),
 				&mut property_value
 			)?];
-			Ok((property_type, property_value))
+			Ok((property_type.get(), property_value))
 		})
 		.ok()?;
 
-		let property = match property_type {
+		let property = match property_type? {
 			ort_sys::OrtPropertyType::OrtIntProperty => Property::Int(unsafe { *property_value.cast::<i64>() }),
 			ort_sys::OrtPropertyType::OrtFloatProperty => Property::Float(unsafe { *property_value.cast::<f32>() }),
 			ort_sys::OrtPropertyType::OrtStringProperty => Property::String(unsafe { CStr::from_ptr(property_value.cast::<c_char>()) }.to_string_lossy().into())

@@ -19,6 +19,7 @@ use mutex_spin as mutex;
 #[cfg(feature = "std")]
 use mutex_std as mutex;
 
+pub(crate) mod c_enum;
 mod map;
 mod stack;
 pub(crate) use self::{

@@ -13,7 +13,7 @@ use core::{
 
 use crate::{
 	ortsys,
-	util::{char_p_to_string, cold, with_cstr}
+	util::{c_enum, char_p_to_string, cold, with_cstr}
 };
 
 /// Type alias for the `Result` type returned by `ort` functions.
@@ -46,7 +46,7 @@ unsafe impl Sync for ErrorInternal {}
 impl ErrorInternal {
 	#[cold]
 	pub(crate) unsafe fn from_ptr(ptr: NonNull<ort_sys::OrtStatus>) -> Self {
-		let code = ErrorCode::from(ortsys![unsafe GetErrorCode(ptr.as_ptr())]);
+		let code = unsafe { c_enum::call(ortsys![GetErrorCode], ptr.as_ptr()) }.map_or(ErrorCode::GenericFailure, ErrorCode::from);
 		let raw: *const c_char = ortsys![unsafe GetErrorMessage(ptr.as_ptr())];
 		match char_p_to_string(raw) {
 			Ok(message) => ErrorInternal {

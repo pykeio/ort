@@ -6,7 +6,7 @@ use std::path::Path;
 
 #[cfg(feature = "api-23")]
 use crate::memory::MemoryInfo;
-use crate::{AsPointer, Error, Result, memory::DeviceType, ortsys};
+use crate::{AsPointer, Error, Result, memory::DeviceType, ortsys, util::c_enum};
 #[cfg(feature = "api-24")]
 use crate::{ep::ExecutionProvider, memory::Allocator, util::with_cstr};
 
@@ -82,12 +82,12 @@ impl<'e> Device<'e> {
 	pub fn compatibility<E: ExecutionProvider>(&self, compatibility_info: &CompatibilityInfo<E>) -> Result<DeviceCompatibility> {
 		// API expects an array of devices
 		let devices = [self.ptr.as_ptr().cast_const()];
-		let mut out = ort_sys::OrtCompiledModelCompatibility::EP_NOT_APPLICABLE;
-		ortsys![unsafe GetModelCompatibilityForEpDevices(devices.as_ptr(), 1, compatibility_info.str.as_ptr(), &mut out)?];
-		Ok(match out {
-			ort_sys::OrtCompiledModelCompatibility::EP_SUPPORTED_OPTIMAL => DeviceCompatibility::SupportedOptimal,
-			ort_sys::OrtCompiledModelCompatibility::EP_SUPPORTED_PREFER_RECOMPILATION => DeviceCompatibility::SupportedPreferRecompilation,
-			ort_sys::OrtCompiledModelCompatibility::EP_UNSUPPORTED => DeviceCompatibility::Unsupported,
+		let mut out = c_enum::Out::new(ort_sys::OrtCompiledModelCompatibility::EP_NOT_APPLICABLE);
+		ortsys![unsafe GetModelCompatibilityForEpDevices(devices.as_ptr(), 1, compatibility_info.str.as_ptr(), out.as_mut_ptr())?];
+		Ok(match out.get() {
+			Some(ort_sys::OrtCompiledModelCompatibility::EP_SUPPORTED_OPTIMAL) => DeviceCompatibility::SupportedOptimal,
+			Some(ort_sys::OrtCompiledModelCompatibility::EP_SUPPORTED_PREFER_RECOMPILATION) => DeviceCompatibility::SupportedPreferRecompilation,
+			Some(ort_sys::OrtCompiledModelCompatibility::EP_UNSUPPORTED) => DeviceCompatibility::Unsupported,
 			_ => DeviceCompatibility::NotApplicable
 		})
 	}
@@ -119,10 +119,11 @@ impl<'e> HardwareDevice<'e> {
 	/// # }
 	/// ```
 	pub fn ty(&self) -> DeviceType {
-		match ortsys![unsafe HardwareDevice_Type(self.ptr.as_ptr())] {
-			ort_sys::OrtHardwareDeviceType::OrtHardwareDeviceType_CPU => DeviceType::CPU,
-			ort_sys::OrtHardwareDeviceType::OrtHardwareDeviceType_GPU => DeviceType::GPU,
-			ort_sys::OrtHardwareDeviceType::OrtHardwareDeviceType_NPU => DeviceType::NPU
+		match unsafe { c_enum::call(ortsys![HardwareDevice_Type], self.ptr()) } {
+			Some(ort_sys::OrtHardwareDeviceType::OrtHardwareDeviceType_CPU) => DeviceType::CPU,
+			Some(ort_sys::OrtHardwareDeviceType::OrtHardwareDeviceType_GPU) => DeviceType::GPU,
+			Some(ort_sys::OrtHardwareDeviceType::OrtHardwareDeviceType_NPU) => DeviceType::NPU,
+			None => panic!("unknown hardware device type")
 		}
 	}
 

@@ -430,10 +430,17 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 		Ok(())
 	}
 
-	pub fn log_level(&self) -> Result<LogLevel> {
-		let mut log_level = ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE;
-		ortsys![unsafe RunOptionsGetRunLogSeverityLevel(self.ptr(), &mut log_level as *mut ort_sys::OrtLoggingLevel as *mut _)?];
-		Ok(LogLevel::from(log_level))
+	pub fn log_level(&self) -> Option<LogLevel> {
+		let mut log_level = 0;
+		ortsys![unsafe RunOptionsGetRunLogSeverityLevel(self.ptr(), &mut log_level).expect("infallible")];
+		match log_level {
+			-1 => None,
+			0 => Some(LogLevel::Verbose),
+			1 => Some(LogLevel::Info),
+			2 => Some(LogLevel::Warning),
+			3 => Some(LogLevel::Error),
+			_ => Some(LogLevel::Fatal)
+		}
 	}
 
 	pub fn set_log_verbosity(&mut self, verbosity: c_int) -> Result<()> {
@@ -441,10 +448,10 @@ impl<O: SelectedOutputMarker> RunOptions<O> {
 		Ok(())
 	}
 
-	pub fn log_verbosity(&self) -> Result<i32> {
+	pub fn log_verbosity(&self) -> i32 {
 		let mut verbosity = 0;
-		ortsys![unsafe RunOptionsGetRunLogVerbosityLevel(self.ptr(), &mut verbosity)?];
-		Ok(verbosity)
+		ortsys![unsafe RunOptionsGetRunLogVerbosityLevel(self.ptr(), &mut verbosity).expect("infallible")];
+		verbosity
 	}
 
 	pub fn disable_device_sync(&mut self) -> Result<()> {
@@ -472,5 +479,23 @@ impl<O: SelectedOutputMarker> AsPointer for RunOptions<O> {
 
 	fn ptr(&self) -> *const Self::Sys {
 		self.inner.ptr.as_ptr()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::RunOptions;
+	use crate::logging::LogLevel;
+
+	#[test]
+	fn test_log_level() -> crate::Result<()> {
+		let mut options = RunOptions::new()?;
+		assert!(options.log_level().is_none());
+
+		for level in [LogLevel::Verbose, LogLevel::Info, LogLevel::Warning, LogLevel::Error, LogLevel::Fatal] {
+			options.set_log_level(level)?;
+			assert_eq!(options.log_level(), Some(level));
+		}
+		Ok(())
 	}
 }

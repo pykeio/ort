@@ -5,7 +5,10 @@ use core::{
 	ptr::NonNull
 };
 
-use crate::{AsPointer, ortsys, util::with_cstr_ptr_array};
+use crate::{
+	AsPointer, ortsys,
+	util::{c_enum, with_cstr_ptr_array}
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum LogLevel {
@@ -173,9 +176,9 @@ impl<'a> Logger<'a> {
 
 	/// Returns the current [`LogLevel`] of this logger.
 	pub fn level(&self) -> LogLevel {
-		let mut log_level = ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE;
-		ortsys![unsafe Logger_GetLoggingSeverityLevel(self.ptr(), &mut log_level as *mut ort_sys::OrtLoggingLevel as *mut _).expect("infallible")];
-		LogLevel::from(log_level)
+		let mut log_level = c_enum::Out::new(ort_sys::OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE);
+		ortsys![unsafe Logger_GetLoggingSeverityLevel(self.ptr(), log_level.as_mut_ptr()).expect("infallible")];
+		log_level.get().map_or(LogLevel::Verbose, LogLevel::from)
 	}
 
 	/// Logs a message to this logger with the given level and message.
